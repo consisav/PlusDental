@@ -26,6 +26,21 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .menu-login:hover{border-color:#0B6E69;color:#0B6E69}
 .menu-btn{display:none;align-items:center;gap:8px;font:inherit;font-weight:600;font-size:15px;color:#0F2A2E;background:transparent;border:1px solid #C9D4D2;border-radius:999px;padding:10px 16px;min-height:44px;cursor:pointer}
 #loginDlg{border:0;border-radius:24px;padding:0;width:min(440px,calc(100% - 32px));box-shadow:0 30px 80px rgba(15,42,46,.25);color:#0F2A2E}
+[hidden]{display:none !important}
+#loginDlg.wide{width:min(640px,calc(100% - 32px))}
+.dlg-form{display:flex;flex-direction:column;gap:16px}
+.dlg-form label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+.dlg-form input{font:inherit;font-weight:400;padding:12px 14px;border:1px solid #C9D4D2;border-radius:12px;min-height:44px;box-sizing:border-box}
+.dlg-submit{background:#0B6E69;color:#FFFFFF;border:0;padding:15px 24px;border-radius:999px;font:inherit;font-weight:700;font-size:16px;cursor:pointer;min-height:48px}
+.dlg-submit:disabled{opacity:.6;cursor:wait}
+.dlg-link{background:transparent;border:0;padding:8px 0;font:inherit;font-size:15px;font-weight:600;color:#0B6E69;cursor:pointer;text-decoration:underline;text-underline-offset:3px;align-self:flex-start}
+.dlg-msg{margin:0;font-size:14px;line-height:1.5;color:#44585B}
+.role-pill{display:inline-block;background:#E4ECEA;color:#08504C;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700}
+.roles-wrap{overflow-x:auto;border:1px solid #DCE3E1;border-radius:14px}
+.roles-wrap table{width:100%;border-collapse:collapse;font-size:14px}
+.roles-wrap th,.roles-wrap td{text-align:left;padding:10px 12px;border-bottom:1px solid #DCE3E1;vertical-align:middle}
+.roles-wrap th{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#5B6E70;font-weight:600}
+.roles-wrap select{font:inherit;padding:8px 10px;border:1px solid #C9D4D2;border-radius:10px;min-height:40px;background:#FFFFFF;color:#0F2A2E}
 #loginDlg::backdrop{background:rgba(15,42,46,.55)}
 .wa-float{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:30;display:inline-flex;align-items:center;gap:10px;background:#1FA855;color:#FFFFFF !important;text-decoration:none;font-family:'Manrope',system-ui,sans-serif;font-weight:700;font-size:15px;padding:14px 20px 14px 16px;border-radius:999px;box-shadow:0 14px 30px rgba(15,42,46,.25);transition:transform .2s ease,background .2s ease}
 .wa-float:hover{background:#178F47;transform:translateY(-2px)}
@@ -71,7 +86,7 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 <a href="#administracion" data-login="admin">Administración</a>
 <a href="#contacto">Contactarnos</a>
 <a class="btn" href="#agenda" style="background: #0B6E69; color: #FFFFFF; text-decoration: none; padding: 13px 22px; border-radius: 999px; font-weight: 600; font-size: 15px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Programar consulta</a>
-<button type="button" class="menu-login" data-login="user"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>Conectarse</button>
+<button type="button" class="menu-login" data-login="user"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg><span id="loginLabel">Conectarse</span></button>
 </nav>
 </header>
 </div>
@@ -354,22 +369,52 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 </a>
 
 <!-- LOGIN -->
-<dialog id="loginDlg" aria-labelledby="loginTitle">
-<form id="loginForm" style="font-family: 'Manrope', system-ui, sans-serif; padding: 32px; display: flex; flex-direction: column; gap: 18px">
+<dialog id="loginDlg" aria-labelledby="dlgTitle">
+<div style="font-family: 'Manrope', system-ui, sans-serif; padding: 32px; display: flex; flex-direction: column; gap: 20px">
 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px">
-<div style="display: flex; flex-direction: column; gap: 6px">
-<span id="loginEyebrow" style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Acceso</span>
-<h2 id="loginTitle" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 34px; line-height: 1.1">Conectarse</h2>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span id="dlgEyebrow" style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Acceso</span>
+<h2 id="dlgTitle" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 34px; line-height: 1.1; overflow-wrap: anywhere">Conectarse</h2>
 </div>
 <button type="button" id="loginClose" aria-label="Cerrar" style="background: transparent; border: 0; font-size: 28px; line-height: 1; color: #44585B; cursor: pointer; min-width: 44px; min-height: 44px">×</button>
 </div>
-<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">Usuario<input id="loginUser" type="text" autocomplete="username" required style="font: inherit; font-weight: 400; padding: 12px 14px; border: 1px solid #C9D4D2; border-radius: 12px; min-height: 44px; box-sizing: border-box"></label>
-<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">Clave<input id="loginPass" type="password" autocomplete="current-password" required style="font: inherit; font-weight: 400; padding: 12px 14px; border: 1px solid #C9D4D2; border-radius: 12px; min-height: 44px; box-sizing: border-box"></label>
-<button type="submit" class="btn" style="background: #0B6E69; color: #FFFFFF; border: 0; padding: 15px 24px; border-radius: 999px; font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; min-height: 48px">Ingresar</button>
-<p id="loginMsg" role="status" style="margin: 0; font-size: 14px; line-height: 1.5; color: #44585B">¿Olvidaste tu clave? Comunícate con la clínica al +502 3756-5739.</p>
+
+<form id="loginForm" class="dlg-form">
+<label>Correo electrónico<input id="loginEmail" type="email" autocomplete="username" required></label>
+<label>Clave<input id="loginPass" type="password" autocomplete="current-password" required></label>
+<button type="submit" class="dlg-submit">Ingresar</button>
+<p id="loginMsg" class="dlg-msg" role="status">¿Olvidaste tu clave? Comunícate con la clínica al +502 3756-5739.</p>
+<button type="button" class="dlg-link" data-view="signupForm">¿Aún no tienes usuario? Crear usuario</button>
 </form>
+
+<form id="signupForm" class="dlg-form" hidden>
+<label>Nombre completo<input id="signupName" type="text" autocomplete="name" required></label>
+<label>Correo electrónico<input id="signupEmail" type="email" autocomplete="email" required></label>
+<label>Clave (mínimo 8 caracteres)<input id="signupPass" type="password" autocomplete="new-password" minlength="8" required></label>
+<label>Repetir clave<input id="signupPass2" type="password" autocomplete="new-password" minlength="8" required></label>
+<button type="submit" class="dlg-submit">Crear usuario</button>
+<p id="signupMsg" class="dlg-msg" role="status">Tu cuenta se crea como Cliente.</p>
+<button type="button" class="dlg-link" data-view="loginForm">Ya tengo usuario, ingresar</button>
+</form>
+
+<div id="sessionView" class="dlg-form" hidden>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; font-size: 15px; color: #44585B">
+<span id="sesCorreo" style="overflow-wrap: anywhere"></span><span id="sesRol" class="role-pill"></span>
+</div>
+<p id="adminNote" class="dlg-msg" hidden></p>
+<div id="rolesPanel" hidden style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-size: 14px; font-weight: 700">Tipos de usuario</span>
+<div class="roles-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
+<p id="rolesMsg" class="dlg-msg" role="status"></p>
+</div>
+<button type="button" id="logoutBtn" class="dlg-link">Cerrar sesión</button>
+</div>
+</div>
 </dialog>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
 <script src="app.js"></script>
+<script src="auth.js"></script>
 </body>
 </html>
