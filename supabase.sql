@@ -1,16 +1,20 @@
 -- Plus Dental — usuarios y tipos de usuario
 -- Ejecutar una sola vez en Supabase: SQL Editor → New query → pegar todo → Run.
+-- Se ingresa con nombre de usuario y clave. Supabase exige un correo, así que la página
+-- guarda cada usuario como <usuario>@usuarios.plusdental.com (correo interno que nadie recibe).
+-- En Authentication → Sign In / Providers → Email, desactivar «Confirm email».
 
 -- Tipos de usuario
 create type public.rol_usuario as enum ('cliente', 'administrador', 'super_administrador');
 
 -- Un perfil por cada usuario creado en Supabase Auth
 create table public.perfiles (
-  id     uuid primary key references auth.users (id) on delete cascade,
-  nombre text,
-  correo text,
-  rol    public.rol_usuario not null default 'cliente',
-  creado timestamptz not null default now()
+  id      uuid primary key references auth.users (id) on delete cascade,
+  usuario text unique,
+  nombre  text,
+  correo  text,
+  rol     public.rol_usuario not null default 'cliente',
+  creado  timestamptz not null default now()
 );
 
 alter table public.perfiles enable row level security;
@@ -33,8 +37,13 @@ returns trigger
 language plpgsql security definer set search_path = public
 as $$
 begin
-  insert into public.perfiles (id, nombre, correo)
-  values (new.id, new.raw_user_meta_data ->> 'nombre', new.email);
+  insert into public.perfiles (id, usuario, nombre, correo)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'usuario', split_part(new.email, '@', 1)),
+    new.raw_user_meta_data ->> 'nombre',
+    new.email
+  );
   return new;
 end;
 $$;
@@ -58,6 +67,6 @@ create policy "super administrador cambia tipos"
 
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
--- cambiando el correo por el tuyo:
+-- cambiando «oliver» por tu nombre de usuario:
 --
--- update public.perfiles set rol = 'super_administrador' where correo = 'TU-CORREO@ejemplo.com';
+-- update public.perfiles set rol = 'super_administrador' where usuario = 'oliver';

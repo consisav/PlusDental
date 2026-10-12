@@ -380,7 +380,7 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 </div>
 
 <form id="loginForm" class="dlg-form">
-<label>Correo electrónico<input id="loginEmail" type="email" autocomplete="username" required></label>
+<label>Usuario<input id="loginUser" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
 <label>Clave<input id="loginPass" type="password" autocomplete="current-password" required></label>
 <button type="submit" class="dlg-submit">Ingresar</button>
 <p id="loginMsg" class="dlg-msg" role="status">¿Olvidaste tu clave? Comunícate con la clínica al +502 3756-5739.</p>
@@ -388,10 +388,9 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 </form>
 
 <form id="signupForm" class="dlg-form" hidden>
-<label>Nombre completo<input id="signupName" type="text" autocomplete="name" required></label>
-<label>Correo electrónico<input id="signupEmail" type="email" autocomplete="email" required></label>
+<label>Usuario<input id="signupUser" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="30" pattern="[A-Za-z0-9._\-]{3,30}" title="De 3 a 30 caracteres: letras, números, punto, guion o guion bajo, sin espacios" required></label>
 <label>Clave (mínimo 8 caracteres)<input id="signupPass" type="password" autocomplete="new-password" minlength="8" required></label>
-<label>Repetir clave<input id="signupPass2" type="password" autocomplete="new-password" minlength="8" required></label>
+<label>Confirmar clave<input id="signupPass2" type="password" autocomplete="new-password" minlength="8" required></label>
 <button type="submit" class="dlg-submit">Crear usuario</button>
 <p id="signupMsg" class="dlg-msg" role="status">Tu cuenta se crea como Cliente.</p>
 <button type="button" class="dlg-link" data-view="loginForm">Ya tengo usuario, ingresar</button>
