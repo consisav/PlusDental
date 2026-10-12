@@ -25,7 +25,7 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .menu-login{display:inline-flex;align-items:center;gap:8px;font:inherit;font-weight:600;font-size:15px;color:#0F2A2E;background:transparent;border:1px solid #C9D4D2;border-radius:999px;padding:11px 18px;min-height:44px;cursor:pointer}
 .menu-login:hover{border-color:#0B6E69;color:#0B6E69}
 .menu-btn{display:none;align-items:center;gap:8px;font:inherit;font-weight:600;font-size:15px;color:#0F2A2E;background:transparent;border:1px solid #C9D4D2;border-radius:999px;padding:10px 16px;min-height:44px;cursor:pointer}
-#loginDlg{border:0;border-radius:24px;padding:0;width:min(440px,calc(100% - 32px));box-shadow:0 30px 80px rgba(15,42,46,.25);color:#0F2A2E}
+#loginDlg,#claveDlg{border:0;border-radius:24px;padding:0;width:min(440px,calc(100% - 32px));box-shadow:0 30px 80px rgba(15,42,46,.25);color:#0F2A2E}
 [hidden]{display:none !important}
 #loginDlg.wide{width:min(640px,calc(100% - 32px))}
 .dlg-form{display:flex;flex-direction:column;gap:16px}
@@ -41,7 +41,14 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .roles-wrap th,.roles-wrap td{text-align:left;padding:10px 12px;border-bottom:1px solid #DCE3E1;vertical-align:middle}
 .roles-wrap th{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#5B6E70;font-weight:600}
 .roles-wrap select{font:inherit;padding:8px 10px;border:1px solid #C9D4D2;border-radius:10px;min-height:40px;background:#FFFFFF;color:#0F2A2E}
-#loginDlg::backdrop{background:rgba(15,42,46,.55)}
+.adm-input{font:inherit;font-size:15px;padding:10px 14px;border:1px solid #C9D4D2;border-radius:999px;min-height:44px;box-sizing:border-box;width:220px;max-width:100%;background:#FFFFFF;color:#0F2A2E}
+.adm-btn{font:inherit;font-size:14px;font-weight:600;padding:10px 16px;min-height:44px;border-radius:999px;cursor:pointer;background:#FFFFFF;color:#0F2A2E;border:1px solid #C9D4D2}
+.adm-btn:hover:not(:disabled){border-color:#0B6E69;color:#0B6E69}
+.adm-btn:disabled{opacity:.45;cursor:not-allowed}
+.adm-chip{background:#F1F5F4;border-radius:999px;padding:6px 14px;font-size:14px;color:#44585B}
+.adm-chip b{color:#0F2A2E;font-variant-numeric:tabular-nums}
+.roles-wrap td.fecha{color:#5B6E70;white-space:nowrap;font-variant-numeric:tabular-nums}
+#loginDlg::backdrop,#claveDlg::backdrop{background:rgba(15,42,46,.55)}
 .wa-float{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:30;display:inline-flex;align-items:center;gap:10px;background:#1FA855;color:#FFFFFF !important;text-decoration:none;font-family:'Manrope',system-ui,sans-serif;font-weight:700;font-size:15px;padding:14px 20px 14px 16px;border-radius:999px;box-shadow:0 14px 30px rgba(15,42,46,.25);transition:transform .2s ease,background .2s ease}
 .wa-float:hover{background:#178F47;transform:translateY(-2px)}
 @media (max-width:560px){.wa-float span{display:none}.wa-float{padding:16px}}
@@ -90,6 +97,27 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 </nav>
 </header>
 </div>
+
+<!-- ADMINISTRACIÓN: solo visible para Administrador y Super Administrador -->
+<section id="administracion" hidden style="background: #FFFFFF; border-bottom: 1px solid #DCE3E1">
+<div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 56px 48px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Administración</span>
+<h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 48px; line-height: 1.05">Usuarios</h2>
+<p id="admQuien" style="margin: 0; font-size: 16px; color: #44585B"></p>
+</div>
+<div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
+<input id="admBuscar" type="search" placeholder="Buscar usuario" aria-label="Buscar usuario" class="adm-input">
+<button type="button" id="admRecargar" class="adm-btn">Actualizar</button>
+<button type="button" id="admCerrar" class="adm-btn">Cerrar panel</button>
+</div>
+</div>
+<div id="admResumen" style="display: flex; gap: 8px; flex-wrap: wrap"></div>
+<div class="roles-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th><th>Creado</th><th>Clave</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
+<p id="rolesMsg" class="dlg-msg" role="status"></p>
+</div>
+</section>
 
 <!-- HERO -->
 <section id="inicio" class="pad" style="max-width: 1280px; margin: 0 auto; padding: 56px 48px 96px">
@@ -401,14 +429,30 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 <span id="sesCorreo" style="overflow-wrap: anywhere"></span><span id="sesRol" class="role-pill"></span>
 </div>
 <p id="adminNote" class="dlg-msg" hidden></p>
-<div id="rolesPanel" hidden style="display: flex; flex-direction: column; gap: 10px">
-<span style="font-size: 14px; font-weight: 700">Tipos de usuario</span>
-<div class="roles-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
-<p id="rolesMsg" class="dlg-msg" role="status"></p>
-</div>
+<button type="button" id="goAdminBtn" class="dlg-submit" hidden>Ver usuarios</button>
+<div style="display: flex; gap: 8px 24px; flex-wrap: wrap">
+<button type="button" id="myPassBtn" class="dlg-link">Cambiar mi clave</button>
 <button type="button" id="logoutBtn" class="dlg-link">Cerrar sesión</button>
 </div>
 </div>
+</div>
+</dialog>
+
+<!-- CAMBIAR CLAVE -->
+<dialog id="claveDlg" aria-labelledby="claveTitle">
+<form id="claveForm" class="dlg-form" style="font-family: 'Manrope', system-ui, sans-serif; padding: 32px">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Cambiar clave</span>
+<h2 id="claveTitle" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 34px; line-height: 1.1; overflow-wrap: anywhere"></h2>
+</div>
+<button type="button" id="claveClose" aria-label="Cerrar" style="background: transparent; border: 0; font-size: 28px; line-height: 1; color: #44585B; cursor: pointer; min-width: 44px; min-height: 44px">×</button>
+</div>
+<label>Nueva clave (mínimo 8 caracteres)<input id="claveNueva" type="password" autocomplete="new-password" minlength="8" required></label>
+<label>Confirmar clave<input id="claveNueva2" type="password" autocomplete="new-password" minlength="8" required></label>
+<button type="submit" class="dlg-submit">Guardar clave</button>
+<p id="claveMsg" class="dlg-msg" role="status"></p>
+</form>
 </dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>

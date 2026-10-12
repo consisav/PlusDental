@@ -65,6 +65,65 @@ create policy "super administrador cambia tipos"
   using (public.es_super_administrador() and id <> auth.uid())
   with check (public.es_super_administrador() and id <> auth.uid());
 
+-- ===== Panel de Administración: ver usuarios y cambiar claves =====
+
+-- ¿El usuario conectado es Administrador o Super Administrador?
+create or replace function public.es_personal()
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select exists (
+    select 1 from public.perfiles
+    where id = auth.uid() and rol in ('administrador', 'super_administrador')
+  );
+$$;
+
+-- Administrador y Super Administrador ven a todos los usuarios
+drop policy if exists "ver perfiles" on public.perfiles;
+create policy "ver perfiles"
+  on public.perfiles for select
+  using (id = auth.uid() or public.es_personal());
+
+-- Cambiar la clave de otro usuario.
+--  · Super Administrador: cualquier usuario
+--  · Administrador: solo Clientes
+-- (Para la clave propia la página usa la función normal de Supabase.)
+create extension if not exists pgcrypto with schema extensions;
+
+create or replace function public.cambiar_clave(uid uuid, nueva text)
+returns void
+language plpgsql security definer set search_path = public, extensions
+as $$
+declare
+  rol_objetivo public.rol_usuario;
+begin
+  if nueva is null or length(nueva) < 8 then
+    raise exception 'La clave debe tener al menos 8 caracteres';
+  end if;
+  if uid = auth.uid() then
+    raise exception 'Usa «Cambiar mi clave» para tu propio usuario';
+  end if;
+
+  select rol into rol_objetivo from public.perfiles where id = uid;
+  if rol_objetivo is null then
+    raise exception 'Usuario no encontrado';
+  end if;
+
+  if not (public.es_super_administrador()
+          or (public.es_personal() and rol_objetivo = 'cliente')) then
+    raise exception 'No tienes permiso para cambiar la clave de este usuario';
+  end if;
+
+  update auth.users
+     set encrypted_password = extensions.crypt(nueva, extensions.gen_salt('bf')),
+         updated_at = now()
+   where id = uid;
+end;
+$$;
+
+revoke execute on function public.cambiar_clave(uuid, text) from public, anon;
+grant execute on function public.cambiar_clave(uuid, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
