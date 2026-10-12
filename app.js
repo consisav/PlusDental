@@ -134,30 +134,6 @@
   menuBtn.addEventListener('click', function () { setMenu(!menu.classList.contains('open')); });
   menu.addEventListener('click', function (e) { if (e.target.closest('a,button')) setMenu(false); });
 
-  // Conectarse / Administración: ventana de usuario y clave.
-  // Pendiente: conectar a un servicio de autenticación real; esta página no valida claves.
-  var dlg = $('loginDlg');
-  document.querySelectorAll('[data-login]').forEach(function (el) {
-    el.addEventListener('click', function (e) {
-      e.preventDefault();
-      var admin = el.getAttribute('data-login') === 'admin';
-      $('loginEyebrow').textContent = admin ? 'Solo personal autorizado' : 'Acceso';
-      $('loginTitle').textContent = admin ? 'Administración' : 'Conectarse';
-      $('loginMsg').textContent = '¿Olvidaste tu clave? Comunícate con la clínica al +502 3756-5739.';
-      $('loginMsg').style.color = '#44585B';
-      dlg.showModal();
-      $('loginUser').focus();
-    });
-  });
-  $('loginClose').addEventListener('click', function () { dlg.close(); });
-  dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
-  $('loginForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    $('loginPass').value = '';
-    $('loginMsg').textContent = 'El acceso en línea todavía no está habilitado. Comunícate con la clínica para obtener tu usuario.';
-    $('loginMsg').style.color = '#9A3B2E';
-  });
-
   $('firstDay').textContent = wd[dayDates[0].getDay()] + ' ' + dayDates[0].getDate();
   render();
 })();
