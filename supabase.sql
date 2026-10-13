@@ -826,6 +826,51 @@ do $$ begin
   end if;
 end $$;
 
+-- ===== Pacientes: estado, foto y quién registra / modifica =====
+do $$ begin
+  create type public.estado_paciente as enum ('activo', 'inactivo', 'suspendido', 'baja');
+exception when duplicate_object then null;
+end $$;
+
+alter table public.pacientes add column if not exists estado public.estado_paciente not null default 'activo';
+alter table public.pacientes add column if not exists foto text;              -- ruta en el almacenamiento privado
+alter table public.pacientes add column if not exists registrado_por text;
+alter table public.pacientes add column if not exists actualizado_por text;
+
+-- "Paciente desde" (creado) y "registrado por" se fijan al crear; "actualizado por" en cada cambio
+create or replace function public.firmar_paciente()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    new.creado := now();
+    new.registrado_por := v_usuario;
+  else
+    new.creado := old.creado;
+    new.registrado_por := old.registrado_por;
+  end if;
+  new.actualizado_por := v_usuario;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'pacientes_firma' and tgrelid = 'public.pacientes'::regclass) then
+    create trigger pacientes_firma before insert or update on public.pacientes
+      for each row execute function public.firmar_paciente();
+  end if;
+end $$;
+
+-- La foto de cada paciente se reemplaza en el mismo archivo (fotos/<id>.jpg)
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects'
+                 and policyname = 'personal reemplaza fotos de pacientes') then
+    create policy "personal reemplaza fotos de pacientes" on storage.objects for update
+      using (bucket_id = 'expedientes' and name like 'fotos/%' and public.es_personal())
+      with check (bucket_id = 'expedientes' and name like 'fotos/%' and public.es_personal());
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

@@ -151,6 +151,16 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .rot-chart .col.cerrado .bar{background:#D9E4EC}
 .rot-chart .n{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
 .rot-chart .d{font-size:11px;color:#5A6D7A;white-space:nowrap}
+.campos{border:0;padding:0;margin:0;min-width:0}
+.campos:disabled input,.campos:disabled textarea,.campos:disabled select{background:#F5F9FC;border-color:#E3EBF1;color:#0B2B40;-webkit-text-fill-color:#0B2B40;opacity:1;cursor:default}
+.avatar{width:40px;height:40px;border-radius:50%;background:#E2EEF6;color:#00476B;display:grid;place-items:center;font-weight:700;font-size:14px;overflow:hidden;flex:0 0 auto}
+.avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar.grande{width:112px;height:112px;font-size:36px;border:3px solid #FFFFFF;box-shadow:0 0 0 1px #D9E4EC}
+.pac-foto{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.pac-nombre{display:flex;align-items:center;gap:12px}
+.pac-meta{display:flex;flex-wrap:wrap;gap:6px 24px;font-size:14px;color:#475B68;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:12px 16px}
+.pac-meta b{color:#0B2B40}
+.estado-activo{background:#DCF2EC;color:#08504C}.estado-inactivo{background:#EBF0F4;color:#475B68}.estado-suspendido{background:#FEF3C7;color:#92400E}.estado-baja{background:#FDE2E4;color:#9F1239}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -256,17 +266,26 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <!-- Lista de pacientes -->
 <div id="expLista" class="adm-pane">
 <div class="adm-pane-head"><h3 class="adm-h">Expedientes de pacientes</h3><button type="button" id="expNuevo" class="adm-btn adm-primary">Nuevo paciente</button></div>
-<input id="expBuscar" type="search" class="adm-input" placeholder="Buscar por nombre, DPI o teléfono" aria-label="Buscar paciente" style="width: 100%; max-width: 420px">
-<div class="roles-wrap"><table><thead><tr><th>Paciente</th><th>DPI</th><th>Teléfono</th><th>Edad</th><th>Actualizado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="expBody"></tbody></table></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">
+<div id="expFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar por estado">
+<button type="button" class="adm-btn" data-efiltro="activo" aria-pressed="true">Activos</button>
+<button type="button" class="adm-btn" data-efiltro="inactivo" aria-pressed="false">Inactivos</button>
+<button type="button" class="adm-btn" data-efiltro="suspendido" aria-pressed="false">Suspendidos</button>
+<button type="button" class="adm-btn" data-efiltro="baja" aria-pressed="false">Baja</button>
+<button type="button" class="adm-btn" data-efiltro="todos" aria-pressed="false">Todos</button>
+</div>
+<input id="expBuscar" type="search" class="adm-input" placeholder="Buscar por nombre, DPI o teléfono" aria-label="Buscar paciente" style="width: 100%; max-width: 360px">
+</div>
+<div class="roles-wrap"><table><thead><tr><th>Paciente</th><th>DPI</th><th>Teléfono</th><th>Edad</th><th>Estado</th><th>Paciente desde</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="expBody"></tbody></table></div>
 <p id="expMsg" class="dlg-msg" role="status"></p>
 </div>
 
 <!-- Ficha del paciente -->
 <div id="expFicha" class="adm-pane" hidden>
 <button type="button" id="expVolver" class="dlg-link">← Todos los pacientes</button>
-<div style="display: flex; flex-direction: column; gap: 6px">
-<h3 id="expNombre" class="adm-h"></h3>
-<p id="expSub" class="dlg-msg"></p>
+<div class="adm-pane-head">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="expNombre" class="adm-h"></h3><p id="expSub" class="dlg-msg"></p></div>
+<span id="expEstado" class="estado" hidden></span>
 </div>
 <div id="fichaTabs" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Partes del expediente">
 <button type="button" class="adm-btn" data-ficha="fDatos" aria-pressed="true">Datos</button>
@@ -277,6 +296,17 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </div>
 
 <form id="fDatos" class="exp-form">
+<div class="full pac-foto">
+<div id="pFotoVista" class="avatar grande" aria-hidden="true"></div>
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+<span style="font-size: 14px; font-weight: 600">Foto del paciente</span>
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><button type="button" id="pFotoBtn" class="adm-btn">Subir foto</button></div>
+<input id="pFotoArchivo" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+<p id="pFotoMsg" class="dlg-msg" role="status"></p>
+</div>
+</div>
+<div id="pMeta" class="full pac-meta" hidden></div>
+<fieldset id="pDatosCampos" class="full campos"><div class="exp-form">
 <label class="full">Nombre completo *<input id="pNombre" type="text" maxlength="150" required></label>
 <label>DPI<input id="pDpi" type="text" inputmode="numeric" maxlength="20" placeholder="0000 00000 0000"></label>
 <label>Fecha de nacimiento<input id="pNacimiento" type="date"></label>
@@ -284,14 +314,28 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <label class="full">Dirección<input id="pDireccion" type="text" maxlength="250"></label>
 <label>Contacto de emergencia<input id="pEmNombre" type="text" maxlength="150" placeholder="Nombre y parentesco"></label>
 <label>Teléfono de emergencia<input id="pEmTelefono" type="tel" maxlength="40"></label>
-<div class="full exp-actions"><button type="submit" class="dlg-submit">Guardar datos</button><p id="fDatosMsg" class="dlg-msg" role="status"></p></div>
+<label>Estado del paciente<select id="pEstado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="suspendido">Suspendido</option><option value="baja">Baja</option></select></label>
+</div></fieldset>
+<div class="full exp-actions">
+<button type="button" class="adm-btn adm-primary" data-exp-accion="editar">Modificar registro</button>
+<button type="submit" class="dlg-submit" data-exp-accion="guardar">Guardar datos</button>
+<button type="button" class="adm-btn" data-exp-accion="cancelar">Cancelar</button>
+<p id="fDatosMsg" class="dlg-msg" role="status"></p>
+</div>
 </form>
 
 <form id="fHistoria" class="exp-form" hidden>
+<fieldset id="pHistoriaCampos" class="full campos"><div class="exp-form">
 <label class="full">Alergias<textarea id="pAlergias" rows="3" maxlength="2000" placeholder="Ej.: penicilina, látex. Escribe «Ninguna» si no tiene."></textarea></label>
 <label class="full">Enfermedades y condiciones<textarea id="pEnfermedades" rows="3" maxlength="2000" placeholder="Ej.: diabetes, hipertensión, embarazo"></textarea></label>
 <label class="full">Medicamentos actuales<textarea id="pMedicamentos" rows="3" maxlength="2000" placeholder="Nombre y dosis"></textarea></label>
-<div class="full exp-actions"><button type="submit" class="dlg-submit">Guardar historia médica</button><p id="fHistoriaMsg" class="dlg-msg" role="status"></p></div>
+</div></fieldset>
+<div class="full exp-actions">
+<button type="button" class="adm-btn adm-primary" data-exp-accion="editar">Modificar registro</button>
+<button type="submit" class="dlg-submit" data-exp-accion="guardar">Guardar historia médica</button>
+<button type="button" class="adm-btn" data-exp-accion="cancelar">Cancelar</button>
+<p id="fHistoriaMsg" class="dlg-msg" role="status"></p>
+</div>
 </form>
 
 <div id="fOdonto" class="adm-pane" hidden>

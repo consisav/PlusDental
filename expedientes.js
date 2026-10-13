@@ -6,11 +6,13 @@
   var BUCKET = 'expedientes';
   var CAMPOS = {
     nombre: 'pNombre', dpi: 'pDpi', fecha_nacimiento: 'pNacimiento', telefono: 'pTelefono', direccion: 'pDireccion',
-    emergencia_nombre: 'pEmNombre', emergencia_telefono: 'pEmTelefono',
+    emergencia_nombre: 'pEmNombre', emergencia_telefono: 'pEmTelefono', estado: 'pEstado',
     alergias: 'pAlergias', enfermedades: 'pEnfermedades', medicamentos: 'pMedicamentos'
   };
 
+  var ESTADOS_PAC = { activo: 'Activo', inactivo: 'Inactivo', suspendido: 'Suspendido', baja: 'Baja' };
   var pacientes = [], actual = null, odontoCambiado = false;
+  var filtroEstado = 'activo', editando = false, fotos = {};
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -30,6 +32,9 @@
     return a;
   }
   function edad(f) { return f ? anios(f) + ' años' : '—'; }
+  function iniciales(n) { return String(n || '?').trim().split(/\s+/).slice(0, 2).map(function (x) { return x.charAt(0).toUpperCase(); }).join(''); }
+  function avatar(p, url) { return url ? '<img src="' + esc(url) + '" alt="">' : esc(iniciales(p.nombre)); }
+  function fechaHoraCorta(f) { return f ? new Date(f).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '—'; }
   function traducir(err) {
     var m = (err && err.message) || '';
     if (/pacientes_dpi_unico|duplicate key/i.test(m)) return 'Ya existe un paciente con ese DPI.';
@@ -45,25 +50,40 @@
   // ---------- Lista ----------
   async function cargar() {
     aviso('expMsg', '');
-    $('expBody').innerHTML = '<tr><td colspan="6">Cargando…</td></tr>';
-    var r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado').order('nombre');
+    $('expBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
+    var r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado,estado,foto').order('nombre');
+    // Si aún no existen las columnas nuevas, se muestra la lista sin ellas
+    if (r.error && /estado|foto/.test(r.error.message)) r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado').order('nombre');
     if (r.error) { $('expBody').innerHTML = ''; aviso('expMsg', traducir(r.error), true); return; }
     pacientes = r.data;
     pintarLista();
+    // Fotos de la lista (enlaces temporales del almacenamiento privado)
+    var rutas = pacientes.filter(function (p) { return p.foto; }).map(function (p) { return p.foto; });
+    if (rutas.length) {
+      var u = await sb.storage.from(BUCKET).createSignedUrls(rutas, 3600);
+      if (!u.error) { fotos = {}; u.data.forEach(function (x, i) { if (x.signedUrl) fotos[rutas[i]] = x.signedUrl; }); pintarLista(); }
+    }
   }
 
   function pintarLista() {
     var q = $('expBuscar').value.trim().toLowerCase();
+    document.querySelectorAll('#expFiltros [data-efiltro]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.efiltro === filtroEstado); });
     var lista = pacientes.filter(function (p) {
-      return !q || [p.nombre, p.dpi, p.telefono].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; });
+      var est = p.estado || 'activo';
+      return (filtroEstado === 'todos' || est === filtroEstado) &&
+        (!q || [p.nombre, p.dpi, p.telefono].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; }));
     });
     if (!lista.length) {
-      $('expBody').innerHTML = '<tr><td colspan="6">' + (q ? 'Ningún paciente coincide con «' + esc(q) + '».' : 'Todavía no hay expedientes. Crea el primero con «Nuevo paciente».') + '</td></tr>';
+      $('expBody').innerHTML = '<tr><td colspan="7">' + (q ? 'Ningún paciente coincide con «' + esc(q) + '».'
+        : pacientes.length ? 'No hay pacientes con estado «' + (ESTADOS_PAC[filtroEstado] || 'Todos') + '».' : 'Todavía no hay expedientes. Crea el primero con «Nuevo paciente».') + '</td></tr>';
       return;
     }
     $('expBody').innerHTML = lista.map(function (p) {
-      return '<tr><td><strong>' + esc(p.nombre) + '</strong></td><td>' + esc(p.dpi || '—') + '</td><td>' + esc(p.telefono || '—') + '</td>' +
-        '<td class="fecha">' + edad(p.fecha_nacimiento) + '</td><td class="fecha">' + fechaCorta(p.actualizado) + '</td>' +
+      var est = p.estado || 'activo';
+      return '<tr><td><div class="pac-nombre"><span class="avatar">' + avatar(p, fotos[p.foto]) + '</span><strong>' + esc(p.nombre) + '</strong></div></td>' +
+        '<td>' + esc(p.dpi || '—') + '</td><td>' + esc(p.telefono || '—') + '</td>' +
+        '<td class="fecha">' + edad(p.fecha_nacimiento) + '</td><td><span class="estado estado-' + est + '">' + ESTADOS_PAC[est] + '</span></td>' +
+        '<td class="fecha">' + fechaCorta(p.creado) + '</td>' +
         '<td><button type="button" class="adm-btn" data-abrir="' + p.id + '">Abrir</button></td></tr>';
     }).join('');
   }
@@ -89,13 +109,100 @@
 
   function rellenar(p) {
     Object.keys(CAMPOS).forEach(function (k) { $(CAMPOS[k]).value = (p && p[k]) || ''; });
+    $('pEstado').value = (p && p.estado) || 'activo';
+  }
+
+  // Modo consulta / modo edición ("Modificar registro")
+  function aplicarModo() {
+    $('pDatosCampos').disabled = !editando;
+    $('pHistoriaCampos').disabled = !editando;
+    document.querySelectorAll('[data-exp-accion]').forEach(function (b) {
+      var a = b.dataset.expAccion;
+      b.hidden = a === 'editar' ? (editando || !actual) : !editando;
+    });
+  }
+  function editar() {
+    editando = true;
+    aplicarModo();
+    ['fDatosMsg', 'fHistoriaMsg'].forEach(function (m) { aviso(m, 'Modo edición: haz los cambios y pulsa «Guardar».'); });
+    var primero = $('fDatos').hidden ? $('pAlergias') : $('pNombre');
+    primero.focus();
+  }
+  function cancelar() {
+    if (!actual) { verLista(); return; }
+    rellenar(actual);
+    editando = false;
+    aplicarModo();
+    ['fDatosMsg', 'fHistoriaMsg'].forEach(function (m) { aviso(m, 'Se descartaron los cambios.'); });
+  }
+
+  // ---------- Foto del paciente ----------
+  async function pintarFoto() {
+    var vista = $('pFotoVista');
+    $('pFotoBtn').disabled = !actual;
+    $('pFotoBtn').textContent = actual && actual.foto ? 'Cambiar foto' : 'Subir foto';
+    aviso('pFotoMsg', actual ? '' : 'Podrás agregar la foto después de guardar los datos.');
+    vista.innerHTML = esc(iniciales(actual ? actual.nombre : $('pNombre').value || '?'));
+    if (!actual || !actual.foto) return;
+    var u = await sb.storage.from(BUCKET).createSignedUrl(actual.foto, 3600);
+    if (!u.error && actual && actual.foto) vista.innerHTML = '<img src="' + esc(u.data.signedUrl) + '" alt="Foto de ' + esc(actual.nombre) + '">';
+  }
+
+  // Reduce la foto a 600 px como máximo y la convierte a JPG
+  function reducirImagen(archivo) {
+    return new Promise(function (ok, falla) {
+      var img = new Image(), url = URL.createObjectURL(archivo);
+      img.onload = function () {
+        var escala = Math.min(1, 600 / Math.max(img.width, img.height));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.width * escala); c.height = Math.round(img.height * escala);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob(function (b) { b ? ok(b) : falla(new Error('No se pudo procesar la imagen.')); }, 'image/jpeg', 0.86);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); falla(new Error('El archivo no es una imagen válida.')); };
+      img.src = url;
+    });
+  }
+
+  async function subirFoto(archivo) {
+    if (!archivo || !actual) return;
+    $('pFotoBtn').disabled = true;
+    aviso('pFotoMsg', 'Subiendo foto…');
+    try {
+      var blob = await reducirImagen(archivo);
+      var ruta = 'fotos/' + actual.id + '.jpg';
+      var up = await sb.storage.from(BUCKET).upload(ruta, blob, { contentType: 'image/jpeg', upsert: true });
+      if (up.error) throw up.error;
+      if (actual.foto !== ruta) {
+        var r = await sb.from('pacientes').update({ foto: ruta }).eq('id', actual.id).select('*').single();
+        if (r.error) throw r.error;
+        actual = r.data;
+      }
+      aviso('pFotoMsg', 'Foto guardada.');
+      await pintarFoto();
+      pintarCabecera();
+    } catch (e) {
+      aviso('pFotoMsg', e.message && /válida|procesar/.test(e.message) ? e.message : traducir(e), true);
+    } finally {
+      $('pFotoBtn').disabled = !actual;
+    }
   }
 
   function pintarCabecera() {
     $('expNombre').textContent = actual ? actual.nombre : 'Nuevo paciente';
     $('expSub').textContent = actual
-      ? [actual.dpi ? 'DPI ' + actual.dpi : '', actual.fecha_nacimiento ? edad(actual.fecha_nacimiento) : '', 'Actualizado ' + fechaCorta(actual.actualizado)].filter(Boolean).join(' · ')
+      ? [actual.dpi ? 'DPI ' + actual.dpi : '', actual.fecha_nacimiento ? edad(actual.fecha_nacimiento) : ''].filter(Boolean).join(' · ')
       : 'Llena los datos y guarda para crear el expediente. Después podrás completar las demás partes.';
+    var est = actual && (actual.estado || 'activo');
+    $('expEstado').hidden = !actual;
+    if (actual) { $('expEstado').className = 'estado estado-' + est; $('expEstado').textContent = ESTADOS_PAC[est]; }
+    $('pMeta').hidden = !actual;
+    if (actual) {
+      $('pMeta').innerHTML = '<span>Paciente desde <b>' + fechaHoraCorta(actual.creado) + '</b></span>' +
+        '<span>Registrado por <b>' + esc(actual.registrado_por || '—') + '</b></span>' +
+        '<span>Última modificación <b>' + fechaHoraCorta(actual.actualizado) + '</b>' + (actual.actualizado_por ? ' por <b>' + esc(actual.actualizado_por) + '</b>' : '') + '</span>';
+    }
     // Las demás partes necesitan un expediente ya guardado
     document.querySelectorAll('#fichaTabs [data-ficha]').forEach(function (b) { if (b.dataset.ficha !== 'fDatos') b.disabled = !actual; });
   }
@@ -108,7 +215,10 @@
     cargarOdonto();
     rellenar(actual);
     ['fDatosMsg', 'fHistoriaMsg', 'notaMsg', 'rxMsg'].forEach(function (m) { aviso(m, ''); });
+    editando = false;
+    aplicarModo();
     pintarCabecera();
+    pintarFoto();
     $('expLista').hidden = true; $('expFicha').hidden = false;
     parte('fDatos');
     $('expFicha').scrollIntoView({ block: 'start' });
@@ -119,7 +229,10 @@
     cargarOdonto();
     rellenar(null);
     ['fDatosMsg', 'fHistoriaMsg', 'notaMsg', 'rxMsg'].forEach(function (m) { aviso(m, ''); });
+    editando = true;
+    aplicarModo();
     pintarCabecera();
+    pintarFoto();
     $('expLista').hidden = true; $('expFicha').hidden = false;
     parte('fDatos');
     $('pNombre').focus();
@@ -144,7 +257,11 @@
     var eraNuevo = !actual;
     actual = r.data;
     if (eraNuevo) cargarOdonto();
+    rellenar(actual);
+    editando = false;
+    aplicarModo();
     pintarCabecera();
+    pintarFoto();
     aviso(msgId, eraNuevo ? 'Expediente creado. Ya puedes completar la historia médica, el odontograma, las notas y las radiografías.' : 'Cambios guardados.');
   }
 
@@ -334,12 +451,25 @@
     if (b && !b.disabled) parte(b.dataset.ficha);
   });
 
+  document.querySelectorAll('[data-exp-accion]').forEach(function (b) {
+    if (b.dataset.expAccion === 'editar') b.addEventListener('click', editar);
+    if (b.dataset.expAccion === 'cancelar') b.addEventListener('click', cancelar);
+  });
+  $('pFotoBtn').addEventListener('click', function () { $('pFotoArchivo').click(); });
+  $('pFotoArchivo').addEventListener('change', function () { var f = this.files[0]; this.value = ''; subirFoto(f); });
+  $('expFiltros').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-efiltro]');
+    if (b) { filtroEstado = b.dataset.efiltro; pintarLista(); }
+  });
+
   $('fDatos').addEventListener('submit', function (e) {
     e.preventDefault();
-    guardar(['nombre', 'dpi', 'fecha_nacimiento', 'telefono', 'direccion', 'emergencia_nombre', 'emergencia_telefono'], 'fDatosMsg', this.querySelector('[type=submit]'));
+    if (!editando) return;
+    guardar(['nombre', 'dpi', 'fecha_nacimiento', 'telefono', 'direccion', 'emergencia_nombre', 'emergencia_telefono', 'estado'], 'fDatosMsg', this.querySelector('[type=submit]'));
   });
   $('fHistoria').addEventListener('submit', function (e) {
     e.preventDefault();
+    if (!editando) return;
     guardar(['alergias', 'enfermedades', 'medicamentos'], 'fHistoriaMsg', this.querySelector('[type=submit]'));
   });
 
