@@ -224,6 +224,20 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-celda.cerrado{cursor:default;color:#94A6B2;background:#F5F9FC;border-color:transparent}
 .ag-urg{display:inline-block;background:#FDE2E4;color:#9F1239;border-radius:999px;padding:0 7px;font-size:11px;font-weight:700;margin-left:4px}
 .ag-fijo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#E6F1F8;border:1px solid #C4D4DF;border-radius:12px;padding:10px 14px;font-size:14px;color:#00476B}
+.ag-vista{display:inline-flex;border:1px solid #C4D4DF;border-radius:999px;padding:3px;background:#FFFFFF}
+.ag-vista button{font:inherit;font-size:14px;font-weight:600;border:0;background:transparent;color:#475B68;padding:7px 14px;border-radius:999px;cursor:pointer;min-height:36px}
+.ag-vista button[aria-pressed="true"]{background:#0B2B40;color:#FFFFFF}
+.ag-grid.semana{min-width:860px;table-layout:fixed}
+.ag-grid.semana th:first-child,.ag-grid.semana td:first-child{width:64px}
+.ag-dia-btn{font:inherit;font-size:13px;font-weight:700;background:transparent;border:0;color:#0B2B40;cursor:pointer;padding:0;text-align:left;display:flex;flex-direction:column;gap:2px}
+.ag-dia-btn small{font-weight:600;color:#5A6D7A;font-size:11px;letter-spacing:.3px}
+.ag-dia-btn.hoy{color:#005A87}
+.ag-mini{display:block;width:100%;text-align:left;font:inherit;font-size:12px;line-height:1.3;border-radius:8px;padding:5px 7px;margin-bottom:4px;cursor:pointer;border:1px solid #D9E4EC;background:#FFFFFF;color:#0B2B40;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ag-mini.cita{border-left:3px solid #005A87}
+.ag-mini.cita.pendiente{border-left-color:#B45309}
+.ag-mini.cita.urgente{background:#FFF6F6;border-left-color:#C0263A}
+.ag-mini.libre{border-style:dashed;color:#005A87;font-weight:600;background:#F5F9FC}
+.ag-mini.cerrado{cursor:default;color:#94A6B2;background:transparent;border-color:transparent}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -509,8 +523,9 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </form>
 
 <div class="adm-pane-head">
-<h3 style="margin: 0; font-size: 19px; font-weight: 700">Agenda del día</h3>
+<h3 id="agTitulo" style="margin: 0; font-size: 19px; font-weight: 700">Agenda del día</h3>
 <div class="ag-nav">
+<div class="ag-vista" role="group" aria-label="Vista de la agenda"><button type="button" data-vista="dia" aria-pressed="true">Día</button><button type="button" data-vista="semana" aria-pressed="false">Semana</button></div>
 <button type="button" id="agPrev" class="adm-btn" aria-label="Día anterior">←</button>
 <input id="agDia" type="date" class="adm-input" aria-label="Día de la agenda" style="width: auto">
 <button type="button" id="agNext" class="adm-btn" aria-label="Día siguiente">→</button>
@@ -518,7 +533,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </div>
 </div>
 <div class="roles-wrap"><table class="ag-grid"><thead id="agHead"></thead><tbody id="agBody"></tbody></table></div>
-<p class="dlg-msg">Toca un espacio <b>Libre</b> para agendar ahí, o una cita para ver su detalle.</p>
+<p id="agAyuda" class="dlg-msg">Toca un espacio <b>Libre</b> para agendar ahí, o una cita para ver su detalle.</p>
 <div id="agDetalle" class="adm-box" hidden></div>
 <p id="agMsg" class="dlg-msg" role="status"></p>
 </div>

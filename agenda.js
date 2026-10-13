@@ -25,7 +25,7 @@
   var ESPECIALIDADES = ['Odontología general', 'Ortodoncia', 'Endodoncia', 'Periodoncia', 'Odontopediatría', 'Prostodoncia', 'Rehabilitación oral', 'Cirugía', 'Implantología', 'Estética', 'Higiene', 'Trastornos temporomandibulares'];
   var SERVICIOS = ['Evaluación general', 'Limpieza', 'Urgencia / dolor', 'Estética', 'Ortodoncia', 'Implantes'];
 
-  var dentistas = [], salas = [], pacientes = [], citas = [], bloqueos = [], fijo = null, sugerencias = [], diaCitas = [];
+  var dentistas = [], salas = [], pacientes = [], citas = [], bloqueos = [], fijo = null, sugerencias = [], diaCitas = [], vista = 'dia';
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -225,10 +225,14 @@
   }
 
   // ---------- Agenda del día ----------
+  // Lunes de la semana de una fecha
+  function lunesDe(f) { var d = fecha(f).getDay(); return sumar(f, d === 0 ? -6 : 1 - d); }
+
   async function cargarCitas() {
-    var desde = hoy() < $('agDia').value ? hoy() : $('agDia').value;
+    var inicio = lunesDe($('agDia').value), fin = sumar(inicio, 6);
+    var desde = hoy() < inicio ? hoy() : inicio;
     var hasta = sumar(hoy(), DIAS_BUSQUEDA + 31);
-    if ($('agDia').value > hasta) hasta = $('agDia').value;
+    if (fin > hasta) hasta = fin;
     var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas')
       .gte('fecha', desde).lte('fecha', hasta).neq('estado', 'cancelada');
     if (r.error && /paciente_id|prioridad|notas/.test(r.error.message)) {
@@ -236,10 +240,55 @@
       aviso('agMsg', 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para agendar desde aquí.', true);
     }
     citas = r.error ? [] : r.data;
-    pintarDia();
+    pintar();
+  }
+
+  function pintar() {
+    document.querySelectorAll('.ag-vista [data-vista]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.vista === vista); });
+    $('agTitulo').textContent = vista === 'semana' ? 'Agenda de la semana' : 'Agenda del día';
+    $('agAyuda').innerHTML = vista === 'semana'
+      ? 'Toca un día o un <b>+ libre</b> para abrirlo por salas y agendar, o una cita para ver su detalle.'
+      : 'Toca un espacio <b>Libre</b> para agendar ahí, o una cita para ver su detalle.';
+    $('agPrev').setAttribute('aria-label', vista === 'semana' ? 'Semana anterior' : 'Día anterior');
+    $('agNext').setAttribute('aria-label', vista === 'semana' ? 'Semana siguiente' : 'Día siguiente');
+    if (vista === 'semana') pintarSemana(); else pintarDia();
+  }
+
+  // Vista de semana: lunes a sábado, todas las salas en cada casilla
+  function pintarSemana() {
+    var inicio = lunesDe($('agDia').value), dias = [];
+    for (var i = 0; i < 6; i++) dias.push(sumar(inicio, i));
+    var activas = salas.filter(function (s) { return s.activa; });
+    var ahora = new Date(), hAhora = ('0' + ahora.getHours()).slice(-2) + ':' + ('0' + ahora.getMinutes()).slice(-2);
+    $('agHead').innerHTML = '<tr><th>Hora</th>' + dias.map(function (f) {
+      var n = citas.filter(function (c) { return c.fecha === f; }).length;
+      return '<th><button type="button" class="ag-dia-btn' + (f === hoy() ? ' hoy' : '') + '" data-ir-dia="' + f + '">' + textoFecha(f) + '<small>' + (n ? n + (n === 1 ? ' cita' : ' citas') : 'Sin citas') + '</small></button></th>';
+    }).join('') + '</tr>';
+    $('agBody').innerHTML = TURNOS.semana.map(function (h) {
+      return '<tr><td class="hora">' + h + '</td>' + dias.map(function (f) {
+        if (turnos(f).indexOf(h) < 0) return '<td><span class="ag-mini cerrado">—</span></td>';
+        var cs = citasEn(f, h);
+        var html = cs.map(function (x) {
+          var sala = salas.filter(function (s) { return s.id === x.posicion_id; })[0];
+          return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '" title="' + esc(x.nombre + ' · ' + x.servicio + ' · ' + nombreDentista(x.dentista_id)) + '">' +
+            (sala ? '<b>' + esc(sala.codigo) + '</b> · ' : '') + esc(x.nombre) + '</button>';
+        }).join('');
+        var pasado = f < hoy() || (f === hoy() && h <= hAhora);
+        if (bloqueado(f, h)) return '<td>' + html + '<span class="ag-mini cerrado">Bloqueado</span></td>';
+        if (!pasado) {
+          var libres = activas.length
+            ? activas.filter(function (s) { return salaAbierta(s, f, h) && !salaOcupada(s.id, f, h); }).length
+            : (cs.length ? 0 : 1);
+          if (libres) html += '<button type="button" class="ag-mini libre" data-ir-dia="' + f + '">+ ' + libres + (libres === 1 ? ' libre' : ' libres') + '</button>';
+        }
+        return '<td>' + (html || '<span class="ag-mini cerrado">—</span>') + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    document.querySelector('.ag-grid').classList.add('semana');
   }
 
   function pintarDia() {
+    document.querySelector('.ag-grid').classList.remove('semana');
     var f = $('agDia').value;
     var lista = turnos(f);
     var columnas = salas.filter(function (s) { return s.activa; });
@@ -348,10 +397,21 @@
   $('agFijo').addEventListener('click', function (e) { if (e.target.closest('#agQuitarFijo')) { fijo = null; pintarFijo(); } });
 
   $('agDia').addEventListener('change', cargarCitas);
-  $('agPrev').addEventListener('click', function () { $('agDia').value = sumar($('agDia').value || hoy(), -1); cargarCitas(); });
-  $('agNext').addEventListener('click', function () { $('agDia').value = sumar($('agDia').value || hoy(), 1); cargarCitas(); });
+  $('agPrev').addEventListener('click', function () { $('agDia').value = sumar($('agDia').value || hoy(), vista === 'semana' ? -7 : -1); cargarCitas(); });
+  $('agNext').addEventListener('click', function () { $('agDia').value = sumar($('agDia').value || hoy(), vista === 'semana' ? 7 : 1); cargarCitas(); });
+  document.querySelector('.ag-vista').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-vista]');
+    if (b && b.dataset.vista !== vista) { vista = b.dataset.vista; $('agDetalle').hidden = true; cargarCitas(); }
+  });
+  // En la semana: tocar un día o un «+ libres» abre ese día por salas
+  $('agHead').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-ir-dia]');
+    if (b) { $('agDia').value = b.dataset.irDia; vista = 'dia'; pintar(); }
+  });
   $('agHoy').addEventListener('click', function () { $('agDia').value = hoy(); cargarCitas(); });
   $('agBody').addEventListener('click', function (e) {
+    var irDia = e.target.closest('[data-ir-dia]');
+    if (irDia) { $('agDia').value = irDia.dataset.irDia; vista = 'dia'; pintar(); return; }
     var libre = e.target.closest('[data-libre]');
     if (libre) {
       fijo = { fecha: $('agDia').value, hora: libre.dataset.libre, sala: libre.dataset.sala ? +libre.dataset.sala : null };
