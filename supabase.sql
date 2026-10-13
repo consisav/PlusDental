@@ -1285,6 +1285,11 @@ grant execute on function public.agendar_cita(date, text, bigint, text, text, te
 alter table public.pacientes add column if not exists correo text;
 alter table public.dentistas add column if not exists correo text;
 
+-- ===== Recordatorios automáticos por correo =====
+-- La función «recordatorios» marca aquí cuándo envió el recordatorio de cada cita (para no repetirlo).
+-- La tarea programada que la ejecuta cada día está en un archivo aparte, fuera del repositorio, porque lleva una clave privada.
+alter table public.citas add column if not exists recordatorio_enviado timestamptz;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
