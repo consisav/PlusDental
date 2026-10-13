@@ -202,6 +202,28 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .menu-btn{font-size:0;gap:0;padding:12px}
 }
 @media (prefers-reduced-motion:reduce){.marca-sello,.marca-nombre,.marca-eslogan{transition:none}}
+.ag-sugerencias{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.ag-sug{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.ag-sug.mejor{border-color:#005A87;box-shadow:0 0 0 1px #005A87}
+.ag-sug .cuando{font-size:17px;font-weight:700;color:#0B2B40}
+.ag-sug .quien{font-size:14px;color:#475B68;line-height:1.45}
+.ag-sug .barra-puntos{height:6px;border-radius:999px;background:#E2EEF6;overflow:hidden}
+.ag-sug .barra-puntos i{display:block;height:100%;background:linear-gradient(90deg,#188EC0,#005A87);border-radius:999px}
+.ag-razones{display:flex;flex-wrap:wrap;gap:6px}
+.ag-razones span{font-size:12px;font-weight:600;background:#EEF5FA;color:#00476B;border-radius:999px;padding:3px 9px}
+.ag-nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ag-grid{min-width:640px}
+.ag-grid th,.ag-grid td{vertical-align:top}
+.ag-grid td.hora{font-weight:700;white-space:nowrap;color:#0B2B40;font-variant-numeric:tabular-nums}
+.ag-celda{display:block;width:100%;text-align:left;font:inherit;font-size:13px;line-height:1.35;border-radius:10px;padding:8px 10px;cursor:pointer;border:1px solid #D9E4EC;background:#FFFFFF;color:#0B2B40;min-height:44px}
+.ag-celda.libre{border-style:dashed;color:#005A87;font-weight:600;background:#F5F9FC}
+.ag-celda.libre:hover{background:#E6F1F8}
+.ag-celda.cita{border-left:4px solid #005A87}
+.ag-celda.cita.pendiente{border-left-color:#B45309}
+.ag-celda.cita.urgente{background:#FFF6F6}
+.ag-celda.cerrado{cursor:default;color:#94A6B2;background:#F5F9FC;border-color:transparent}
+.ag-urg{display:inline-block;background:#FDE2E4;color:#9F1239;border-radius:999px;padding:0 7px;font-size:11px;font-weight:700;margin-left:4px}
+.ag-fijo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#E6F1F8;border:1px solid #C4D4DF;border-radius:12px;padding:10px 14px;font-size:14px;color:#00476B}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -281,6 +303,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios">Administración de usuarios</button>
 <button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expedientes de pacientes</button>
 <button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
+<button type="button" role="tab" id="tabAgenda" data-tab="admAgenda" aria-selected="false" aria-controls="admAgenda">Agenda de clínicas</button>
 <button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuestos</button>
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
 <button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
@@ -453,6 +476,51 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <p id="bloqMsg" class="dlg-msg" role="status"></p>
 <ul id="bloqLista" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column"></ul>
 </div>
+</div>
+
+<!-- 9. Agenda de clínicas -->
+<div id="admAgenda" role="tabpanel" aria-labelledby="tabAgenda" hidden class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Agenda de clínicas</h3><span class="pronto-pill" style="background: #E2EEF6; color: #00476B">Asistente inteligente</span></div>
+
+<form id="agForm" class="adm-box">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h3 style="margin: 0; font-size: 19px; font-weight: 700">Nueva cita</h3>
+<p class="dlg-msg">Indica el paciente y el tratamiento. El asistente busca los mejores horarios según la especialidad requerida, el médico del paciente, la disponibilidad de cada dentista y sala, y la prioridad.</p>
+</div>
+<div class="exp-form">
+<label class="full">Paciente *<select id="agPaciente"><option value="">Cargando pacientes…</option></select></label>
+<label id="agNombreWrap" hidden>Nombre del paciente nuevo *<input id="agNombre" type="text" maxlength="120"></label>
+<label id="agTelWrap" hidden>Teléfono / WhatsApp *<input id="agTelefono" type="tel" maxlength="40"></label>
+<p id="agPacInfo" class="full dlg-msg"></p>
+<label>Tratamiento *<input id="agTratamiento" type="text" list="agTratamientos" maxlength="60" placeholder="Ej.: Limpieza, Ortodoncia, Extracción de cordal" required></label>
+<datalist id="agTratamientos"></datalist>
+<label>Especialidad requerida<select id="agEspecialidad"><option value="">Detectar automáticamente</option></select></label>
+<p id="agEspDetectada" class="full dlg-msg"></p>
+<label>Médico<select id="agMedico"><option value="">El más adecuado (recomendado)</option></select></label>
+<label>Buscar desde<input id="agDesde" type="date" required></label>
+<label>Preferencia de horario<select id="agFranja"><option value="">Cualquier hora</option><option value="manana">Mañana (antes de las 12:00)</option><option value="tarde">Tarde (desde las 12:00)</option></select></label>
+<label>Prioridad<select id="agPrioridad"><option value="normal">Normal</option><option value="urgente">Urgente (lo antes posible)</option></select></label>
+<label class="full">Motivo u observaciones<textarea id="agNotas" rows="2" maxlength="500" placeholder="Ej.: dolor en pieza 36 desde hace 3 días"></textarea></label>
+<label class="full pos-activa" style="flex-direction: row"><input id="agConfirmada" type="checkbox" checked> Registrar como cita confirmada</label>
+<div id="agFijo" class="full" hidden></div>
+<div class="full exp-actions"><button type="submit" class="dlg-submit">Sugerir horarios</button><p id="agFormMsg" class="dlg-msg" role="status"></p></div>
+</div>
+<div id="agSugerencias" class="ag-sugerencias"></div>
+</form>
+
+<div class="adm-pane-head">
+<h3 style="margin: 0; font-size: 19px; font-weight: 700">Agenda del día</h3>
+<div class="ag-nav">
+<button type="button" id="agPrev" class="adm-btn" aria-label="Día anterior">←</button>
+<input id="agDia" type="date" class="adm-input" aria-label="Día de la agenda" style="width: auto">
+<button type="button" id="agNext" class="adm-btn" aria-label="Día siguiente">→</button>
+<button type="button" id="agHoy" class="adm-btn">Hoy</button>
+</div>
+</div>
+<div class="roles-wrap"><table class="ag-grid"><thead id="agHead"></thead><tbody id="agBody"></tbody></table></div>
+<p class="dlg-msg">Toca un espacio <b>Libre</b> para agendar ahí, o una cita para ver su detalle.</p>
+<div id="agDetalle" class="adm-box" hidden></div>
+<p id="agMsg" class="dlg-msg" role="status"></p>
 </div>
 
 <!-- 4. Presupuestos -->
@@ -1190,5 +1258,6 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <script src="cuentas.js"></script>
 <script src="posiciones.js"></script>
 <script src="dentistas.js"></script>
+<script src="agenda.js"></script>
 </body>
 </html>

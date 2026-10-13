@@ -155,8 +155,7 @@ create table if not exists public.citas (
   estado     public.estado_cita not null default 'pendiente'
 );
 
--- Un solo paciente por horario (las canceladas liberan el espacio)
-create unique index if not exists citas_un_paciente_por_horario on public.citas (fecha, hora) where estado <> 'cancelada';
+-- (El cupo por horario se define en «Agenda de clínicas»: uno por dentista y uno por sala.)
 
 alter table public.citas enable row level security;
 
@@ -1138,6 +1137,149 @@ grant execute on function public.solicitar_cita(date, text, text, text, text) to
 -- ===== Pacientes: médico asignado =====
 alter table public.pacientes add column if not exists dentista_id bigint references public.dentistas (id) on delete set null;
 create index if not exists pacientes_dentista on public.pacientes (dentista_id);
+
+-- ===== Agenda de clínicas: agendar desde el panel, varias salas a la vez =====
+-- Cada dentista y cada sala tiene su propio cupo por horario (antes había un solo paciente por horario).
+-- Estas versiones de disponibilidad() y solicitar_cita() reemplazan a las anteriores.
+
+alter table public.citas add column if not exists paciente_id bigint references public.pacientes (id) on delete set null;
+alter table public.citas add column if not exists prioridad text not null default 'normal';
+alter table public.citas add column if not exists notas text;
+alter table public.citas add column if not exists creada_por text;
+create index if not exists citas_paciente on public.citas (paciente_id);
+do $$ begin
+  alter table public.citas add constraint citas_prioridad check (prioridad in ('normal', 'urgente'));
+exception when duplicate_object then null;
+end $$;
+
+drop index if exists public.citas_un_paciente_por_horario;
+create unique index if not exists citas_dentista_horario on public.citas (fecha, hora, dentista_id)
+  where estado <> 'cancelada' and dentista_id is not null;
+create unique index if not exists citas_posicion_horario on public.citas (fecha, hora, posicion_id)
+  where estado <> 'cancelada' and posicion_id is not null;
+create unique index if not exists citas_sin_asignar_horario on public.citas (fecha, hora)
+  where estado <> 'cancelada' and dentista_id is null and posicion_id is null;
+
+-- ¿El dentista atiende a esa hora y tanto él como su sala están libres?
+create or replace function public.dentista_libre(d public.dentistas, f date, h time)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.dentista_atiende(d, f, h)
+     and not exists (select 1 from public.citas c
+                     where c.fecha = f and c.hora = h and c.estado <> 'cancelada' and c.dentista_id = d.id)
+     and (d.posicion_id is null or not exists (select 1 from public.citas c
+                     where c.fecha = f and c.hora = h and c.estado <> 'cancelada' and c.posicion_id = d.posicion_id));
+$$;
+
+create or replace function public.disponibilidad(desde date, hasta date)
+returns table (fecha date, hora text, libre boolean)
+language sql stable security definer set search_path = public
+as $$
+  with turnos as (
+    select dia::date as f, h
+    from generate_series(desde::timestamp, least(hasta, desde + 31)::timestamp, interval '1 day') as dia,
+         lateral public.turnos_del_dia(dia::date) as h
+  ),
+  con_horario as (
+    select exists (select 1 from public.dentistas where estado = 'activo' and horario <> '{}'::jsonb) as hay
+  )
+  select t.f,
+         to_char(t.h, 'HH24:MI'),
+         (t.f + t.h) > (now() at time zone 'America/Guatemala') + interval '1 hour'
+         and not exists (select 1 from public.bloqueos b
+                         where b.fecha = t.f and (b.hora is null or b.hora = t.h))
+         and case
+               when (select hay from con_horario)
+                 then exists (select 1 from public.dentistas d where public.dentista_libre(d, t.f, t.h))
+               else not exists (select 1 from public.citas c
+                                where c.fecha = t.f and c.hora = t.h and c.estado <> 'cancelada')
+             end
+  from turnos t
+  order by 1, 2;
+$$;
+
+create or replace function public.solicitar_cita(p_fecha date, p_hora text, p_servicio text, p_nombre text, p_telefono text)
+returns bigint
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_id bigint;
+  v_dentista bigint;
+  v_posicion bigint;
+begin
+  if coalesce(trim(p_nombre), '') = '' or coalesce(trim(p_telefono), '') = '' then
+    raise exception 'Escribe tu nombre y tu WhatsApp';
+  end if;
+  if length(p_nombre) > 120 or length(p_telefono) > 40 or length(p_servicio) > 60 then
+    raise exception 'Los datos son demasiado largos';
+  end if;
+  if not exists (select 1 from public.disponibilidad(p_fecha, p_fecha) d where d.hora = p_hora and d.libre) then
+    raise exception 'Ese horario ya no está disponible';
+  end if;
+
+  -- Dentista libre a esa hora (primero el principal de su sala) y su sala
+  select d.id, d.posicion_id into v_dentista, v_posicion
+    from public.dentistas d
+   where public.dentista_libre(d, p_fecha, p_hora::time)
+   order by (d.rol_sala = 'alterno'), d.nombre
+   limit 1;
+
+  insert into public.citas (fecha, hora, servicio, nombre, telefono, usuario_id, dentista_id, posicion_id)
+  values (p_fecha, p_hora::time, trim(p_servicio), trim(p_nombre), trim(p_telefono), auth.uid(), v_dentista, v_posicion)
+  returning id into v_id;
+  return v_id;
+exception
+  when unique_violation then
+    raise exception 'Ese horario ya no está disponible';
+end;
+$$;
+
+-- Agendar desde el panel (personal): paciente del expediente o nuevo, dentista, sala, prioridad y notas
+create or replace function public.agendar_cita(
+  p_fecha date, p_hora text, p_paciente_id bigint, p_nombre text, p_telefono text, p_servicio text,
+  p_dentista_id bigint, p_posicion_id bigint, p_prioridad text, p_notas text, p_estado text)
+returns bigint
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_id bigint;
+  v_nombre text := trim(coalesce(p_nombre, ''));
+  v_tel text := trim(coalesce(p_telefono, ''));
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if p_paciente_id is not null then
+    select coalesce(nullif(v_nombre, ''), nombre), coalesce(nullif(v_tel, ''), telefono, '')
+      into v_nombre, v_tel
+      from public.pacientes where id = p_paciente_id;
+  end if;
+  if coalesce(v_nombre, '') = '' then
+    raise exception 'Indica el paciente';
+  end if;
+  if exists (select 1 from public.bloqueos b where b.fecha = p_fecha and (b.hora is null or b.hora = p_hora::time)) then
+    raise exception 'Ese horario está bloqueado';
+  end if;
+
+  insert into public.citas (fecha, hora, servicio, nombre, telefono, paciente_id, dentista_id, posicion_id,
+                            prioridad, notas, estado, creada_por)
+  values (p_fecha, p_hora::time, coalesce(nullif(trim(p_servicio), ''), 'Evaluación general'), v_nombre, v_tel,
+          p_paciente_id, p_dentista_id, p_posicion_id,
+          case when p_prioridad = 'urgente' then 'urgente' else 'normal' end,
+          nullif(trim(p_notas), ''),
+          case when p_estado = 'pendiente' then 'pendiente'::public.estado_cita else 'confirmada'::public.estado_cita end,
+          (select usuario from public.perfiles where id = auth.uid()))
+  returning id into v_id;
+  return v_id;
+exception
+  when unique_violation then
+    raise exception 'Ese horario ya está ocupado para ese dentista o esa sala';
+end;
+$$;
+
+grant execute on function public.disponibilidad(date, date) to anon, authenticated;
+grant execute on function public.solicitar_cita(date, text, text, text, text) to anon, authenticated;
+revoke execute on function public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text) from public, anon;
+grant execute on function public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text) to authenticated;
 
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
