@@ -161,6 +161,18 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .pac-meta{display:flex;flex-wrap:wrap;gap:6px 24px;font-size:14px;color:#475B68;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:12px 16px}
 .pac-meta b{color:#0B2B40}
 .estado-activo{background:#DCF2EC;color:#08504C}.estado-inactivo{background:#EBF0F4;color:#475B68}.estado-suspendido{background:#FEF3C7;color:#92400E}.estado-baja{background:#FDE2E4;color:#9F1239}
+.exp-campo{display:flex;flex-direction:column;gap:6px;min-width:0}
+.exp-calc{min-height:44px;display:flex;align-items:center;padding:0 14px;border-radius:12px;background:#EEF5FA;border:1px dashed #C4D4DF;font-weight:700;color:#00476B}
+.esp-chips{display:flex;flex-wrap:wrap;gap:8px}
+.esp-chip{display:inline-flex;align-items:center;gap:6px;background:#E2EEF6;color:#00476B;border-radius:999px;padding:6px 6px 6px 12px;font-size:14px;font-weight:600}
+.esp-chip button{border:0;background:#FFFFFF;color:#00476B;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:15px;line-height:1}
+.campos:disabled .esp-chip button,.campos:disabled .esp-buscador{display:none}
+.esp-buscador{position:relative}
+.esp-buscador input{font:inherit;font-size:15px;padding:12px 14px;border:1px solid #C4D4DF;border-radius:12px;min-height:44px;width:100%;box-sizing:border-box;background:#FFFFFF;color:#0B2B40}
+.esp-lista{position:absolute;z-index:5;left:0;right:0;top:calc(100% + 4px);margin:0;padding:6px;list-style:none;background:#FFFFFF;border:1px solid #C4D4DF;border-radius:12px;box-shadow:0 16px 32px rgba(11,43,64,.14);max-height:280px;overflow:auto}
+.esp-lista li{padding:9px 12px;border-radius:8px;cursor:pointer;font-size:14px;display:flex;flex-direction:column;gap:2px}
+.esp-lista li small{color:#5A6D7A;font-size:12px}
+.esp-lista li[aria-selected="true"],.esp-lista li:hover{background:#EEF5FA}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -246,6 +258,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
 <button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
 <button type="button" role="tab" id="tabPosiciones" data-tab="admPosiciones" aria-selected="false" aria-controls="admPosiciones">Posiciones y clínicas</button>
+<button type="button" role="tab" id="tabDentistas" data-tab="admDentistas" aria-selected="false" aria-controls="admDentistas">Dentistas</button>
 </div>
 <div class="adm-main">
 
@@ -666,6 +679,115 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </div>
 </div>
 
+<!-- 8. Dentistas -->
+<div id="admDentistas" role="tabpanel" aria-labelledby="tabDentistas" hidden class="adm-pane">
+
+<!-- Lista de dentistas -->
+<div id="denLista" class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Dentistas</h3><button type="button" id="denNuevo" class="adm-btn adm-primary">Nuevo dentista</button></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">
+<div id="denFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar por estado">
+<button type="button" class="adm-btn" data-dfiltro="activo" aria-pressed="true">Activos</button>
+<button type="button" class="adm-btn" data-dfiltro="inactivo" aria-pressed="false">Inactivos</button>
+<button type="button" class="adm-btn" data-dfiltro="baja" aria-pressed="false">Baja</button>
+<button type="button" class="adm-btn" data-dfiltro="todos" aria-pressed="false">Todos</button>
+</div>
+<input id="denBuscar" type="search" class="adm-input" placeholder="Buscar por nombre, código o especialidad" aria-label="Buscar dentista" style="width: 100%; max-width: 360px">
+</div>
+<div class="roles-wrap"><table><thead><tr><th>Dentista</th><th>Código</th><th>Especialidad</th><th>Sala</th><th>Experiencia</th><th>Estado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="denBody"></tbody></table></div>
+<p id="denMsg" class="dlg-msg" role="status"></p>
+</div>
+
+<!-- Ficha del dentista -->
+<div id="denFicha" class="adm-pane" hidden>
+<button type="button" id="denVolver" class="dlg-link">← Todos los dentistas</button>
+<div class="adm-pane-head">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="denTitulo" class="adm-h"></h3><p id="denSub" class="dlg-msg"></p></div>
+<span id="denEstadoPill" class="estado" hidden></span>
+</div>
+
+<form id="denForm" class="adm-pane">
+<div class="pac-foto">
+<div id="deFotoVista" class="avatar grande" aria-hidden="true"></div>
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+<span style="font-size: 14px; font-weight: 600">Fotografía</span>
+<div><button type="button" id="deFotoBtn" class="adm-btn">Subir foto</button></div>
+<input id="deFotoArchivo" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+<p id="deFotoMsg" class="dlg-msg" role="status"></p>
+</div>
+</div>
+<div id="deMeta" class="pac-meta" hidden></div>
+
+<fieldset id="deCampos" class="campos adm-pane">
+<fieldset class="pos-sec"><legend>Datos personales</legend>
+<div class="exp-form">
+<label>Código *<input id="deCodigo" type="text" maxlength="20" required placeholder="DEN-001"></label>
+<label>Nombre completo *<input id="deNombre" type="text" maxlength="150" required></label>
+<label>Teléfono<input id="deTelefono" type="tel" maxlength="40"></label>
+<label>Código de colegiado activo (opcional)<input id="deColegiado" type="text" maxlength="30"></label>
+<label class="full">Dirección<input id="deDireccion" type="text" maxlength="250"></label>
+</div>
+</fieldset>
+
+<fieldset class="pos-sec"><legend>Trayectoria y especialidad</legend>
+<div class="exp-form">
+<label>Inicio como odontólogo<input id="deInicioProf" type="date"></label>
+<div class="exp-campo"><span class="pos-lbl">Años de ejercicio</span><div id="deExperiencia" class="exp-calc">—</div></div>
+<div class="full exp-campo">
+<span class="pos-lbl" id="deEspLbl">Especialidades</span>
+<div id="deEspChips" class="esp-chips"></div>
+<div class="esp-buscador">
+<input id="deEspInput" type="text" maxlength="80" autocomplete="off" placeholder="Escribe para buscar: orto, endo, niños, implantes…" aria-labelledby="deEspLbl" aria-controls="deEspLista" aria-expanded="false" role="combobox">
+<ul id="deEspLista" class="esp-lista" role="listbox" hidden></ul>
+</div>
+</div>
+</div>
+</fieldset>
+
+<fieldset class="pos-sec"><legend>En la clínica</legend>
+<div class="exp-form">
+<label>Fecha de inicio en la clínica<input id="deIngreso" type="date" required></label>
+<label>Fecha final en la clínica<input id="deSalida" type="date"></label>
+<label>Sala o clínica asignada<select id="dePosicion"><option value="">Sin asignar</option></select></label>
+<label>Asistente dental<select id="deAsistente"><option value="">Sin asistente</option></select></label>
+<label>Estado<select id="deEstado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="baja">Baja</option></select></label>
+</div>
+<p class="dlg-msg">Las salas vienen de «Posiciones y clínicas»; los asistentes, de «Posiciones y clínicas → Personal».</p>
+</fieldset>
+
+<fieldset class="pos-sec"><legend>Días y horas de atención a pacientes</legend>
+<div id="deHorario" class="pos-horario"></div>
+</fieldset>
+
+<div class="exp-form"><label class="full">Notas<textarea id="deNotas" rows="2" maxlength="1000" placeholder="Opcional"></textarea></label></div>
+</fieldset>
+
+<div class="exp-actions">
+<button type="button" class="adm-btn adm-primary" data-de-accion="editar">Modificar registro</button>
+<button type="submit" class="dlg-submit" data-de-accion="guardar">Guardar</button>
+<button type="button" class="adm-btn" data-de-accion="cancelar">Cancelar</button>
+<p id="deMsg" class="dlg-msg" role="status"></p>
+</div>
+</form>
+
+<!-- Títulos -->
+<div id="deTitulosSec" class="adm-pane" hidden>
+<h3 style="margin: 0; font-size: 19px; font-weight: 700">Títulos</h3>
+<form id="titForm" class="adm-box">
+<div class="exp-form">
+<label>Título *<input id="titNombre" type="text" maxlength="200" required placeholder="Ej.: Cirujano Dentista"></label>
+<label>Institución<input id="titInst" type="text" list="titInstituciones" maxlength="150" placeholder="Universidad"></label>
+<datalist id="titInstituciones"><option value="Universidad de San Carlos de Guatemala (USAC)"></option><option value="Universidad Francisco Marroquín (UFM)"></option><option value="Universidad Mariano Gálvez de Guatemala (UMG)"></option></datalist>
+<label>Año<input id="titAnio" type="number" min="1950" max="2100" step="1"></label>
+<label>Archivo escaneado (PDF o imagen, opcional)<input id="titArchivo" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"></label>
+<div class="full exp-actions"><button type="submit" class="dlg-submit">Agregar título</button><p id="titMsg" class="dlg-msg" role="status"></p></div>
+</div>
+</form>
+<div class="roles-wrap"><table><thead><tr><th>Título</th><th>Institución</th><th>Año</th><th>Archivo</th><th>Registrado por</th><th><span class="sr-only">Borrar</span></th></tr></thead><tbody id="titBody"></tbody></table></div>
+</div>
+</div>
+</div>
+
 </div>
 </div>
 </div>
@@ -1022,5 +1144,6 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <script src="presupuestos.js"></script>
 <script src="cuentas.js"></script>
 <script src="posiciones.js"></script>
+<script src="dentistas.js"></script>
 </body>
 </html>

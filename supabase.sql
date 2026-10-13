@@ -871,6 +871,109 @@ do $$ begin
   end if;
 end $$;
 
+-- ===== Dentistas =====
+do $$ begin
+  create type public.estado_dentista as enum ('activo', 'inactivo', 'baja');
+exception when duplicate_object then null;
+end $$;
+
+create table if not exists public.dentistas (
+  id               bigint generated always as identity primary key,
+  codigo           text not null,
+  nombre           text not null,
+  telefono         text,
+  direccion        text,
+  colegiado        text,                                   -- código de colegiado activo (opcional)
+  inicio_profesion date,                                   -- desde cuándo ejerce como odontólogo
+  especialidades   text[] not null default '{}',
+  fecha_ingreso    date not null default current_date,     -- inicio en la clínica
+  fecha_salida     date,                                   -- fin en la clínica
+  posicion_id      bigint references public.posiciones (id) on delete set null,
+  asistente_id     bigint references public.personal (id) on delete set null,
+  horario          jsonb not null default '{}'::jsonb,     -- { "1": { "abre": "08:00", "cierra": "17:00" }, ... } 1 = lunes
+  foto             text,
+  estado           public.estado_dentista not null default 'activo',
+  notas            text,
+  registrado_por   text,
+  creado           timestamptz not null default now(),
+  actualizado_por  text,
+  actualizado      timestamptz not null default now(),
+  constraint dentistas_fechas check (fecha_salida is null or fecha_salida >= fecha_ingreso)
+);
+create unique index if not exists dentistas_codigo_unico on public.dentistas (lower(codigo));
+alter table public.dentistas enable row level security;
+drop policy if exists "personal ve dentistas" on public.dentistas;
+create policy "personal ve dentistas" on public.dentistas for select using (public.es_personal());
+drop policy if exists "personal crea dentistas" on public.dentistas;
+create policy "personal crea dentistas" on public.dentistas for insert with check (public.es_personal());
+drop policy if exists "personal edita dentistas" on public.dentistas;
+create policy "personal edita dentistas" on public.dentistas for update
+  using (public.es_personal()) with check (public.es_personal());
+drop policy if exists "super administrador borra dentistas" on public.dentistas;
+create policy "super administrador borra dentistas" on public.dentistas for delete using (public.es_super_administrador());
+
+-- Usuario y fecha de registro fijos; usuario y fecha de la última modificación en cada cambio
+create or replace function public.firmar_dentista()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    new.creado := now();
+    new.registrado_por := v_usuario;
+  else
+    new.creado := old.creado;
+    new.registrado_por := old.registrado_por;
+  end if;
+  new.actualizado := now();
+  new.actualizado_por := v_usuario;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'dentistas_firma' and tgrelid = 'public.dentistas'::regclass) then
+    create trigger dentistas_firma before insert or update on public.dentistas
+      for each row execute function public.firmar_dentista();
+  end if;
+end $$;
+
+-- Títulos (con archivo escaneado opcional)
+create table if not exists public.dentista_titulos (
+  id             bigint generated always as identity primary key,
+  dentista_id    bigint not null references public.dentistas (id) on delete cascade,
+  titulo         text not null,
+  institucion    text,
+  anio           int check (anio between 1950 and 2100),
+  archivo        text,
+  registrado_por text,
+  creado         timestamptz not null default now()
+);
+create index if not exists dentista_titulos_dentista on public.dentista_titulos (dentista_id);
+alter table public.dentista_titulos enable row level security;
+drop policy if exists "personal ve titulos" on public.dentista_titulos;
+create policy "personal ve titulos" on public.dentista_titulos for select using (public.es_personal());
+drop policy if exists "personal registra titulos" on public.dentista_titulos;
+create policy "personal registra titulos" on public.dentista_titulos for insert with check (public.es_personal());
+drop policy if exists "super administrador borra titulos" on public.dentista_titulos;
+create policy "super administrador borra titulos" on public.dentista_titulos for delete using (public.es_super_administrador());
+
+create or replace function public.firmar_titulo()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.registrado_por := (select usuario from public.perfiles where id = auth.uid());
+  new.creado := now();
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'dentista_titulos_firma' and tgrelid = 'public.dentista_titulos'::regclass) then
+    create trigger dentista_titulos_firma before insert on public.dentista_titulos
+      for each row execute function public.firmar_titulo();
+  end if;
+end $$;
+-- Fotos de dentistas: fotos/dentista-<id>.jpg (usa la regla de "fotos/" ya creada).
+-- Títulos escaneados: dentistas/<id>/... (usa las reglas generales del almacenamiento de expedientes).
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

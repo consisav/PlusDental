@@ -12,7 +12,7 @@
   // Horario base de la clínica para posiciones nuevas
   var HORARIO_BASE = { 1: { abre: '08:00', cierra: '18:00' }, 2: { abre: '08:00', cierra: '18:00' }, 3: { abre: '08:00', cierra: '18:00' }, 4: { abre: '08:00', cierra: '18:00' }, 5: { abre: '08:00', cierra: '18:00' }, 6: { abre: '08:00', cierra: '12:30' } };
 
-  var posiciones = [], personal = [], actual = null, canal = null, citasHoy = {};
+  var posiciones = [], personal = [], actual = null, canal = null, citasHoy = {}, dentistasPorPos = {};
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -60,6 +60,10 @@
     if (r.error) { aviso('posMsg', traducir(r.error), true); return; }
     posiciones = r.data;
     // Citas de hoy por posición (para las tarjetas)
+    // Dentistas activos asignados a cada sala (opción «Dentistas»)
+    dentistasPorPos = {};
+    var den = await sb.from('dentistas').select('nombre,posicion_id').eq('estado', 'activo').not('posicion_id', 'is', null);
+    if (!den.error) den.data.forEach(function (d) { (dentistasPorPos[d.posicion_id] = dentistasPorPos[d.posicion_id] || []).push(d.nombre); });
     citasHoy = {};
     var c = await sb.from('citas').select('posicion_id').eq('fecha', hoy()).neq('estado', 'cancelada').not('posicion_id', 'is', null);
     if (!c.error) c.data.forEach(function (x) { citasHoy[x.posicion_id] = (citasHoy[x.posicion_id] || 0) + 1; });
@@ -79,7 +83,7 @@
       return;
     }
     $('posGrid').innerHTML = posiciones.map(function (p) {
-      var resp = nombresPersonal(p.responsables);
+      var resp = (dentistasPorPos[p.id] || []).concat(nombresPersonal(p.responsables)).filter(function (n, i, a) { return a.indexOf(n) === i; });
       var opciones = Object.keys(ESTADOS).map(function (k) { return '<option value="' + k + '"' + (k === p.estado ? ' selected' : '') + '>' + ESTADOS[k] + '</option>'; }).join('');
       return '<article class="pos-card' + (p.activa ? '' : ' inactiva') + '">' +
         '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><span class="cod">' + esc(p.codigo) + (p.activa ? '' : ' · inactiva') + '</span>' +
