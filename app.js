@@ -197,7 +197,31 @@
   menuBtn.addEventListener('click', function () { setMenu(!menu.classList.contains('open')); });
   menu.addEventListener('click', function (e) { if (e.target.closest('a,button')) setMenu(false); });
 
+  // Equipo en la sección «Nosotros»: dentistas activos marcados para la página pública
+  async function cargarEquipo() {
+    if (!sb) return;
+    var r = await sb.rpc('equipo_publico');
+    if (r.error || !r.data || !r.data.length) return;
+    var hoy = new Date();
+    $('equipo').innerHTML = r.data.map(function (d) {
+      var foto = d.foto_publica ? sb.storage.from('publico').getPublicUrl(d.foto_publica).data.publicUrl + '?v=' + encodeURIComponent(d.actualizado || '') : '';
+      var anios = null;
+      if (d.inicio_profesion) {
+        var p = d.inicio_profesion.split('-'), ini = new Date(+p[0], p[1] - 1, +p[2]);
+        anios = hoy.getFullYear() - ini.getFullYear() - ((hoy.getMonth() < ini.getMonth() || (hoy.getMonth() === ini.getMonth() && hoy.getDate() < ini.getDate())) ? 1 : 0);
+      }
+      var iniciales = d.nombre.trim().split(/\s+/).slice(0, 2).map(function (x) { return x.charAt(0).toUpperCase(); }).join('');
+      return '<article class="eq-card"><div class="eq-foto">' + (foto ? '<img src="' + esc(foto) + '" alt="' + esc(d.nombre) + '" loading="lazy">' : esc(iniciales)) + '</div>' +
+        '<div class="eq-info"><h4>' + esc(d.nombre) + '</h4>' +
+        ((d.especialidades || []).length ? '<span class="eq-esp">' + esc(d.especialidades.join(' · ')) + '</span>' : '') +
+        '<span class="eq-meta">' + [d.colegiado ? 'Colegiado N.º ' + esc(d.colegiado) : '', anios > 0 ? anios + (anios === 1 ? ' año' : ' años') + ' de experiencia' : ''].filter(Boolean).join(' · ') + '</span>' +
+        '</div></article>';
+    }).join('');
+    $('equipoWrap').hidden = false;
+  }
+
   pintarProximo();
   render();
   cargarDisponibilidad();
+  cargarEquipo();
 })();

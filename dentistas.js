@@ -197,6 +197,7 @@
     $('deIngreso').value = d ? d.fecha_ingreso : hoy();
     $('deSalida').value = (d && d.fecha_salida) || '';
     $('deEstado').value = (d && d.estado) || 'activo';
+    $('deWeb').checked = d ? d.mostrar_en_web !== false : true;
     $('deNotas').value = (d && d.notas) || '';
     especialidades = d ? (d.especialidades || []).slice() : [];
     pintarChips();
@@ -246,6 +247,7 @@
     ver('denFicha');
     $('denFicha').scrollIntoView({ block: 'start' });
     cargarTitulos();
+    sincronizarFotoPublica();
   }
 
   function nuevo() {
@@ -280,6 +282,7 @@
       asistente_id: $('deAsistente').value ? +$('deAsistente').value : null,
       horario: horario,
       estado: $('deEstado').value,
+      mostrar_en_web: $('deWeb').checked,
       notas: $('deNotas').value.trim() || null
     };
     if (!datos.codigo || !datos.nombre) { aviso('deMsg', 'El código y el nombre son obligatorios.', true); return; }
@@ -303,6 +306,7 @@
     pintarFoto();
     if (eraNuevo) cargarTitulos();
     aviso('deMsg', eraNuevo ? 'Dentista registrado. Ya puedes agregar su foto y sus títulos.' : 'Cambios guardados.');
+    sincronizarFotoPublica();
   }
 
   // ---------- Especialidades (buscador inteligente) ----------
@@ -397,12 +401,40 @@
         pintarCabecera();
       }
       aviso('deFotoMsg', 'Foto guardada.');
+      await sincronizarFotoPublica(blob);
       await pintarFoto();
     } catch (e) {
       aviso('deFotoMsg', /válida|procesar/.test(e.message || '') ? e.message : traducir(e), true);
     } finally {
       $('deFotoBtn').disabled = !actual;
     }
+  }
+
+  // Copia pública de la foto para la página web (solo si está marcado "Mostrar en la página pública").
+  // blob: la foto recién subida; sin blob, copia la foto privada si aún no hay copia pública.
+  async function sincronizarFotoPublica(blob) {
+    if (!actual) return;
+    var ruta = 'dentistas/dentista-' + actual.id + '.jpg';
+    var cambios = null;
+    if (actual.mostrar_en_web !== false && actual.foto) {
+      if (!blob) {
+        if (actual.foto_publica) return;
+        var d = await sb.storage.from(BUCKET).download(actual.foto);
+        if (d.error) return;
+        blob = d.data;
+      }
+      var up = await sb.storage.from('publico').upload(ruta, blob, { contentType: 'image/jpeg', upsert: true, cacheControl: '300' });
+      if (up.error) { aviso('deFotoMsg', 'La foto no se pudo publicar en la página: ' + traducir(up.error), true); return; }
+      cambios = { foto_publica: ruta }; // también renueva la fecha de actualización para que la web muestre la foto nueva
+    } else if (actual.mostrar_en_web === false && actual.foto_publica) {
+      await sb.storage.from('publico').remove([actual.foto_publica]);
+      cambios = { foto_publica: null };
+    }
+    if (!cambios) return;
+    var r = await sb.from('dentistas').update(cambios).eq('id', actual.id).select('*').single();
+    if (r.error) return;
+    actual = r.data;
+    dentistas = dentistas.map(function (x) { return x.id === actual.id ? actual : x; });
   }
 
   // ---------- Títulos ----------

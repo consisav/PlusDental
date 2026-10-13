@@ -1009,6 +1009,48 @@ do $$ begin
   end if;
 end $$;
 
+-- ===== Equipo en la página pública =====
+-- Solo se publican: nombre, especialidades, colegiado, años de experiencia y foto de dentistas activos
+-- que tengan marcada la casilla "Mostrar en la página pública".
+
+alter table public.dentistas add column if not exists mostrar_en_web boolean not null default true;
+alter table public.dentistas add column if not exists foto_publica text;   -- ruta en el almacenamiento público
+
+create or replace function public.equipo_publico()
+returns table (nombre text, especialidades text[], colegiado text, inicio_profesion date, foto_publica text, actualizado timestamptz)
+language sql stable security definer set search_path = public as $$
+  select d.nombre, d.especialidades, d.colegiado, d.inicio_profesion, d.foto_publica, d.actualizado
+    from public.dentistas d
+   where d.estado = 'activo' and d.mostrar_en_web
+   order by (d.rol_sala = 'alterno'), d.nombre;
+$$;
+grant execute on function public.equipo_publico() to anon, authenticated;
+
+-- Almacenamiento público (solo fotos para la web, máx. 2 MB). Cualquiera puede verlas; solo el personal las cambia.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('publico', 'publico', true, 2097152, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal sube fotos publicas') then
+    create policy "personal sube fotos publicas" on storage.objects for insert
+      with check (bucket_id = 'publico' and public.es_personal());
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal reemplaza fotos publicas') then
+    create policy "personal reemplaza fotos publicas" on storage.objects for update
+      using (bucket_id = 'publico' and public.es_personal())
+      with check (bucket_id = 'publico' and public.es_personal());
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal borra fotos publicas') then
+    create policy "personal borra fotos publicas" on storage.objects for delete
+      using (bucket_id = 'publico' and public.es_personal());
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal ve fotos publicas') then
+    create policy "personal ve fotos publicas" on storage.objects for select
+      using (bucket_id = 'publico' and public.es_personal());
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
