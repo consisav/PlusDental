@@ -2,6 +2,10 @@
 (function () {
   var WHATSAPP = '50237565739';
   var DARK = '#0F2A2E', LINE = '#C9D4D2';
+  var sb = window.PD_SB || null;
+  // Horarios reales desde Supabase: { 'AAAA-MM-DD': [{ hora: '09:30', libre: true }] }.
+  // Si no se pueden cargar, la agenda ofrece los horarios fijos y envía la solicitud por WhatsApp.
+  var avail = null;
 
   var state = { concern: 'dolor', service: 'Evaluación general', day: 0, time: '09:30', faq: 0 };
 
@@ -41,12 +45,43 @@
     return on ? 'background:' + DARK + ';color:#FFFFFF;border:1px solid ' + DARK + ';'
               : 'background:#FFFFFF;color:' + DARK + ';border:1px solid ' + LINE + ';';
   }
-  function times() {
-    return dayDates[state.day].getDay() === 6 ? ['08:00', '09:30', '11:00'] : ['08:00', '09:30', '11:00', '14:00', '15:30', '17:00'];
+  function iso(x) { return x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2) + '-' + ('0' + x.getDate()).slice(-2); }
+  function slotsDe(i) {
+    if (avail) return avail[iso(dayDates[i])] || [];
+    var fijos = dayDates[i].getDay() === 6 ? ['08:00', '09:30', '11:00'] : ['08:00', '09:30', '11:00', '14:00', '15:30', '17:00'];
+    return fijos.map(function (h) { return { hora: h, libre: true }; });
   }
+  function slots() { return slotsDe(state.day); }
+  function libre(t) { return slots().some(function (s) { return s.hora === t && s.libre; }); }
+  function primerLibre() { var s = slots().filter(function (x) { return x.libre; })[0]; return s ? s.hora : ''; }
+  function fechaTexto() { var dd = dayDates[state.day]; return wd[dd.getDay()] + ' ' + dd.getDate(); }
   function summary() {
-    var dd = dayDates[state.day];
-    return state.service + ' · ' + wd[dd.getDay()] + ' ' + dd.getDate() + ' · ' + state.time;
+    return state.service + ' · ' + fechaTexto() + ' · ' + (state.time || 'elige una hora');
+  }
+  function bookMsg(texto, error) {
+    $('bookMsg').hidden = !texto;
+    $('bookMsg').textContent = texto || '';
+    $('bookMsg').style.color = error ? '#9A3B2E' : '#44585B';
+  }
+
+  // Próximo horario libre (tarjeta de la portada)
+  function pintarProximo() {
+    for (var i = 0; i < dayDates.length; i++) {
+      var s = slotsDe(i).filter(function (x) { return x.libre; })[0];
+      if (s) { $('firstDay').textContent = wd[dayDates[i].getDay()] + ' ' + dayDates[i].getDate() + ' · ' + s.hora; return; }
+    }
+    $('firstDay').textContent = 'Consúltanos por WhatsApp';
+  }
+
+  async function cargarDisponibilidad() {
+    if (!sb) return;
+    var r = await sb.rpc('disponibilidad', { desde: iso(dayDates[0]), hasta: iso(dayDates[dayDates.length - 1]) });
+    if (r.error) { console.warn('Plus Dental: no se pudo leer la disponibilidad', r.error.message); return; }
+    avail = {};
+    r.data.forEach(function (x) { (avail[x.fecha] = avail[x.fecha] || []).push({ hora: x.hora, libre: x.libre }); });
+    if (!libre(state.time)) state.time = primerLibre();
+    pintarProximo();
+    render();
   }
 
   function render() {
@@ -74,10 +109,16 @@
         '<span style="font-size:20px;font-weight:700">' + x.getDate() + '</span></button>';
     }).join('');
 
-    $('times').innerHTML = times().map(function (t) {
-      var on = state.time === t;
-      return '<button type="button" data-time="' + t + '" aria-pressed="' + on + '" style="font:inherit;font-size:15px;font-weight:600;padding:10px 0;min-height:44px;border-radius:12px;cursor:pointer;' + pill(on) + '">' + t + '</button>';
-    }).join('');
+    var lista = slots();
+    $('times').innerHTML = !lista.some(function (s) { return s.libre; })
+      ? '<p style="grid-column:1/-1;margin:0;padding:12px 0;font-size:15px;color:#5B6E70">No quedan horarios libres este día. Elige otro día o escríbenos por WhatsApp.</p>'
+      : lista.map(function (s) {
+        var on = state.time === s.hora;
+        if (!s.libre) {
+          return '<button type="button" disabled title="Ocupado" aria-label="' + s.hora + ', ocupado" style="font:inherit;font-size:15px;font-weight:600;padding:10px 0;min-height:44px;border-radius:12px;cursor:not-allowed;background:#F1F5F4;color:#9AA8AA;border:1px solid #E4ECEA;text-decoration:line-through">' + s.hora + '</button>';
+        }
+        return '<button type="button" data-time="' + s.hora + '" aria-pressed="' + on + '" style="font:inherit;font-size:15px;font-weight:600;padding:10px 0;min-height:44px;border-radius:12px;cursor:pointer;' + pill(on) + '">' + s.hora + '</button>';
+      }).join('');
 
     document.querySelectorAll('.summary').forEach(function (el) { el.textContent = summary(); });
 
@@ -98,7 +139,7 @@
     if (b.dataset.service) state.service = b.dataset.service;
     if (b.dataset.day) {
       state.day = +b.dataset.day;
-      if (times().indexOf(state.time) < 0) state.time = '09:30';
+      if (!libre(state.time)) state.time = primerLibre();
     }
     if (b.dataset.time) state.time = b.dataset.time;
     if (b.dataset.faq) { var i = +b.dataset.faq; state.faq = state.faq === i ? -1 : i; }
@@ -111,14 +152,36 @@
     render();
   });
 
-  // Confirmar: abre WhatsApp con la solicitud ya escrita
-  $('confirmBtn').addEventListener('click', function () {
-    var inputs = $('formView').querySelectorAll('input');
-    var nombre = inputs[0].value.trim(), tel = inputs[1].value.trim();
+  // Confirmar: registra la cita en Supabase; si la agenda en línea no está disponible, abre WhatsApp
+  $('confirmBtn').addEventListener('click', async function () {
+    var btn = this;
+    var nombre = $('bookName').value.trim(), tel = $('bookPhone').value.trim();
+    if (!state.time) { bookMsg('Elige una hora libre.', true); return; }
+    var resumen = summary();
     var msg = 'Hola Plus Dental, quiero agendar una cita.\n' +
-      'Servicio: ' + state.service + '\nFecha y hora: ' + summary().split(' · ').slice(1).join(' · ') +
+      'Servicio: ' + state.service + '\nFecha y hora: ' + fechaTexto() + ' · ' + state.time +
       (nombre ? '\nNombre: ' + nombre : '') + (tel ? '\nTeléfono: ' + tel : '');
-    window.open('https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(msg), '_blank');
+    $('waDone').href = 'https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(msg);
+
+    if (avail) {
+      if (!nombre || !tel) { bookMsg('Escribe tu nombre y tu WhatsApp para registrar la cita.', true); return; }
+      btn.disabled = true;
+      bookMsg('Registrando tu cita…');
+      var r = await sb.rpc('solicitar_cita', { p_fecha: iso(dayDates[state.day]), p_hora: state.time, p_servicio: state.service, p_nombre: nombre, p_telefono: tel });
+      btn.disabled = false;
+      if (r.error) {
+        bookMsg(/disponible/i.test(r.error.message) ? 'Ese horario se acaba de ocupar. Elige otro, por favor.' : 'No se pudo registrar la cita: ' + r.error.message, true);
+        cargarDisponibilidad();
+        return;
+      }
+      $('doneText').textContent = 'Registramos tu solicitud. Te escribiremos por WhatsApp para confirmarla.';
+      cargarDisponibilidad();
+    } else {
+      window.open($('waDone').href, '_blank');
+      $('doneText').textContent = 'Te escribiremos por WhatsApp para confirmar tu cita.';
+    }
+    bookMsg('');
+    $('doneSummary').textContent = resumen;
     $('formView').hidden = true; $('doneView').hidden = false;
   });
   $('resetBtn').addEventListener('click', function () {
@@ -134,6 +197,7 @@
   menuBtn.addEventListener('click', function () { setMenu(!menu.classList.contains('open')); });
   menu.addEventListener('click', function (e) { if (e.target.closest('a,button')) setMenu(false); });
 
-  $('firstDay').textContent = wd[dayDates[0].getDay()] + ' ' + dayDates[0].getDate();
+  pintarProximo();
   render();
+  cargarDisponibilidad();
 })();

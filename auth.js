@@ -8,12 +8,14 @@
   function correoInterno(usuario) { return usuario.trim().toLowerCase() + '@' + DOMINIO; }
   function nombreDe(p) { return p.usuario || (p.correo || '').split('@')[0]; }
 
-  var cfg = window.PLUS_DENTAL_CONFIG || {};
-  var configurado = !!(window.supabase && /^https:\/\//.test(cfg.supabaseUrl || '') && cfg.supabaseKey && cfg.supabaseKey.indexOf('PEGAR') < 0);
-  var sb = configurado ? window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey) : null;
+  var sb = window.PD_SB || null;
 
   var dlg = $('loginDlg'), claveDlg = $('claveDlg'), panel = $('administracion');
   var perfil = null, quiereAdmin = false, usuarios = [], claveDe = null;
+  var citas = [], bloqueos = [], filtro = 'pendiente';
+  var ESTADOS = { pendiente: 'Pendiente', confirmada: 'Confirmada', cancelada: 'Cancelada' };
+  var DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -87,9 +89,105 @@
     $('admQuien').textContent = 'Conectado como ' + nombreDe(perfil) + ' · ' + ROLES[perfil.rol] + '.' +
       (esSuper() ? ' Puedes cambiar el tipo y la clave de cualquier usuario.' : ' Puedes cambiar la clave de los Clientes.');
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    cargarUsuarios();
+    cargarPanel();
   }
-  function cerrarPanel() { panel.hidden = true; usuarios = []; $('rolesBody').innerHTML = ''; }
+  function cargarPanel() { cargarCitas(); cargarBloqueos(); cargarUsuarios(); }
+  function cerrarPanel() {
+    panel.hidden = true;
+    usuarios = []; citas = []; bloqueos = [];
+    $('rolesBody').innerHTML = ''; $('citasBody').innerHTML = ''; $('bloqLista').innerHTML = '';
+  }
+  function pestana(id) {
+    ['admCitas', 'admUsuarios'].forEach(function (p) { $(p).hidden = p !== id; });
+    document.querySelectorAll('.adm-tabs [data-tab]').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === id); });
+  }
+
+  // ---- Citas ----
+  function hoyISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function fechaLarga(f) { var p = f.split('-'), d = new Date(+p[0], p[1] - 1, +p[2]); return DIAS[d.getDay()] + ' ' + d.getDate() + ' ' + MESES[d.getMonth()]; }
+  function hhmm(h) { return String(h || '').slice(0, 5); }
+  function waPaciente(c) {
+    var num = String(c.telefono).replace(/\D/g, '');
+    if (num.length === 8) num = '502' + num; // número de Guatemala sin código de país
+    var texto = 'Hola ' + c.nombre + ', le escribimos de Plus Dental para confirmar su cita de ' + c.servicio +
+      ' el ' + fechaLarga(c.fecha) + ' a las ' + hhmm(c.hora) + '.';
+    return 'https://wa.me/' + num + '?text=' + encodeURIComponent(texto);
+  }
+
+  async function cargarCitas() {
+    aviso('citasMsg', '');
+    $('citasBody').innerHTML = '<tr><td colspan="5">Cargando…</td></tr>';
+    var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,creada')
+      .gte('fecha', hoyISO()).order('fecha').order('hora');
+    if (r.error) {
+      $('citasBody').innerHTML = '';
+      aviso('citasMsg', /citas/.test(r.error.message) && /exist|find/i.test(r.error.message)
+        ? 'Falta ejecutar en Supabase el script de la agenda.' : traducir(r.error), true);
+      return;
+    }
+    citas = r.data;
+    pintarCitas();
+  }
+
+  function pintarCitas() {
+    var pendientes = citas.filter(function (c) { return c.estado === 'pendiente'; }).length;
+    $('nPend').hidden = !pendientes;
+    $('nPend').textContent = pendientes;
+    document.querySelectorAll('#citaFiltros [data-filtro]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.filtro === filtro); });
+
+    var lista = citas.filter(function (c) { return filtro === 'todas' || c.estado === filtro; });
+    if (!lista.length) {
+      var vacio = { pendiente: 'No hay citas pendientes de confirmar.', confirmada: 'No hay citas confirmadas próximas.', cancelada: 'No hay citas canceladas próximas.', todas: 'No hay citas próximas.' };
+      $('citasBody').innerHTML = '<tr><td colspan="5">' + vacio[filtro] + '</td></tr>';
+      return;
+    }
+    $('citasBody').innerHTML = lista.map(function (c) {
+      var acciones = '';
+      if (c.estado === 'pendiente') acciones += '<button type="button" class="adm-btn adm-primary" data-cita="' + c.id + '" data-estado="confirmada">Confirmar</button>';
+      if (c.estado !== 'cancelada') acciones += '<button type="button" class="adm-btn" data-cita="' + c.id + '" data-estado="cancelada">Cancelar</button>';
+      acciones += '<a class="adm-btn" style="text-decoration:none;display:inline-flex;align-items:center" href="' + esc(waPaciente(c)) + '" target="_blank" rel="noopener">WhatsApp</a>';
+      return '<tr><td class="fecha"><strong style="color:#0F2A2E">' + fechaLarga(c.fecha) + '</strong><br>' + hhmm(c.hora) + '</td>' +
+        '<td><strong>' + esc(c.nombre) + '</strong><br><span style="color:#5B6E70">' + esc(c.telefono) + '</span></td>' +
+        '<td>' + esc(c.servicio) + '</td>' +
+        '<td><span class="estado estado-' + c.estado + '">' + ESTADOS[c.estado] + '</span></td>' +
+        '<td><div class="acciones">' + acciones + '</div></td></tr>';
+    }).join('');
+  }
+
+  async function cambiarEstado(id, estado, boton) {
+    boton.disabled = true;
+    var r = await sb.from('citas').update({ estado: estado }).eq('id', id).select('id');
+    if (r.error || !r.data || !r.data.length) {
+      boton.disabled = false;
+      aviso('citasMsg', r.error ? traducir(r.error) : 'No tienes permiso para cambiar esta cita.', true);
+      return;
+    }
+    citas.forEach(function (c) { if (String(c.id) === String(id)) c.estado = estado; });
+    aviso('citasMsg', estado === 'confirmada'
+      ? 'Cita confirmada. Avísale al paciente con el botón WhatsApp.'
+      : 'Cita cancelada. El horario quedó libre en la agenda.');
+    pintarCitas();
+  }
+
+  // ---- Bloqueos de horario ----
+  async function cargarBloqueos() {
+    var r = await sb.from('bloqueos').select('id,fecha,hora,motivo').gte('fecha', hoyISO()).order('fecha').order('hora', { nullsFirst: true });
+    if (r.error) { aviso('bloqMsg', /bloqueos/.test(r.error.message) ? 'Falta ejecutar en Supabase el script de la agenda.' : traducir(r.error), true); return; }
+    bloqueos = r.data;
+    pintarBloqueos();
+  }
+  function pintarBloqueos() {
+    $('bloqLista').innerHTML = bloqueos.length
+      ? bloqueos.map(function (b) {
+        return '<li class="bloq-item"><span><strong>' + fechaLarga(b.fecha) + '</strong> · ' + (b.hora ? hhmm(b.hora) : 'Todo el día') +
+          (b.motivo ? ' <span style="color:#5B6E70">— ' + esc(b.motivo) + '</span>' : '') + '</span>' +
+          '<button type="button" class="adm-btn" data-desbloquear="' + b.id + '">Quitar</button></li>';
+      }).join('')
+      : '<li class="bloq-item" style="color:#5B6E70">No hay horarios bloqueados.</li>';
+  }
 
   async function cargarUsuarios() {
     aviso('rolesMsg', '');
@@ -211,7 +309,44 @@
   $('goAdminBtn').addEventListener('click', function () { dlg.close(); abrirPanel(); });
   $('myPassBtn').addEventListener('click', function () { abrirClave(null); });
 
-  $('admRecargar').addEventListener('click', cargarUsuarios);
+  $('admRecargar').addEventListener('click', cargarPanel);
+  document.querySelectorAll('.adm-tabs [data-tab]').forEach(function (b) {
+    b.addEventListener('click', function () { pestana(b.dataset.tab); });
+  });
+  $('citaFiltros').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-filtro]');
+    if (b) { filtro = b.dataset.filtro; pintarCitas(); }
+  });
+  $('citasBody').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-cita]');
+    if (b) cambiarEstado(b.dataset.cita, b.dataset.estado, b);
+  });
+
+  $('bloqFecha').min = hoyISO();
+  $('bloqForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var fecha = $('bloqFecha').value, hora = $('bloqHora').value;
+    if (!fecha) return;
+    var ocupadas = citas.filter(function (c) { return c.estado !== 'cancelada' && c.fecha === fecha && (!hora || hhmm(c.hora) === hora); });
+    ocupado(this, true);
+    var r = await sb.from('bloqueos').insert({ fecha: fecha, hora: hora || null, motivo: $('bloqMotivo').value.trim() || null });
+    ocupado(this, false);
+    if (r.error) { aviso('bloqMsg', traducir(r.error), true); return; }
+    $('bloqMotivo').value = '';
+    aviso('bloqMsg', ocupadas.length
+      ? 'Horario bloqueado. Ojo: ya hay ' + ocupadas.length + ' cita(s) en ese horario; el bloqueo no las cancela.'
+      : 'Horario bloqueado.', ocupadas.length > 0);
+    cargarBloqueos();
+  });
+  $('bloqLista').addEventListener('click', async function (e) {
+    var b = e.target.closest('button[data-desbloquear]');
+    if (!b) return;
+    b.disabled = true;
+    var r = await sb.from('bloqueos').delete().eq('id', b.dataset.desbloquear);
+    if (r.error) { b.disabled = false; aviso('bloqMsg', traducir(r.error), true); return; }
+    aviso('bloqMsg', 'Bloqueo quitado. Ese horario vuelve a estar disponible.');
+    cargarBloqueos();
+  });
   $('admCerrar').addEventListener('click', function () { cerrarPanel(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   $('admBuscar').addEventListener('input', pintarUsuarios);
 

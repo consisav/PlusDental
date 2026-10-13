@@ -47,6 +47,23 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .adm-btn:disabled{opacity:.45;cursor:not-allowed}
 .adm-chip{background:#F1F5F4;border-radius:999px;padding:6px 14px;font-size:14px;color:#44585B}
 .adm-chip b{color:#0F2A2E;font-variant-numeric:tabular-nums}
+.adm-btn[aria-pressed="true"]{background:#0F2A2E;color:#FFFFFF;border-color:#0F2A2E}
+.adm-primary{background:#0B6E69;color:#FFFFFF;border-color:#0B6E69}
+.adm-primary:hover:not(:disabled){background:#08504C;color:#FFFFFF}
+.adm-tabs{display:flex;gap:4px;border-bottom:1px solid #DCE3E1;flex-wrap:wrap}
+.adm-tabs button{font:inherit;font-size:16px;font-weight:600;background:transparent;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;padding:12px 16px;min-height:44px;color:#5B6E70;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.adm-tabs button[aria-selected="true"]{color:#0F2A2E;border-bottom-color:#0B6E69}
+.adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
+.adm-box{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
+.adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+.adm-field .adm-input{border-radius:12px;width:auto}
+.estado{display:inline-block;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700;white-space:nowrap}
+.estado-pendiente{background:#FEF3C7;color:#92400E}
+.estado-confirmada{background:#DCF2EC;color:#08504C}
+.estado-cancelada{background:#ECEFEF;color:#5B6E70}
+.acciones{display:flex;gap:8px;flex-wrap:wrap}
+.acciones .adm-btn{min-height:38px;padding:7px 14px}
+.bloq-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #DCE3E1;font-size:15px}
 .roles-wrap td.fecha{color:#5B6E70;white-space:nowrap;font-variant-numeric:tabular-nums}
 #loginDlg::backdrop,#claveDlg::backdrop{background:rgba(15,42,46,.55)}
 .wa-float{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:30;display:inline-flex;align-items:center;gap:10px;background:#1FA855;color:#FFFFFF !important;text-decoration:none;font-family:'Manrope',system-ui,sans-serif;font-weight:700;font-size:15px;padding:14px 20px 14px 16px;border-radius:999px;box-shadow:0 14px 30px rgba(15,42,46,.25);transition:transform .2s ease,background .2s ease}
@@ -100,22 +117,60 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 
 <!-- ADMINISTRACIÓN: solo visible para Administrador y Super Administrador -->
 <section id="administracion" hidden style="background: #FFFFFF; border-bottom: 1px solid #DCE3E1">
-<div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 56px 48px; display: flex; flex-direction: column; gap: 24px">
+<div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 56px 48px; display: flex; flex-direction: column; gap: 28px">
 <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap">
 <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
 <span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Administración</span>
-<h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 48px; line-height: 1.05">Usuarios</h2>
+<h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 48px; line-height: 1.05">Panel de la clínica</h2>
 <p id="admQuien" style="margin: 0; font-size: 16px; color: #44585B"></p>
 </div>
 <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
-<input id="admBuscar" type="search" placeholder="Buscar usuario" aria-label="Buscar usuario" class="adm-input">
 <button type="button" id="admRecargar" class="adm-btn">Actualizar</button>
 <button type="button" id="admCerrar" class="adm-btn">Cerrar panel</button>
 </div>
 </div>
+
+<div class="adm-tabs" role="tablist" aria-label="Secciones del panel">
+<button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Citas <span id="nPend" class="adm-count" hidden></span></button>
+<button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios">Usuarios</button>
+</div>
+
+<!-- Citas -->
+<div id="admCitas" role="tabpanel" aria-labelledby="tabCitas" style="display: flex; flex-direction: column; gap: 20px">
+<div id="citaFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar citas">
+<button type="button" class="adm-btn" data-filtro="pendiente" aria-pressed="true">Pendientes</button>
+<button type="button" class="adm-btn" data-filtro="confirmada" aria-pressed="false">Confirmadas</button>
+<button type="button" class="adm-btn" data-filtro="cancelada" aria-pressed="false">Canceladas</button>
+<button type="button" class="adm-btn" data-filtro="todas" aria-pressed="false">Todas</button>
+</div>
+<div class="roles-wrap"><table><thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Servicio</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="citasBody"></tbody></table></div>
+<p id="citasMsg" class="dlg-msg" role="status"></p>
+
+<div class="adm-box">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h3 style="margin: 0; font-size: 19px; font-weight: 700">Bloquear horarios</h3>
+<p class="dlg-msg">Los horarios bloqueados no se ofrecen a los pacientes. Úsalo para feriados, vacaciones o turnos sin odontólogo.</p>
+</div>
+<form id="bloqForm" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end">
+<label class="adm-field">Fecha<input id="bloqFecha" type="date" required class="adm-input"></label>
+<label class="adm-field">Horario<select id="bloqHora" class="adm-input"><option value="">Todo el día</option><option>08:00</option><option>09:30</option><option>11:00</option><option>14:00</option><option>15:30</option><option>17:00</option></select></label>
+<label class="adm-field" style="flex: 1 1 200px">Motivo (opcional)<input id="bloqMotivo" type="text" maxlength="80" placeholder="Ej.: feriado" class="adm-input" style="width: 100%"></label>
+<button type="submit" class="adm-btn adm-primary">Bloquear</button>
+</form>
+<p id="bloqMsg" class="dlg-msg" role="status"></p>
+<ul id="bloqLista" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column"></ul>
+</div>
+</div>
+
+<!-- Usuarios -->
+<div id="admUsuarios" role="tabpanel" aria-labelledby="tabUsuarios" hidden style="display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
 <div id="admResumen" style="display: flex; gap: 8px; flex-wrap: wrap"></div>
+<input id="admBuscar" type="search" placeholder="Buscar usuario" aria-label="Buscar usuario" class="adm-input">
+</div>
 <div class="roles-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th><th>Creado</th><th>Clave</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
 <p id="rolesMsg" class="dlg-msg" role="status"></p>
+</div>
 </div>
 </section>
 
@@ -146,7 +201,7 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 </div>
 <div style="position: absolute; right: 24px; top: 28px; background: #0F2A2E; color: #FFFFFF; border-radius: 16px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px">
 <span style="font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: #B9CFCC">Próximo espacio</span>
-<span style="font-size: 18px; font-weight: 600"><span id="firstDay"></span> · 09:30</span>
+<span style="font-size: 18px; font-weight: 600"><span id="firstDay"></span></span>
 </div>
 </div>
 </div>
@@ -316,17 +371,19 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 </div>
 </div>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
-<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">Nombre<input type="text" placeholder="Tu nombre" style="font: inherit; font-weight: 400; padding: 12px 14px; border: 1px solid #C9D4D2; border-radius: 12px; min-height: 44px; box-sizing: border-box"></label>
-<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">WhatsApp<input type="tel" placeholder="+502 0000 0000" style="font: inherit; font-weight: 400; padding: 12px 14px; border: 1px solid #C9D4D2; border-radius: 12px; min-height: 44px; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">Nombre<input id="bookName" type="text" autocomplete="name" maxlength="120" placeholder="Tu nombre" style="font: inherit; font-weight: 400; padding: 12px 14px; border: 1px solid #C9D4D2; border-radius: 12px; min-height: 44px; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">WhatsApp<input id="bookPhone" type="tel" autocomplete="tel" maxlength="40" placeholder="+502 0000 0000" style="font: inherit; font-weight: 400; padding: 12px 14px; border: 1px solid #C9D4D2; border-radius: 12px; min-height: 44px; box-sizing: border-box"></label>
 </div>
 <button type="button" class="btn" id="confirmBtn" style="background: #0B6E69; color: #FFFFFF; border: 0; padding: 16px 24px; border-radius: 999px; font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; min-height: 48px">Confirmar: <span class="summary"></span></button>
+<p id="bookMsg" class="dlg-msg" role="status" hidden></p>
 </div>
 </div>
 <div id="doneView" hidden>
 <div style="display: flex; flex-direction: column; gap: 18px; align-items: flex-start; padding: 24px 0">
 <svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true"><circle cx="28" cy="28" r="27" stroke="#0B6E69" stroke-width="2"></circle><path d="M17 29l7 7 15-16" stroke="#0B6E69" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 <h3 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 38px; line-height: 1.1">¡Solicitud recibida!</h3>
-<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #44585B"><span class="summary"></span>. Te escribiremos por WhatsApp para confirmar tu cita.</p>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #44585B"><strong id="doneSummary" style="color: #0F2A2E"></strong>. <span id="doneText">Te escribiremos por WhatsApp para confirmar tu cita.</span></p>
+<a id="waDone" href="#" target="_blank" rel="noopener" style="font-weight: 600; font-size: 16px">Enviar también por WhatsApp →</a>
 <button type="button" id="resetBtn" style="background: transparent; border: 1px solid #0F2A2E; color: #0F2A2E; padding: 12px 20px; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px">Cambiar cita</button>
 </div>
 </div>
@@ -457,6 +514,7 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
+<script src="supabase-client.js"></script>
 <script src="app.js"></script>
 <script src="auth.js"></script>
 </body>
