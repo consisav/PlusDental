@@ -17,7 +17,7 @@ a{color:#005A87}a:hover{color:#00476B}
 .card:hover{border-color:#005A87 !important;box-shadow:0 12px 32px rgba(11,43,64,.08)}
 input:focus{outline:2px solid #005A87;outline-offset:1px}
 button:focus-visible,a:focus-visible{outline:2px solid #005A87;outline-offset:2px}
-html{scroll-behavior:smooth;scroll-padding-top:96px}
+html{scroll-behavior:smooth;scroll-padding-top:140px}
 .topbar{position:sticky;top:0;z-index:20;background:rgba(245,249,252,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid #D9E4EC}
 .mainmenu{display:flex;align-items:center;gap:28px;font-size:15px;font-weight:500}
 .mainmenu a:not(.btn){color:#0B2B40;text-decoration:none;padding:10px 0}
@@ -187,6 +187,21 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 @media (max-width:560px){.logo-pd{height:52px}}
 .mainmenu .btn,.menu-login{white-space:nowrap}
 @media (max-width:1240px){.mainmenu{gap:18px}}
+.marca{display:flex;align-items:center;gap:16px;text-decoration:none;color:#0B2B40;min-width:0}
+.marca-sello{width:92px;height:auto;flex:0 0 auto;display:block;transition:width .25s ease}
+.marca-texto{display:flex;flex-direction:column;gap:5px;min-width:0}
+.marca-nombre{font-family:'Instrument Serif',Georgia,serif;font-size:38px;line-height:1;letter-spacing:.14em;color:#0B2B40;white-space:nowrap;transition:font-size .25s ease}
+.marca-sub{font-family:'Manrope',system-ui,sans-serif;font-weight:700;font-size:11px;letter-spacing:.32em;color:#188EC0;display:flex;align-items:center;gap:10px;white-space:nowrap}
+.marca-sub::before{content:"";width:22px;height:2px;background:#188EC0;flex:0 0 auto}
+.marca-eslogan{font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:19px;line-height:1.25;color:#475B68;transition:font-size .25s ease}
+.topbar.compacta .marca-sello{width:70px}.topbar.compacta .marca-nombre{font-size:30px}.topbar.compacta .marca-eslogan{font-size:16px}
+@media (max-width:640px){
+.marca{gap:10px}.marca-sello{width:60px}.marca-nombre{font-size:22px;letter-spacing:.1em}
+.marca-sub{font-size:8px;letter-spacing:.2em;gap:6px}.marca-sub::before{width:12px}.marca-eslogan{font-size:12.5px}
+.topbar.compacta .marca-sello{width:50px}.topbar.compacta .marca-nombre{font-size:20px}.topbar.compacta .marca-eslogan{font-size:12px}
+.menu-btn{font-size:0;gap:0;padding:12px}
+}
+@media (prefers-reduced-motion:reduce){.marca-sello,.marca-nombre,.marca-eslogan{transition:none}}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -204,7 +219,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .wa-float:hover{background:#178F47;transform:translateY(-2px)}
 @media (max-width:560px){.wa-float span{display:none}.wa-float{padding:16px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn,.card,.wa-float{transition:none}}
-@media (max-width:1080px){
+@media (max-width:1320px){
 .menu-btn{display:inline-flex}
 .mainmenu{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:0;background:#F5F9FC;padding:8px 20px 24px;border-bottom:1px solid #D9E4EC;box-shadow:0 18px 30px rgba(11,43,64,.08)}
 .mainmenu.open{display:flex}
@@ -232,10 +247,8 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 
 <!-- NAV -->
 <div class="topbar">
-<header class="pad" style="position: relative; max-width: 1280px; margin: 0 auto; padding: 16px 48px; display: flex; align-items: center; justify-content: space-between; gap: 24px">
-<a href="#inicio" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #0B2B40">
-<svg class="logo-pd" viewBox="0 0 484 150" role="img" aria-label="Plus Dental · Odontología integral"><g transform="translate(4,5)"><circle cx="70" cy="70" r="66" fill="none" stroke="#005A87" stroke-width="2"/><circle cx="70" cy="70" r="61.5" fill="none" stroke="#005A87" stroke-width=".7"/><circle cx="70" cy="70" r="41" fill="none" stroke="#005A87" stroke-width=".7"/><path id="pdHdra" d="M21.5 70A48.5 48.5 0 0 1 118.5 70" fill="none"/><path id="pdHdrb" d="M12 70A58 58 0 0 0 128 70" fill="none"/><text font-family="Manrope, system-ui, sans-serif" font-size="10.5" font-weight="700" letter-spacing="3.2" fill="#005A87"><textPath href="#pdHdra" startOffset="50%" text-anchor="middle">PLUS DENTAL</textPath></text><text font-family="Manrope, system-ui, sans-serif" font-size="10.5" font-weight="700" letter-spacing="3.2" fill="#005A87"><textPath href="#pdHdrb" startOffset="50%" text-anchor="middle">GUATEMALA</textPath></text><circle cx="18.5" cy="70" r="2.2" fill="#005A87"/><circle cx="121.5" cy="70" r="2.2" fill="#005A87"/><g transform="translate(42,40) scale(0.56)"><path d="M30 14C20 14 12 22 12 34C12 48 18 56 21 70C23 81 25 96 33 96C41 96 40 80 45 70C47 66 49 64 52 64C55 64 57 66 59 70C64 80 63 96 71 96C79 96 81 81 83 70C86 56 92 48 92 34C92 22 84 14 74 14C65 14 61 19 52 19C43 19 39 14 30 14Z" fill="#005A87"/><rect x="47.5" y="28" width="9" height="27" rx="4.5" fill="#FFFFFF"/><rect x="38.5" y="37" width="27" height="9" rx="4.5" fill="#FFFFFF"/><rect x="49.6" y="30.5" width="4.8" height="22" rx="2.4" fill="#188EC0"/><rect x="41" y="39.1" width="22" height="4.8" rx="2.4" fill="#188EC0"/></g></g><text x="172" y="80" font-family="Instrument Serif, Georgia, serif" font-size="54" letter-spacing="6" fill="#0B2B40">PLUS DENTAL</text><line x1="174" y1="100" x2="196" y2="100" stroke="#188EC0" stroke-width="2.4"/><text x="205" y="105" font-family="Manrope, system-ui, sans-serif" font-weight="700" font-size="13" letter-spacing="4.4" fill="#188EC0">ODONTOLOGÍA INTEGRAL</text></svg>
-</a>
+<header class="pad barra" style="position: relative; max-width: 1440px; margin: 0 auto; padding: 14px 48px; display: flex; align-items: center; justify-content: space-between; gap: 24px">
+<a href="#inicio" class="marca" aria-label="Plus Dental · Precisión clínica para sonrisas naturales"><svg class="marca-sello" viewBox="0 0 148 150" aria-hidden="true"><g transform="translate(4,5)"><circle cx="70" cy="70" r="66" fill="none" stroke="#005A87" stroke-width="2"/><circle cx="70" cy="70" r="61.5" fill="none" stroke="#005A87" stroke-width=".7"/><circle cx="70" cy="70" r="41" fill="none" stroke="#005A87" stroke-width=".7"/><path id="pdHdra" d="M21.5 70A48.5 48.5 0 0 1 118.5 70" fill="none"/><path id="pdHdrb" d="M12 70A58 58 0 0 0 128 70" fill="none"/><text font-family="Manrope, system-ui, sans-serif" font-size="10.5" font-weight="700" letter-spacing="3.2" fill="#005A87"><textPath href="#pdHdra" startOffset="50%" text-anchor="middle">PLUS DENTAL</textPath></text><text font-family="Manrope, system-ui, sans-serif" font-size="10.5" font-weight="700" letter-spacing="3.2" fill="#005A87"><textPath href="#pdHdrb" startOffset="50%" text-anchor="middle">GUATEMALA</textPath></text><circle cx="18.5" cy="70" r="2.2" fill="#005A87"/><circle cx="121.5" cy="70" r="2.2" fill="#005A87"/><g transform="translate(42,40) scale(.56)"><path d="M30 14C20 14 12 22 12 34C12 48 18 56 21 70C23 81 25 96 33 96C41 96 40 80 45 70C47 66 49 64 52 64C55 64 57 66 59 70C64 80 63 96 71 96C79 96 81 81 83 70C86 56 92 48 92 34C92 22 84 14 74 14C65 14 61 19 52 19C43 19 39 14 30 14Z" fill="#005A87"/><rect x="47.5" y="28" width="9" height="27" rx="4.5" fill="#FFFFFF"/><rect x="38.5" y="37" width="27" height="9" rx="4.5" fill="#FFFFFF"/><rect x="49.6" y="30.5" width="4.8" height="22" rx="2.4" fill="#188EC0"/><rect x="41" y="39.1" width="22" height="4.8" rx="2.4" fill="#188EC0"/></g></g></svg><span class="marca-texto"><span class="marca-nombre">PLUS DENTAL</span><span class="marca-sub">ODONTOLOGÍA INTEGRAL</span><span class="marca-eslogan">Precisión clínica para sonrisas naturales.</span></span></a>
 <button type="button" class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="mainMenu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>Menú</button>
 <nav class="mainmenu" id="mainMenu" aria-label="Principal">
 <a href="#nosotros">Nosotros</a>

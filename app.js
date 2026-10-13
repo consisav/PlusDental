@@ -188,6 +188,12 @@
     $('formView').hidden = false; $('doneView').hidden = true;
   });
 
+  // La barra se compacta un poco al bajar por la página (el eslogan sigue visible)
+  var barra = document.querySelector('.topbar');
+  function compactarBarra() { barra.classList.toggle('compacta', window.scrollY > 40); }
+  window.addEventListener('scroll', compactarBarra, { passive: true });
+  compactarBarra();
+
   // Menú principal: botón para pantallas pequeñas
   var menu = $('mainMenu'), menuBtn = $('menuBtn');
   function setMenu(open) {
