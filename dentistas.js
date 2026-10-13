@@ -585,7 +585,7 @@
   $('tabDentistas').addEventListener('click', function () { if (!$('denLista').hidden) cargar(); });
 
   window.PD_DENTISTAS = async function () {
-    var r = await sb.from('dentistas').select('id,nombre,posicion_id').eq('estado', 'activo').order('nombre');
+    var r = await sb.from('dentistas').select('id,nombre,posicion_id,rol_sala').eq('estado', 'activo').order('nombre');
     return r.error ? [] : r.data;
   };
 

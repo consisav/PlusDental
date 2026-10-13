@@ -1135,6 +1135,10 @@ $$;
 grant execute on function public.disponibilidad(date, date) to anon, authenticated;
 grant execute on function public.solicitar_cita(date, text, text, text, text) to anon, authenticated;
 
+-- ===== Pacientes: médico asignado =====
+alter table public.pacientes add column if not exists dentista_id bigint references public.dentistas (id) on delete set null;
+create index if not exists pacientes_dentista on public.pacientes (dentista_id);
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

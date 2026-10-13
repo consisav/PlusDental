@@ -298,7 +298,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </div>
 <input id="expBuscar" type="search" class="adm-input" placeholder="Buscar por nombre, DPI o teléfono" aria-label="Buscar paciente" style="width: 100%; max-width: 360px">
 </div>
-<div class="roles-wrap"><table><thead><tr><th>Paciente</th><th>DPI</th><th>Teléfono</th><th>Edad</th><th>Estado</th><th>Paciente desde</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="expBody"></tbody></table></div>
+<div class="roles-wrap"><table><thead><tr><th>Paciente</th><th>DPI</th><th>Teléfono</th><th>Edad</th><th>Médico asignado</th><th>Estado</th><th>Paciente desde</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="expBody"></tbody></table></div>
 <p id="expMsg" class="dlg-msg" role="status"></p>
 </div>
 
@@ -336,6 +336,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <label class="full">Dirección<input id="pDireccion" type="text" maxlength="250"></label>
 <label>Contacto de emergencia<input id="pEmNombre" type="text" maxlength="150" placeholder="Nombre y parentesco"></label>
 <label>Teléfono de emergencia<input id="pEmTelefono" type="tel" maxlength="40"></label>
+<label>Médico asignado<select id="pDentista"><option value="">Sin asignar</option></select></label>
 <label>Estado del paciente<select id="pEstado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="suspendido">Suspendido</option><option value="baja">Baja</option></select></label>
 </div></fieldset>
 <div class="full exp-actions">

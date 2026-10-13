@@ -12,7 +12,7 @@
 
   var ESTADOS_PAC = { activo: 'Activo', inactivo: 'Inactivo', suspendido: 'Suspendido', baja: 'Baja' };
   var pacientes = [], actual = null, odontoCambiado = false;
-  var filtroEstado = 'activo', editando = false, fotos = {};
+  var filtroEstado = 'activo', editando = false, fotos = {}, medicos = [];
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -50,8 +50,9 @@
   // ---------- Lista ----------
   async function cargar() {
     aviso('expMsg', '');
-    $('expBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
-    var r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado,estado,foto').order('nombre');
+    $('expBody').innerHTML = '<tr><td colspan="8">Cargando…</td></tr>';
+    var r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado,estado,foto,dentista_id,medico:dentistas(nombre)').order('nombre');
+    if (r.error && /dentista/.test(r.error.message)) r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado,estado,foto').order('nombre');
     // Si aún no existen las columnas nuevas, se muestra la lista sin ellas
     if (r.error && /estado|foto/.test(r.error.message)) r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado').order('nombre');
     if (r.error) { $('expBody').innerHTML = ''; aviso('expMsg', traducir(r.error), true); return; }
@@ -71,10 +72,10 @@
     var lista = pacientes.filter(function (p) {
       var est = p.estado || 'activo';
       return (filtroEstado === 'todos' || est === filtroEstado) &&
-        (!q || [p.nombre, p.dpi, p.telefono].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; }));
+        (!q || [p.nombre, p.dpi, p.telefono, p.medico && p.medico.nombre].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; }));
     });
     if (!lista.length) {
-      $('expBody').innerHTML = '<tr><td colspan="7">' + (q ? 'Ningún paciente coincide con «' + esc(q) + '».'
+      $('expBody').innerHTML = '<tr><td colspan="8">' + (q ? 'Ningún paciente coincide con «' + esc(q) + '».'
         : pacientes.length ? 'No hay pacientes con estado «' + (ESTADOS_PAC[filtroEstado] || 'Todos') + '».' : 'Todavía no hay expedientes. Crea el primero con «Nuevo paciente».') + '</td></tr>';
       return;
     }
@@ -82,7 +83,9 @@
       var est = p.estado || 'activo';
       return '<tr><td><div class="pac-nombre"><span class="avatar">' + avatar(p, fotos[p.foto]) + '</span><strong>' + esc(p.nombre) + '</strong></div></td>' +
         '<td>' + esc(p.dpi || '—') + '</td><td>' + esc(p.telefono || '—') + '</td>' +
-        '<td class="fecha">' + edad(p.fecha_nacimiento) + '</td><td><span class="estado estado-' + est + '">' + ESTADOS_PAC[est] + '</span></td>' +
+        '<td class="fecha">' + edad(p.fecha_nacimiento) + '</td>' +
+        '<td>' + (p.medico ? esc(p.medico.nombre) : '<span style="color:#94A6B2">Sin asignar</span>') + '</td>' +
+        '<td><span class="estado estado-' + est + '">' + ESTADOS_PAC[est] + '</span></td>' +
         '<td class="fecha">' + fechaCorta(p.creado) + '</td>' +
         '<td><button type="button" class="adm-btn" data-abrir="' + p.id + '">Abrir</button></td></tr>';
     }).join('');
@@ -107,9 +110,27 @@
     if (id === 'fRx') cargarArchivos();
   }
 
+  // Médico principal por defecto: el primer dentista activo marcado como principal (si no hay, el primero activo)
+  function medicoPorDefecto() {
+    var p = medicos.filter(function (m) { return m.rol_sala !== 'alterno'; })[0] || medicos[0];
+    return p ? String(p.id) : '';
+  }
+  function opcionesMedicos(elegido) {
+    var lista = medicos.slice();
+    // Si el paciente tiene un médico que ya no está activo, se muestra igual
+    if (elegido && !lista.some(function (m) { return m.id === elegido; }) && actual && actual.medico) lista.push({ id: elegido, nombre: actual.medico.nombre + ' (inactivo)', rol_sala: 'alterno' });
+    $('pDentista').innerHTML = '<option value="">Sin asignar</option>' + lista.map(function (m) {
+      return '<option value="' + m.id + '">' + esc(m.nombre) + (m.rol_sala === 'alterno' ? ' · alterno' : ' · principal') + '</option>';
+    }).join('');
+    $('pDentista').value = elegido ? String(elegido) : '';
+  }
+  async function cargarMedicos() { medicos = window.PD_DENTISTAS ? await window.PD_DENTISTAS() : []; }
+
   function rellenar(p) {
     Object.keys(CAMPOS).forEach(function (k) { $(CAMPOS[k]).value = (p && p[k]) || ''; });
     $('pEstado').value = (p && p.estado) || 'activo';
+    opcionesMedicos(p ? p.dentista_id : null);
+    if (!p) $('pDentista').value = medicoPorDefecto();
   }
 
   // Modo consulta / modo edición ("Modificar registro")
@@ -123,6 +144,7 @@
   }
   function editar() {
     editando = true;
+    if (!$('pDentista').value) $('pDentista').value = medicoPorDefecto();
     aplicarModo();
     ['fDatosMsg', 'fHistoriaMsg'].forEach(function (m) { aviso(m, 'Modo edición: haz los cambios y pulsa «Guardar».'); });
     var primero = $('fDatos').hidden ? $('pAlergias') : $('pNombre');
@@ -209,7 +231,9 @@
 
   async function abrir(id) {
     aviso('expMsg', '');
-    var r = await sb.from('pacientes').select('*').eq('id', id).single();
+    await cargarMedicos();
+    var r = await sb.from('pacientes').select('*,medico:dentistas(nombre)').eq('id', id).single();
+    if (r.error && /dentista/.test(r.error.message)) r = await sb.from('pacientes').select('*').eq('id', id).single();
     if (r.error) { aviso('expMsg', traducir(r.error), true); return; }
     actual = r.data;
     cargarOdonto();
@@ -224,7 +248,8 @@
     $('expFicha').scrollIntoView({ block: 'start' });
   }
 
-  function nuevo() {
+  async function nuevo() {
+    await cargarMedicos();
     actual = null;
     cargarOdonto();
     rellenar(null);
@@ -241,6 +266,7 @@
   function valores(claves) {
     var o = {};
     claves.forEach(function (k) { var v = $(CAMPOS[k]).value.trim(); o[k] = v === '' ? null : v; });
+    if (claves.indexOf('nombre') >= 0) o.dentista_id = $('pDentista').value ? +$('pDentista').value : null;
     return o;
   }
 
@@ -250,8 +276,8 @@
     boton.disabled = true;
     aviso(msgId, 'Guardando…');
     var r = actual
-      ? await sb.from('pacientes').update(datos).eq('id', actual.id).select('*').single()
-      : await sb.from('pacientes').insert(datos).select('*').single();
+      ? await sb.from('pacientes').update(datos).eq('id', actual.id).select('*,medico:dentistas(nombre)').single()
+      : await sb.from('pacientes').insert(datos).select('*,medico:dentistas(nombre)').single();
     boton.disabled = false;
     if (r.error) { aviso(msgId, traducir(r.error), true); return; }
     var eraNuevo = !actual;
