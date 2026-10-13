@@ -974,6 +974,41 @@ end $$;
 -- Fotos de dentistas: fotos/dentista-<id>.jpg (usa la regla de "fotos/" ya creada).
 -- Títulos escaneados: dentistas/<id>/... (usa las reglas generales del almacenamiento de expedientes).
 
+-- ===== Dentistas: principal o alterno en su sala =====
+do $$ begin
+  create type public.rol_sala as enum ('principal', 'alterno');
+exception when duplicate_object then null;
+end $$;
+
+alter table public.dentistas add column if not exists rol_sala public.rol_sala not null default 'principal';
+
+-- Si una sala quedó con más de un principal, se conserva el primero registrado y los demás pasan a alternos
+update public.dentistas d
+   set rol_sala = 'alterno'
+ where d.rol_sala = 'principal'
+   and d.posicion_id is not null
+   and exists (select 1 from public.dentistas o
+               where o.posicion_id = d.posicion_id and o.rol_sala = 'principal' and o.id < d.id);
+
+-- Un solo principal por sala: al marcar uno como principal, el anterior de esa sala pasa a alterno
+create or replace function public.un_principal_por_sala()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.rol_sala = 'principal' and new.posicion_id is not null then
+    update public.dentistas
+       set rol_sala = 'alterno'
+     where posicion_id = new.posicion_id and id <> new.id and rol_sala = 'principal';
+  end if;
+  return null;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'dentistas_un_principal' and tgrelid = 'public.dentistas'::regclass) then
+    create trigger dentistas_un_principal after insert or update of rol_sala, posicion_id on public.dentistas
+      for each row execute function public.un_principal_por_sala();
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

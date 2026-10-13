@@ -62,8 +62,14 @@
     // Citas de hoy por posición (para las tarjetas)
     // Dentistas activos asignados a cada sala (opción «Dentistas»)
     dentistasPorPos = {};
-    var den = await sb.from('dentistas').select('nombre,posicion_id').eq('estado', 'activo').not('posicion_id', 'is', null);
-    if (!den.error) den.data.forEach(function (d) { (dentistasPorPos[d.posicion_id] = dentistasPorPos[d.posicion_id] || []).push(d.nombre); });
+    var den = await sb.from('dentistas').select('nombre,posicion_id,rol_sala').eq('estado', 'activo').not('posicion_id', 'is', null);
+    if (den.error && /rol_sala/.test(den.error.message)) den = await sb.from('dentistas').select('nombre,posicion_id').eq('estado', 'activo').not('posicion_id', 'is', null);
+    if (!den.error) {
+      // El principal primero
+      den.data.sort(function (a, b) { return (a.rol_sala === 'alterno') - (b.rol_sala === 'alterno'); }).forEach(function (d) {
+        (dentistasPorPos[d.posicion_id] = dentistasPorPos[d.posicion_id] || []).push(d.nombre + (d.rol_sala === 'alterno' ? ' (alterno)' : ' (principal)'));
+      });
+    }
     citasHoy = {};
     var c = await sb.from('citas').select('posicion_id').eq('fecha', hoy()).neq('estado', 'cancelada').not('posicion_id', 'is', null);
     if (!c.error) c.data.forEach(function (x) { citasHoy[x.posicion_id] = (citasHoy[x.posicion_id] || 0) + 1; });

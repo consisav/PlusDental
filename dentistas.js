@@ -78,7 +78,7 @@
   // ---------- Lista ----------
   async function cargar() {
     aviso('denMsg', '');
-    $('denBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
+    $('denBody').innerHTML = '<tr><td colspan="8">Cargando…</td></tr>';
     var r = await sb.from('dentistas').select('*').order('nombre');
     if (r.error) { $('denBody').innerHTML = ''; aviso('denMsg', traducir(r.error), true); return; }
     dentistas = r.data;
@@ -108,7 +108,7 @@
         (!q || [d.nombre, d.codigo, (d.especialidades || []).join(' ')].some(function (v) { return sinTildes(v).indexOf(q) >= 0; }));
     });
     if (!lista.length) {
-      $('denBody').innerHTML = '<tr><td colspan="7">' + (q ? 'Ningún dentista coincide.' : dentistas.length ? 'No hay dentistas con este estado.' : 'Todavía no hay dentistas registrados. Agrega el primero con «Nuevo dentista».') + '</td></tr>';
+      $('denBody').innerHTML = '<tr><td colspan="8">' + (q ? 'Ningún dentista coincide.' : dentistas.length ? 'No hay dentistas con este estado.' : 'Todavía no hay dentistas registrados. Agrega el primero con «Nuevo dentista».') + '</td></tr>';
       return;
     }
     $('denBody').innerHTML = lista.map(function (d) {
@@ -116,6 +116,7 @@
       return '<tr><td><div class="pac-nombre"><span class="avatar">' + (url ? '<img src="' + esc(url) + '" alt="">' : esc(iniciales(d.nombre))) + '</span><strong>' + esc(d.nombre) + '</strong></div></td>' +
         '<td class="fecha">' + esc(d.codigo) + '</td><td>' + esc((d.especialidades || []).join(', ') || '—') + '</td>' +
         '<td>' + esc(d.posicion_id ? nombrePosicion(d.posicion_id) : '—') + '</td>' +
+        '<td>' + (d.posicion_id ? '<span class="estado rol-' + (d.rol_sala || 'principal') + '">' + (d.rol_sala === 'alterno' ? 'Alterno' : 'Principal') + '</span>' : '—') + '</td>' +
         '<td class="fecha">' + esc(aniosMeses(d.inicio_profesion) || '—') + '</td>' +
         '<td><span class="estado estado-' + d.estado + '">' + ESTADOS[d.estado] + '</span></td>' +
         '<td><button type="button" class="adm-btn" data-abrir-den="' + d.id + '">Abrir</button></td></tr>';
@@ -132,7 +133,7 @@
   function opcionesSalas(elegida) {
     var otros = {};
     dentistas.forEach(function (d) {
-      if (d.posicion_id && d.estado === 'activo' && (!actual || d.id !== actual.id)) (otros[d.posicion_id] = otros[d.posicion_id] || []).push(d.nombre);
+      if (d.posicion_id && d.estado === 'activo' && (!actual || d.id !== actual.id)) (otros[d.posicion_id] = otros[d.posicion_id] || []).push(d.nombre + (d.rol_sala === 'alterno' ? '' : ' (principal)'));
     });
     $('dePosicion').innerHTML = '<option value="">Sin asignar</option>' + posiciones.filter(function (p) { return p.activa || p.id === elegida; }).map(function (p) {
       var extra = EST_POS[p.estado] + (otros[p.id] ? ' · también: ' + otros[p.id].join(', ') : ' · disponible');
@@ -165,6 +166,25 @@
     return h;
   }
 
+  // Principal actual de una sala (sin contar al dentista que se está editando)
+  function principalDe(posId) {
+    return dentistas.filter(function (d) {
+      return d.posicion_id === posId && d.estado === 'activo' && d.rol_sala !== 'alterno' && (!actual || d.id !== actual.id);
+    })[0] || null;
+  }
+  function rolPorDefecto(posId) { return posId && principalDe(posId) ? 'alterno' : 'principal'; }
+  function notaRol() {
+    var posId = $('dePosicion').value ? +$('dePosicion').value : null;
+    $('deRolSala').disabled = !posId;
+    if (!posId) { $('deRolNota').textContent = 'El rol de principal o alterno aplica cuando el dentista tiene una sala asignada.'; return; }
+    var p = principalDe(posId);
+    $('deRolNota').textContent = !p
+      ? 'Esta sala no tiene dentista principal: este dentista queda como principal.'
+      : $('deRolSala').value === 'principal'
+        ? 'Al guardar, este dentista será el principal de la sala y ' + p.nombre + ' pasará a alterno.'
+        : 'Principal actual de esta sala: ' + p.nombre + '.';
+  }
+
   function pintarExperiencia() { $('deExperiencia').textContent = aniosMeses($('deInicioProf').value) || '—'; }
 
   function rellenar(d) {
@@ -181,15 +201,17 @@
     especialidades = d ? (d.especialidades || []).slice() : [];
     pintarChips();
     opcionesSalas(d ? d.posicion_id : null);
+    $('deRolSala').value = d ? (d.rol_sala || 'principal') : 'principal';
     opcionesAsistentes(d ? d.asistente_id : null);
     pintarHorario(d ? (d.horario || {}) : HORARIO_BASE);
     pintarExperiencia();
+    notaRol();
   }
 
   function pintarCabecera() {
     $('denTitulo').textContent = actual ? actual.nombre : 'Nuevo dentista';
     $('denSub').textContent = actual
-      ? [actual.codigo, (actual.especialidades || []).join(', '), actual.colegiado ? 'Colegiado ' + actual.colegiado : ''].filter(Boolean).join(' · ')
+      ? [actual.codigo, actual.posicion_id ? (actual.rol_sala === 'alterno' ? 'Alterno' : 'Principal') + ' en ' + nombrePosicion(actual.posicion_id) : '', (actual.especialidades || []).join(', '), actual.colegiado ? 'Colegiado ' + actual.colegiado : ''].filter(Boolean).join(' · ')
       : 'Llena los datos y guarda. Después podrás agregar la foto y los títulos.';
     $('denEstadoPill').hidden = !actual;
     if (actual) { $('denEstadoPill').className = 'estado estado-' + actual.estado; $('denEstadoPill').textContent = ESTADOS[actual.estado]; }
@@ -254,6 +276,7 @@
       fecha_ingreso: $('deIngreso').value || hoy(),
       fecha_salida: $('deSalida').value || null,
       posicion_id: $('dePosicion').value ? +$('dePosicion').value : null,
+      rol_sala: $('deRolSala').value,
       asistente_id: $('deAsistente').value ? +$('deAsistente').value : null,
       horario: horario,
       estado: $('deEstado').value,
@@ -271,7 +294,8 @@
     if (r.error) { aviso('deMsg', traducir(r.error), true); return; }
     var eraNuevo = !actual;
     actual = r.data;
-    dentistas = eraNuevo ? dentistas.concat([r.data]) : dentistas.map(function (d) { return d.id === r.data.id ? r.data : d; });
+    var todos = await sb.from('dentistas').select('*').order('nombre');
+    dentistas = !todos.error ? todos.data : eraNuevo ? dentistas.concat([r.data]) : dentistas.map(function (d) { return d.id === r.data.id ? r.data : d; });
     editando = false;
     rellenar(actual);
     aplicarModo();
@@ -434,6 +458,11 @@
   });
   $('denForm').addEventListener('submit', function (e) { e.preventDefault(); if (editando) guardar(this); });
   $('deInicioProf').addEventListener('input', pintarExperiencia);
+  $('dePosicion').addEventListener('change', function () {
+    $('deRolSala').value = rolPorDefecto($('dePosicion').value ? +$('dePosicion').value : null);
+    notaRol();
+  });
+  $('deRolSala').addEventListener('change', notaRol);
   $('deHorario').addEventListener('change', function (e) {
     var c = e.target.closest('[data-abierto]');
     if (!c) return;
