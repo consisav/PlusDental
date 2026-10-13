@@ -1287,8 +1287,61 @@ alter table public.dentistas add column if not exists correo text;
 
 -- ===== Recordatorios automáticos por correo =====
 -- La función «recordatorios» marca aquí cuándo envió el recordatorio de cada cita (para no repetirlo).
--- La tarea programada que la ejecuta cada día está en un archivo aparte, fuera del repositorio, porque lleva una clave privada.
+-- Lo usan tanto la función «recordatorios» (Brevo) como el script de Google (Gmail) de la sección siguiente.
 alter table public.citas add column if not exists recordatorio_enviado timestamptz;
+
+-- ===== Recordatorios por correo desde Gmail (Google Apps Script) =====
+-- Un script de Google en la cuenta de la clínica consulta cada mañana las citas de mañana y envía los correos.
+-- Para poder leerlas usa una clave privada que se guarda en config_privada (nunca en este archivo).
+
+create table if not exists public.config_privada (
+  clave text primary key,
+  valor text not null
+);
+alter table public.config_privada enable row level security;
+-- Sin reglas de acceso: nadie puede leerla desde la página; solo las funciones de abajo.
+
+create or replace function public.clave_valida(p_clave text, p_valor text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select p_valor is not null and exists (select 1 from public.config_privada where clave = p_clave and valor = p_valor);
+$$;
+revoke execute on function public.clave_valida(text, text) from public, anon, authenticated;
+
+-- Citas de mañana (hora de Guatemala) con correo del paciente y sin recordatorio enviado
+create or replace function public.recordatorios_pendientes(p_secreto text)
+returns table (cita_id bigint, cita_fecha date, cita_hora text, tratamiento text, paciente text, correo text, dentista text, sala text)
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.clave_valida('recordatorios', p_secreto) then
+    raise exception 'No autorizado';
+  end if;
+  return query
+  select c.id, c.fecha, to_char(c.hora, 'HH24:MI'), c.servicio, c.nombre, p.correo, d.nombre,
+         case when s.id is null then null else s.codigo || ' · ' || s.nombre end
+    from public.citas c
+    join public.pacientes p on p.id = c.paciente_id
+    left join public.dentistas d on d.id = c.dentista_id
+    left join public.posiciones s on s.id = c.posicion_id
+   where c.fecha = ((now() at time zone 'America/Guatemala')::date + 1)
+     and c.estado in ('pendiente', 'confirmada')
+     and c.recordatorio_enviado is null
+     and coalesce(trim(p.correo), '') <> ''
+   order by c.hora;
+end;
+$$;
+
+create or replace function public.marcar_recordatorio(p_secreto text, p_cita bigint)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.clave_valida('recordatorios', p_secreto) then
+    raise exception 'No autorizado';
+  end if;
+  update public.citas set recordatorio_enviado = now() where id = p_cita;
+end;
+$$;
+
+grant execute on function public.recordatorios_pendientes(text) to anon, authenticated;
+grant execute on function public.marcar_recordatorio(text, bigint) to anon, authenticated;
 
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
