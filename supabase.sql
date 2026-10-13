@@ -1,14 +1,18 @@
 -- Plus Dental — usuarios y tipos de usuario
--- Ejecutar una sola vez en Supabase: SQL Editor → New query → pegar todo → Run.
+-- Se puede ejecutar completo cuantas veces haga falta: Supabase SQL Editor → New query → pegar todo → Run.
+-- Lo que ya existe se mantiene y solo se crea lo que falta.
 -- Se ingresa con nombre de usuario y clave. Supabase exige un correo, así que la página
 -- guarda cada usuario como <usuario>@usuarios.plusdental.com (correo interno que nadie recibe).
 -- En Authentication → Sign In / Providers → Email, desactivar «Confirm email».
 
 -- Tipos de usuario
-create type public.rol_usuario as enum ('cliente', 'administrador', 'super_administrador');
+do $$ begin
+  create type public.rol_usuario as enum ('cliente', 'administrador', 'super_administrador');
+exception when duplicate_object then null;
+end $$;
 
 -- Un perfil por cada usuario creado en Supabase Auth
-create table public.perfiles (
+create table if not exists public.perfiles (
   id      uuid primary key references auth.users (id) on delete cascade,
   usuario text unique,
   nombre  text,
@@ -17,6 +21,7 @@ create table public.perfiles (
   creado  timestamptz not null default now()
 );
 
+alter table public.perfiles add column if not exists usuario text unique;
 alter table public.perfiles enable row level security;
 
 -- ¿El usuario conectado es Super Administrador?
@@ -48,18 +53,24 @@ begin
 end;
 $$;
 
-create trigger al_crear_usuario
-  after insert on auth.users
-  for each row execute function public.crear_perfil();
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'al_crear_usuario' and tgrelid = 'auth.users'::regclass) then
+    create trigger al_crear_usuario
+    after insert on auth.users
+    for each row execute function public.crear_perfil();
+  end if;
+end $$;
 
 -- Reglas de acceso:
 --  · cada usuario ve solo su perfil; el Super Administrador ve todos
 --  · solo el Super Administrador cambia el tipo de usuario
 --  · nadie puede cambiarse su propio tipo desde la página
+drop policy if exists "ver perfiles" on public.perfiles;
 create policy "ver perfiles"
   on public.perfiles for select
   using (id = auth.uid() or public.es_super_administrador());
 
+drop policy if exists "super administrador cambia tipos" on public.perfiles;
 create policy "super administrador cambia tipos"
   on public.perfiles for update
   using (public.es_super_administrador() and id <> auth.uid())
@@ -127,9 +138,12 @@ grant execute on function public.cambiar_clave(uuid, text) to authenticated;
 -- ===== Agenda de citas =====
 -- Todo el horario de atención está disponible salvo lo reservado o bloqueado por el personal.
 
-create type public.estado_cita as enum ('pendiente', 'confirmada', 'cancelada');
+do $$ begin
+  create type public.estado_cita as enum ('pendiente', 'confirmada', 'cancelada');
+exception when duplicate_object then null;
+end $$;
 
-create table public.citas (
+create table if not exists public.citas (
   id         bigint generated always as identity primary key,
   creada     timestamptz not null default now(),
   fecha      date not null,
@@ -142,16 +156,18 @@ create table public.citas (
 );
 
 -- Un solo paciente por horario (las canceladas liberan el espacio)
-create unique index citas_un_paciente_por_horario on public.citas (fecha, hora) where estado <> 'cancelada';
+create unique index if not exists citas_un_paciente_por_horario on public.citas (fecha, hora) where estado <> 'cancelada';
 
 alter table public.citas enable row level security;
 
 -- Nombre y teléfono de los pacientes: solo los ve el personal
+drop policy if exists "personal ve citas" on public.citas;
 create policy "personal ve citas" on public.citas for select using (public.es_personal());
+drop policy if exists "personal actualiza citas" on public.citas;
 create policy "personal actualiza citas" on public.citas for update
   using (public.es_personal()) with check (public.es_personal());
 
-create table public.bloqueos (
+create table if not exists public.bloqueos (
   id     bigint generated always as identity primary key,
   fecha  date not null,
   hora   time,            -- vacío = todo el día
@@ -161,6 +177,7 @@ create table public.bloqueos (
 
 alter table public.bloqueos enable row level security;
 
+drop policy if exists "personal gestiona bloqueos" on public.bloqueos;
 create policy "personal gestiona bloqueos" on public.bloqueos for all
   using (public.es_personal()) with check (public.es_personal());
 
@@ -231,7 +248,7 @@ grant execute on function public.solicitar_cita(date, text, text, text, text) to
 
 -- ===== Expedientes de pacientes (solo Administrador y Super Administrador) =====
 
-create table public.pacientes (
+create table if not exists public.pacientes (
   id                  bigint generated always as identity primary key,
   nombre              text not null,
   dpi                 text,
@@ -249,13 +266,17 @@ create table public.pacientes (
 );
 
 -- Un DPI no puede repetirse
-create unique index pacientes_dpi_unico on public.pacientes (dpi) where dpi is not null and dpi <> '';
+create unique index if not exists pacientes_dpi_unico on public.pacientes (dpi) where dpi is not null and dpi <> '';
 
 alter table public.pacientes enable row level security;
+drop policy if exists "personal ve pacientes" on public.pacientes;
 create policy "personal ve pacientes" on public.pacientes for select using (public.es_personal());
+drop policy if exists "personal crea pacientes" on public.pacientes;
 create policy "personal crea pacientes" on public.pacientes for insert with check (public.es_personal());
+drop policy if exists "personal edita pacientes" on public.pacientes;
 create policy "personal edita pacientes" on public.pacientes for update
   using (public.es_personal()) with check (public.es_personal());
+drop policy if exists "super administrador borra pacientes" on public.pacientes;
 create policy "super administrador borra pacientes" on public.pacientes for delete using (public.es_super_administrador());
 
 create or replace function public.marcar_actualizado()
@@ -266,11 +287,15 @@ begin
 end;
 $$;
 
-create trigger pacientes_actualizado before update on public.pacientes
-  for each row execute function public.marcar_actualizado();
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'pacientes_actualizado' and tgrelid = 'public.pacientes'::regclass) then
+    create trigger pacientes_actualizado before update on public.pacientes
+    for each row execute function public.marcar_actualizado();
+  end if;
+end $$;
 
 -- Notas de cada visita
-create table public.notas_visita (
+create table if not exists public.notas_visita (
   id            bigint generated always as identity primary key,
   paciente_id   bigint not null references public.pacientes (id) on delete cascade,
   fecha         date not null default current_date,
@@ -279,11 +304,14 @@ create table public.notas_visita (
   autor_usuario text,
   creada        timestamptz not null default now()
 );
-create index notas_visita_paciente on public.notas_visita (paciente_id, fecha desc);
+create index if not exists notas_visita_paciente on public.notas_visita (paciente_id, fecha desc);
 
 alter table public.notas_visita enable row level security;
+drop policy if exists "personal ve notas" on public.notas_visita;
 create policy "personal ve notas" on public.notas_visita for select using (public.es_personal());
+drop policy if exists "personal escribe notas" on public.notas_visita;
 create policy "personal escribe notas" on public.notas_visita for insert with check (public.es_personal());
+drop policy if exists "super administrador borra notas" on public.notas_visita;
 create policy "super administrador borra notas" on public.notas_visita for delete using (public.es_super_administrador());
 
 -- Quien escribe la nota queda registrado automáticamente
@@ -296,8 +324,12 @@ begin
 end;
 $$;
 
-create trigger notas_visita_firma before insert on public.notas_visita
-  for each row execute function public.firmar_nota();
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'notas_visita_firma' and tgrelid = 'public.notas_visita'::regclass) then
+    create trigger notas_visita_firma before insert on public.notas_visita
+    for each row execute function public.firmar_nota();
+  end if;
+end $$;
 
 -- Radiografías y fotografías clínicas: almacenamiento privado (máx. 10 MB por archivo)
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -305,35 +337,53 @@ values ('expedientes', 'expedientes', false, 10485760,
         array['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
 on conflict (id) do nothing;
 
-create policy "personal ve archivos de expedientes" on storage.objects for select
-  using (bucket_id = 'expedientes' and public.es_personal());
-create policy "personal sube archivos de expedientes" on storage.objects for insert
-  with check (bucket_id = 'expedientes' and public.es_personal());
-create policy "super administrador borra archivos de expedientes" on storage.objects for delete
-  using (bucket_id = 'expedientes' and public.es_super_administrador());
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal ve archivos de expedientes') then
+    create policy "personal ve archivos de expedientes" on storage.objects for select
+    using (bucket_id = 'expedientes' and public.es_personal());
+  end if;
+end $$;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal sube archivos de expedientes') then
+    create policy "personal sube archivos de expedientes" on storage.objects for insert
+    with check (bucket_id = 'expedientes' and public.es_personal());
+  end if;
+end $$;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'super administrador borra archivos de expedientes') then
+    create policy "super administrador borra archivos de expedientes" on storage.objects for delete
+    using (bucket_id = 'expedientes' and public.es_super_administrador());
+  end if;
+end $$;
 
 -- ===== Presupuestos =====
 -- Precios con IVA incluido. El costo se carga a la cuenta del paciente cuando cada tratamiento
 -- de un presupuesto aprobado se marca como realizado.
 
 -- Catálogo de tratamientos con precio base
-create table public.tratamientos (
+create table if not exists public.tratamientos (
   id     bigint generated always as identity primary key,
   nombre text not null,
   precio numeric(10,2) not null default 0 check (precio >= 0),
   activo boolean not null default true,
   creado timestamptz not null default now()
 );
-create unique index tratamientos_nombre_unico on public.tratamientos (lower(nombre));
+create unique index if not exists tratamientos_nombre_unico on public.tratamientos (lower(nombre));
 alter table public.tratamientos enable row level security;
+drop policy if exists "personal ve tratamientos" on public.tratamientos;
 create policy "personal ve tratamientos" on public.tratamientos for select using (public.es_personal());
+drop policy if exists "personal crea tratamientos" on public.tratamientos;
 create policy "personal crea tratamientos" on public.tratamientos for insert with check (public.es_personal());
+drop policy if exists "personal edita tratamientos" on public.tratamientos;
 create policy "personal edita tratamientos" on public.tratamientos for update
   using (public.es_personal()) with check (public.es_personal());
 
-create type public.estado_presupuesto as enum ('borrador', 'enviado', 'aprobado', 'rechazado');
+do $$ begin
+  create type public.estado_presupuesto as enum ('borrador', 'enviado', 'aprobado', 'rechazado');
+exception when duplicate_object then null;
+end $$;
 
-create table public.presupuestos (
+create table if not exists public.presupuestos (
   id            bigint generated always as identity primary key,
   paciente_id   bigint not null references public.pacientes (id) on delete cascade,
   fecha         date not null default current_date,
@@ -344,16 +394,20 @@ create table public.presupuestos (
   creado        timestamptz not null default now(),
   actualizado   timestamptz not null default now()
 );
-create index presupuestos_paciente on public.presupuestos (paciente_id);
+create index if not exists presupuestos_paciente on public.presupuestos (paciente_id);
 alter table public.presupuestos enable row level security;
+drop policy if exists "personal ve presupuestos" on public.presupuestos;
 create policy "personal ve presupuestos" on public.presupuestos for select using (public.es_personal());
+drop policy if exists "personal crea presupuestos" on public.presupuestos;
 create policy "personal crea presupuestos" on public.presupuestos for insert with check (public.es_personal());
+drop policy if exists "personal edita presupuestos" on public.presupuestos;
 create policy "personal edita presupuestos" on public.presupuestos for update
   using (public.es_personal()) with check (public.es_personal());
+drop policy if exists "super administrador borra presupuestos no aprobados" on public.presupuestos;
 create policy "super administrador borra presupuestos no aprobados" on public.presupuestos for delete
   using (public.es_super_administrador() and estado <> 'aprobado');
 
-create table public.presupuesto_items (
+create table if not exists public.presupuesto_items (
   id             bigint generated always as identity primary key,
   presupuesto_id bigint not null references public.presupuestos (id) on delete cascade,
   orden          int not null default 0,
@@ -364,9 +418,10 @@ create table public.presupuesto_items (
   realizado      boolean not null default false,
   realizado_en   date
 );
-create index presupuesto_items_presupuesto on public.presupuesto_items (presupuesto_id);
+create index if not exists presupuesto_items_presupuesto on public.presupuesto_items (presupuesto_id);
 alter table public.presupuesto_items enable row level security;
 -- Se leen directo; se escriben solo con las funciones de abajo, que validan el estado
+drop policy if exists "personal ve items" on public.presupuesto_items;
 create policy "personal ve items" on public.presupuesto_items for select using (public.es_personal());
 
 -- Quién creó el presupuesto
@@ -377,8 +432,12 @@ begin
   return new;
 end;
 $$;
-create trigger presupuestos_firma before insert on public.presupuestos
-  for each row execute function public.firmar_presupuesto();
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'presupuestos_firma' and tgrelid = 'public.presupuestos'::regclass) then
+    create trigger presupuestos_firma before insert on public.presupuestos
+    for each row execute function public.firmar_presupuesto();
+  end if;
+end $$;
 
 -- Un presupuesto aprobado con tratamientos realizados no cambia de estado ni de descuento
 create or replace function public.antes_de_cambiar_presupuesto()
@@ -397,8 +456,12 @@ begin
   return new;
 end;
 $$;
-create trigger presupuestos_cambio before update on public.presupuestos
-  for each row execute function public.antes_de_cambiar_presupuesto();
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'presupuestos_cambio' and tgrelid = 'public.presupuestos'::regclass) then
+    create trigger presupuestos_cambio before update on public.presupuestos
+    for each row execute function public.antes_de_cambiar_presupuesto();
+  end if;
+end $$;
 
 -- Guardar tratamientos, descuento y notas de un presupuesto en borrador o enviado (todo o nada)
 create or replace function public.guardar_presupuesto(p_id bigint, p_descuento numeric, p_notas text, p_items jsonb)
@@ -457,9 +520,12 @@ grant execute on function public.marcar_realizado(bigint, boolean) to authentica
 -- ===== Cobros y pagos + Estados de cuenta =====
 -- El número de recibo es el id del pago. Los pagos no se borran: el Super Administrador los anula con un motivo.
 
-create type public.metodo_pago as enum ('efectivo', 'tarjeta', 'transferencia', 'deposito');
+do $$ begin
+  create type public.metodo_pago as enum ('efectivo', 'tarjeta', 'transferencia', 'deposito');
+exception when duplicate_object then null;
+end $$;
 
-create table public.pagos (
+create table if not exists public.pagos (
   id             bigint generated always as identity primary key,
   paciente_id    bigint not null references public.pacientes (id) on delete restrict,
   presupuesto_id bigint references public.presupuestos (id) on delete set null,
@@ -475,11 +541,13 @@ create table public.pagos (
   anulado_por    text,
   anulado_en     timestamptz
 );
-create index pagos_paciente on public.pagos (paciente_id);
-create index pagos_fecha on public.pagos (fecha desc);
+create index if not exists pagos_paciente on public.pagos (paciente_id);
+create index if not exists pagos_fecha on public.pagos (fecha desc);
 
 alter table public.pagos enable row level security;
+drop policy if exists "personal ve pagos" on public.pagos;
 create policy "personal ve pagos" on public.pagos for select using (public.es_personal());
+drop policy if exists "personal registra pagos" on public.pagos;
 create policy "personal registra pagos" on public.pagos for insert with check (public.es_personal());
 -- Sin reglas de update ni delete: solo se anulan con la función anular_pago
 
@@ -494,8 +562,12 @@ begin
   return new;
 end;
 $$;
-create trigger pagos_firma before insert on public.pagos
-  for each row execute function public.firmar_pago();
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'pagos_firma' and tgrelid = 'public.pagos'::regclass) then
+    create trigger pagos_firma before insert on public.pagos
+    for each row execute function public.firmar_pago();
+  end if;
+end $$;
 
 create or replace function public.anular_pago(p_id bigint, p_motivo text)
 returns void language plpgsql security definer set search_path = public as $$
@@ -520,7 +592,7 @@ grant execute on function public.anular_pago(bigint, text) to authenticated;
 
 -- Movimientos de cuenta: cargos (tratamientos realizados con su descuento) y abonos (pagos no anulados).
 -- security_invoker: respeta las reglas de las tablas, así que solo el personal ve resultados.
-create view public.movimientos_cuenta with (security_invoker = true) as
+create or replace view public.movimientos_cuenta with (security_invoker = true) as
   select i.realizado_en as fecha,
          p.paciente_id,
          'cargo'::text as tipo,
@@ -544,7 +616,7 @@ create view public.movimientos_cuenta with (security_invoker = true) as
     from public.pagos g
    where not g.anulado;
 
-create view public.saldos_pacientes with (security_invoker = true) as
+create or replace view public.saldos_pacientes with (security_invoker = true) as
   select pa.id as paciente_id,
          pa.nombre,
          pa.telefono,
