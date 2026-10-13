@@ -50,9 +50,24 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .adm-btn[aria-pressed="true"]{background:#0F2A2E;color:#FFFFFF;border-color:#0F2A2E}
 .adm-primary{background:#0B6E69;color:#FFFFFF;border-color:#0B6E69}
 .adm-primary:hover:not(:disabled){background:#08504C;color:#FFFFFF}
-.adm-tabs{display:flex;gap:4px;border-bottom:1px solid #DCE3E1;flex-wrap:wrap}
-.adm-tabs button{font:inherit;font-size:16px;font-weight:600;background:transparent;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;padding:12px 16px;min-height:44px;color:#5B6E70;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
-.adm-tabs button[aria-selected="true"]{color:#0F2A2E;border-bottom-color:#0B6E69}
+.adm-layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:36px;align-items:start}
+.adm-menu{display:flex;flex-direction:column;gap:4px;position:sticky;top:96px;border-right:1px solid #DCE3E1;padding-right:20px}
+.adm-menu button{font:inherit;font-size:15px;font-weight:600;text-align:left;color:#44585B;background:transparent;border:0;border-radius:12px;padding:12px 14px;min-height:44px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.adm-menu button:hover{background:#F1F5F4;color:#0F2A2E}
+.adm-menu button[aria-selected="true"]{background:#0F2A2E;color:#FFFFFF}
+.adm-menu .pronto{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;opacity:.55}
+.adm-main{min-width:0}
+.adm-pane{display:flex;flex-direction:column;gap:20px}
+.adm-pane-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.adm-h{margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:34px;line-height:1.1}
+.adm-intro{margin:0;font-size:17px;line-height:1.6;color:#44585B;max-width:60ch}
+.adm-plan{margin:0;padding:20px 24px 20px 44px;background:#F7F8F6;border:1px dashed #C9D4D2;border-radius:18px;display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.5;color:#44585B}
+.pronto-pill{background:#ECEFEF;color:#5B6E70;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700}
+@media (max-width:960px){
+.adm-layout{grid-template-columns:minmax(0,1fr);gap:20px}
+.adm-menu{flex-direction:row;overflow-x:auto;position:static;border-right:0;border-bottom:1px solid #DCE3E1;padding:0 0 8px}
+.adm-menu button{white-space:nowrap;flex:0 0 auto}
+}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -130,13 +145,44 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 </div>
 </div>
 
-<div class="adm-tabs" role="tablist" aria-label="Secciones del panel">
-<button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Citas <span id="nPend" class="adm-count" hidden></span></button>
-<button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios">Usuarios</button>
+<div class="adm-layout">
+<div class="adm-menu" role="tablist" aria-label="Menú de administración" aria-orientation="vertical">
+<button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios">Administración de usuarios</button>
+<button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expedientes de pacientes <span class="pronto">Pronto</span></button>
+<button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
+<button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuestos <span class="pronto">Pronto</span></button>
+<button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta <span class="pronto">Pronto</span></button>
+<button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos <span class="pronto">Pronto</span></button>
+</div>
+<div class="adm-main">
+
+<!-- 1. Administración de usuarios -->
+<div id="admUsuarios" role="tabpanel" aria-labelledby="tabUsuarios" hidden class="adm-pane">
+<h3 class="adm-h">Administración de usuarios</h3>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+<div id="admResumen" style="display: flex; gap: 8px; flex-wrap: wrap"></div>
+<input id="admBuscar" type="search" placeholder="Buscar usuario" aria-label="Buscar usuario" class="adm-input">
+</div>
+<div class="roles-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th><th>Creado</th><th>Clave</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
+<p id="rolesMsg" class="dlg-msg" role="status"></p>
 </div>
 
-<!-- Citas -->
-<div id="admCitas" role="tabpanel" aria-labelledby="tabCitas" style="display: flex; flex-direction: column; gap: 20px">
+<!-- 2. Expedientes de pacientes -->
+<div id="admExpedientes" role="tabpanel" aria-labelledby="tabExpedientes" hidden class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Expedientes de pacientes</h3><span class="pronto-pill">En preparación</span></div>
+<p class="adm-intro">Una ficha por paciente con toda su información clínica en un solo lugar.</p>
+<ul class="adm-plan"><li>Datos personales y de contacto</li><li>Antecedentes médicos, alergias y medicamentos</li><li>Odontograma con el estado de cada pieza</li><li>Notas de evolución de cada visita</li><li>Radiografías y fotografías clínicas</li></ul>
+</div>
+
+<!-- 3. Historial de citas -->
+<div id="admCitas" role="tabpanel" aria-labelledby="tabCitas" class="adm-pane">
+<div class="adm-pane-head">
+<h3 class="adm-h">Historial de citas</h3>
+<div id="citaPeriodo" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Periodo">
+<button type="button" class="adm-btn" data-periodo="proximas" aria-pressed="true">Próximas</button>
+<button type="button" class="adm-btn" data-periodo="anteriores" aria-pressed="false">Anteriores</button>
+</div>
+</div>
 <div id="citaFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar citas">
 <button type="button" class="adm-btn" data-filtro="pendiente" aria-pressed="true">Pendientes</button>
 <button type="button" class="adm-btn" data-filtro="confirmada" aria-pressed="false">Confirmadas</button>
@@ -162,14 +208,28 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 </div>
 </div>
 
-<!-- Usuarios -->
-<div id="admUsuarios" role="tabpanel" aria-labelledby="tabUsuarios" hidden style="display: flex; flex-direction: column; gap: 20px">
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
-<div id="admResumen" style="display: flex; gap: 8px; flex-wrap: wrap"></div>
-<input id="admBuscar" type="search" placeholder="Buscar usuario" aria-label="Buscar usuario" class="adm-input">
+<!-- 4. Presupuestos -->
+<div id="admPresupuestos" role="tabpanel" aria-labelledby="tabPresupuestos" hidden class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Presupuestos</h3><span class="pronto-pill">En preparación</span></div>
+<p class="adm-intro">El plan de tratamiento de cada paciente con su costo, listo para enviar y aprobar.</p>
+<ul class="adm-plan"><li>Tratamientos propuestos con la pieza y el precio de cada uno</li><li>Descuentos y total</li><li>Estado: enviado, aprobado o rechazado</li><li>Envío al paciente por WhatsApp</li></ul>
 </div>
-<div class="roles-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th><th>Creado</th><th>Clave</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
-<p id="rolesMsg" class="dlg-msg" role="status"></p>
+
+<!-- 5. Estados de cuenta -->
+<div id="admEstados" role="tabpanel" aria-labelledby="tabEstados" hidden class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Estados de cuenta</h3><span class="pronto-pill">En preparación</span></div>
+<p class="adm-intro">Cuánto debe cada paciente y cómo se llegó a ese saldo.</p>
+<ul class="adm-plan"><li>Saldo de cada paciente: tratamientos realizados menos pagos</li><li>Movimientos con fecha y concepto</li><li>Lista de pacientes con saldo pendiente</li></ul>
+</div>
+
+<!-- 6. Cobros y pagos -->
+<div id="admCobros" role="tabpanel" aria-labelledby="tabCobros" hidden class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Cobros y pagos</h3><span class="pronto-pill">En preparación</span></div>
+<p class="adm-intro">El registro de cada pago que entra a la clínica.</p>
+<ul class="adm-plan"><li>Pagos en efectivo, tarjeta, transferencia o depósito</li><li>Abonos y pagos en cuotas</li><li>Recibo numerado por cada pago</li><li>Resumen de ingresos por día y por mes</li></ul>
+</div>
+
+</div>
 </div>
 </div>
 </section>

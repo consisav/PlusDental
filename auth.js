@@ -12,7 +12,7 @@
 
   var dlg = $('loginDlg'), claveDlg = $('claveDlg'), panel = $('administracion');
   var perfil = null, quiereAdmin = false, usuarios = [], claveDe = null;
-  var citas = [], bloqueos = [], filtro = 'pendiente';
+  var citas = [], bloqueos = [], filtro = 'pendiente', periodo = 'proximas';
   var ESTADOS = { pendiente: 'Pendiente', confirmada: 'Confirmada', cancelada: 'Cancelada' };
   var DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -98,8 +98,10 @@
     $('rolesBody').innerHTML = ''; $('citasBody').innerHTML = ''; $('bloqLista').innerHTML = '';
   }
   function pestana(id) {
-    ['admCitas', 'admUsuarios'].forEach(function (p) { $(p).hidden = p !== id; });
-    document.querySelectorAll('.adm-tabs [data-tab]').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === id); });
+    document.querySelectorAll('.adm-menu [data-tab]').forEach(function (b) {
+      b.setAttribute('aria-selected', b.dataset.tab === id);
+      $(b.dataset.tab).hidden = b.dataset.tab !== id;
+    });
   }
 
   // ---- Citas ----
@@ -120,8 +122,11 @@
   async function cargarCitas() {
     aviso('citasMsg', '');
     $('citasBody').innerHTML = '<tr><td colspan="5">Cargando…</td></tr>';
-    var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,creada')
-      .gte('fecha', hoyISO()).order('fecha').order('hora');
+    var q = sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,creada');
+    var r = periodo === 'proximas'
+      ? await q.gte('fecha', hoyISO()).order('fecha').order('hora')
+      : await q.lt('fecha', hoyISO()).order('fecha', { ascending: false }).order('hora', { ascending: false }).limit(300);
+    contarPendientes();
     if (r.error) {
       $('citasBody').innerHTML = '';
       aviso('citasMsg', /citas/.test(r.error.message) && /exist|find/i.test(r.error.message)
@@ -132,15 +137,22 @@
     pintarCitas();
   }
 
+  // Contador del menú: citas próximas sin confirmar
+  async function contarPendientes() {
+    var r = await sb.from('citas').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente').gte('fecha', hoyISO());
+    var n = r.error ? 0 : r.count || 0;
+    $('nPend').hidden = !n;
+    $('nPend').textContent = n;
+  }
+
   function pintarCitas() {
-    var pendientes = citas.filter(function (c) { return c.estado === 'pendiente'; }).length;
-    $('nPend').hidden = !pendientes;
-    $('nPend').textContent = pendientes;
     document.querySelectorAll('#citaFiltros [data-filtro]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.filtro === filtro); });
+    document.querySelectorAll('#citaPeriodo [data-periodo]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.periodo === periodo); });
 
     var lista = citas.filter(function (c) { return filtro === 'todas' || c.estado === filtro; });
     if (!lista.length) {
-      var vacio = { pendiente: 'No hay citas pendientes de confirmar.', confirmada: 'No hay citas confirmadas próximas.', cancelada: 'No hay citas canceladas próximas.', todas: 'No hay citas próximas.' };
+      var cuando = periodo === 'proximas' ? 'próximas' : 'anteriores';
+      var vacio = { pendiente: 'No hay citas pendientes ' + cuando + '.', confirmada: 'No hay citas confirmadas ' + cuando + '.', cancelada: 'No hay citas canceladas ' + cuando + '.', todas: 'No hay citas ' + cuando + '.' };
       $('citasBody').innerHTML = '<tr><td colspan="5">' + vacio[filtro] + '</td></tr>';
       return;
     }
@@ -166,6 +178,7 @@
       return;
     }
     citas.forEach(function (c) { if (String(c.id) === String(id)) c.estado = estado; });
+    contarPendientes();
     aviso('citasMsg', estado === 'confirmada'
       ? 'Cita confirmada. Avísale al paciente con el botón WhatsApp.'
       : 'Cita cancelada. El horario quedó libre en la agenda.');
@@ -310,12 +323,23 @@
   $('myPassBtn').addEventListener('click', function () { abrirClave(null); });
 
   $('admRecargar').addEventListener('click', cargarPanel);
-  document.querySelectorAll('.adm-tabs [data-tab]').forEach(function (b) {
-    b.addEventListener('click', function () { pestana(b.dataset.tab); });
+  document.querySelectorAll('.adm-menu [data-tab]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      pestana(b.dataset.tab);
+      b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); // en celular el menú se desliza de lado
+    });
   });
   $('citaFiltros').addEventListener('click', function (e) {
     var b = e.target.closest('[data-filtro]');
     if (b) { filtro = b.dataset.filtro; pintarCitas(); }
+  });
+  $('citaPeriodo').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-periodo]');
+    if (!b || b.dataset.periodo === periodo) return;
+    periodo = b.dataset.periodo;
+    // En el historial lo útil es ver todo; en las próximas, lo que falta confirmar
+    filtro = periodo === 'anteriores' ? 'todas' : 'pendiente';
+    cargarCitas();
   });
   $('citasBody').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-cita]');
