@@ -324,7 +324,9 @@
     pintarCabecera();
     pintarFoto();
     if (eraNuevo) cargarTitulos();
-    aviso('deMsg', eraNuevo ? 'Dentista registrado. Ya puedes agregar su foto y sus títulos.' : 'Cambios guardados.');
+    var aviso_salida = actual.estado === 'activo' && actual.fecha_salida && actual.fecha_salida <= hoy()
+      ? ' Ojo: tiene «Fecha final en la clínica» ' + fechaCorta(actual.fecha_salida) + ', así que ya no aparecerá en la agenda. Si sigue trabajando, deja esa fecha vacía.' : '';
+    aviso('deMsg', (eraNuevo ? 'Dentista registrado. Ya puedes agregar su foto y sus títulos.' : 'Cambios guardados.') + aviso_salida, !!aviso_salida);
     sincronizarFotoPublica();
   }
 
