@@ -191,6 +191,7 @@
     $('deCodigo').value = d ? d.codigo : siguienteCodigo();
     $('deNombre').value = (d && d.nombre) || '';
     $('deTelefono').value = (d && d.telefono) || '';
+    $('deCorreo').value = (d && d.correo) || '';
     $('deDireccion').value = (d && d.direccion) || '';
     $('deColegiado').value = (d && d.colegiado) || '';
     $('deInicioProf').value = (d && d.inicio_profesion) || '';
@@ -288,6 +289,7 @@
       codigo: $('deCodigo').value.trim(),
       nombre: $('deNombre').value.trim(),
       telefono: $('deTelefono').value.trim() || null,
+      correo: $('deCorreo').value.trim() || null,
       direccion: $('deDireccion').value.trim() || null,
       colegiado: $('deColegiado').value.trim() || null,
       inicio_profesion: $('deInicioProf').value || null,

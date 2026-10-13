@@ -177,7 +177,9 @@
     $('agNombreWrap').hidden = !nuevo;
     $('agTelWrap').hidden = !nuevo;
     var p = pacienteElegido();
-    $('agPacInfo').textContent = p ? [p.telefono ? 'WhatsApp ' + p.telefono : 'Sin teléfono en el expediente', p.dentista_id ? 'Médico asignado: ' + nombreDentista(p.dentista_id) : 'Sin médico asignado'].join(' · ') : '';
+    $('agPacInfo').textContent = p ? [p.telefono ? 'WhatsApp ' + p.telefono : 'Sin teléfono en el expediente', p.correo ? 'Correo ' + p.correo : 'Sin correo', p.dentista_id ? 'Médico asignado: ' + nombreDentista(p.dentista_id) : 'Sin médico asignado'].join(' · ') : '';
+    $('agCorreoWrap').hidden = !(nuevo || (p && !p.correo));
+    $('agCorreo').value = '';
     if (p && p.dentista_id && !$('agMedico').value) {
       // No se fija el médico: el asistente ya le da preferencia al médico asignado
     }
@@ -189,6 +191,44 @@
   function pintarFijo() {
     $('agFijo').hidden = !fijo;
     if (fijo) $('agFijo').innerHTML = '<div class="ag-fijo">Horario elegido en la agenda: <b>' + textoFecha(fijo.fecha) + ' · ' + fijo.hora + (fijo.sala ? ' · ' + esc(nombreSala(fijo.sala)) : '') + '</b><button type="button" class="adm-btn" id="agQuitarFijo" style="min-height:34px;padding:5px 12px">Quitar</button></div>';
+  }
+
+  // ---------- Avisos: WhatsApp al paciente y al médico, recordatorio por correo ----------
+  var CLINICA = 'Reforma Montúfar, zona 10, Ciudad de Guatemala', TEL_CLINICA = '+502 3756-5739';
+  function datosAviso(c) {
+    var d = dentistas.filter(function (x) { return x.id === c.dentista_id; })[0] || null;
+    return {
+      cuando: textoFecha(c.fecha) + ' a las ' + hhmm(c.hora),
+      dentista: d, sala: c.posicion_id ? nombreSala(c.posicion_id) : ''
+    };
+  }
+  function avisosHtml(c, cuales) {
+    var a = datosAviso(c), b = [];
+    var pac = telWa(c.telefono), med = a.dentista ? telWa(a.dentista.telefono) : '';
+    if (cuales.paciente) {
+      var tp = 'Hola ' + c.nombre + ', le confirmamos su cita en Plus Dental el ' + a.cuando + (a.dentista ? ' con ' + a.dentista.nombre : '') +
+        (a.sala ? ' (' + a.sala + ')' : '') + ' para ' + c.servicio + '. Dirección: ' + CLINICA + '. Si necesita cambiarla, responda a este mensaje. ¡Le esperamos!';
+      b.push(pac ? '<a class="adm-btn" href="https://wa.me/' + pac + '?text=' + encodeURIComponent(tp) + '" target="_blank" rel="noopener">WhatsApp al paciente</a>'
+        : '<span class="dlg-msg">El paciente no tiene teléfono.</span>');
+    }
+    if (cuales.medico) {
+      var tm = 'Hola ' + (a.dentista ? a.dentista.nombre : '') + ', tiene una cita asignada en Plus Dental:\n' +
+        'Paciente: ' + c.nombre + '\nTratamiento: ' + c.servicio + '\nFecha y hora: ' + a.cuando + (a.sala ? '\nSala: ' + a.sala : '') +
+        (c.prioridad === 'urgente' ? '\nPrioridad: URGENTE' : '') + (c.notas ? '\nMotivo: ' + c.notas : '');
+      b.push(!a.dentista ? '<span class="dlg-msg">La cita no tiene médico asignado.</span>'
+        : med ? '<a class="adm-btn" href="https://wa.me/' + med + '?text=' + encodeURIComponent(tm) + '" target="_blank" rel="noopener">WhatsApp al médico</a>'
+          : '<span class="dlg-msg">' + esc(a.dentista.nombre) + ' no tiene teléfono en su ficha.</span>');
+    }
+    if (cuales.correo) {
+      var correo = c.correo || '';
+      var asunto = 'Recordatorio de su cita en Plus Dental · ' + a.cuando;
+      var cuerpo = 'Hola ' + c.nombre + ':\n\nLe recordamos su cita en Plus Dental:\n\n' +
+        '• Fecha y hora: ' + a.cuando + '\n• Tratamiento: ' + c.servicio + (a.dentista ? '\n• Dentista: ' + a.dentista.nombre : '') + (a.sala ? '\n• Sala: ' + a.sala : '') +
+        '\n\nDirección: ' + CLINICA + '.\nSi necesita cambiar su cita, escríbanos o llame al ' + TEL_CLINICA + '.\n\nPlus Dental · Precisión clínica para sonrisas naturales.';
+      b.push(correo ? '<a class="adm-btn" href="mailto:' + encodeURIComponent(correo) + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo) + '">Recordatorio por correo</a>'
+        : '<span class="dlg-msg">El paciente no tiene correo registrado.</span>');
+    }
+    return b.length ? '<div class="ag-aviso-btns">' + b.join('') + '</div>' : '';
   }
 
   async function agendar(o, boton) {
@@ -212,11 +252,17 @@
     boton.disabled = false;
     if (r.error) { aviso('agFormMsg', traducir(r.error), true); await cargarCitas(); return; }
     var nombre = p ? p.nombre : $('agNombre').value.trim(), tel = p ? p.telefono : $('agTelefono').value.trim();
-    var texto = 'Hola ' + nombre + ', le confirmamos su cita en Plus Dental el ' + textoFecha(o.fecha) + ' a las ' + o.hora +
-      (o.dentista ? ' con ' + o.dentista.nombre : '') + (o.sala ? ' en ' + o.sala.nombre : '') + ' para ' + $('agTratamiento').value.trim() + '. ¡Le esperamos!';
-    var wa = telWa(tel);
-    $('agSugerencias').innerHTML = '<div class="ag-fijo" style="background:#DCF2EC;border-color:#BFE6D8;color:#08504C">Cita agendada: <b>' + textoFecha(o.fecha) + ' · ' + o.hora + ' · ' + esc(nombre) + '</b>' +
-      (wa ? '<a class="adm-btn" href="https://wa.me/' + wa + '?text=' + encodeURIComponent(texto) + '" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;min-height:34px">Avisar por WhatsApp</a>' : '') + '</div>';
+    var correo = (p && p.correo) || $('agCorreo').value.trim();
+    if (p && !p.correo && correo) {
+      var ac = await sb.from('pacientes').update({ correo: correo }).eq('id', p.id).select('id');
+      if (!ac.error) p.correo = correo;
+    }
+    var cita = { fecha: o.fecha, hora: o.hora, nombre: nombre, telefono: tel, correo: correo, servicio: $('agTratamiento').value.trim(),
+      dentista_id: o.dentista ? o.dentista.id : null, posicion_id: o.sala ? o.sala.id : null, prioridad: $('agPrioridad').value, notas: $('agNotas').value.trim() };
+    var avisos = avisosHtml(cita, { paciente: $('agAvPac').checked, medico: $('agAvMed').checked, correo: $('agAvMail').checked });
+    $('agSugerencias').innerHTML = '<div class="ag-fijo" style="background:#DCF2EC;border-color:#BFE6D8;color:#08504C;flex-direction:column;align-items:flex-start">' +
+      '<span>Cita agendada: <b>' + textoFecha(o.fecha) + ' · ' + o.hora + ' · ' + esc(nombre) + '</b></span>' +
+      (avisos ? '<span>Envía los avisos:</span>' + avisos : '') + '</div>';
     aviso('agFormMsg', '');
     fijo = null; pintarFijo();
     $('agNotas').value = '';
@@ -317,8 +363,8 @@
   function verDetalle(id) {
     var c = citas.filter(function (x) { return String(x.id) === String(id); })[0];
     if (!c) return;
-    var wa = telWa(c.telefono);
-    var texto = 'Hola ' + c.nombre + ', le recordamos su cita en Plus Dental el ' + textoFecha(c.fecha) + ' a las ' + hhmm(c.hora) + (c.dentista_id ? ' con ' + nombreDentista(c.dentista_id) : '') + '. ¡Le esperamos!';
+    var pac = pacientes.filter(function (p) { return p.id === c.paciente_id; })[0];
+    var conCorreo = Object.assign({}, c, { correo: pac && pac.correo });
     $('agDetalle').hidden = false;
     $('agDetalle').innerHTML = '<div class="adm-pane-head"><h3 style="margin:0;font-size:18px;font-weight:700">' + esc(c.nombre) + '</h3><span class="estado estado-' + c.estado + '">' + (c.estado === 'pendiente' ? 'Pendiente' : 'Confirmada') + '</span></div>' +
       '<div class="pac-meta"><span><b>' + textoFecha(c.fecha) + ' · ' + hhmm(c.hora) + '</b></span><span>' + esc(c.servicio) + '</span><span>' + esc(nombreDentista(c.dentista_id)) + '</span><span>' + esc(c.posicion_id ? nombreSala(c.posicion_id) : 'Sin sala') + '</span>' +
@@ -326,8 +372,8 @@
       (c.notas ? '<p class="dlg-msg">' + esc(c.notas) + '</p>' : '') +
       '<div class="acciones">' + (c.estado === 'pendiente' ? '<button type="button" class="adm-btn adm-primary" data-det-estado="confirmada" data-id="' + c.id + '">Confirmar</button>' : '') +
       '<button type="button" class="adm-btn" data-det-estado="cancelada" data-id="' + c.id + '" data-confirmar="0">Cancelar cita</button>' +
-      (wa ? '<a class="adm-btn" href="https://wa.me/' + wa + '?text=' + encodeURIComponent(texto) + '" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Recordatorio por WhatsApp</a>' : '') +
-      '<button type="button" class="adm-btn" data-det-cerrar>Cerrar</button></div>';
+      '<button type="button" class="adm-btn" data-det-cerrar>Cerrar</button></div>' +
+      '<span class="pos-lbl" style="margin:4px 0 0">Avisos y recordatorios</span>' + avisosHtml(conCorreo, { paciente: true, medico: true, correo: true });
     $('agDetalle').scrollIntoView({ block: 'nearest' });
   }
 
@@ -337,12 +383,14 @@
     if (!$('agDesde').value) $('agDesde').value = sumar(hoyF, 1);
     if (!$('agDia').value) $('agDia').value = hoyF;
     var rs = await Promise.all([
-      sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida').eq('estado', 'activo').order('nombre'),
+      sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo').eq('estado', 'activo').order('nombre'),
       sb.from('posiciones').select('id,codigo,nombre,especialidad,estado,activa,horario').order('codigo'),
-      sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado').order('nombre'),
+      sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo').order('nombre'),
       sb.from('tratamientos').select('nombre,activo').eq('activo', true).order('nombre'),
       sb.from('bloqueos').select('fecha,hora').gte('fecha', hoyF)
     ]);
+    if (rs[0].error && /correo/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono').eq('estado', 'activo').order('nombre');
+    if (rs[2].error && /correo/.test(rs[2].error.message)) rs[2] = await sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado').order('nombre');
     dentistas = rs[0].error ? [] : rs[0].data;
     salas = rs[1].error ? [] : rs[1].data;
     pacientes = rs[2].error ? [] : rs[2].data.filter(function (p) { return !p.estado || p.estado === 'activo'; });

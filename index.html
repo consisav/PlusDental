@@ -238,6 +238,10 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-mini.cita.urgente{background:#FFF6F6;border-left-color:#C0263A}
 .ag-mini.libre{border-style:dashed;color:#005A87;font-weight:600;background:#F5F9FC}
 .ag-mini.cerrado{cursor:default;color:#94A6B2;background:transparent;border-color:transparent}
+.ag-avisos{display:flex;flex-wrap:wrap;gap:10px 28px}
+.ag-avisos label{flex-direction:row}
+.ag-aviso-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ag-aviso-btns a{text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:38px}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -388,6 +392,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <label>DPI<input id="pDpi" type="text" inputmode="numeric" maxlength="20" placeholder="0000 00000 0000"></label>
 <label>Fecha de nacimiento<input id="pNacimiento" type="date"></label>
 <label>Teléfono / WhatsApp<input id="pTelefono" type="tel" maxlength="40"></label>
+<label>Correo electrónico<input id="pCorreo" type="email" maxlength="120" placeholder="paciente@correo.com"></label>
 <label class="full">Dirección<input id="pDireccion" type="text" maxlength="250"></label>
 <label>Contacto de emergencia<input id="pEmNombre" type="text" maxlength="150" placeholder="Nombre y parentesco"></label>
 <label>Teléfono de emergencia<input id="pEmTelefono" type="tel" maxlength="40"></label>
@@ -516,6 +521,15 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <label>Prioridad<select id="agPrioridad"><option value="normal">Normal</option><option value="urgente">Urgente (lo antes posible)</option></select></label>
 <label class="full">Motivo u observaciones<textarea id="agNotas" rows="2" maxlength="500" placeholder="Ej.: dolor en pieza 36 desde hace 3 días"></textarea></label>
 <label class="full pos-activa" style="flex-direction: row"><input id="agConfirmada" type="checkbox" checked> Registrar como cita confirmada</label>
+<fieldset class="full pos-sec"><legend>Avisos</legend>
+<div class="ag-avisos">
+<label class="pos-activa"><input id="agAvPac" type="checkbox" checked> WhatsApp al paciente</label>
+<label class="pos-activa"><input id="agAvMed" type="checkbox" checked> WhatsApp al médico</label>
+<label class="pos-activa"><input id="agAvMail" type="checkbox" checked> Recordatorio por correo al paciente</label>
+</div>
+<label id="agCorreoWrap" class="adm-field" hidden>Correo del paciente<input id="agCorreo" type="email" maxlength="120" placeholder="paciente@correo.com" class="adm-input" style="width: 100%; max-width: 420px"></label>
+<p class="dlg-msg">Al agendar, cada aviso se abre ya escrito en WhatsApp o en tu programa de correo: solo pulsa «Enviar».</p>
+</fieldset>
 <div id="agFijo" class="full" hidden></div>
 <div class="full exp-actions"><button type="submit" class="dlg-submit">Sugerir horarios</button><p id="agFormMsg" class="dlg-msg" role="status"></p></div>
 </div>
@@ -834,7 +848,8 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <div class="exp-form">
 <label>Código *<input id="deCodigo" type="text" maxlength="20" required placeholder="DEN-001"></label>
 <label>Nombre completo *<input id="deNombre" type="text" maxlength="150" required></label>
-<label>Teléfono<input id="deTelefono" type="tel" maxlength="40"></label>
+<label>Teléfono / WhatsApp<input id="deTelefono" type="tel" maxlength="40"></label>
+<label>Correo electrónico<input id="deCorreo" type="email" maxlength="120"></label>
 <label>Código de colegiado activo (opcional)<input id="deColegiado" type="text" maxlength="30"></label>
 <label class="full">Dirección<input id="deDireccion" type="text" maxlength="250"></label>
 </div>

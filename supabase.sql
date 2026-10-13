@@ -1281,6 +1281,10 @@ grant execute on function public.solicitar_cita(date, text, text, text, text) to
 revoke execute on function public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text) from public, anon;
 grant execute on function public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text) to authenticated;
 
+-- ===== Correo electrónico de pacientes y dentistas (avisos y recordatorios) =====
+alter table public.pacientes add column if not exists correo text;
+alter table public.dentistas add column if not exists correo text;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
