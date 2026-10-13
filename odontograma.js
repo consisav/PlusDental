@@ -73,36 +73,36 @@
   function inyectarEstilos() {
     if (document.getElementById('odg-estilos')) return;
     var css = [
-      '.odg{font-family:Manrope,system-ui,sans-serif;color:#0F2A2E;display:flex;flex-direction:column;gap:16px}',
+      '.odg{font-family:Manrope,system-ui,sans-serif;color:#0B2B40;display:flex;flex-direction:column;gap:16px}',
       '.odg-barra{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}',
-      '.odg-seg{display:inline-flex;border:1px solid #C9D4D2;border-radius:999px;padding:3px;background:#F7F8F6;flex-wrap:wrap}',
-      '.odg-seg button{font:inherit;font-size:14px;font-weight:600;border:0;background:transparent;color:#44585B;padding:8px 14px;border-radius:999px;cursor:pointer;min-height:38px}',
-      '.odg-seg button[aria-pressed="true"]{background:#0F2A2E;color:#FFFFFF}',
+      '.odg-seg{display:inline-flex;border:1px solid #C4D4DF;border-radius:999px;padding:3px;background:#F5F9FC;flex-wrap:wrap}',
+      '.odg-seg button{font:inherit;font-size:14px;font-weight:600;border:0;background:transparent;color:#475B68;padding:8px 14px;border-radius:999px;cursor:pointer;min-height:38px}',
+      '.odg-seg button[aria-pressed="true"]{background:#0B2B40;color:#FFFFFF}',
       '.odg-seg .r[aria-pressed="true"]{background:' + ROJO + '}.odg-seg .a[aria-pressed="true"]{background:' + AZUL + '}',
       '.odg-herr{display:flex;flex-wrap:wrap;gap:8px;align-items:center}',
-      '.odg-herr .grupo{font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:#5B6E70;margin-right:2px}',
-      '.odg-herr button{font:inherit;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;padding:7px 12px;min-height:36px;border-radius:10px;border:1px solid #C9D4D2;background:#FFFFFF;color:#0F2A2E;cursor:pointer}',
-      '.odg-herr button:hover{border-color:#0F2A2E}',
-      '.odg-herr button[aria-pressed="true"]{border-color:#0F2A2E;box-shadow:inset 0 0 0 1.5px #0F2A2E;background:#F1F5F4}',
+      '.odg-herr .grupo{font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:#5A6D7A;margin-right:2px}',
+      '.odg-herr button{font:inherit;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;padding:7px 12px;min-height:36px;border-radius:10px;border:1px solid #C4D4DF;background:#FFFFFF;color:#0B2B40;cursor:pointer}',
+      '.odg-herr button:hover{border-color:#0B2B40}',
+      '.odg-herr button[aria-pressed="true"]{border-color:#0B2B40;box-shadow:inset 0 0 0 1.5px #0B2B40;background:#EEF5FA}',
       '.odg-herr svg{flex:0 0 auto}',
-      '.odg-lienzo{overflow-x:auto;background:#FFFFFF;border:1px solid #DCE3E1;border-radius:18px;padding:18px 16px 10px}',
+      '.odg-lienzo{overflow-x:auto;background:#FFFFFF;border:1px solid #D9E4EC;border-radius:18px;padding:18px 16px 10px}',
       '.odg-mapa{min-width:680px;display:flex;flex-direction:column;gap:6px}',
       '.odg-fila{display:grid;gap:4px;justify-content:center}',
-      '.odg-sep{height:1px;background:#DCE3E1;margin:8px 0}',
-      '.odg-etq{font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:#5B6E70;text-align:center;margin:6px 0 2px}',
+      '.odg-sep{height:1px;background:#D9E4EC;margin:8px 0}',
+      '.odg-etq{font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:#5A6D7A;text-align:center;margin:6px 0 2px}',
       '.odg-pz{display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:10px;padding:3px 1px;outline:none}',
-      '.odg-pz:focus-visible{box-shadow:0 0 0 2px #0B6E69}',
-      '.odg-pz .num{font-size:12px;font-weight:700;color:#44585B;font-variant-numeric:tabular-nums}',
+      '.odg-pz:focus-visible{box-shadow:0 0 0 2px #005A87}',
+      '.odg-pz .num{font-size:12px;font-weight:700;color:#475B68;font-variant-numeric:tabular-nums}',
       '.odg-pz svg{width:100%;max-width:52px;height:auto;display:block;overflow:visible}',
-      '.odg-pz path,.odg-pz .cen{stroke:#8A9A9C;stroke-width:1.2;fill:#FFFFFF;cursor:pointer;transition:fill .12s}',
-      '.odg-pz path:hover,.odg-pz .cen:hover{fill:#EAF1F0}',
+      '.odg-pz path,.odg-pz .cen{stroke:#8A9DA9;stroke-width:1.2;fill:#FFFFFF;cursor:pointer;transition:fill .12s}',
+      '.odg-pz path:hover,.odg-pz .cen:hover{fill:#E6F1F8}',
       '.odg-pz .tira{min-height:16px;display:flex;gap:2px;justify-content:center;flex-wrap:wrap}',
       '.odg-pz .tira span{font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:1px 3px;border-radius:3px;color:#FFFFFF;line-height:1.3}',
       '.odg-pz.ausente svg .cuerpo{opacity:.35}',
-      '.odg-ley{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:#44585B}',
+      '.odg-ley{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:#475B68}',
       '.odg-ley i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}',
       '.odg-res{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}',
-      '.odg-res div{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.55}',
+      '.odg-res div{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.55}',
       '.odg-res h4{margin:0 0 6px;font-size:13px;letter-spacing:.5px;text-transform:uppercase}',
       '.odg-res ul{margin:0;padding-left:18px}',
       '@media (prefers-reduced-motion:reduce){.odg-pz path,.odg-pz .cen{transition:none}}'
@@ -115,7 +115,7 @@
 
   function icono(h, modo) {
     var c = h.fijo ? (h.fijo === 'r' ? ROJO : AZUL) : (modo === 'r' ? ROJO : AZUL);
-    var base = '<svg width="18" height="18" viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="26" fill="#FFFFFF" stroke="#8A9A9C" stroke-width="3"/>';
+    var base = '<svg width="18" height="18" viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="26" fill="#FFFFFF" stroke="#8A9DA9" stroke-width="3"/>';
     var marca = {
       caries: '<circle cx="30" cy="30" r="12" fill="' + c + '"/>',
       obturacion: '<path d="' + SEG.arriba + '" fill="' + c + '"/><circle cx="30" cy="30" r="11" fill="' + c + '"/>',
@@ -124,7 +124,7 @@
       implante: '<text x="30" y="40" text-anchor="middle" font-size="28" font-weight="800" fill="' + c + '">IM</text>',
       extraccion: '<path d="M10 10L50 50M50 10L10 50" stroke="' + c + '" stroke-width="8"/>',
       ausente: '<path d="M8 52L52 8" stroke="' + c + '" stroke-width="8"/>',
-      borrar: '<path d="M18 18L42 42M42 18L18 42" stroke="#5B6E70" stroke-width="7"/>'
+      borrar: '<path d="M18 18L42 42M42 18L18 42" stroke="#5A6D7A" stroke-width="7"/>'
     }[h.id];
     return base + marca + '</svg>';
   }

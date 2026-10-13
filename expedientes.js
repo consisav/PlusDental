@@ -14,7 +14,7 @@
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function aviso(id, texto, error) { $(id).textContent = texto || ''; $(id).style.color = error ? '#9A3B2E' : '#44585B'; }
+  function aviso(id, texto, error) { $(id).textContent = texto || ''; $(id).style.color = error ? '#9A3B2E' : '#475B68'; }
   function esSuper() { return window.PD_SESION && window.PD_SESION.esSuper(); }
   function hoyISO() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function fechaCorta(f) {
@@ -258,11 +258,11 @@
     if (r.error) { $('notaLista').innerHTML = ''; aviso('notaMsg', traducir(r.error), true); return; }
     $('notaLista').innerHTML = r.data.length
       ? r.data.map(function (n) {
-        return '<li><div class="meta"><span><strong style="color:#0F2A2E">' + fechaCorta(n.fecha) + '</strong>' + (n.autor_usuario ? ' · por ' + esc(n.autor_usuario) : '') + '</span>' +
+        return '<li><div class="meta"><span><strong style="color:#0B2B40">' + fechaCorta(n.fecha) + '</strong>' + (n.autor_usuario ? ' · por ' + esc(n.autor_usuario) : '') + '</span>' +
           (esSuper() ? '<button type="button" class="adm-btn" data-borrar-nota="' + n.id + '" data-confirmar="0" style="min-height:36px;padding:6px 12px">Borrar</button>' : '') +
           '</div><div class="texto">' + esc(n.texto) + '</div></li>';
       }).join('')
-      : '<li style="color:#5B6E70">Todavía no hay notas de visita.</li>';
+      : '<li style="color:#5A6D7A">Todavía no hay notas de visita.</li>';
   }
 
   // ---------- Radiografías ----------

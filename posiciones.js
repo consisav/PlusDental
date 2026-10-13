@@ -16,7 +16,7 @@
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function aviso(id, texto, error) { $(id).textContent = texto || ''; $(id).style.color = error ? '#9A3B2E' : '#44585B'; }
+  function aviso(id, texto, error) { $(id).textContent = texto || ''; $(id).style.color = error ? '#9A3B2E' : '#475B68'; }
   function esSuper() { return window.PD_SESION && window.PD_SESION.esSuper(); }
   function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function sumarDias(f, n) { var p = f.split('-'); return iso(new Date(+p[0], p[1] - 1, +p[2] + n)); }
@@ -86,8 +86,8 @@
         '<select class="pos-estado est-' + p.estado + '" data-estado-pos="' + p.id + '" aria-label="Estado de ' + esc(p.nombre) + '"' + (p.activa ? '' : ' disabled') + '>' + opciones + '</select></div>' +
         '<h4>' + esc(p.nombre) + '</h4>' +
         '<div class="det">' + (p.ubicacion ? esc(p.ubicacion) + '<br>' : '') + (p.especialidad ? '<strong>' + esc(p.especialidad) + '</strong><br>' : '') +
-        (resp.length ? 'Atiende: ' + esc(resp.join(', ')) : '<span style="color:#9AA8AA">Sin responsable asignado</span>') + '</div>' +
-        '<div class="det" style="font-size:12px;color:#5B6E70">' + ESTADOS[p.estado] + ' ' + hace(p.estado_desde) + (p.estado_por ? ' · ' + esc(p.estado_por) : '') + '</div>' +
+        (resp.length ? 'Atiende: ' + esc(resp.join(', ')) : '<span style="color:#94A6B2">Sin responsable asignado</span>') + '</div>' +
+        '<div class="det" style="font-size:12px;color:#5A6D7A">' + ESTADOS[p.estado] + ' ' + hace(p.estado_desde) + (p.estado_por ? ' · ' + esc(p.estado_por) : '') + '</div>' +
         '<div class="pie"><span class="det">Hoy: <strong>' + (citasHoy[p.id] || 0) + '</strong> cita(s)</span>' +
         '<button type="button" class="adm-btn" data-abrir-pos="' + p.id + '">Abrir</button></div></article>';
     }).join('');
@@ -140,7 +140,7 @@
     var lista = personal.filter(function (p) { return roles.indexOf(p.rol) >= 0 && (p.activo || (elegidos || []).indexOf(p.id) >= 0); });
     $(contenedor).innerHTML = lista.length ? lista.map(function (p) {
       return '<label><input type="checkbox" value="' + p.id + '"' + ((elegidos || []).indexOf(p.id) >= 0 ? ' checked' : '') + '>' + esc(p.nombre) +
-        '<span style="color:#5B6E70;font-size:12px">' + ROLES[p.rol] + (p.especialidad ? ' · ' + esc(p.especialidad) : '') + '</span></label>';
+        '<span style="color:#5A6D7A;font-size:12px">' + ROLES[p.rol] + (p.especialidad ? ' · ' + esc(p.especialidad) : '') + '</span></label>';
     }).join('') : '<span class="dlg-msg">No hay personal con este rol. Agrégalo en «Personal».</span>';
   }
 
@@ -247,10 +247,10 @@
       var abierta = (actual.horario || {})[diaSemana(f)];
       var citas = r.data.filter(function (c) { return c.fecha === f; });
       var p = f.split('-'), d = new Date(+p[0], p[1] - 1, +p[2]);
-      return '<div class="dia"' + (abierta ? '' : ' style="background:#F7F8F6"') + '><h5>' + DIAS_CORTOS[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth() + 1) +
-        ' <span style="font-weight:500;color:#5B6E70">' + (abierta ? abierta.abre + '–' + abierta.cierra : 'Cerrada') + '</span></h5>' +
+      return '<div class="dia"' + (abierta ? '' : ' style="background:#F5F9FC"') + '><h5>' + DIAS_CORTOS[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth() + 1) +
+        ' <span style="font-weight:500;color:#5A6D7A">' + (abierta ? abierta.abre + '–' + abierta.cierra : 'Cerrada') + '</span></h5>' +
         (citas.length ? citas.map(function (c) {
-          return '<div class="cita ' + c.estado + '"><strong>' + String(c.hora).slice(0, 5) + '</strong> · ' + esc(c.nombre) + '<br><span style="color:#5B6E70">' + esc(c.servicio) + (c.estado === 'pendiente' ? ' · sin confirmar' : '') + '</span></div>';
+          return '<div class="cita ' + c.estado + '"><strong>' + String(c.hora).slice(0, 5) + '</strong> · ' + esc(c.nombre) + '<br><span style="color:#5A6D7A">' + esc(c.servicio) + (c.estado === 'pendiente' ? ' · sin confirmar' : '') + '</span></div>';
         }).join('') : '<span class="dlg-msg">Sin citas</span>') + '</div>';
     }).join('');
   }
@@ -314,7 +314,7 @@
       return '<tr data-per="' + p.id + '"><td>' + campo('nombre', p.nombre, '100%') + '</td>' +
         '<td><select class="adm-input" data-c="rol" style="border-radius:10px" aria-label="Rol">' + roles + '</select></td>' +
         '<td>' + campo('especialidad', p.especialidad, '150px') + '</td><td>' + campo('colegiado', p.colegiado, '110px') + '</td><td>' + campo('telefono', p.telefono, '130px') + '</td>' +
-        '<td><input type="checkbox" data-c="activo"' + (p.activo ? ' checked' : '') + ' aria-label="Activo" style="width:20px;height:20px;accent-color:#0B6E69"></td>' +
+        '<td><input type="checkbox" data-c="activo"' + (p.activo ? ' checked' : '') + ' aria-label="Activo" style="width:20px;height:20px;accent-color:#005A87"></td>' +
         '<td><button type="button" class="adm-btn" data-guardar-per="' + p.id + '">Guardar</button></td></tr>';
     }).join('') : '<tr><td colspan="7">Todavía no hay personal registrado.</td></tr>';
   }

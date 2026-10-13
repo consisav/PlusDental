@@ -1,7 +1,7 @@
 // Plus Dental — interacción de la página (asistente, agenda y preguntas frecuentes)
 (function () {
   var WHATSAPP = '50237565739';
-  var DARK = '#0F2A2E', LINE = '#C9D4D2';
+  var DARK = '#0B2B40', LINE = '#C4D4DF';
   var sb = window.PD_SB || null;
   // Horarios reales desde Supabase: { 'AAAA-MM-DD': [{ hora: '09:30', libre: true }] }.
   // Si no se pueden cargar, la agenda ofrece los horarios fijos y envía la solicitud por WhatsApp.
@@ -61,7 +61,7 @@
   function bookMsg(texto, error) {
     $('bookMsg').hidden = !texto;
     $('bookMsg').textContent = texto || '';
-    $('bookMsg').style.color = error ? '#9A3B2E' : '#44585B';
+    $('bookMsg').style.color = error ? '#9A3B2E' : '#475B68';
   }
 
   // Próximo horario libre (tarjeta de la portada)
@@ -88,7 +88,7 @@
     $('concerns').innerHTML = concernList.map(function (c, i) {
       var on = state.concern === c[0];
       var st = 'display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;padding:20px;min-height:104px;border-radius:18px;cursor:pointer;font:inherit;' +
-        (on ? 'background:#FFFFFF;color:#0F2A2E;border:1px solid #FFFFFF;' : 'background:transparent;color:#FFFFFF;border:1px solid rgba(255,255,255,.28);');
+        (on ? 'background:#FFFFFF;color:#0B2B40;border:1px solid #FFFFFF;' : 'background:transparent;color:#FFFFFF;border:1px solid rgba(255,255,255,.28);');
       return '<button type="button" data-concern="' + c[0] + '" aria-pressed="' + on + '" style="' + st + '">' +
         '<span style="font-size:12px;opacity:.7;letter-spacing:1px">0' + (i + 1) + '</span>' +
         '<span style="font-size:17px;font-weight:600;line-height:1.3">' + esc(c[1]) + '</span></button>';
@@ -111,11 +111,11 @@
 
     var lista = slots();
     $('times').innerHTML = !lista.some(function (s) { return s.libre; })
-      ? '<p style="grid-column:1/-1;margin:0;padding:12px 0;font-size:15px;color:#5B6E70">No quedan horarios libres este día. Elige otro día o escríbenos por WhatsApp.</p>'
+      ? '<p style="grid-column:1/-1;margin:0;padding:12px 0;font-size:15px;color:#5A6D7A">No quedan horarios libres este día. Elige otro día o escríbenos por WhatsApp.</p>'
       : lista.map(function (s) {
         var on = state.time === s.hora;
         if (!s.libre) {
-          return '<button type="button" disabled title="Ocupado" aria-label="' + s.hora + ', ocupado" style="font:inherit;font-size:15px;font-weight:600;padding:10px 0;min-height:44px;border-radius:12px;cursor:not-allowed;background:#F1F5F4;color:#9AA8AA;border:1px solid #E4ECEA;text-decoration:line-through">' + s.hora + '</button>';
+          return '<button type="button" disabled title="Ocupado" aria-label="' + s.hora + ', ocupado" style="font:inherit;font-size:15px;font-weight:600;padding:10px 0;min-height:44px;border-radius:12px;cursor:not-allowed;background:#EEF5FA;color:#94A6B2;border:1px solid #E2EEF6;text-decoration:line-through">' + s.hora + '</button>';
         }
         return '<button type="button" data-time="' + s.hora + '" aria-pressed="' + on + '" style="font:inherit;font-size:15px;font-weight:600;padding:10px 0;min-height:44px;border-radius:12px;cursor:pointer;' + pill(on) + '">' + s.hora + '</button>';
       }).join('');
@@ -124,10 +124,10 @@
 
     $('faqs').innerHTML = faqList.map(function (f, i) {
       var open = state.faq === i;
-      return '<div style="border-bottom:1px solid #DCE3E1">' +
-        '<button type="button" data-faq="' + i + '" aria-expanded="' + open + '" style="width:100%;background:transparent;border:0;padding:24px 0;display:flex;justify-content:space-between;align-items:center;gap:16px;font:inherit;font-size:19px;font-weight:600;color:#0F2A2E;text-align:left;cursor:pointer;min-height:44px">' +
-        esc(f[0]) + '<span aria-hidden="true" style="font-size:26px;font-weight:400;color:#0B6E69">' + (open ? '−' : '+') + '</span></button>' +
-        (open ? '<p style="margin:0;padding:0 0 24px;font-size:16px;line-height:1.7;color:#44585B;max-width:720px">' + esc(f[1]) + '</p>' : '') +
+      return '<div style="border-bottom:1px solid #D9E4EC">' +
+        '<button type="button" data-faq="' + i + '" aria-expanded="' + open + '" style="width:100%;background:transparent;border:0;padding:24px 0;display:flex;justify-content:space-between;align-items:center;gap:16px;font:inherit;font-size:19px;font-weight:600;color:#0B2B40;text-align:left;cursor:pointer;min-height:44px">' +
+        esc(f[0]) + '<span aria-hidden="true" style="font-size:26px;font-weight:400;color:#005A87">' + (open ? '−' : '+') + '</span></button>' +
+        (open ? '<p style="margin:0;padding:0 0 24px;font-size:16px;line-height:1.7;color:#475B68;max-width:720px">' + esc(f[1]) + '</p>' : '') +
         '</div>';
     }).join('');
   }

@@ -11,7 +11,7 @@
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function aviso(id, texto, error) { $(id).textContent = texto || ''; $(id).style.color = error ? '#9A3B2E' : '#44585B'; }
+  function aviso(id, texto, error) { $(id).textContent = texto || ''; $(id).style.color = error ? '#9A3B2E' : '#475B68'; }
   function esSuper() { return window.PD_SESION && window.PD_SESION.esSuper(); }
   function q(n) { return 'Q' + (Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -30,11 +30,11 @@
 
   // ---------- Impresión (recibos y estados de cuenta) ----------
   function encabezado(titulo) {
-    return '<div style="font-family:Manrope,system-ui,sans-serif;color:#0F2A2E;max-width:720px;margin:0 auto;padding:24px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid #0F2A2E;padding-bottom:14px;margin-bottom:18px">' +
+    return '<div style="font-family:Manrope,system-ui,sans-serif;color:#0B2B40;max-width:720px;margin:0 auto;padding:24px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid #0B2B40;padding-bottom:14px;margin-bottom:18px">' +
       '<div><div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:30px">' + CLINICA.nombre + '</div>' +
-      '<div style="font-size:12px;color:#44585B">' + CLINICA.direccion + ' · ' + CLINICA.telefono + '</div></div>' +
-      '<div style="text-align:right;font-size:13px;color:#44585B"><div style="font-size:18px;font-weight:700;color:#0F2A2E">' + titulo + '</div>Impreso el ' + fechaCorta(hoy()) + '</div></div>';
+      '<div style="font-size:12px;color:#475B68">' + CLINICA.direccion + ' · ' + CLINICA.telefono + '</div></div>' +
+      '<div style="text-align:right;font-size:13px;color:#475B68"><div style="font-size:18px;font-weight:700;color:#0B2B40">' + titulo + '</div>Impreso el ' + fechaCorta(hoy()) + '</div></div>';
   }
   function imprimir(html) {
     $('impresion').innerHTML = html;
@@ -47,7 +47,7 @@
   });
 
   function htmlRecibo(p) {
-    var fila = function (k, v) { return '<tr><td style="padding:8px 0;color:#44585B;width:200px">' + k + '</td><td style="padding:8px 0;font-weight:600">' + v + '</td></tr>'; };
+    var fila = function (k, v) { return '<tr><td style="padding:8px 0;color:#475B68;width:200px">' + k + '</td><td style="padding:8px 0;font-weight:600">' + v + '</td></tr>'; };
     var s = saldoDe[p.paciente_id];
     return encabezado('Recibo ' + recibo(p.id)) +
       (p.anulado ? '<div style="border:2px solid #9A3B2E;color:#9A3B2E;font-weight:700;padding:10px 14px;margin-bottom:14px">RECIBO ANULADO — ' + esc(p.anulado_motivo) + '</div>' : '') +
@@ -60,7 +60,7 @@
       (p.presupuesto_id ? fila('Presupuesto', 'N.º ' + p.presupuesto_id) : '') +
       (s && !p.anulado ? fila('Saldo pendiente a la fecha', q(Math.max(s.saldo, 0))) : '') +
       fila('Registrado por', esc(p.registrado_por || '—')) +
-      '</table><div style="margin-top:60px;display:flex;justify-content:flex-end"><div style="border-top:1px solid #0F2A2E;width:260px;text-align:center;padding-top:6px;font-size:13px">Firma y sello</div></div></div>';
+      '</table><div style="margin-top:60px;display:flex;justify-content:flex-end"><div style="border-top:1px solid #0B2B40;width:260px;text-align:center;padding-top:6px;font-size:13px">Firma y sello</div></div></div>';
   }
 
   // ---------- Saldos ----------
@@ -89,7 +89,7 @@
     $('ecBody').innerHTML = filas.map(function (s) {
       var clase = s.saldo > 0.004 ? 'saldo-debe' : s.saldo < -0.004 ? 'saldo-favor' : '';
       return '<tr><td><strong>' + esc(s.nombre) + '</strong></td><td class="num">' + q(s.cargos) + '</td><td class="num">' + q(s.abonos) + '</td>' +
-        '<td class="num"><strong class="' + clase + '">' + q(s.saldo) + '</strong>' + (s.saldo < -0.004 ? '<br><span style="font-size:12px;color:#0B6E69">a favor</span>' : '') + '</td>' +
+        '<td class="num"><strong class="' + clase + '">' + q(s.saldo) + '</strong>' + (s.saldo < -0.004 ? '<br><span style="font-size:12px;color:#005A87">a favor</span>' : '') + '</td>' +
         '<td class="fecha">' + fechaCorta(s.ultimo_movimiento) + '</td>' +
         '<td><button type="button" class="adm-btn" data-ec="' + s.paciente_id + '">Ver</button></td></tr>';
     }).join('');
@@ -113,7 +113,7 @@
     $('ecSaldo').className = acumulado > 0.004 ? 'saldo-debe' : acumulado < -0.004 ? 'saldo-favor' : '';
     $('ecMovs').innerHTML = movimientos.length ? movimientos.map(function (m) {
       return '<tr><td class="fecha">' + fechaCorta(m.fecha) + '</td><td>' + esc(m.concepto) + '</td>' +
-        '<td class="num">' + (m.cargo ? q(m.cargo) : '') + '</td><td class="num" style="color:#0B6E69">' + (m.abono ? q(m.abono) : '') + '</td>' +
+        '<td class="num">' + (m.cargo ? q(m.cargo) : '') + '</td><td class="num" style="color:#005A87">' + (m.abono ? q(m.abono) : '') + '</td>' +
         '<td class="num"><strong>' + q(m.saldo) + '</strong></td></tr>';
     }).join('') : '<tr><td colspan="5">Sin movimientos. Los cargos aparecen al marcar tratamientos como realizados en un presupuesto aprobado.</td></tr>';
 
@@ -130,7 +130,7 @@
 
   function imprimirEstado() {
     var ultimo = movimientos.length ? movimientos[movimientos.length - 1].saldo : 0;
-    var celda = 'padding:8px 6px;border-bottom:1px solid #DCE3E1';
+    var celda = 'padding:8px 6px;border-bottom:1px solid #D9E4EC';
     imprimir(encabezado('Estado de cuenta') +
       '<div style="font-size:16px;margin-bottom:14px"><strong>' + esc(ecActual.nombre) + '</strong></div>' +
       '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>' +
@@ -198,7 +198,7 @@
         (p.anulado ? '<br><span class="estado estado-cancelada" title="' + esc(p.anulado_motivo) + '">Anulado</span>' : '') + '</td>' +
         '<td class="fecha">' + fechaCorta(p.fecha) + '</td><td><strong>' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</strong></td>' +
         '<td>' + esc(p.concepto || (p.presupuesto_id ? 'Presupuesto N.º ' + p.presupuesto_id : '—')) + '</td>' +
-        '<td>' + METODOS[p.metodo] + (p.referencia ? '<br><span style="color:#5B6E70;font-size:13px">' + esc(p.referencia) + '</span>' : '') + '</td>' +
+        '<td>' + METODOS[p.metodo] + (p.referencia ? '<br><span style="color:#5A6D7A;font-size:13px">' + esc(p.referencia) + '</span>' : '') + '</td>' +
         '<td class="num"><strong>' + q(p.monto) + '</strong></td><td><div class="acciones">' + acciones + '</div></td></tr>';
     }).join('');
   }
@@ -220,7 +220,7 @@
     $('pgSaldo').hidden = !s;
     if (s) {
       $('pgSaldo').innerHTML = s.saldo > 0.004 ? 'Saldo pendiente: <strong style="color:#9A3B2E">' + q(s.saldo) + '</strong>'
-        : s.saldo < -0.004 ? 'Tiene saldo a favor: <strong style="color:#0B6E69">' + q(-s.saldo) + '</strong>'
+        : s.saldo < -0.004 ? 'Tiene saldo a favor: <strong style="color:#005A87">' + q(-s.saldo) + '</strong>'
           : 'No tiene saldo pendiente. El pago quedará como saldo a favor.';
     }
     $('pgPresupuesto').innerHTML = '<option value="">Sin presupuesto</option>';

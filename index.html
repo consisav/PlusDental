@@ -5,88 +5,88 @@
 <title>Plus Dental — Tratamientos dentales</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Plus Dental: odontología integral en zona 10, Ciudad de Guatemala. Limpieza, estética, ortodoncia, implantes y endodoncia. Agenda tu cita en línea.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Ccircle cx='17' cy='17' r='16' fill='%230B6E69'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Ccircle cx='17' cy='17' r='16' fill='%23005A87'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
 <style>
-body{margin:0;background:#F7F8F6}
-a{color:#0B6E69}a:hover{color:#08504C}
+body{margin:0;background:#F5F9FC}
+a{color:#005A87}a:hover{color:#00476B}
 .btn{transition:background .2s ease,transform .2s ease}
-.btn:hover{transform:translateY(-1px)}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
 .card{transition:border-color .2s ease,box-shadow .2s ease}
-.card:hover{border-color:#0B6E69 !important;box-shadow:0 12px 32px rgba(15,42,46,.08)}
-input:focus{outline:2px solid #0B6E69;outline-offset:1px}
-button:focus-visible,a:focus-visible{outline:2px solid #0B6E69;outline-offset:2px}
+.card:hover{border-color:#005A87 !important;box-shadow:0 12px 32px rgba(11,43,64,.08)}
+input:focus{outline:2px solid #005A87;outline-offset:1px}
+button:focus-visible,a:focus-visible{outline:2px solid #005A87;outline-offset:2px}
 html{scroll-behavior:smooth;scroll-padding-top:96px}
-.topbar{position:sticky;top:0;z-index:20;background:rgba(247,248,246,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid #DCE3E1}
+.topbar{position:sticky;top:0;z-index:20;background:rgba(245,249,252,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid #D9E4EC}
 .mainmenu{display:flex;align-items:center;gap:28px;font-size:15px;font-weight:500}
-.mainmenu a:not(.btn){color:#0F2A2E;text-decoration:none;padding:10px 0}
-.mainmenu a:not(.btn):hover{color:#0B6E69}
-.menu-login{display:inline-flex;align-items:center;gap:8px;font:inherit;font-weight:600;font-size:15px;color:#0F2A2E;background:transparent;border:1px solid #C9D4D2;border-radius:999px;padding:11px 18px;min-height:44px;cursor:pointer}
-.menu-login:hover{border-color:#0B6E69;color:#0B6E69}
-.menu-btn{display:none;align-items:center;gap:8px;font:inherit;font-weight:600;font-size:15px;color:#0F2A2E;background:transparent;border:1px solid #C9D4D2;border-radius:999px;padding:10px 16px;min-height:44px;cursor:pointer}
-#loginDlg,#claveDlg{border:0;border-radius:24px;padding:0;width:min(440px,calc(100% - 32px));box-shadow:0 30px 80px rgba(15,42,46,.25);color:#0F2A2E}
+.mainmenu a:not(.btn){color:#0B2B40;text-decoration:none;padding:10px 0}
+.mainmenu a:not(.btn):hover{color:#005A87}
+.menu-login{display:inline-flex;align-items:center;gap:8px;font:inherit;font-weight:600;font-size:15px;color:#0B2B40;background:transparent;border:1px solid #C4D4DF;border-radius:999px;padding:11px 18px;min-height:44px;cursor:pointer}
+.menu-login:hover{border-color:#005A87;color:#005A87}
+.menu-btn{display:none;align-items:center;gap:8px;font:inherit;font-weight:600;font-size:15px;color:#0B2B40;background:transparent;border:1px solid #C4D4DF;border-radius:999px;padding:10px 16px;min-height:44px;cursor:pointer}
+#loginDlg,#claveDlg{border:0;border-radius:24px;padding:0;width:min(440px,calc(100% - 32px));box-shadow:0 30px 80px rgba(11,43,64,.25);color:#0B2B40}
 [hidden]{display:none !important}
 #loginDlg.wide{width:min(640px,calc(100% - 32px))}
 .dlg-form{display:flex;flex-direction:column;gap:16px}
 .dlg-form label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
-.dlg-form input{font:inherit;font-weight:400;padding:12px 14px;border:1px solid #C9D4D2;border-radius:12px;min-height:44px;box-sizing:border-box}
-.dlg-submit{background:#0B6E69;color:#FFFFFF;border:0;padding:15px 24px;border-radius:999px;font:inherit;font-weight:700;font-size:16px;cursor:pointer;min-height:48px}
+.dlg-form input{font:inherit;font-weight:400;padding:12px 14px;border:1px solid #C4D4DF;border-radius:12px;min-height:44px;box-sizing:border-box}
+.dlg-submit{background:#005A87;color:#FFFFFF;border:0;padding:15px 24px;border-radius:999px;font:inherit;font-weight:700;font-size:16px;cursor:pointer;min-height:48px}
 .dlg-submit:disabled{opacity:.6;cursor:wait}
-.dlg-link{background:transparent;border:0;padding:8px 0;font:inherit;font-size:15px;font-weight:600;color:#0B6E69;cursor:pointer;text-decoration:underline;text-underline-offset:3px;align-self:flex-start}
-.dlg-msg{margin:0;font-size:14px;line-height:1.5;color:#44585B}
-.role-pill{display:inline-block;background:#E4ECEA;color:#08504C;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700}
-.roles-wrap{overflow-x:auto;border:1px solid #DCE3E1;border-radius:14px}
+.dlg-link{background:transparent;border:0;padding:8px 0;font:inherit;font-size:15px;font-weight:600;color:#005A87;cursor:pointer;text-decoration:underline;text-underline-offset:3px;align-self:flex-start}
+.dlg-msg{margin:0;font-size:14px;line-height:1.5;color:#475B68}
+.role-pill{display:inline-block;background:#E2EEF6;color:#00476B;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700}
+.roles-wrap{overflow-x:auto;border:1px solid #D9E4EC;border-radius:14px}
 .roles-wrap table{width:100%;border-collapse:collapse;font-size:14px}
-.roles-wrap th,.roles-wrap td{text-align:left;padding:10px 12px;border-bottom:1px solid #DCE3E1;vertical-align:middle}
-.roles-wrap th{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#5B6E70;font-weight:600}
-.roles-wrap select{font:inherit;padding:8px 10px;border:1px solid #C9D4D2;border-radius:10px;min-height:40px;background:#FFFFFF;color:#0F2A2E}
-.adm-input{font:inherit;font-size:15px;padding:10px 14px;border:1px solid #C9D4D2;border-radius:999px;min-height:44px;box-sizing:border-box;width:220px;max-width:100%;background:#FFFFFF;color:#0F2A2E}
-.adm-btn{font:inherit;font-size:14px;font-weight:600;padding:10px 16px;min-height:44px;border-radius:999px;cursor:pointer;background:#FFFFFF;color:#0F2A2E;border:1px solid #C9D4D2}
-.adm-btn:hover:not(:disabled){border-color:#0B6E69;color:#0B6E69}
+.roles-wrap th,.roles-wrap td{text-align:left;padding:10px 12px;border-bottom:1px solid #D9E4EC;vertical-align:middle}
+.roles-wrap th{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#5A6D7A;font-weight:600}
+.roles-wrap select{font:inherit;padding:8px 10px;border:1px solid #C4D4DF;border-radius:10px;min-height:40px;background:#FFFFFF;color:#0B2B40}
+.adm-input{font:inherit;font-size:15px;padding:10px 14px;border:1px solid #C4D4DF;border-radius:999px;min-height:44px;box-sizing:border-box;width:220px;max-width:100%;background:#FFFFFF;color:#0B2B40}
+.adm-btn{font:inherit;font-size:14px;font-weight:600;padding:10px 16px;min-height:44px;border-radius:999px;cursor:pointer;background:#FFFFFF;color:#0B2B40;border:1px solid #C4D4DF}
+.adm-btn:hover:not(:disabled){border-color:#005A87;color:#005A87}
 .adm-btn:disabled{opacity:.45;cursor:not-allowed}
-.adm-chip{background:#F1F5F4;border-radius:999px;padding:6px 14px;font-size:14px;color:#44585B}
-.adm-chip b{color:#0F2A2E;font-variant-numeric:tabular-nums}
-.adm-btn[aria-pressed="true"]{background:#0F2A2E;color:#FFFFFF;border-color:#0F2A2E}
-.adm-primary{background:#0B6E69;color:#FFFFFF;border-color:#0B6E69}
-.adm-primary:hover:not(:disabled){background:#08504C;color:#FFFFFF}
+.adm-chip{background:#EEF5FA;border-radius:999px;padding:6px 14px;font-size:14px;color:#475B68}
+.adm-chip b{color:#0B2B40;font-variant-numeric:tabular-nums}
+.adm-btn[aria-pressed="true"]{background:#0B2B40;color:#FFFFFF;border-color:#0B2B40}
+.adm-primary{background:#005A87;color:#FFFFFF;border-color:#005A87}
+.adm-primary:hover:not(:disabled){background:#00476B;color:#FFFFFF}
 .adm-layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:36px;align-items:start}
-.adm-menu{display:flex;flex-direction:column;gap:4px;position:sticky;top:96px;border-right:1px solid #DCE3E1;padding-right:20px}
-.adm-menu button{font:inherit;font-size:15px;font-weight:600;text-align:left;color:#44585B;background:transparent;border:0;border-radius:12px;padding:12px 14px;min-height:44px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
-.adm-menu button:hover{background:#F1F5F4;color:#0F2A2E}
-.adm-menu button[aria-selected="true"]{background:#0F2A2E;color:#FFFFFF}
+.adm-menu{display:flex;flex-direction:column;gap:4px;position:sticky;top:96px;border-right:1px solid #D9E4EC;padding-right:20px}
+.adm-menu button{font:inherit;font-size:15px;font-weight:600;text-align:left;color:#475B68;background:transparent;border:0;border-radius:12px;padding:12px 14px;min-height:44px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.adm-menu button:hover{background:#EEF5FA;color:#0B2B40}
+.adm-menu button[aria-selected="true"]{background:#0B2B40;color:#FFFFFF}
 .adm-menu .pronto{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;opacity:.55}
 .adm-main{min-width:0}
 .adm-pane{display:flex;flex-direction:column;gap:20px}
 .adm-pane-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .adm-h{margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:34px;line-height:1.1}
-.adm-intro{margin:0;font-size:17px;line-height:1.6;color:#44585B;max-width:60ch}
-.adm-plan{margin:0;padding:20px 24px 20px 44px;background:#F7F8F6;border:1px dashed #C9D4D2;border-radius:18px;display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.5;color:#44585B}
-.pronto-pill{background:#ECEFEF;color:#5B6E70;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700}
+.adm-intro{margin:0;font-size:17px;line-height:1.6;color:#475B68;max-width:60ch}
+.adm-plan{margin:0;padding:20px 24px 20px 44px;background:#F5F9FC;border:1px dashed #C4D4DF;border-radius:18px;display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.5;color:#475B68}
+.pronto-pill{background:#EBF0F4;color:#5A6D7A;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700}
 @media (max-width:960px){
 .adm-layout{grid-template-columns:minmax(0,1fr);gap:20px}
-.adm-menu{flex-direction:row;overflow-x:auto;position:static;border-right:0;border-bottom:1px solid #DCE3E1;padding:0 0 8px}
+.adm-menu{flex-direction:row;overflow-x:auto;position:static;border-right:0;border-bottom:1px solid #D9E4EC;padding:0 0 8px}
 .adm-menu button{white-space:nowrap;flex:0 0 auto}
 }
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .exp-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .exp-form .full{grid-column:1/-1}
 .exp-form label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
-.exp-form input,.exp-form textarea,.exp-form select{font:inherit;font-weight:400;font-size:15px;padding:12px 14px;border:1px solid #C9D4D2;border-radius:12px;min-height:44px;box-sizing:border-box;background:#FFFFFF;color:#0F2A2E;width:100%}
+.exp-form input,.exp-form textarea,.exp-form select{font:inherit;font-weight:400;font-size:15px;padding:12px 14px;border:1px solid #C4D4DF;border-radius:12px;min-height:44px;box-sizing:border-box;background:#FFFFFF;color:#0B2B40;width:100%}
 .exp-form textarea{resize:vertical;line-height:1.5}
 .exp-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .exp-actions .dlg-submit{padding:13px 24px}
 @media (max-width:640px){.exp-form{grid-template-columns:minmax(0,1fr)}}
 .nota-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
-.nota-lista li{border-top:1px solid #DCE3E1;padding:16px 0;display:flex;flex-direction:column;gap:6px}
-.nota-lista .meta{font-size:13px;color:#5B6E70;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+.nota-lista li{border-top:1px solid #D9E4EC;padding:16px 0;display:flex;flex-direction:column;gap:6px}
+.nota-lista .meta{font-size:13px;color:#5A6D7A;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
 .nota-lista .texto{font-size:15px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
 .rx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
-.rx-item{border:1px solid #DCE3E1;border-radius:14px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column}
-.rx-item a.ver{display:block;aspect-ratio:4/3;background:#0F2A2E;color:#FFFFFF;text-decoration:none}
+.rx-item{border:1px solid #D9E4EC;border-radius:14px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column}
+.rx-item a.ver{display:block;aspect-ratio:4/3;background:#0B2B40;color:#FFFFFF;text-decoration:none}
 .rx-item img{width:100%;height:100%;object-fit:cover;display:block}
 .rx-item .pdf{display:grid;place-items:center;height:100%;font-weight:700;letter-spacing:1px}
-.rx-item .pie{padding:10px 12px;font-size:13px;color:#44585B;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rx-item .pie{padding:10px 12px;font-size:13px;color:#475B68;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .rx-item .pie span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .num{text-align:right !important;font-variant-numeric:tabular-nums}
 .adm-box.pre-nuevo{flex-direction:row;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:18px}
@@ -94,85 +94,85 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .pre-items td{vertical-align:middle}
 .pre-items .c-trat{min-width:220px}.pre-items .c-pieza{width:80px}.pre-items .c-cant{width:80px}.pre-items .c-precio{width:120px}
 .pre-items input[type=number]{text-align:right}
-.pre-items input[type=checkbox]{width:20px;height:20px;accent-color:#0B6E69;cursor:pointer}
+.pre-items input[type=checkbox]{width:20px;height:20px;accent-color:#005A87;cursor:pointer}
 .pre-bottom{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;justify-content:space-between}
-.pre-notas{font:inherit;font-weight:400;font-size:15px;padding:12px 14px;border:1px solid #C9D4D2;border-radius:12px;width:100%;box-sizing:border-box;resize:vertical;line-height:1.5;background:#FFFFFF;color:#0F2A2E}
-.pre-totales{display:flex;flex-direction:column;gap:10px;min-width:280px;flex:0 1 340px;background:#F7F8F6;border:1px solid #DCE3E1;border-radius:18px;padding:18px 20px}
-.pre-totales>div{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:15px;color:#44585B}
-.pre-totales b{color:#0F2A2E;font-variant-numeric:tabular-nums}
-.pre-totales .total{border-top:1px solid #C9D4D2;padding-top:10px;font-size:18px}.pre-totales .total b{font-size:22px}
-.pre-totales .cargado{font-size:14px}.pre-totales .cargado b{color:#0B6E69}
-.estado-borrador{background:#ECEFEF;color:#44585B}.estado-enviado{background:#DBEAFE;color:#1E40AF}.estado-aprobado{background:#DCF2EC;color:#08504C}.estado-rechazado{background:#FDE2E4;color:#9F1239}
+.pre-notas{font:inherit;font-weight:400;font-size:15px;padding:12px 14px;border:1px solid #C4D4DF;border-radius:12px;width:100%;box-sizing:border-box;resize:vertical;line-height:1.5;background:#FFFFFF;color:#0B2B40}
+.pre-totales{display:flex;flex-direction:column;gap:10px;min-width:280px;flex:0 1 340px;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:18px;padding:18px 20px}
+.pre-totales>div{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:15px;color:#475B68}
+.pre-totales b{color:#0B2B40;font-variant-numeric:tabular-nums}
+.pre-totales .total{border-top:1px solid #C4D4DF;padding-top:10px;font-size:18px}.pre-totales .total b{font-size:22px}
+.pre-totales .cargado{font-size:14px}.pre-totales .cargado b{color:#005A87}
+.estado-borrador{background:#EBF0F4;color:#475B68}.estado-enviado{background:#DBEAFE;color:#1E40AF}.estado-aprobado{background:#DCF2EC;color:#08504C}.estado-rechazado{background:#FDE2E4;color:#9F1239}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
-.kpi{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
-.kpi span{font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:600;color:#5B6E70}
-.kpi b{font-size:26px;color:#0F2A2E;font-variant-numeric:tabular-nums}
+.kpi{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kpi span{font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:600;color:#5A6D7A}
+.kpi b{font-size:26px;color:#0B2B40;font-variant-numeric:tabular-nums}
 .kpi-saldo{min-width:220px}
-.kpi-metodos{display:flex;flex-direction:column;gap:4px;font-size:14px;color:#44585B}
+.kpi-metodos{display:flex;flex-direction:column;gap:4px;font-size:14px;color:#475B68}
 .kpi-metodos div{display:flex;justify-content:space-between;gap:12px}.kpi-metodos b{font-size:14px}
-.saldo-debe{color:#9A3B2E !important}.saldo-favor{color:#0B6E69 !important}
-tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
+.saldo-debe{color:#9A3B2E !important}.saldo-favor{color:#005A87 !important}
+tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .anular-row td{background:#FFF7F5}
 #impresion{display:none}
 @media print{body.imprimir>*:not(#impresion){display:none !important}body.imprimir #impresion{display:block !important}body.imprimir{background:#FFFFFF}}
-.odo-input{font:inherit;font-size:14px;padding:8px 10px;border:1px solid #C9D4D2;border-radius:10px;min-height:40px;box-sizing:border-box;background:#FFFFFF;color:#0F2A2E;width:100%}
+.odo-input{font:inherit;font-size:14px;padding:8px 10px;border:1px solid #C4D4DF;border-radius:10px;min-height:40px;box-sizing:border-box;background:#FFFFFF;color:#0B2B40;width:100%}
 .odo-hora{white-space:nowrap;font-variant-numeric:tabular-nums}
-.odo-meta{display:block;font-size:12px;color:#5B6E70;margin-top:2px}
+.odo-meta{display:block;font-size:12px;color:#5A6D7A;margin-top:2px}
 .pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
-.pos-card{background:#FFFFFF;border:1px solid #DCE3E1;border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.pos-card{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .pos-card.inactiva{opacity:.6}
-.pos-card .cod{font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:#5B6E70}
+.pos-card .cod{font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:#5A6D7A}
 .pos-card h4{margin:0;font-size:18px;font-weight:700;line-height:1.25}
-.pos-card .det{font-size:14px;color:#44585B;line-height:1.5}
-.pos-card .pie{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #DCE3E1;padding-top:10px}
+.pos-card .det{font-size:14px;color:#475B68;line-height:1.5}
+.pos-card .pie{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #D9E4EC;padding-top:10px}
 .pos-estado{font:inherit;font-size:13px;font-weight:700;border-radius:999px;padding:6px 10px;border:1px solid transparent;cursor:pointer;min-height:34px}
 .est-libre{background:#DCF2EC;color:#08504C}.est-ocupado{background:#FEF3C7;color:#92400E}.est-limpieza{background:#DBEAFE;color:#1E40AF}.est-mantenimiento{background:#FDE2E4;color:#9F1239}
-.pos-sec{border:1px solid #DCE3E1;border-radius:18px;padding:16px 18px 18px;margin:0;display:flex;flex-direction:column;gap:12px;min-width:0}
+.pos-sec{border:1px solid #D9E4EC;border-radius:18px;padding:16px 18px 18px;margin:0;display:flex;flex-direction:column;gap:12px;min-width:0}
 .pos-sec legend{font-weight:700;font-size:15px;padding:0 6px}
 .pos-lbl{display:block;font-size:14px;font-weight:600;margin-bottom:8px}
-.pos-checks{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;border:1px solid #DCE3E1;border-radius:12px;padding:10px 12px;background:#FFFFFF}
+.pos-checks{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;border:1px solid #D9E4EC;border-radius:12px;padding:10px 12px;background:#FFFFFF}
 .pos-checks label{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;flex-direction:row}
-.pos-checks input{width:18px;height:18px;min-height:0;accent-color:#0B6E69}
+.pos-checks input{width:18px;height:18px;min-height:0;accent-color:#005A87}
 .pos-horario{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
-.pos-dia{display:flex;align-items:center;gap:8px;font-size:14px;border:1px solid #DCE3E1;border-radius:12px;padding:8px 10px;background:#FFFFFF}
+.pos-dia{display:flex;align-items:center;gap:8px;font-size:14px;border:1px solid #D9E4EC;border-radius:12px;padding:8px 10px;background:#FFFFFF}
 .pos-dia .nom{width:80px;display:flex;align-items:center;gap:6px;font-weight:600}
-.pos-dia input[type=time]{font:inherit;font-size:14px;border:1px solid #C9D4D2;border-radius:8px;padding:4px 6px;min-height:34px;width:100%}
-.pos-dia input[type=checkbox]{width:18px;height:18px;accent-color:#0B6E69}
+.pos-dia input[type=time]{font:inherit;font-size:14px;border:1px solid #C4D4DF;border-radius:8px;padding:4px 6px;min-height:34px;width:100%}
+.pos-dia input[type=checkbox]{width:18px;height:18px;accent-color:#005A87}
 .pos-activa{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}
-.pos-activa input{width:18px;height:18px;accent-color:#0B6E69}
+.pos-activa input{width:18px;height:18px;accent-color:#005A87}
 .pos-agenda{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-.pos-agenda .dia{background:#FFFFFF;border:1px solid #DCE3E1;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.pos-agenda .dia{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
 .pos-agenda .dia h5{margin:0;font-size:14px;font-weight:700}
-.pos-agenda .cita{font-size:13px;line-height:1.4;border-left:3px solid #0B6E69;padding-left:8px}
+.pos-agenda .cita{font-size:13px;line-height:1.4;border-left:3px solid #005A87;padding-left:8px}
 .pos-agenda .cita.pendiente{border-left-color:#B45309}
 .rot-chart{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:6px;align-items:end;height:180px;padding-top:12px}
 .rot-chart .col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%;min-width:0}
-.rot-chart .bar{width:100%;max-width:34px;background:#0B6E69;border-radius:6px 6px 2px 2px;min-height:2px}
-.rot-chart .col.cerrado .bar{background:#DCE3E1}
+.rot-chart .bar{width:100%;max-width:34px;background:#005A87;border-radius:6px 6px 2px 2px;min-height:2px}
+.rot-chart .col.cerrado .bar{background:#D9E4EC}
 .rot-chart .n{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
-.rot-chart .d{font-size:11px;color:#5B6E70;white-space:nowrap}
+.rot-chart .d{font-size:11px;color:#5A6D7A;white-space:nowrap}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
-.adm-box{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
+.adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
 .adm-field .adm-input{border-radius:12px;width:auto}
 .estado{display:inline-block;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700;white-space:nowrap}
 .estado-pendiente{background:#FEF3C7;color:#92400E}
 .estado-confirmada{background:#DCF2EC;color:#08504C}
-.estado-cancelada{background:#ECEFEF;color:#5B6E70}
+.estado-cancelada{background:#EBF0F4;color:#5A6D7A}
 .acciones{display:flex;gap:8px;flex-wrap:wrap}
 .acciones .adm-btn{min-height:38px;padding:7px 14px}
-.bloq-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #DCE3E1;font-size:15px}
-.roles-wrap td.fecha{color:#5B6E70;white-space:nowrap;font-variant-numeric:tabular-nums}
-#loginDlg::backdrop,#claveDlg::backdrop{background:rgba(15,42,46,.55)}
-.wa-float{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:30;display:inline-flex;align-items:center;gap:10px;background:#1FA855;color:#FFFFFF !important;text-decoration:none;font-family:'Manrope',system-ui,sans-serif;font-weight:700;font-size:15px;padding:14px 20px 14px 16px;border-radius:999px;box-shadow:0 14px 30px rgba(15,42,46,.25);transition:transform .2s ease,background .2s ease}
+.bloq-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #D9E4EC;font-size:15px}
+.roles-wrap td.fecha{color:#5A6D7A;white-space:nowrap;font-variant-numeric:tabular-nums}
+#loginDlg::backdrop,#claveDlg::backdrop{background:rgba(11,43,64,.55)}
+.wa-float{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:30;display:inline-flex;align-items:center;gap:10px;background:#1FA855;color:#FFFFFF !important;text-decoration:none;font-family:'Manrope',system-ui,sans-serif;font-weight:700;font-size:15px;padding:14px 20px 14px 16px;border-radius:999px;box-shadow:0 14px 30px rgba(11,43,64,.25);transition:transform .2s ease,background .2s ease}
 .wa-float:hover{background:#178F47;transform:translateY(-2px)}
 @media (max-width:560px){.wa-float span{display:none}.wa-float{padding:16px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn,.card,.wa-float{transition:none}}
 @media (max-width:1080px){
 .menu-btn{display:inline-flex}
-.mainmenu{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:0;background:#F7F8F6;padding:8px 20px 24px;border-bottom:1px solid #DCE3E1;box-shadow:0 18px 30px rgba(15,42,46,.08)}
+.mainmenu{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:0;background:#F5F9FC;padding:8px 20px 24px;border-bottom:1px solid #D9E4EC;box-shadow:0 18px 30px rgba(11,43,64,.08)}
 .mainmenu.open{display:flex}
-.mainmenu a:not(.btn){padding:14px 0;border-bottom:1px solid #DCE3E1}
+.mainmenu a:not(.btn){padding:14px 0;border-bottom:1px solid #D9E4EC}
 .mainmenu .btn,.mainmenu .menu-login{margin-top:14px;justify-content:center}
 }
 @media (max-width:960px){
@@ -192,14 +192,13 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 </head>
 <body>
 
-<div style="font-family: 'Manrope', system-ui, sans-serif; color: #0F2A2E; background: #F7F8F6; width: 100%; min-width: 0">
+<div style="font-family: 'Manrope', system-ui, sans-serif; color: #0B2B40; background: #F5F9FC; width: 100%; min-width: 0">
 
 <!-- NAV -->
 <div class="topbar">
 <header class="pad" style="position: relative; max-width: 1280px; margin: 0 auto; padding: 16px 48px; display: flex; align-items: center; justify-content: space-between; gap: 24px">
-<a href="#inicio" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #0F2A2E">
-<svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true"><circle cx="17" cy="17" r="16" stroke="#0B6E69" stroke-width="1.5"></circle><path d="M11 12c0-2 1.6-3 3.2-3 1.2 0 1.8.6 2.8.6s1.6-.6 2.8-.6c1.6 0 3.2 1 3.2 3 0 2.4-.8 3.6-1.3 6-.4 2-.7 5-1.9 5-1.3 0-1.2-4-2.8-4s-1.5 4-2.8 4c-1.2 0-1.5-3-1.9-5-.5-2.4-1.3-3.6-1.3-6z" stroke="#0B6E69" stroke-width="1.5" stroke-linejoin="round"></path></svg>
-<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; letter-spacing: 0.2px">Plus Dental</span>
+<a href="#inicio" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #0B2B40">
+<img src="logo-plus-dental.png" alt="Plus Dental" width="86" height="56" style="height: 56px; width: auto; display: block">
 </a>
 <button type="button" class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="mainMenu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>Menú</button>
 <nav class="mainmenu" id="mainMenu" aria-label="Principal">
@@ -207,20 +206,20 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <a href="#tratamientos">Servicios</a>
 <a href="#administracion" data-login="admin">Administración</a>
 <a href="#contacto">Contactarnos</a>
-<a class="btn" href="#agenda" style="background: #0B6E69; color: #FFFFFF; text-decoration: none; padding: 13px 22px; border-radius: 999px; font-weight: 600; font-size: 15px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Programar consulta</a>
+<a class="btn" href="#agenda" style="background: #005A87; color: #FFFFFF; text-decoration: none; padding: 13px 22px; border-radius: 999px; font-weight: 600; font-size: 15px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Programar consulta</a>
 <button type="button" class="menu-login" data-login="user"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg><span id="loginLabel">Conectarse</span></button>
 </nav>
 </header>
 </div>
 
 <!-- ADMINISTRACIÓN: solo visible para Administrador y Super Administrador -->
-<section id="administracion" hidden style="background: #FFFFFF; border-bottom: 1px solid #DCE3E1">
+<section id="administracion" hidden style="background: #FFFFFF; border-bottom: 1px solid #D9E4EC">
 <div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 56px 48px; display: flex; flex-direction: column; gap: 28px">
 <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap">
 <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
-<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Administración</span>
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #005A87">Administración</span>
 <h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 48px; line-height: 1.05">Panel de la clínica</h2>
-<p id="admQuien" style="margin: 0; font-size: 16px; color: #44585B"></p>
+<p id="admQuien" style="margin: 0; font-size: 16px; color: #475B68"></p>
 </div>
 <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
 <button type="button" id="admRecargar" class="adm-btn">Actualizar</button>
@@ -632,29 +631,29 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <section id="inicio" class="pad" style="max-width: 1280px; margin: 0 auto; padding: 56px 48px 96px">
 <div class="cols2" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px; align-items: center">
 <div style="display: flex; flex-direction: column; gap: 28px">
-<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Odontología integral · Zona 10, Guatemala</span>
-<h1 class="hero-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 76px; line-height: 1.02; letter-spacing: -1px">Una sonrisa sana, <em style="color: #0B6E69">planificada</em> a tu medida.</h1>
-<p style="margin: 0; font-size: 19px; line-height: 1.6; color: #44585B; max-width: 520px">Diagnóstico digital, tratamientos claros y un plan con tiempos y costos definidos desde la primera consulta. Sin sorpresas.</p>
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #005A87">Odontología integral · Zona 10, Guatemala</span>
+<h1 class="hero-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 76px; line-height: 1.02; letter-spacing: -1px">Una sonrisa sana, <em style="color: #188EC0">planificada</em> a tu medida.</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.6; color: #475B68; max-width: 520px">Diagnóstico digital, tratamientos claros y un plan con tiempos y costos definidos desde la primera consulta. Sin sorpresas.</p>
 <div style="display: flex; gap: 14px; flex-wrap: wrap">
-<a class="btn" href="#asistente" style="background: #0B6E69; color: #FFFFFF; text-decoration: none; padding: 16px 26px; border-radius: 999px; font-weight: 600; font-size: 16px; min-height: 44px; box-sizing: border-box">Encontrar mi tratamiento</a>
-<a class="btn" href="#agenda" style="background: transparent; color: #0F2A2E; text-decoration: none; padding: 15px 25px; border-radius: 999px; font-weight: 600; font-size: 16px; border: 1px solid #0F2A2E; min-height: 44px; box-sizing: border-box">Agendar evaluación</a>
+<a class="btn" href="#asistente" style="background: #005A87; color: #FFFFFF; text-decoration: none; padding: 16px 26px; border-radius: 999px; font-weight: 600; font-size: 16px; min-height: 44px; box-sizing: border-box">Encontrar mi tratamiento</a>
+<a class="btn" href="#agenda" style="background: transparent; color: #0B2B40; text-decoration: none; padding: 15px 25px; border-radius: 999px; font-weight: 600; font-size: 16px; border: 1px solid #0B2B40; min-height: 44px; box-sizing: border-box">Agendar evaluación</a>
 </div>
-<div style="display: flex; gap: 28px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid #DCE3E1; font-size: 14px; color: #44585B">
-<span style="display: flex; align-items: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0B6E69" stroke-width="1.8" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Radiografía digital</span>
-<span style="display: flex; align-items: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0B6E69" stroke-width="1.8" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Plan por escrito</span>
-<span style="display: flex; align-items: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0B6E69" stroke-width="1.8" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Opciones de pago</span>
+<div style="display: flex; gap: 28px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid #D9E4EC; font-size: 14px; color: #475B68">
+<span style="display: flex; align-items: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#005A87" stroke-width="1.8" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Radiografía digital</span>
+<span style="display: flex; align-items: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#005A87" stroke-width="1.8" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Plan por escrito</span>
+<span style="display: flex; align-items: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#005A87" stroke-width="1.8" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Opciones de pago</span>
 </div>
 </div>
 <div style="position: relative; min-height: 560px">
-<div role="img" aria-label="Espacio para fotografía de la clínica" style="position: absolute; inset: 0 0 0 48px; border-radius: 28px; background: #E4ECEA; display: flex; align-items: center; justify-content: center; color: #5B6E70; font-size: 14px; letter-spacing: 1px; text-transform: uppercase">[FOTO DE LA CLÍNICA]</div>
-<div style="position: absolute; left: 0; bottom: 40px; width: 300px; background: #FFFFFF; border-radius: 20px; padding: 22px; box-shadow: 0 24px 48px rgba(15,42,46,.12); display: flex; flex-direction: column; gap: 14px">
-<div style="display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: #0B6E69; text-transform: uppercase; letter-spacing: 1.2px">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0B6E69" stroke-width="1.8" aria-hidden="true"><path d="M12 3l2.2 5.4L20 9l-4.4 3.8L17 19l-5-3-5 3 1.4-6.2L4 9l5.8-.6z"></path></svg>Asistente inteligente</div>
+<div role="img" aria-label="Espacio para fotografía de la clínica" style="position: absolute; inset: 0 0 0 48px; border-radius: 28px; background: linear-gradient(140deg, #E8F3FA 0%, #D3E9F6 55%, #BFDFF2 100%); display: flex; align-items: center; justify-content: center; color: #5A6D7A; font-size: 14px; letter-spacing: 1px; text-transform: uppercase">[FOTO DE LA CLÍNICA]</div>
+<div style="position: absolute; left: 0; bottom: 40px; width: 300px; background: #FFFFFF; border-radius: 20px; padding: 22px; box-shadow: 0 24px 48px rgba(11,43,64,.12); display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: #005A87; text-transform: uppercase; letter-spacing: 1.2px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#005A87" stroke-width="1.8" aria-hidden="true"><path d="M12 3l2.2 5.4L20 9l-4.4 3.8L17 19l-5-3-5 3 1.4-6.2L4 9l5.8-.6z"></path></svg>Asistente inteligente</div>
 <div style="font-size: 17px; font-weight: 600; line-height: 1.4">Cuéntanos qué sientes y te sugerimos el tratamiento adecuado.</div>
 <a href="#asistente" style="font-size: 15px; font-weight: 600">Probar ahora →</a>
 </div>
-<div style="position: absolute; right: 24px; top: 28px; background: #0F2A2E; color: #FFFFFF; border-radius: 16px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px">
-<span style="font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: #B9CFCC">Próximo espacio</span>
+<div style="position: absolute; right: 24px; top: 28px; background: #0B2B40; color: #FFFFFF; border-radius: 16px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: #A9CBE0">Próximo espacio</span>
 <span style="font-size: 18px; font-weight: 600"><span id="firstDay"></span></span>
 </div>
 </div>
@@ -665,55 +664,55 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <section id="nosotros" class="pad" style="max-width: 1280px; margin: 0 auto; padding: 24px 48px 104px">
 <div class="cols2" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px; align-items: start">
 <div style="display: flex; flex-direction: column; gap: 18px">
-<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Nosotros</span>
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #005A87">Nosotros</span>
 <h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05">Una clínica que te explica cada paso.</h2>
-<p style="margin: 0; font-size: 18px; line-height: 1.6; color: #44585B">En Plus Dental atendemos a toda la familia en zona 10 de Ciudad de Guatemala. Trabajamos con diagnóstico digital y te entregamos el plan por escrito, para que sepas qué vamos a hacer, cuánto tiempo toma y cuánto cuesta antes de empezar.</p>
-<p style="margin: 0; font-size: 18px; line-height: 1.6; color: #44585B">[HISTORIA DE LA CLÍNICA: AÑO DE FUNDACIÓN Y QUIÉN LA DIRIGE]</p>
+<p style="margin: 0; font-size: 18px; line-height: 1.6; color: #475B68">En Plus Dental atendemos a toda la familia en zona 10 de Ciudad de Guatemala. Trabajamos con diagnóstico digital y te entregamos el plan por escrito, para que sepas qué vamos a hacer, cuánto tiempo toma y cuánto cuesta antes de empezar.</p>
+<p style="margin: 0; font-size: 18px; line-height: 1.6; color: #475B68">[HISTORIA DE LA CLÍNICA: AÑO DE FUNDACIÓN Y QUIÉN LA DIRIGE]</p>
 </div>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
-<div style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+<div style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
 <h3 style="margin: 0; font-size: 18px; font-weight: 700">Diagnóstico digital</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #44585B">Radiografía digital y fotografías clínicas en cada evaluación.</p>
+<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475B68">Radiografía digital y fotografías clínicas en cada evaluación.</p>
 </div>
-<div style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+<div style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
 <h3 style="margin: 0; font-size: 18px; font-weight: 700">Costos claros</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #44585B">Presupuesto completo por escrito y opciones de pago.</p>
+<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475B68">Presupuesto completo por escrito y opciones de pago.</p>
 </div>
-<div style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+<div style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
 <h3 style="margin: 0; font-size: 18px; font-weight: 700">Atención sin prisas</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #44585B">Citas puntuales y tiempo para resolver tus dudas.</p>
+<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475B68">Citas puntuales y tiempo para resolver tus dudas.</p>
 </div>
-<div style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+<div style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
 <h3 style="margin: 0; font-size: 18px; font-weight: 700">Toda la familia</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #44585B">Desde odontopediatría hasta implantes, en un solo lugar.</p>
+<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475B68">Desde odontopediatría hasta implantes, en un solo lugar.</p>
 </div>
 </div>
 </div>
 </section>
 
 <!-- SMART GUIDE -->
-<section id="asistente" style="background: #0F2A2E; color: #FFFFFF">
+<section id="asistente" style="background: #0B2B40; color: #FFFFFF">
 <div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 96px 48px; display: flex; flex-direction: column; gap: 48px">
 <div style="display: flex; flex-direction: column; gap: 16px; max-width: 720px">
-<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #8FD3CB">Asistente de tratamiento</span>
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #6CC4EE">Asistente de tratamiento</span>
 <h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05">¿Qué te gustaría resolver?</h2>
-<p style="margin: 0; font-size: 18px; line-height: 1.6; color: #C6D6D4">Elige lo que más se parece a tu caso. Te mostramos el tratamiento más probable, cuánto suele tomar y qué esperar. La confirmación siempre la da el odontólogo en tu evaluación.</p>
+<p style="margin: 0; font-size: 18px; line-height: 1.6; color: #C2D8E6">Elige lo que más se parece a tu caso. Te mostramos el tratamiento más probable, cuánto suele tomar y qué esperar. La confirmación siempre la da el odontólogo en tu evaluación.</p>
 </div>
 <div class="cols2" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; align-items: start">
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
 <div id="concerns" style="display:contents"></div>
 </div>
-<div style="background: #FFFFFF; color: #0F2A2E; border-radius: 24px; padding: 36px; display: flex; flex-direction: column; gap: 22px; min-height: 380px; box-sizing: border-box">
-<span style="font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Tratamiento sugerido</span>
+<div style="background: #FFFFFF; color: #0B2B40; border-radius: 24px; padding: 36px; display: flex; flex-direction: column; gap: 22px; min-height: 380px; box-sizing: border-box">
+<span style="font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #005A87">Tratamiento sugerido</span>
 <h3 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 40px; line-height: 1.1"><span data-rec="title"></span></h3>
-<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #44585B"><span data-rec="text"></span></p>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #475B68"><span data-rec="text"></span></p>
 <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
-<div style="background: #F1F5F4; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #5B6E70; text-transform: uppercase; letter-spacing: 1px">Duración</span><span style="font-size: 16px; font-weight: 600"><span data-rec="time"></span></span></div>
-<div style="background: #F1F5F4; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #5B6E70; text-transform: uppercase; letter-spacing: 1px">Citas</span><span style="font-size: 16px; font-weight: 600"><span data-rec="visits"></span></span></div>
-<div style="background: #F1F5F4; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #5B6E70; text-transform: uppercase; letter-spacing: 1px">Desde</span><span style="font-size: 16px; font-weight: 600">Q [PRECIO]</span></div>
+<div style="background: #EEF5FA; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #5A6D7A; text-transform: uppercase; letter-spacing: 1px">Duración</span><span style="font-size: 16px; font-weight: 600"><span data-rec="time"></span></span></div>
+<div style="background: #EEF5FA; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #5A6D7A; text-transform: uppercase; letter-spacing: 1px">Citas</span><span style="font-size: 16px; font-weight: 600"><span data-rec="visits"></span></span></div>
+<div style="background: #EEF5FA; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #5A6D7A; text-transform: uppercase; letter-spacing: 1px">Desde</span><span style="font-size: 16px; font-weight: 600">Q [PRECIO]</span></div>
 </div>
-<a class="btn" href="#agenda" id="bookRec" style="align-self: flex-start; background: #0B6E69; color: #FFFFFF; text-decoration: none; padding: 15px 24px; border-radius: 999px; font-weight: 600; font-size: 15px; min-height: 44px; box-sizing: border-box">Agendar <span data-rec="short"></span></a>
-<span style="font-size: 13px; color: #5B6E70">Orientativo. Tiempos y costos finales se confirman tras la evaluación clínica.</span>
+<a class="btn" href="#agenda" id="bookRec" style="align-self: flex-start; background: #005A87; color: #FFFFFF; text-decoration: none; padding: 15px 24px; border-radius: 999px; font-weight: 600; font-size: 15px; min-height: 44px; box-sizing: border-box">Agendar <span data-rec="short"></span></a>
+<span style="font-size: 13px; color: #5A6D7A">Orientativo. Tiempos y costos finales se confirman tras la evaluación clínica.</span>
 </div>
 </div>
 </div>
@@ -723,72 +722,72 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <section id="tratamientos" class="pad" style="max-width: 1280px; margin: 0 auto; padding: 104px 48px; display: flex; flex-direction: column; gap: 48px">
 <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap">
 <div style="display: flex; flex-direction: column; gap: 14px; max-width: 640px">
-<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Servicios</span>
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #005A87">Servicios</span>
 <h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05">Todo lo que tu sonrisa necesita, en un solo lugar.</h2>
 </div>
 <a href="#agenda" style="font-weight: 600; font-size: 16px">Ver disponibilidad →</a>
 </div>
 <div class="cols3" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
-<article class="card" style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#0B6E69" stroke-width="1.6" aria-hidden="true"><circle cx="20" cy="20" r="12"></circle><path d="M20 4v4M20 32v4M4 20h4M32 20h4"></path></svg>
+<article class="card" style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#005A87" stroke-width="1.6" aria-hidden="true"><circle cx="20" cy="20" r="12"></circle><path d="M20 4v4M20 32v4M4 20h4M32 20h4"></path></svg>
 <h3 style="margin: 0; font-size: 21px; font-weight: 700">Limpieza y prevención</h3>
-<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #44585B">Profilaxis, revisión completa y plan de cuidado en casa para evitar problemas antes de que aparezcan.</p>
+<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #475B68">Profilaxis, revisión completa y plan de cuidado en casa para evitar problemas antes de que aparezcan.</p>
 </article>
-<article class="card" style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#0B6E69" stroke-width="1.6" aria-hidden="true"><path d="M20 6l3 8 8 1-6 6 2 9-7-4-7 4 2-9-6-6 8-1z"></path></svg>
+<article class="card" style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#005A87" stroke-width="1.6" aria-hidden="true"><path d="M20 6l3 8 8 1-6 6 2 9-7-4-7 4 2-9-6-6 8-1z"></path></svg>
 <h3 style="margin: 0; font-size: 21px; font-weight: 700">Estética dental</h3>
-<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #44585B">Blanqueamiento, carillas y diseño de sonrisa con simulación previa del resultado.</p>
+<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #475B68">Blanqueamiento, carillas y diseño de sonrisa con simulación previa del resultado.</p>
 </article>
-<article class="card" style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#0B6E69" stroke-width="1.6" aria-hidden="true"><path d="M6 16c4-4 24-4 28 0M6 24c4 4 24 4 28 0"></path><path d="M12 15v10M20 14v12M28 15v10"></path></svg>
+<article class="card" style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#005A87" stroke-width="1.6" aria-hidden="true"><path d="M6 16c4-4 24-4 28 0M6 24c4 4 24 4 28 0"></path><path d="M12 15v10M20 14v12M28 15v10"></path></svg>
 <h3 style="margin: 0; font-size: 21px; font-weight: 700">Ortodoncia</h3>
-<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #44585B">Alineadores transparentes y brackets estéticos, con seguimiento digital de cada etapa.</p>
+<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #475B68">Alineadores transparentes y brackets estéticos, con seguimiento digital de cada etapa.</p>
 </article>
-<article class="card" style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#0B6E69" stroke-width="1.6" aria-hidden="true"><path d="M13 8h14l-2 10H15z"></path><path d="M17 18l1 4h4l1-4M18 22l-1 4h6l-1-4M17 26l1 6h4l1-6"></path></svg>
+<article class="card" style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#005A87" stroke-width="1.6" aria-hidden="true"><path d="M13 8h14l-2 10H15z"></path><path d="M17 18l1 4h4l1-4M18 22l-1 4h6l-1-4M17 26l1 6h4l1-6"></path></svg>
 <h3 style="margin: 0; font-size: 21px; font-weight: 700">Implantes dentales</h3>
-<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #44585B">Reposición fija de piezas perdidas, planificada con imagen 3D para mayor precisión.</p>
+<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #475B68">Reposición fija de piezas perdidas, planificada con imagen 3D para mayor precisión.</p>
 </article>
-<article class="card" style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#0B6E69" stroke-width="1.6" aria-hidden="true"><path d="M12 10c0-3 2-4 4-4 2 0 3 1 4 1s2-1 4-1c2 0 4 1 4 4 0 4-1 6-2 10-.6 3-1 8-3 8s-2-6-3-6-1 6-3 6-2.4-5-3-8c-1-4-2-6-2-10z"></path><path d="M20 12v8"></path></svg>
+<article class="card" style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#005A87" stroke-width="1.6" aria-hidden="true"><path d="M12 10c0-3 2-4 4-4 2 0 3 1 4 1s2-1 4-1c2 0 4 1 4 4 0 4-1 6-2 10-.6 3-1 8-3 8s-2-6-3-6-1 6-3 6-2.4-5-3-8c-1-4-2-6-2-10z"></path><path d="M20 12v8"></path></svg>
 <h3 style="margin: 0; font-size: 21px; font-weight: 700">Endodoncia</h3>
-<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #44585B">Tratamiento de conductos para eliminar el dolor y conservar tu pieza natural.</p>
+<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #475B68">Tratamiento de conductos para eliminar el dolor y conservar tu pieza natural.</p>
 </article>
-<article class="card" style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#0B6E69" stroke-width="1.6" aria-hidden="true"><circle cx="15" cy="15" r="6"></circle><circle cx="27" cy="25" r="6"></circle><path d="M8 32c2-4 5-6 7-6M32 8c-2 4-5 6-7 6"></path></svg>
+<article class="card" style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#005A87" stroke-width="1.6" aria-hidden="true"><circle cx="15" cy="15" r="6"></circle><circle cx="27" cy="25" r="6"></circle><path d="M8 32c2-4 5-6 7-6M32 8c-2 4-5 6-7 6"></path></svg>
 <h3 style="margin: 0; font-size: 21px; font-weight: 700">Odontopediatría</h3>
-<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #44585B">Atención amable para niños, con enfoque preventivo y un ambiente sin miedo.</p>
+<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #475B68">Atención amable para niños, con enfoque preventivo y un ambiente sin miedo.</p>
 </article>
 </div>
 </section>
 
 <!-- PROCESS -->
-<section id="proceso" style="background: #EDE8DF">
+<section id="proceso" style="background: #E8F3FA">
 <div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 96px 48px; display: flex; flex-direction: column; gap: 48px">
 <div style="display: flex; flex-direction: column; gap: 14px; max-width: 640px">
-<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #08504C">Cómo trabajamos</span>
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #00476B">Cómo trabajamos</span>
 <h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05">Cuatro pasos, cero sorpresas.</h2>
 </div>
 <div class="cols4" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px">
-<div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #0F2A2E; padding-top: 20px">
-<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; color: #08504C">01</span>
+<div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #0B2B40; padding-top: 20px">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; color: #00476B">01</span>
 <h3 style="margin: 0; font-size: 19px; font-weight: 700">Evaluación</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #44585B">Revisión clínica, fotografías y radiografía digital.</p>
+<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475B68">Revisión clínica, fotografías y radiografía digital.</p>
 </div>
-<div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #0F2A2E; padding-top: 20px">
-<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; color: #08504C">02</span>
+<div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #0B2B40; padding-top: 20px">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; color: #00476B">02</span>
 <h3 style="margin: 0; font-size: 19px; font-weight: 700">Plan claro</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #44585B">Opciones, tiempos y costo total por escrito antes de empezar.</p>
+<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475B68">Opciones, tiempos y costo total por escrito antes de empezar.</p>
 </div>
-<div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #0F2A2E; padding-top: 20px">
-<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; color: #08504C">03</span>
+<div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #0B2B40; padding-top: 20px">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; color: #00476B">03</span>
 <h3 style="margin: 0; font-size: 19px; font-weight: 700">Tratamiento</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #44585B">Citas puntuales, recordatorios y atención sin prisas.</p>
+<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475B68">Citas puntuales, recordatorios y atención sin prisas.</p>
 </div>
-<div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #0F2A2E; padding-top: 20px">
-<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; color: #08504C">04</span>
+<div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #0B2B40; padding-top: 20px">
+<span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; color: #00476B">04</span>
 <h3 style="margin: 0; font-size: 19px; font-weight: 700">Seguimiento</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #44585B">Control posterior y recordatorio de tu próxima limpieza.</p>
+<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475B68">Control posterior y recordatorio de tu próxima limpieza.</p>
 </div>
 </div>
 </div>
@@ -798,12 +797,12 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <section id="agenda" class="pad" style="max-width: 1280px; margin: 0 auto; padding: 104px 48px">
 <div class="cols2" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px; align-items: start">
 <div style="display: flex; flex-direction: column; gap: 18px">
-<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Agenda en línea</span>
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #005A87">Agenda en línea</span>
 <h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05">Reserva tu cita en menos de un minuto.</h2>
-<p style="margin: 0; font-size: 18px; line-height: 1.6; color: #44585B">Elige el servicio, el día y la hora. Te confirmamos por WhatsApp y te enviamos un recordatorio el día anterior.</p>
-<span style="font-size: 16px; color: #44585B">¿Prefieres llamar? <a href="#contacto" style="font-weight: 600">Ver datos de contacto</a></span>
+<p style="margin: 0; font-size: 18px; line-height: 1.6; color: #475B68">Elige el servicio, el día y la hora. Te confirmamos por WhatsApp y te enviamos un recordatorio el día anterior.</p>
+<span style="font-size: 16px; color: #475B68">¿Prefieres llamar? <a href="#contacto" style="font-weight: 600">Ver datos de contacto</a></span>
 </div>
-<div style="background: #FFFFFF; border: 1px solid #DCE3E1; border-radius: 24px; padding: 32px; display: flex; flex-direction: column; gap: 24px">
+<div style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 24px; padding: 32px; display: flex; flex-direction: column; gap: 24px">
 <div id="formView">
 <div style="display: flex; flex-direction: column; gap: 24px">
 <div style="display: flex; flex-direction: column; gap: 10px">
@@ -825,20 +824,20 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 </div>
 </div>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
-<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">Nombre<input id="bookName" type="text" autocomplete="name" maxlength="120" placeholder="Tu nombre" style="font: inherit; font-weight: 400; padding: 12px 14px; border: 1px solid #C9D4D2; border-radius: 12px; min-height: 44px; box-sizing: border-box"></label>
-<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">WhatsApp<input id="bookPhone" type="tel" autocomplete="tel" maxlength="40" placeholder="+502 0000 0000" style="font: inherit; font-weight: 400; padding: 12px 14px; border: 1px solid #C9D4D2; border-radius: 12px; min-height: 44px; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">Nombre<input id="bookName" type="text" autocomplete="name" maxlength="120" placeholder="Tu nombre" style="font: inherit; font-weight: 400; padding: 12px 14px; border: 1px solid #C4D4DF; border-radius: 12px; min-height: 44px; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">WhatsApp<input id="bookPhone" type="tel" autocomplete="tel" maxlength="40" placeholder="+502 0000 0000" style="font: inherit; font-weight: 400; padding: 12px 14px; border: 1px solid #C4D4DF; border-radius: 12px; min-height: 44px; box-sizing: border-box"></label>
 </div>
-<button type="button" class="btn" id="confirmBtn" style="background: #0B6E69; color: #FFFFFF; border: 0; padding: 16px 24px; border-radius: 999px; font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; min-height: 48px">Confirmar: <span class="summary"></span></button>
+<button type="button" class="btn" id="confirmBtn" style="background: #005A87; color: #FFFFFF; border: 0; padding: 16px 24px; border-radius: 999px; font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; min-height: 48px">Confirmar: <span class="summary"></span></button>
 <p id="bookMsg" class="dlg-msg" role="status" hidden></p>
 </div>
 </div>
 <div id="doneView" hidden>
 <div style="display: flex; flex-direction: column; gap: 18px; align-items: flex-start; padding: 24px 0">
-<svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true"><circle cx="28" cy="28" r="27" stroke="#0B6E69" stroke-width="2"></circle><path d="M17 29l7 7 15-16" stroke="#0B6E69" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true"><circle cx="28" cy="28" r="27" stroke="#005A87" stroke-width="2"></circle><path d="M17 29l7 7 15-16" stroke="#005A87" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 <h3 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 38px; line-height: 1.1">¡Solicitud recibida!</h3>
-<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #44585B"><strong id="doneSummary" style="color: #0F2A2E"></strong>. <span id="doneText">Te escribiremos por WhatsApp para confirmar tu cita.</span></p>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #475B68"><strong id="doneSummary" style="color: #0B2B40"></strong>. <span id="doneText">Te escribiremos por WhatsApp para confirmar tu cita.</span></p>
 <a id="waDone" href="#" target="_blank" rel="noopener" style="font-weight: 600; font-size: 16px">Enviar también por WhatsApp →</a>
-<button type="button" id="resetBtn" style="background: transparent; border: 1px solid #0F2A2E; color: #0F2A2E; padding: 12px 20px; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px">Cambiar cita</button>
+<button type="button" id="resetBtn" style="background: transparent; border: 1px solid #0B2B40; color: #0B2B40; padding: 12px 20px; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px">Cambiar cita</button>
 </div>
 </div>
 </div>
@@ -848,41 +847,41 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <!-- FAQ -->
 <section id="preguntas" class="pad" style="max-width: 920px; margin: 0 auto; padding: 24px 48px 104px; display: flex; flex-direction: column; gap: 32px">
 <h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05; text-align: center">Preguntas frecuentes</h2>
-<div style="display: flex; flex-direction: column; border-top: 1px solid #DCE3E1">
+<div style="display: flex; flex-direction: column; border-top: 1px solid #D9E4EC">
 <div id="faqs" style="display:contents"></div>
 </div>
 </section>
 
 <!-- CONTACT -->
-<section id="contacto" style="background: #EDE8DF">
+<section id="contacto" style="background: #E8F3FA">
 <div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 96px 48px; display: flex; flex-direction: column; gap: 40px">
 <div style="display: flex; flex-direction: column; gap: 14px; max-width: 640px">
-<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #08504C">Contactarnos</span>
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #00476B">Contactarnos</span>
 <h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05">Estamos en zona 10.</h2>
 </div>
 <div class="cols3" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
 <div style="background: #FFFFFF; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
-<span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #5B6E70">Teléfono y WhatsApp</span>
+<span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #5A6D7A">Teléfono y WhatsApp</span>
 <span style="font-size: 22px; font-weight: 700">+502 3756-5739</span>
 <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 15px; font-weight: 600"><a href="tel:+50237565739">Llamar</a><a href="https://wa.me/50237565739" target="_blank" rel="noopener">Escribir por WhatsApp</a></div>
 </div>
 <div style="background: #FFFFFF; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
-<span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #5B6E70">Dirección</span>
+<span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #5A6D7A">Dirección</span>
 <span style="font-size: 18px; font-weight: 600; line-height: 1.4">Reforma Montúfar, zona 10, Ciudad de Guatemala</span>
 <a href="https://www.google.com/maps/search/?api=1&amp;query=Reforma+Montufar+zona+10+Guatemala" target="_blank" rel="noopener" style="font-size: 15px; font-weight: 600">Ver en Google Maps →</a>
 </div>
 <div style="background: #FFFFFF; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
-<span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #5B6E70">Horario</span>
+<span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #5A6D7A">Horario</span>
 <span style="font-size: 16px; line-height: 1.6"><strong>Lunes a viernes</strong><br>8:00 a. m. – 6:00 p. m.</span>
 <span style="font-size: 16px; line-height: 1.6"><strong>Sábados</strong><br>8:00 a. m. – 12:30 p. m.</span>
 </div>
 </div>
-<iframe title="Ubicación de Plus Dental en Google Maps" src="https://www.google.com/maps?q=Reforma+Montufar+zona+10+Guatemala&amp;output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade" style="width: 100%; height: 380px; border: 0; border-radius: 22px; display: block; background: #E4ECEA"></iframe>
+<iframe title="Ubicación de Plus Dental en Google Maps" src="https://www.google.com/maps?q=Reforma+Montufar+zona+10+Guatemala&amp;output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade" style="width: 100%; height: 380px; border: 0; border-radius: 22px; display: block; background: #E2EEF6"></iframe>
 </div>
 </section>
 
 <!-- FOOTER -->
-<footer style="background: #0F2A2E; color: #C6D6D4">
+<footer style="background: #0B2B40; color: #C2D8E6">
 <div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 56px 48px; display: flex; justify-content: space-between; gap: 32px; flex-wrap: wrap; font-size: 15px">
 <div style="display: flex; flex-direction: column; gap: 8px">
 <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 30px; color: #FFFFFF">Plus Dental</span>
@@ -915,10 +914,10 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <div style="font-family: 'Manrope', system-ui, sans-serif; padding: 32px; display: flex; flex-direction: column; gap: 20px">
 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px">
 <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
-<span id="dlgEyebrow" style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Acceso</span>
+<span id="dlgEyebrow" style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #005A87">Acceso</span>
 <h2 id="dlgTitle" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 34px; line-height: 1.1; overflow-wrap: anywhere">Conectarse</h2>
 </div>
-<button type="button" id="loginClose" aria-label="Cerrar" style="background: transparent; border: 0; font-size: 28px; line-height: 1; color: #44585B; cursor: pointer; min-width: 44px; min-height: 44px">×</button>
+<button type="button" id="loginClose" aria-label="Cerrar" style="background: transparent; border: 0; font-size: 28px; line-height: 1; color: #475B68; cursor: pointer; min-width: 44px; min-height: 44px">×</button>
 </div>
 
 <form id="loginForm" class="dlg-form">
@@ -939,7 +938,7 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 </form>
 
 <div id="sessionView" class="dlg-form" hidden>
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; font-size: 15px; color: #44585B">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; font-size: 15px; color: #475B68">
 <span id="sesCorreo" style="overflow-wrap: anywhere"></span><span id="sesRol" class="role-pill"></span>
 </div>
 <p id="adminNote" class="dlg-msg" hidden></p>
@@ -957,10 +956,10 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <form id="claveForm" class="dlg-form" style="font-family: 'Manrope', system-ui, sans-serif; padding: 32px">
 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px">
 <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
-<span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #0B6E69">Cambiar clave</span>
+<span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #005A87">Cambiar clave</span>
 <h2 id="claveTitle" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 34px; line-height: 1.1; overflow-wrap: anywhere"></h2>
 </div>
-<button type="button" id="claveClose" aria-label="Cerrar" style="background: transparent; border: 0; font-size: 28px; line-height: 1; color: #44585B; cursor: pointer; min-width: 44px; min-height: 44px">×</button>
+<button type="button" id="claveClose" aria-label="Cerrar" style="background: transparent; border: 0; font-size: 28px; line-height: 1; color: #475B68; cursor: pointer; min-width: 44px; min-height: 44px">×</button>
 </div>
 <label>Nueva clave (mínimo 8 caracteres)<input id="claveNueva" type="password" autocomplete="new-password" minlength="8" required></label>
 <label>Confirmar clave<input id="claveNueva2" type="password" autocomplete="new-password" minlength="8" required></label>

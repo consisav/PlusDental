@@ -10,7 +10,7 @@
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function aviso(id, texto, error) { $(id).textContent = texto || ''; $(id).style.color = error ? '#9A3B2E' : '#44585B'; }
+  function aviso(id, texto, error) { $(id).textContent = texto || ''; $(id).style.color = error ? '#9A3B2E' : '#475B68'; }
   function esSuper() { return window.PD_SESION && window.PD_SESION.esSuper(); }
   function q(n) { return 'Q' + (Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function redondear(n) { return Math.round((Number(n) || 0) * 100) / 100; }
@@ -100,7 +100,7 @@
       ? catalogo.map(function (t) {
         return '<tr data-cat="' + t.id + '"><td><input class="adm-input" style="width:100%;border-radius:10px" maxlength="120" value="' + esc(t.nombre) + '" aria-label="Nombre del tratamiento" data-c="nombre"></td>' +
           '<td class="num"><input class="adm-input" type="number" min="0" step="0.01" style="width:130px;border-radius:10px;text-align:right" value="' + Number(t.precio).toFixed(2) + '" aria-label="Precio de ' + esc(t.nombre) + '" data-c="precio"></td>' +
-          '<td><input type="checkbox" data-c="activo"' + (t.activo ? ' checked' : '') + ' aria-label="Activo" style="width:20px;height:20px;accent-color:#0B6E69"></td>' +
+          '<td><input type="checkbox" data-c="activo"' + (t.activo ? ' checked' : '') + ' aria-label="Activo" style="width:20px;height:20px;accent-color:#005A87"></td>' +
           '<td><button type="button" class="adm-btn" data-guardar-cat="' + t.id + '">Guardar</button></td></tr>';
       }).join('')
       : '<tr><td colspan="4">El catálogo está vacío. Agrega los tratamientos que ofrece la clínica con su precio.</td></tr>';
@@ -141,11 +141,11 @@
           '<td class="c-cant"><input class="adm-input" type="number" min="1" step="1" data-f="cantidad" value="' + it.cantidad + '" aria-label="Cantidad"></td>' +
           '<td class="c-precio"><input class="adm-input" type="number" min="0" step="0.01" data-f="precio" value="' + Number(it.precio).toFixed(2) + '" aria-label="Precio"></td>' +
           '<td class="num" data-importe>' + q(importe(it)) + '</td>' +
-          '<td style="color:#5B6E70;font-size:13px">Al aprobar</td>' +
+          '<td style="color:#5A6D7A;font-size:13px">Al aprobar</td>' +
           '<td><button type="button" class="adm-btn" data-quitar="' + i + '" style="min-height:38px;padding:6px 12px">Quitar</button></td></tr>';
       }
       var marcar = actual.estado === 'aprobado'
-        ? '<label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#5B6E70"><input type="checkbox" data-realizado="' + it.id + '"' + (it.realizado ? ' checked' : '') + ' aria-label="Realizado: ' + esc(it.tratamiento) + '">' + (it.realizado && it.realizado_en ? fechaCorta(it.realizado_en) : '') + '</label>'
+        ? '<label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#5A6D7A"><input type="checkbox" data-realizado="' + it.id + '"' + (it.realizado ? ' checked' : '') + ' aria-label="Realizado: ' + esc(it.tratamiento) + '">' + (it.realizado && it.realizado_en ? fechaCorta(it.realizado_en) : '') + '</label>'
         : '—';
       return '<tr><td><strong>' + esc(it.tratamiento) + '</strong></td><td>' + esc(it.pieza || '—') + '</td><td class="num">' + it.cantidad + '</td>' +
         '<td class="num">' + q(it.precio) + '</td><td class="num">' + q(importe(it)) + '</td><td>' + marcar + '</td><td></td></tr>';

@@ -21,7 +21,7 @@
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function vista(id) { ['loginForm', 'signupForm', 'sessionView'].forEach(function (v) { $(v).hidden = v !== id; }); }
   function titulo(eyebrow, texto) { $('dlgEyebrow').textContent = eyebrow; $('dlgTitle').textContent = texto; }
-  function aviso(id, texto, error) { $(id).textContent = texto; $(id).style.color = error ? '#9A3B2E' : '#44585B'; }
+  function aviso(id, texto, error) { $(id).textContent = texto; $(id).style.color = error ? '#9A3B2E' : '#475B68'; }
   function ocupado(form, si) { form.querySelector('button[type=submit]').disabled = si; }
   function esPersonal() { return !!perfil && perfil.rol !== 'cliente'; }
   function esSuper() { return !!perfil && perfil.rol === 'super_administrador'; }
@@ -171,8 +171,8 @@
       if (c.estado === 'pendiente') acciones += '<button type="button" class="adm-btn adm-primary" data-cita="' + c.id + '" data-estado="confirmada">Confirmar</button>';
       if (c.estado !== 'cancelada') acciones += '<button type="button" class="adm-btn" data-cita="' + c.id + '" data-estado="cancelada">Cancelar</button>';
       acciones += '<a class="adm-btn" style="text-decoration:none;display:inline-flex;align-items:center" href="' + esc(waPaciente(c)) + '" target="_blank" rel="noopener">WhatsApp</a>';
-      return '<tr><td class="fecha"><strong style="color:#0F2A2E">' + fechaLarga(c.fecha) + '</strong><br>' + hhmm(c.hora) + '</td>' +
-        '<td><strong>' + esc(c.nombre) + '</strong><br><span style="color:#5B6E70">' + esc(c.telefono) + '</span></td>' +
+      return '<tr><td class="fecha"><strong style="color:#0B2B40">' + fechaLarga(c.fecha) + '</strong><br>' + hhmm(c.hora) + '</td>' +
+        '<td><strong>' + esc(c.nombre) + '</strong><br><span style="color:#5A6D7A">' + esc(c.telefono) + '</span></td>' +
         '<td>' + esc(c.servicio) + '</td>' +
         '<td>' + selectorPosicion(c) + '</td>' +
         '<td><span class="estado estado-' + c.estado + '">' + ESTADOS[c.estado] + '</span></td>' +
@@ -181,7 +181,7 @@
   }
 
   function selectorPosicion(c) {
-    if (!posicionesCita.length || !('posicion_id' in c)) return '<span style="color:#9AA8AA">—</span>';
+    if (!posicionesCita.length || !('posicion_id' in c)) return '<span style="color:#94A6B2">—</span>';
     return '<select class="adm-input" data-pos-cita="' + c.id + '" aria-label="Posición de la cita de ' + esc(c.nombre) + '" style="border-radius:10px;min-height:38px;padding:6px 8px;max-width:190px"' +
       (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Sin asignar</option>' +
       posicionesCita.map(function (p) { return '<option value="' + p.id + '"' + (p.id === c.posicion_id ? ' selected' : '') + '>' + esc(p.codigo + ' · ' + p.nombre) + '</option>'; }).join('') +
@@ -226,10 +226,10 @@
     $('bloqLista').innerHTML = bloqueos.length
       ? bloqueos.map(function (b) {
         return '<li class="bloq-item"><span><strong>' + fechaLarga(b.fecha) + '</strong> · ' + (b.hora ? hhmm(b.hora) : 'Todo el día') +
-          (b.motivo ? ' <span style="color:#5B6E70">— ' + esc(b.motivo) + '</span>' : '') + '</span>' +
+          (b.motivo ? ' <span style="color:#5A6D7A">— ' + esc(b.motivo) + '</span>' : '') + '</span>' +
           '<button type="button" class="adm-btn" data-desbloquear="' + b.id + '">Quitar</button></li>';
       }).join('')
-      : '<li class="bloq-item" style="color:#5B6E70">No hay horarios bloqueados.</li>';
+      : '<li class="bloq-item" style="color:#5A6D7A">No hay horarios bloqueados.</li>';
   }
 
   async function cargarUsuarios() {
@@ -265,7 +265,7 @@
       var boton = yo
         ? '<button type="button" class="adm-btn" data-mipass>Cambiar mi clave</button>'
         : '<button type="button" class="adm-btn" data-pass="' + p.id + '"' + (puedeCambiarClave(p) ? '' : ' disabled title="Solo el Super Administrador puede cambiar esta clave"') + '>Cambiar clave</button>';
-      return '<tr><td><strong>' + esc(nombreDe(p)) + '</strong>' + (yo ? ' <span style="color:#5B6E70">(tú)</span>' : '') + '</td>' +
+      return '<tr><td><strong>' + esc(nombreDe(p)) + '</strong>' + (yo ? ' <span style="color:#5A6D7A">(tú)</span>' : '') + '</td>' +
         '<td>' + tipo + '</td><td class="fecha">' + fecha + '</td><td>' + boton + '</td></tr>';
     }).join('');
   }
