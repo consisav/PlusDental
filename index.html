@@ -72,7 +72,7 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .exp-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .exp-form .full{grid-column:1/-1}
 .exp-form label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
-.exp-form input,.exp-form textarea{font:inherit;font-weight:400;font-size:15px;padding:12px 14px;border:1px solid #C9D4D2;border-radius:12px;min-height:44px;box-sizing:border-box;background:#FFFFFF;color:#0F2A2E;width:100%}
+.exp-form input,.exp-form textarea,.exp-form select{font:inherit;font-weight:400;font-size:15px;padding:12px 14px;border:1px solid #C9D4D2;border-radius:12px;min-height:44px;box-sizing:border-box;background:#FFFFFF;color:#0F2A2E;width:100%}
 .exp-form textarea{resize:vertical;line-height:1.5}
 .exp-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .exp-actions .dlg-submit{padding:13px 24px}
@@ -118,6 +118,18 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .pre-totales .total{border-top:1px solid #C9D4D2;padding-top:10px;font-size:18px}.pre-totales .total b{font-size:22px}
 .pre-totales .cargado{font-size:14px}.pre-totales .cargado b{color:#0B6E69}
 .estado-borrador{background:#ECEFEF;color:#44585B}.estado-enviado{background:#DBEAFE;color:#1E40AF}.estado-aprobado{background:#DCF2EC;color:#08504C}.estado-rechazado{background:#FDE2E4;color:#9F1239}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.kpi{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kpi span{font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:600;color:#5B6E70}
+.kpi b{font-size:26px;color:#0F2A2E;font-variant-numeric:tabular-nums}
+.kpi-saldo{min-width:220px}
+.kpi-metodos{display:flex;flex-direction:column;gap:4px;font-size:14px;color:#44585B}
+.kpi-metodos div{display:flex;justify-content:space-between;gap:12px}.kpi-metodos b{font-size:14px}
+.saldo-debe{color:#9A3B2E !important}.saldo-favor{color:#0B6E69 !important}
+tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
+.anular-row td{background:#FFF7F5}
+#impresion{display:none}
+@media print{body.imprimir>*:not(#impresion){display:none !important}body.imprimir #impresion{display:block !important}body.imprimir{background:#FFFFFF}}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -201,8 +213,8 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 <button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expedientes de pacientes</button>
 <button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
 <button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuestos</button>
-<button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta <span class="pronto">Pronto</span></button>
-<button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos <span class="pronto">Pronto</span></button>
+<button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
+<button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
 </div>
 <div class="adm-main">
 
@@ -388,16 +400,74 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 
 <!-- 5. Estados de cuenta -->
 <div id="admEstados" role="tabpanel" aria-labelledby="tabEstados" hidden class="adm-pane">
-<div class="adm-pane-head"><h3 class="adm-h">Estados de cuenta</h3><span class="pronto-pill">En preparación</span></div>
-<p class="adm-intro">Cuánto debe cada paciente y cómo se llegó a ese saldo.</p>
-<ul class="adm-plan"><li>Saldo de cada paciente: tratamientos realizados menos pagos</li><li>Movimientos con fecha y concepto</li><li>Lista de pacientes con saldo pendiente</li></ul>
+
+<div id="ecLista" class="adm-pane">
+<h3 class="adm-h">Estados de cuenta</h3>
+<div class="kpis">
+<div class="kpi"><span>Total por cobrar</span><b id="ecPorCobrar">—</b></div>
+<div class="kpi"><span>Pacientes con saldo pendiente</span><b id="ecConSaldo">—</b></div>
+<div class="kpi"><span>Cobrado este mes</span><b id="ecCobradoMes">—</b></div>
+</div>
+<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">
+<div id="ecFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar estados de cuenta">
+<button type="button" class="adm-btn" data-ecfiltro="saldo" aria-pressed="true">Con saldo pendiente</button>
+<button type="button" class="adm-btn" data-ecfiltro="todos" aria-pressed="false">Todos los pacientes</button>
+</div>
+<input id="ecBuscar" type="search" class="adm-input" placeholder="Buscar paciente" aria-label="Buscar paciente">
+</div>
+<div class="roles-wrap"><table><thead><tr><th>Paciente</th><th class="num">Tratamientos realizados</th><th class="num">Pagos</th><th class="num">Saldo</th><th>Último movimiento</th><th><span class="sr-only">Ver</span></th></tr></thead><tbody id="ecBody"></tbody></table></div>
+<p id="ecMsg" class="dlg-msg" role="status"></p>
+</div>
+
+<div id="ecDetalle" class="adm-pane" hidden>
+<button type="button" id="ecVolver" class="dlg-link">← Todos los estados de cuenta</button>
+<div class="adm-pane-head">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="ecNombre" class="adm-h"></h3><p id="ecSub" class="dlg-msg"></p></div>
+<div class="kpi kpi-saldo"><span id="ecSaldoEtiqueta">Saldo pendiente</span><b id="ecSaldo"></b></div>
+</div>
+<div class="roles-wrap"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Cargo</th><th class="num">Pago</th><th class="num">Saldo</th></tr></thead><tbody id="ecMovs"></tbody></table></div>
+<div id="ecAcciones" class="exp-actions"></div>
+<p id="ecDetMsg" class="dlg-msg" role="status"></p>
+</div>
 </div>
 
 <!-- 6. Cobros y pagos -->
 <div id="admCobros" role="tabpanel" aria-labelledby="tabCobros" hidden class="adm-pane">
-<div class="adm-pane-head"><h3 class="adm-h">Cobros y pagos</h3><span class="pronto-pill">En preparación</span></div>
-<p class="adm-intro">El registro de cada pago que entra a la clínica.</p>
-<ul class="adm-plan"><li>Pagos en efectivo, tarjeta, transferencia o depósito</li><li>Abonos y pagos en cuotas</li><li>Recibo numerado por cada pago</li><li>Resumen de ingresos por día y por mes</li></ul>
+<h3 class="adm-h">Cobros y pagos</h3>
+<div class="kpis">
+<div class="kpi"><span>Cobrado hoy</span><b id="cpHoy">—</b></div>
+<div class="kpi"><span>Cobrado este mes</span><b id="cpMes">—</b></div>
+<div class="kpi"><span>Este mes por método</span><div id="cpMetodos" class="kpi-metodos">—</div></div>
+</div>
+
+<form id="pagoForm" class="adm-box">
+<h3 style="margin: 0; font-size: 19px; font-weight: 700">Registrar pago</h3>
+<div class="exp-form">
+<label class="full">Paciente *<select id="pgPaciente" required></select></label>
+<p id="pgSaldo" class="full dlg-msg" hidden></p>
+<label>Monto (Q) *<input id="pgMonto" type="number" min="0.01" step="0.01" required></label>
+<label>Fecha *<input id="pgFecha" type="date" required></label>
+<label>Método *<select id="pgMetodo"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option><option value="deposito">Depósito</option></select></label>
+<label id="pgRefWrap" hidden>N.º de autorización o boleta<input id="pgReferencia" type="text" maxlength="60"></label>
+<label>Presupuesto (opcional)<select id="pgPresupuesto"><option value="">Sin presupuesto</option></select></label>
+<label>Concepto<input id="pgConcepto" type="text" maxlength="150" placeholder="Ej.: abono, pago de limpieza"></label>
+<div class="full exp-actions"><button type="submit" class="dlg-submit">Registrar pago</button><p id="pgMsg" class="dlg-msg" role="status"></p></div>
+</div>
+</form>
+
+<div class="adm-pane-head">
+<h3 style="margin: 0; font-size: 19px; font-weight: 700">Pagos registrados</h3>
+<div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+<div id="cpPeriodo" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Periodo">
+<button type="button" class="adm-btn" data-cpperiodo="mes" aria-pressed="true">Este mes</button>
+<button type="button" class="adm-btn" data-cpperiodo="anterior" aria-pressed="false">Mes anterior</button>
+<button type="button" class="adm-btn" data-cpperiodo="todo" aria-pressed="false">Todos</button>
+</div>
+<input id="cpBuscar" type="search" class="adm-input" placeholder="Paciente o N.º de recibo" aria-label="Buscar pago">
+</div>
+</div>
+<div class="roles-wrap"><table><thead><tr><th>Recibo</th><th>Fecha</th><th>Paciente</th><th>Concepto</th><th>Método</th><th class="num">Monto</th><th>Acciones</th></tr></thead><tbody id="cpBody"></tbody></table></div>
+<p id="cpMsg" class="dlg-msg" role="status"></p>
 </div>
 
 </div>
@@ -678,6 +748,9 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 
 </div>
 
+<!-- Zona que se usa solo al imprimir recibos y estados de cuenta -->
+<div id="impresion"></div>
+
 <!-- WHATSAPP -->
 <a class="wa-float" href="https://wa.me/50237565739?text=Hola%20Plus%20Dental%2C%20quiero%20informaci%C3%B3n." target="_blank" rel="noopener" aria-label="Escribir por WhatsApp a Plus Dental">
 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 20.5l1.3-4.2A8.5 8.5 0 1 1 8 19.4z"></path><path d="M9 8.6c.2-.5.5-.6.8-.6h.5l.9 2-.6.8c.4.9 1.1 1.6 2 2l.8-.6 2 .9v.5c0 .3-.1.6-.6.8-1.6.7-6.5-3.2-5.8-5.8z" fill="currentColor" stroke="none"></path></svg>
@@ -750,5 +823,6 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 <script src="auth.js"></script>
 <script src="expedientes.js"></script>
 <script src="presupuestos.js"></script>
+<script src="cuentas.js"></script>
 </body>
 </html>

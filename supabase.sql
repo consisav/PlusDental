@@ -454,6 +454,108 @@ revoke execute on function public.marcar_realizado(bigint, boolean) from public,
 grant execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb) to authenticated;
 grant execute on function public.marcar_realizado(bigint, boolean) to authenticated;
 
+-- ===== Cobros y pagos + Estados de cuenta =====
+-- El número de recibo es el id del pago. Los pagos no se borran: el Super Administrador los anula con un motivo.
+
+create type public.metodo_pago as enum ('efectivo', 'tarjeta', 'transferencia', 'deposito');
+
+create table public.pagos (
+  id             bigint generated always as identity primary key,
+  paciente_id    bigint not null references public.pacientes (id) on delete restrict,
+  presupuesto_id bigint references public.presupuestos (id) on delete set null,
+  fecha          date not null default current_date,
+  monto          numeric(10,2) not null check (monto > 0),
+  metodo         public.metodo_pago not null,
+  referencia     text,
+  concepto       text,
+  registrado_por text,
+  creado         timestamptz not null default now(),
+  anulado        boolean not null default false,
+  anulado_motivo text,
+  anulado_por    text,
+  anulado_en     timestamptz
+);
+create index pagos_paciente on public.pagos (paciente_id);
+create index pagos_fecha on public.pagos (fecha desc);
+
+alter table public.pagos enable row level security;
+create policy "personal ve pagos" on public.pagos for select using (public.es_personal());
+create policy "personal registra pagos" on public.pagos for insert with check (public.es_personal());
+-- Sin reglas de update ni delete: solo se anulan con la función anular_pago
+
+create or replace function public.firmar_pago()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.registrado_por := (select usuario from public.perfiles where id = auth.uid());
+  new.anulado := false;
+  new.anulado_motivo := null;
+  new.anulado_por := null;
+  new.anulado_en := null;
+  return new;
+end;
+$$;
+create trigger pagos_firma before insert on public.pagos
+  for each row execute function public.firmar_pago();
+
+create or replace function public.anular_pago(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_super_administrador() then
+    raise exception 'Solo el Super Administrador puede anular pagos';
+  end if;
+  if coalesce(trim(p_motivo), '') = '' then
+    raise exception 'Escribe el motivo de la anulación';
+  end if;
+  update public.pagos
+     set anulado = true, anulado_motivo = trim(p_motivo), anulado_en = now(),
+         anulado_por = (select usuario from public.perfiles where id = auth.uid())
+   where id = p_id and not anulado;
+  if not found then
+    raise exception 'El pago no existe o ya estaba anulado';
+  end if;
+end;
+$$;
+revoke execute on function public.anular_pago(bigint, text) from public, anon;
+grant execute on function public.anular_pago(bigint, text) to authenticated;
+
+-- Movimientos de cuenta: cargos (tratamientos realizados con su descuento) y abonos (pagos no anulados).
+-- security_invoker: respeta las reglas de las tablas, así que solo el personal ve resultados.
+create view public.movimientos_cuenta with (security_invoker = true) as
+  select i.realizado_en as fecha,
+         p.paciente_id,
+         'cargo'::text as tipo,
+         i.tratamiento || coalesce(' (pieza ' || i.pieza || ')', '') ||
+           case when i.cantidad > 1 then ' x' || i.cantidad else '' end ||
+           ' · Presupuesto N.º ' || p.id as concepto,
+         round(i.cantidad * i.precio * (1 - p.descuento_pct / 100), 2) as cargo,
+         0::numeric(10,2) as abono,
+         i.id as referencia_id
+    from public.presupuesto_items i
+    join public.presupuestos p on p.id = i.presupuesto_id
+   where i.realizado and p.estado = 'aprobado'
+  union all
+  select g.fecha,
+         g.paciente_id,
+         'pago'::text,
+         'Pago · recibo N.º ' || g.id || ' · ' || g.metodo::text || coalesce(' · ' || g.concepto, ''),
+         0::numeric(10,2),
+         g.monto,
+         g.id
+    from public.pagos g
+   where not g.anulado;
+
+create view public.saldos_pacientes with (security_invoker = true) as
+  select pa.id as paciente_id,
+         pa.nombre,
+         pa.telefono,
+         coalesce(sum(m.cargo), 0) as cargos,
+         coalesce(sum(m.abono), 0) as abonos,
+         coalesce(sum(m.cargo), 0) - coalesce(sum(m.abono), 0) as saldo,
+         max(m.fecha) as ultimo_movimiento
+    from public.pacientes pa
+    left join public.movimientos_cuenta m on m.paciente_id = pa.id
+   group by pa.id, pa.nombre, pa.telefono;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
