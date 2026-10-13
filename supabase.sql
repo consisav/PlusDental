@@ -700,6 +700,132 @@ revoke execute on function public.editar_cambio_odontograma(bigint, timestamptz,
 grant execute on function public.guardar_odontograma(bigint, jsonb, jsonb) to authenticated;
 grant execute on function public.editar_cambio_odontograma(bigint, timestamptz, text) to authenticated;
 
+-- ===== Posiciones (sub-clínicas / boxes) y personal de la clínica =====
+
+-- Personal: odontólogos, especialistas, higienistas y auxiliares (no necesitan usuario en la página)
+create table if not exists public.personal (
+  id          bigint generated always as identity primary key,
+  nombre      text not null,
+  rol         text not null default 'odontologo'
+              check (rol in ('odontologo', 'especialista', 'higienista', 'auxiliar', 'otro')),
+  especialidad text,
+  colegiado   text,
+  telefono    text,
+  activo      boolean not null default true,
+  creado      timestamptz not null default now()
+);
+alter table public.personal enable row level security;
+drop policy if exists "personal ve el personal" on public.personal;
+create policy "personal ve el personal" on public.personal for select using (public.es_personal());
+drop policy if exists "personal agrega personal" on public.personal;
+create policy "personal agrega personal" on public.personal for insert with check (public.es_personal());
+drop policy if exists "personal edita personal" on public.personal;
+create policy "personal edita personal" on public.personal for update
+  using (public.es_personal()) with check (public.es_personal());
+
+do $$ begin
+  create type public.estado_posicion as enum ('libre', 'ocupado', 'limpieza', 'mantenimiento');
+exception when duplicate_object then null;
+end $$;
+
+create table if not exists public.posiciones (
+  id            bigint generated always as identity primary key,
+  codigo        text not null,                       -- ID de clínica (número o código)
+  nombre        text not null,
+  ubicacion     text,
+  tipo_sillon   text,
+  equipamiento  text[] not null default '{}',
+  especialidad  text,
+  responsables  bigint[] not null default '{}',      -- ids de personal
+  soporte       bigint[] not null default '{}',      -- ids de personal
+  horario       jsonb not null default '{}'::jsonb,  -- { "1": { "abre": "08:00", "cierra": "18:00" }, ... } 1 = lunes
+  estado        public.estado_posicion not null default 'libre',
+  estado_desde  timestamptz not null default now(),
+  estado_por    text,
+  activa        boolean not null default true,
+  notas         text,
+  creado        timestamptz not null default now(),
+  actualizado   timestamptz not null default now()
+);
+create unique index if not exists posiciones_codigo_unico on public.posiciones (lower(codigo));
+alter table public.posiciones enable row level security;
+drop policy if exists "personal ve posiciones" on public.posiciones;
+create policy "personal ve posiciones" on public.posiciones for select using (public.es_personal());
+drop policy if exists "personal crea posiciones" on public.posiciones;
+create policy "personal crea posiciones" on public.posiciones for insert with check (public.es_personal());
+drop policy if exists "personal edita posiciones" on public.posiciones;
+create policy "personal edita posiciones" on public.posiciones for update
+  using (public.es_personal()) with check (public.es_personal());
+drop policy if exists "super administrador borra posiciones" on public.posiciones;
+create policy "super administrador borra posiciones" on public.posiciones for delete using (public.es_super_administrador());
+
+-- Cada cambio de estado anota desde cuándo y quién lo hizo
+create or replace function public.antes_de_guardar_posicion()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.actualizado := now();
+  if tg_op = 'INSERT' or new.estado is distinct from old.estado then
+    new.estado_desde := now();
+    new.estado_por := (select usuario from public.perfiles where id = auth.uid());
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'posiciones_guardar' and tgrelid = 'public.posiciones'::regclass) then
+    create trigger posiciones_guardar before insert or update on public.posiciones
+      for each row execute function public.antes_de_guardar_posicion();
+  end if;
+end $$;
+
+-- Historial de mantenimiento
+create table if not exists public.mantenimientos (
+  id             bigint generated always as identity primary key,
+  posicion_id    bigint not null references public.posiciones (id) on delete cascade,
+  fecha          date not null default current_date,
+  tipo           text not null check (tipo in ('revision_sillon', 'calibracion_rx', 'filtros', 'otro')),
+  descripcion    text,
+  responsable    text,          -- técnico o empresa que lo hizo
+  proxima        date,          -- próxima revisión
+  registrado_por text,
+  creado         timestamptz not null default now()
+);
+create index if not exists mantenimientos_posicion on public.mantenimientos (posicion_id, fecha desc);
+alter table public.mantenimientos enable row level security;
+drop policy if exists "personal ve mantenimientos" on public.mantenimientos;
+create policy "personal ve mantenimientos" on public.mantenimientos for select using (public.es_personal());
+drop policy if exists "personal registra mantenimientos" on public.mantenimientos;
+create policy "personal registra mantenimientos" on public.mantenimientos for insert with check (public.es_personal());
+drop policy if exists "super administrador borra mantenimientos" on public.mantenimientos;
+create policy "super administrador borra mantenimientos" on public.mantenimientos for delete using (public.es_super_administrador());
+
+create or replace function public.firmar_mantenimiento()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.registrado_por := (select usuario from public.perfiles where id = auth.uid());
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'mantenimientos_firma' and tgrelid = 'public.mantenimientos'::regclass) then
+    create trigger mantenimientos_firma before insert on public.mantenimientos
+      for each row execute function public.firmar_mantenimiento();
+  end if;
+end $$;
+
+-- Agenda vinculada: cada cita puede asignarse a una posición
+alter table public.citas add column if not exists posicion_id bigint references public.posiciones (id) on delete set null;
+create index if not exists citas_posicion on public.citas (posicion_id, fecha);
+
+-- Estado en tiempo real: avisar a las pantallas abiertas cuando cambia una posición
+do $$ begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (select 1 from pg_publication_tables
+                     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'posiciones') then
+    alter publication supabase_realtime add table public.posiciones;
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

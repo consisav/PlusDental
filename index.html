@@ -118,6 +118,39 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 .odo-input{font:inherit;font-size:14px;padding:8px 10px;border:1px solid #C9D4D2;border-radius:10px;min-height:40px;box-sizing:border-box;background:#FFFFFF;color:#0F2A2E;width:100%}
 .odo-hora{white-space:nowrap;font-variant-numeric:tabular-nums}
 .odo-meta{display:block;font-size:12px;color:#5B6E70;margin-top:2px}
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.pos-card{background:#FFFFFF;border:1px solid #DCE3E1;border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.pos-card.inactiva{opacity:.6}
+.pos-card .cod{font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:#5B6E70}
+.pos-card h4{margin:0;font-size:18px;font-weight:700;line-height:1.25}
+.pos-card .det{font-size:14px;color:#44585B;line-height:1.5}
+.pos-card .pie{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #DCE3E1;padding-top:10px}
+.pos-estado{font:inherit;font-size:13px;font-weight:700;border-radius:999px;padding:6px 10px;border:1px solid transparent;cursor:pointer;min-height:34px}
+.est-libre{background:#DCF2EC;color:#08504C}.est-ocupado{background:#FEF3C7;color:#92400E}.est-limpieza{background:#DBEAFE;color:#1E40AF}.est-mantenimiento{background:#FDE2E4;color:#9F1239}
+.pos-sec{border:1px solid #DCE3E1;border-radius:18px;padding:16px 18px 18px;margin:0;display:flex;flex-direction:column;gap:12px;min-width:0}
+.pos-sec legend{font-weight:700;font-size:15px;padding:0 6px}
+.pos-lbl{display:block;font-size:14px;font-weight:600;margin-bottom:8px}
+.pos-checks{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;border:1px solid #DCE3E1;border-radius:12px;padding:10px 12px;background:#FFFFFF}
+.pos-checks label{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;flex-direction:row}
+.pos-checks input{width:18px;height:18px;min-height:0;accent-color:#0B6E69}
+.pos-horario{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+.pos-dia{display:flex;align-items:center;gap:8px;font-size:14px;border:1px solid #DCE3E1;border-radius:12px;padding:8px 10px;background:#FFFFFF}
+.pos-dia .nom{width:80px;display:flex;align-items:center;gap:6px;font-weight:600}
+.pos-dia input[type=time]{font:inherit;font-size:14px;border:1px solid #C9D4D2;border-radius:8px;padding:4px 6px;min-height:34px;width:100%}
+.pos-dia input[type=checkbox]{width:18px;height:18px;accent-color:#0B6E69}
+.pos-activa{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}
+.pos-activa input{width:18px;height:18px;accent-color:#0B6E69}
+.pos-agenda{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.pos-agenda .dia{background:#FFFFFF;border:1px solid #DCE3E1;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.pos-agenda .dia h5{margin:0;font-size:14px;font-weight:700}
+.pos-agenda .cita{font-size:13px;line-height:1.4;border-left:3px solid #0B6E69;padding-left:8px}
+.pos-agenda .cita.pendiente{border-left-color:#B45309}
+.rot-chart{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:6px;align-items:end;height:180px;padding-top:12px}
+.rot-chart .col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%;min-width:0}
+.rot-chart .bar{width:100%;max-width:34px;background:#0B6E69;border-radius:6px 6px 2px 2px;min-height:2px}
+.rot-chart .col.cerrado .bar{background:#DCE3E1}
+.rot-chart .n{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.rot-chart .d{font-size:11px;color:#5B6E70;white-space:nowrap}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -203,6 +236,7 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuestos</button>
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
 <button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
+<button type="button" role="tab" id="tabPosiciones" data-tab="admPosiciones" aria-selected="false" aria-controls="admPosiciones">Posiciones y clínicas</button>
 </div>
 <div class="adm-main">
 
@@ -318,7 +352,7 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <button type="button" class="adm-btn" data-filtro="cancelada" aria-pressed="false">Canceladas</button>
 <button type="button" class="adm-btn" data-filtro="todas" aria-pressed="false">Todas</button>
 </div>
-<div class="roles-wrap"><table><thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Servicio</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="citasBody"></tbody></table></div>
+<div class="roles-wrap"><table><thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Servicio</th><th>Posición</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="citasBody"></tbody></table></div>
 <p id="citasMsg" class="dlg-msg" role="status"></p>
 
 <div class="adm-box">
@@ -471,6 +505,122 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 </div>
 <div class="roles-wrap"><table><thead><tr><th>Recibo</th><th>Fecha</th><th>Paciente</th><th>Concepto</th><th>Método</th><th class="num">Monto</th><th>Acciones</th></tr></thead><tbody id="cpBody"></tbody></table></div>
 <p id="cpMsg" class="dlg-msg" role="status"></p>
+</div>
+
+<!-- 7. Posiciones y clínicas -->
+<div id="admPosiciones" role="tabpanel" aria-labelledby="tabPosiciones" hidden class="adm-pane">
+
+<!-- Lista de posiciones -->
+<div id="posLista" class="adm-pane">
+<div class="adm-pane-head">
+<h3 class="adm-h">Posiciones y clínicas</h3>
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><button type="button" id="posVerPersonal" class="adm-btn">Personal</button><button type="button" id="posNueva" class="adm-btn adm-primary">Nueva posición</button></div>
+</div>
+<div id="posResumen" class="kpis"></div>
+<div id="posGrid" class="pos-grid"></div>
+<p id="posMsg" class="dlg-msg" role="status"></p>
+</div>
+
+<!-- Ficha de una posición -->
+<div id="posFicha" class="adm-pane" hidden>
+<button type="button" id="posVolver" class="dlg-link">← Todas las posiciones</button>
+<div class="adm-pane-head">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="posTitulo" class="adm-h"></h3><p id="posSub" class="dlg-msg"></p></div>
+<span id="posEstadoPill" class="estado"></span>
+</div>
+<div id="posTabs" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Partes de la posición">
+<button type="button" class="adm-btn" data-pparte="pDatos" aria-pressed="true">Datos</button>
+<button type="button" class="adm-btn" data-pparte="pAgenda" aria-pressed="false">Agenda</button>
+<button type="button" class="adm-btn" data-pparte="pMant" aria-pressed="false">Mantenimiento</button>
+<button type="button" class="adm-btn" data-pparte="pRot" aria-pressed="false">Rotación y uso</button>
+</div>
+
+<form id="pDatos" class="adm-pane">
+<fieldset class="pos-sec"><legend>1. Identificación y datos básicos</legend>
+<div class="exp-form">
+<label>ID de clínica *<input id="poCodigo" type="text" maxlength="30" required placeholder="Ej.: Clínica 1"></label>
+<label>Nombre de la posición *<input id="poNombre" type="text" maxlength="120" required placeholder="Ej.: Gabinete de Ortodoncia"></label>
+<label class="full">Ubicación física<input id="poUbicacion" type="text" maxlength="150" placeholder="Ej.: Planta 1, pasillo B, sala 3"></label>
+</div>
+</fieldset>
+<fieldset class="pos-sec"><legend>2. Capacidad y equipamiento</legend>
+<div class="exp-form">
+<label class="full">Tipo de sillón o unidad dental<input id="poSillon" type="text" maxlength="200" placeholder="Ej.: con cámara intraoral, adaptado para movilidad reducida"></label>
+<label class="full">Equipamiento fijo (uno por línea)<textarea id="poEquipo" rows="4" maxlength="2000" placeholder="Rayos X periapical&#10;Lámpara de polimerización&#10;Motor de endodoncia"></textarea></label>
+<label class="full">Especialidad asignada<input id="poEspecialidad" type="text" list="posEspecialidades" maxlength="80" placeholder="Vacío = uso general"></label>
+<datalist id="posEspecialidades"><option value="Odontología general"></option><option value="Odontopediatría"></option><option value="Ortodoncia"></option><option value="Implantes"></option><option value="Cirugía"></option><option value="Endodoncia"></option><option value="Higiene dental"></option><option value="Estética dental"></option></datalist>
+</div>
+</fieldset>
+<fieldset class="pos-sec"><legend>3. Personal y roles asignados</legend>
+<div class="exp-form">
+<div><span class="pos-lbl">Odontólogo / especialista responsable</span><div id="poResp" class="pos-checks"></div></div>
+<div><span class="pos-lbl">Personal de soporte (higienistas, auxiliares)</span><div id="poSoporte" class="pos-checks"></div></div>
+</div>
+<p class="dlg-msg">¿Falta alguien? Agrégalo en «Personal», en la lista de posiciones.</p>
+</fieldset>
+<fieldset class="pos-sec"><legend>4. Horario de operación</legend>
+<div id="poHorario" class="pos-horario"></div>
+</fieldset>
+<div class="exp-form">
+<label class="full">Notas<textarea id="poNotas" rows="2" maxlength="1000" placeholder="Opcional"></textarea></label>
+</div>
+<label class="pos-activa"><input id="poActiva" type="checkbox" checked> Posición activa (desmárcala si deja de usarse; no se borra su historial)</label>
+<div class="exp-actions"><button type="submit" class="dlg-submit">Guardar posición</button><p id="poMsg" class="dlg-msg" role="status"></p></div>
+</form>
+
+<div id="pAgenda" class="adm-pane" hidden>
+<div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end">
+<label class="adm-field">Desde<input id="poAgDesde" type="date" class="adm-input"></label>
+<p class="dlg-msg" style="padding-bottom: 12px">Citas asignadas a esta posición durante 7 días. Se asignan desde «Historial de citas».</p>
+</div>
+<div id="poAgenda" class="pos-agenda"></div>
+</div>
+
+<div id="pMant" class="adm-pane" hidden>
+<form id="manForm" class="adm-box">
+<h3 style="margin: 0; font-size: 17px; font-weight: 700">Registrar mantenimiento</h3>
+<div class="exp-form">
+<label>Fecha *<input id="manFecha" type="date" required></label>
+<label>Tipo *<select id="manTipo"><option value="revision_sillon">Revisión técnica del sillón</option><option value="calibracion_rx">Calibración de rayos X</option><option value="filtros">Cambio de filtros de agua / aire</option><option value="otro">Otro</option></select></label>
+<label class="full">Descripción<input id="manDesc" type="text" maxlength="300" placeholder="Qué se hizo"></label>
+<label>Realizado por<input id="manResp" type="text" maxlength="120" placeholder="Técnico o empresa"></label>
+<label>Próxima revisión<input id="manProxima" type="date"></label>
+<div class="full exp-actions"><button type="submit" class="dlg-submit">Registrar</button><p id="manMsg" class="dlg-msg" role="status"></p></div>
+</div>
+</form>
+<div class="roles-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Realizado por</th><th>Próxima revisión</th><th>Registrado por</th><th><span class="sr-only">Borrar</span></th></tr></thead><tbody id="manBody"></tbody></table></div>
+</div>
+
+<div id="pRot" class="adm-pane" hidden>
+<div id="rotKpis" class="kpis"></div>
+<div class="adm-box">
+<h3 style="margin: 0; font-size: 17px; font-weight: 700">Pacientes atendidos por día · últimos 14 días</h3>
+<div id="rotChart" class="rot-chart"></div>
+</div>
+<p class="dlg-msg">Se cuentan las citas confirmadas ya pasadas que estaban asignadas a esta posición.</p>
+</div>
+</div>
+
+<!-- Personal de la clínica -->
+<div id="posPersonal" class="adm-pane" hidden>
+<button type="button" id="perVolver" class="dlg-link">← Posiciones y clínicas</button>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h3 class="adm-h">Personal de la clínica</h3>
+<p class="dlg-msg">Odontólogos, especialistas, higienistas y auxiliares que se asignan a las posiciones. No necesitan usuario en la página.</p>
+</div>
+<form id="perForm" class="adm-box">
+<div class="exp-form">
+<label>Nombre completo *<input id="perNombre" type="text" maxlength="150" required></label>
+<label>Rol *<select id="perRol"><option value="odontologo">Odontólogo</option><option value="especialista">Especialista</option><option value="higienista">Higienista</option><option value="auxiliar">Auxiliar dental</option><option value="otro">Otro</option></select></label>
+<label>Especialidad<input id="perEsp" type="text" list="posEspecialidades" maxlength="80"></label>
+<label>N.º de colegiado<input id="perCol" type="text" maxlength="30"></label>
+<label>Teléfono<input id="perTel" type="tel" maxlength="40"></label>
+<div class="exp-actions" style="align-self: end"><button type="submit" class="dlg-submit">Agregar</button></div>
+</div>
+<p id="perMsg" class="dlg-msg" role="status"></p>
+</form>
+<div class="roles-wrap"><table><thead><tr><th>Nombre</th><th>Rol</th><th>Especialidad</th><th>Colegiado</th><th>Teléfono</th><th>Activo</th><th><span class="sr-only">Guardar</span></th></tr></thead><tbody id="perBody"></tbody></table></div>
+</div>
 </div>
 
 </div>
@@ -828,5 +978,6 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <script src="expedientes.js"></script>
 <script src="presupuestos.js"></script>
 <script src="cuentas.js"></script>
+<script src="posiciones.js"></script>
 </body>
 </html>

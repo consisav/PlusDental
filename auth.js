@@ -12,7 +12,7 @@
 
   var dlg = $('loginDlg'), claveDlg = $('claveDlg'), panel = $('administracion');
   var perfil = null, quiereAdmin = false, usuarios = [], claveDe = null;
-  var citas = [], bloqueos = [], filtro = 'pendiente', periodo = 'proximas';
+  var citas = [], bloqueos = [], filtro = 'pendiente', periodo = 'proximas', posicionesCita = [];
   var ESTADOS = { pendiente: 'Pendiente', confirmada: 'Confirmada', cancelada: 'Cancelada' };
   var DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -125,11 +125,17 @@
 
   async function cargarCitas() {
     aviso('citasMsg', '');
-    $('citasBody').innerHTML = '<tr><td colspan="5">Cargando…</td></tr>';
-    var q = sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,creada');
-    var r = periodo === 'proximas'
-      ? await q.gte('fecha', hoyISO()).order('fecha').order('hora')
-      : await q.lt('fecha', hoyISO()).order('fecha', { ascending: false }).order('hora', { ascending: false }).limit(300);
+    $('citasBody').innerHTML = '<tr><td colspan="6">Cargando…</td></tr>';
+    function consulta(campos) {
+      var q = sb.from('citas').select(campos);
+      return periodo === 'proximas'
+        ? q.gte('fecha', hoyISO()).order('fecha').order('hora')
+        : q.lt('fecha', hoyISO()).order('fecha', { ascending: false }).order('hora', { ascending: false }).limit(300);
+    }
+    var r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id');
+    // Si todavía no existe la columna de posición, se muestran las citas sin ella
+    if (r.error && /posicion_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada');
+    posicionesCita = window.PD_POSICIONES ? await window.PD_POSICIONES() : [];
     contarPendientes();
     if (r.error) {
       $('citasBody').innerHTML = '';
@@ -157,7 +163,7 @@
     if (!lista.length) {
       var cuando = periodo === 'proximas' ? 'próximas' : 'anteriores';
       var vacio = { pendiente: 'No hay citas pendientes ' + cuando + '.', confirmada: 'No hay citas confirmadas ' + cuando + '.', cancelada: 'No hay citas canceladas ' + cuando + '.', todas: 'No hay citas ' + cuando + '.' };
-      $('citasBody').innerHTML = '<tr><td colspan="5">' + vacio[filtro] + '</td></tr>';
+      $('citasBody').innerHTML = '<tr><td colspan="6">' + vacio[filtro] + '</td></tr>';
       return;
     }
     $('citasBody').innerHTML = lista.map(function (c) {
@@ -168,9 +174,29 @@
       return '<tr><td class="fecha"><strong style="color:#0F2A2E">' + fechaLarga(c.fecha) + '</strong><br>' + hhmm(c.hora) + '</td>' +
         '<td><strong>' + esc(c.nombre) + '</strong><br><span style="color:#5B6E70">' + esc(c.telefono) + '</span></td>' +
         '<td>' + esc(c.servicio) + '</td>' +
+        '<td>' + selectorPosicion(c) + '</td>' +
         '<td><span class="estado estado-' + c.estado + '">' + ESTADOS[c.estado] + '</span></td>' +
         '<td><div class="acciones">' + acciones + '</div></td></tr>';
     }).join('');
+  }
+
+  function selectorPosicion(c) {
+    if (!posicionesCita.length || !('posicion_id' in c)) return '<span style="color:#9AA8AA">—</span>';
+    return '<select class="adm-input" data-pos-cita="' + c.id + '" aria-label="Posición de la cita de ' + esc(c.nombre) + '" style="border-radius:10px;min-height:38px;padding:6px 8px;max-width:190px"' +
+      (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Sin asignar</option>' +
+      posicionesCita.map(function (p) { return '<option value="' + p.id + '"' + (p.id === c.posicion_id ? ' selected' : '') + '>' + esc(p.codigo + ' · ' + p.nombre) + '</option>'; }).join('') +
+      '</select>';
+  }
+
+  async function asignarPosicion(sel) {
+    sel.disabled = true;
+    var valor = sel.value ? +sel.value : null;
+    var r = await sb.from('citas').update({ posicion_id: valor }).eq('id', sel.dataset.posCita).select('id');
+    sel.disabled = false;
+    if (r.error || !r.data || !r.data.length) { aviso('citasMsg', r.error ? traducir(r.error) : 'No tienes permiso para cambiar esta cita.', true); return; }
+    citas.forEach(function (c) { if (String(c.id) === sel.dataset.posCita) c.posicion_id = valor; });
+    var p = posicionesCita.filter(function (x) { return x.id === valor; })[0];
+    aviso('citasMsg', p ? 'Cita asignada a ' + p.codigo + ' · ' + p.nombre + '.' : 'La cita quedó sin posición asignada.');
   }
 
   async function cambiarEstado(id, estado, boton) {
@@ -344,6 +370,10 @@
     // En el historial lo útil es ver todo; en las próximas, lo que falta confirmar
     filtro = periodo === 'anteriores' ? 'todas' : 'pendiente';
     cargarCitas();
+  });
+  $('citasBody').addEventListener('change', function (e) {
+    var sel = e.target.closest('[data-pos-cita]');
+    if (sel) asignarPosicion(sel);
   });
   $('citasBody').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-cita]');
