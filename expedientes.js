@@ -4,23 +4,13 @@
   if (!sb) return;
 
   var BUCKET = 'expedientes';
-  var ESTADOS = [
-    ['sano', 'Sano'], ['caries', 'Caries'], ['obturado', 'Obturado'], ['corona', 'Corona'],
-    ['endodoncia', 'Endodoncia'], ['implante', 'Implante'], ['ausente', 'Ausente'], ['extraccion', 'Extracción indicada']
-  ];
-  var NOMBRE_ESTADO = {}; ESTADOS.forEach(function (e) { NOMBRE_ESTADO[e[0]] = e[1]; });
-  // Numeración FDI vista de frente: derecha del paciente a la izquierda de la pantalla
-  var ARCADAS = [
-    ['Arcada superior', [18, 17, 16, 15, 14, 13, 12, 11], [21, 22, 23, 24, 25, 26, 27, 28]],
-    ['Arcada inferior', [48, 47, 46, 45, 44, 43, 42, 41], [31, 32, 33, 34, 35, 36, 37, 38]]
-  ];
   var CAMPOS = {
     nombre: 'pNombre', dpi: 'pDpi', fecha_nacimiento: 'pNacimiento', telefono: 'pTelefono', direccion: 'pDireccion',
     emergencia_nombre: 'pEmNombre', emergencia_telefono: 'pEmTelefono',
     alergias: 'pAlergias', enfermedades: 'pEnfermedades', medicamentos: 'pMedicamentos'
   };
 
-  var pacientes = [], actual = null, odonto = {}, pincel = 'caries', odontoCambiado = false;
+  var pacientes = [], actual = null, odontoCambiado = false;
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -32,13 +22,14 @@
     var d = /^\d{4}-\d{2}-\d{2}$/.test(f) ? new Date(f + 'T12:00:00') : new Date(f);
     return d.toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' });
   }
-  function edad(f) {
-    if (!f) return '—';
+  function anios(f) {
+    if (!f) return null;
     var n = new Date(f + 'T12:00:00'), h = new Date();
     var a = h.getFullYear() - n.getFullYear();
     if (h.getMonth() < n.getMonth() || (h.getMonth() === n.getMonth() && h.getDate() < n.getDate())) a--;
-    return a + ' años';
+    return a;
   }
+  function edad(f) { return f ? anios(f) + ' años' : '—'; }
   function traducir(err) {
     var m = (err && err.message) || '';
     if (/pacientes_dpi_unico|duplicate key/i.test(m)) return 'Ya existe un paciente con ese DPI.';
@@ -79,7 +70,7 @@
   // ---------- Ficha ----------
   async function verLista() {
     var sinGuardar = odontoCambiado && actual ? actual.nombre : '';
-    actual = null; odonto = {}; odontoCambiado = false;
+    actual = null; odontoCambiado = false;
     $('expFicha').hidden = true; $('expLista').hidden = false;
     await cargar();
     if (sinGuardar) aviso('expMsg', 'Ojo: no se guardaron los cambios del odontograma de ' + sinGuardar + '.', true);
@@ -112,23 +103,21 @@
     var r = await sb.from('pacientes').select('*').eq('id', id).single();
     if (r.error) { aviso('expMsg', traducir(r.error), true); return; }
     actual = r.data;
-    odonto = Object.assign({}, actual.odontograma || {});
-    odontoCambiado = false;
+    cargarOdonto();
     rellenar(actual);
-    ['fDatosMsg', 'fHistoriaMsg', 'odoMsg', 'notaMsg', 'rxMsg'].forEach(function (m) { aviso(m, ''); });
+    ['fDatosMsg', 'fHistoriaMsg', 'notaMsg', 'rxMsg'].forEach(function (m) { aviso(m, ''); });
     pintarCabecera();
-    pintarOdonto();
     $('expLista').hidden = true; $('expFicha').hidden = false;
     parte('fDatos');
     $('expFicha').scrollIntoView({ block: 'start' });
   }
 
   function nuevo() {
-    actual = null; odonto = {}; odontoCambiado = false;
+    actual = null;
+    cargarOdonto();
     rellenar(null);
-    ['fDatosMsg', 'fHistoriaMsg', 'odoMsg', 'notaMsg', 'rxMsg'].forEach(function (m) { aviso(m, ''); });
+    ['fDatosMsg', 'fHistoriaMsg', 'notaMsg', 'rxMsg'].forEach(function (m) { aviso(m, ''); });
     pintarCabecera();
-    pintarOdonto();
     $('expLista').hidden = true; $('expFicha').hidden = false;
     parte('fDatos');
     $('pNombre').focus();
@@ -152,33 +141,27 @@
     if (r.error) { aviso(msgId, traducir(r.error), true); return; }
     var eraNuevo = !actual;
     actual = r.data;
+    if (eraNuevo) cargarOdonto();
     pintarCabecera();
     aviso(msgId, eraNuevo ? 'Expediente creado. Ya puedes completar la historia médica, el odontograma, las notas y las radiografías.' : 'Cambios guardados.');
   }
 
-  // ---------- Odontograma ----------
-  function pintarEstados() {
-    $('odoEstados').innerHTML = ESTADOS.map(function (e) {
-      return '<button type="button" class="adm-btn est-chip" data-pincel="' + e[0] + '" aria-pressed="' + (pincel === e[0]) + '"><i class="' + (e[0] === 'sano' ? '' : 'e-' + e[0]) + '"></i>' + e[1] + '</button>';
-    }).join('');
-  }
+  // ---------- Odontograma (componente de odontograma.js) ----------
+  var odg = window.Odontograma.crear($('odoComp'), {
+    onCambio: function () { odontoCambiado = true; aviso('odoMsg', 'Hay cambios sin guardar.', true); }
+  });
 
-  function pintarOdonto() {
-    $('odoGrid').innerHTML = ARCADAS.map(function (a) {
-      function pieza(n) {
-        var est = odonto[n] || 'sano';
-        return '<button type="button" class="pieza' + (est === 'sano' ? '' : ' e-' + est) + '" data-pieza="' + n + '" aria-label="Pieza ' + n + ': ' + NOMBRE_ESTADO[est] + '" title="' + n + ' · ' + NOMBRE_ESTADO[est] + '">' + n + '</button>';
-      }
-      return '<div class="odo-label">' + a[0] + '</div><div class="odo-row">' + a[1].map(pieza).join('') + '<span aria-hidden="true"></span>' + a[2].map(pieza).join('') + '</div>';
-    }).join('');
-    var marcadas = Object.keys(odonto).length;
-    if (!odontoCambiado) aviso('odoMsg', marcadas ? marcadas + ' pieza(s) con hallazgos.' : 'Todas las piezas marcadas como sanas.');
+  function cargarOdonto() {
+    odg.cargar(actual ? actual.odontograma : null, actual ? anios(actual.fecha_nacimiento) : null);
+    odontoCambiado = false;
+    var n = odg.hallazgos();
+    aviso('odoMsg', n ? n + ' pieza(s) con hallazgos.' : 'Sin hallazgos registrados.');
   }
 
   async function guardarOdonto(boton) {
     boton.disabled = true;
     aviso('odoMsg', 'Guardando…');
-    var r = await sb.from('pacientes').update({ odontograma: odonto }).eq('id', actual.id).select('*').single();
+    var r = await sb.from('pacientes').update({ odontograma: odg.valor() }).eq('id', actual.id).select('*').single();
     boton.disabled = false;
     if (r.error) { aviso('odoMsg', traducir(r.error), true); return; }
     actual = r.data;
@@ -281,19 +264,6 @@
     guardar(['alergias', 'enfermedades', 'medicamentos'], 'fHistoriaMsg', this.querySelector('[type=submit]'));
   });
 
-  $('odoEstados').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-pincel]');
-    if (b) { pincel = b.dataset.pincel; pintarEstados(); }
-  });
-  $('odoGrid').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-pieza]');
-    if (!b) return;
-    var n = b.dataset.pieza;
-    if (pincel === 'sano' || odonto[n] === pincel) delete odonto[n]; else odonto[n] = pincel;
-    odontoCambiado = true;
-    aviso('odoMsg', 'Hay cambios sin guardar.', true);
-    pintarOdonto();
-  });
   $('odoGuardar').addEventListener('click', function () { guardarOdonto(this); });
 
   $('notaForm').addEventListener('submit', async function (e) {
@@ -331,14 +301,13 @@
     cargarArchivos();
   });
 
-  pintarEstados();
-
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { if ($('expFicha').hidden) cargar(); },
     limpiar: function () {
-      pacientes = []; actual = null; odonto = {}; odontoCambiado = false;
+      pacientes = []; actual = null; odontoCambiado = false;
+      odg.cargar(null);
       rellenar(null);
-      $('expBody').innerHTML = ''; $('notaLista').innerHTML = ''; $('rxGrid').innerHTML = ''; $('odoGrid').innerHTML = '';
+      $('expBody').innerHTML = ''; $('notaLista').innerHTML = ''; $('rxGrid').innerHTML = '';
       $('expFicha').hidden = true; $('expLista').hidden = false;
     }
   });

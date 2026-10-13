@@ -77,21 +77,6 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .exp-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .exp-actions .dlg-submit{padding:13px 24px}
 @media (max-width:640px){.exp-form{grid-template-columns:minmax(0,1fr)}}
-.odo-wrap{overflow-x:auto;padding:4px 0}
-.odo{display:flex;flex-direction:column;gap:14px;min-width:560px}
-.odo-row{display:grid;grid-template-columns:repeat(8,minmax(0,1fr)) 14px repeat(8,minmax(0,1fr));gap:5px}
-.odo-label{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#5B6E70;font-weight:600}
-.pieza{aspect-ratio:3/4;border:1.5px solid #C9D4D2;border-radius:7px 7px 14px 14px;background:#FFFFFF;color:#44585B;font:inherit;font-size:12px;font-weight:700;display:flex;align-items:flex-end;justify-content:center;padding:0 0 5px;cursor:pointer;font-variant-numeric:tabular-nums}
-.pieza:hover{border-color:#0F2A2E}
-.est-chip{display:inline-flex;align-items:center;gap:8px}
-.est-chip i{width:14px;height:14px;border-radius:4px;border:1.5px solid #C9D4D2;background:#FFFFFF;display:inline-block}
-.e-caries{background:#FDE2E4 !important;border-color:#E11D48 !important;color:#9F1239 !important}
-.e-obturado{background:#DBEAFE !important;border-color:#2563EB !important;color:#1E40AF !important}
-.e-corona{background:#FEF3C7 !important;border-color:#D97706 !important;color:#92400E !important}
-.e-endodoncia{background:#EDE9FE !important;border-color:#7C3AED !important;color:#5B21B6 !important}
-.e-implante{background:#DCF2EC !important;border-color:#0B6E69 !important;color:#08504C !important}
-.e-ausente{background:#ECEFEF !important;border-color:#9AA8AA !important;color:#7A8A8C !important;text-decoration:line-through}
-.e-extraccion{background:#FFFFFF !important;border:2px dashed #E11D48 !important;color:#9F1239 !important}
 .nota-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .nota-lista li{border-top:1px solid #DCE3E1;padding:16px 0;display:flex;flex-direction:column;gap:6px}
 .nota-lista .meta{font-size:13px;color:#5B6E70;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
@@ -274,9 +259,8 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 </form>
 
 <div id="fOdonto" class="adm-pane" hidden>
-<p class="dlg-msg">Elige un estado y toca las piezas para marcarlas. Toca de nuevo una pieza con el mismo estado para dejarla sana.</p>
-<div id="odoEstados" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Estado a marcar"></div>
-<div class="odo-wrap"><div id="odoGrid" class="odo"></div></div>
+<p class="dlg-msg">Elige la dentición y una herramienta. Las de «Por cara» se aplican tocando la cara; las de «Pieza completa», tocando cualquier parte de la pieza. Toca de nuevo para quitar la marca.</p>
+<div id="odoComp"></div>
 <div class="exp-actions"><button type="button" id="odoGuardar" class="dlg-submit">Guardar odontograma</button><p id="odoMsg" class="dlg-msg" role="status"></p></div>
 </div>
 
@@ -821,6 +805,7 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <script src="supabase-client.js"></script>
 <script src="app.js"></script>
 <script src="auth.js"></script>
+<script src="odontograma.js"></script>
 <script src="expedientes.js"></script>
 <script src="presupuestos.js"></script>
 <script src="cuentas.js"></script>
