@@ -33,6 +33,7 @@
   function traducir(err) {
     var m = (err && err.message) || '';
     if (/pacientes_dpi_unico|duplicate key/i.test(m)) return 'Ya existe un paciente con ese DPI.';
+    if (/odontograma_cambios|guardar_odontograma|editar_cambio_odontograma/i.test(m) && /does not exist|could not find/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para el historial del odontograma.';
     if (/relation .*(pacientes|notas_visita).* does not exist|could not find the table/i.test(m)) return 'Falta ejecutar en Supabase el script de expedientes.';
     if (/bucket not found/i.test(m)) return 'Falta ejecutar en Supabase el script de expedientes (almacenamiento de radiografías).';
     if (/row-level security|permission denied|not authorized|unauthorized/i.test(m)) return 'No tienes permiso para esta acción.';
@@ -82,6 +83,7 @@
       $(b.dataset.ficha).hidden = b.dataset.ficha !== id;
     });
     if (id === 'fNotas') cargarNotas();
+    if (id === 'fOdonto') cargarHistorial();
     if (id === 'fRx') cargarArchivos();
   }
 
@@ -147,27 +149,102 @@
   }
 
   // ---------- Odontograma (componente de odontograma.js) ----------
-  var odg = window.Odontograma.crear($('odoComp'), {
-    onCambio: function () { odontoCambiado = true; aviso('odoMsg', 'Hay cambios sin guardar.', true); }
-  });
+  // base = lo último guardado; los cambios pendientes salen de comparar contra ella.
+  // meta guarda, por pieza, la fecha del cambio y las observaciones escritas antes de guardar.
+  var base = null, meta = {}, pendientes = [], historial = [];
+  var odg = window.Odontograma.crear($('odoComp'), { onCambio: function () { revisarCambios(); } });
+
+  function dos(n) { return ('0' + n).slice(-2); }
+  function valorFechaHora(d) {
+    return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()) + 'T' + dos(d.getHours()) + ':' + dos(d.getMinutes()) + ':' + dos(d.getSeconds());
+  }
+  function fechaHora(f) {
+    return f ? new Date(f).toLocaleString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '—';
+  }
 
   function cargarOdonto() {
     odg.cargar(actual ? actual.odontograma : null, actual ? anios(actual.fecha_nacimiento) : null);
-    odontoCambiado = false;
+    base = odg.valor();
+    meta = {};
+    revisarCambios();
     var n = odg.hallazgos();
     aviso('odoMsg', n ? n + ' pieza(s) con hallazgos.' : 'Sin hallazgos registrados.');
+    historial = [];
+    $('odoHist').innerHTML = '';
+    aviso('odoHistMsg', '');
+  }
+
+  function revisarCambios() {
+    pendientes = base ? window.Odontograma.diferencias(base, odg.valor()) : [];
+    odontoCambiado = pendientes.length > 0;
+    pendientes.forEach(function (c) { if (!meta[c.clave]) meta[c.clave] = { fecha: valorFechaHora(new Date()), obs: '' }; });
+    $('odoPend').hidden = !pendientes.length;
+    $('odoGuardar').disabled = !pendientes.length;
+    $('odoDescartar').disabled = !pendientes.length;
+    $('odoPendBody').innerHTML = pendientes.map(function (c) {
+      var m = meta[c.clave], de = c.pieza ? ' de la pieza ' + c.pieza : '';
+      return '<tr data-clave="' + esc(c.clave) + '"><td class="fecha"><strong>' + (c.pieza || 'General') + '</strong></td><td>' + esc(c.descripcion) + '</td>' +
+        '<td style="min-width:215px"><input type="datetime-local" step="1" class="odo-input" data-m="fecha" value="' + m.fecha + '" aria-label="Fecha del cambio' + de + '"></td>' +
+        '<td style="min-width:220px"><input type="text" maxlength="1000" class="odo-input" data-m="obs" value="' + esc(m.obs) + '" placeholder="Opcional" aria-label="Observaciones' + de + '"></td></tr>';
+    }).join('');
+    if (pendientes.length) aviso('odoMsg', pendientes.length + ' cambio(s) sin guardar.', true);
   }
 
   async function guardarOdonto(boton) {
+    if (!pendientes.length || !actual) return;
+    var cambios = pendientes.map(function (c) {
+      var m = meta[c.clave], f = m.fecha ? new Date(m.fecha) : new Date();
+      return { pieza: c.pieza, descripcion: c.descripcion, fecha_cambio: (isNaN(f) ? new Date() : f).toISOString(), observaciones: m.obs };
+    });
+    var valor = odg.valor();
     boton.disabled = true;
     aviso('odoMsg', 'Guardando…');
-    var r = await sb.from('pacientes').update({ odontograma: odg.valor() }).eq('id', actual.id).select('*').single();
-    boton.disabled = false;
-    if (r.error) { aviso('odoMsg', traducir(r.error), true); return; }
-    actual = r.data;
-    odontoCambiado = false;
+    var r = await sb.rpc('guardar_odontograma', { p_paciente: actual.id, p_odontograma: valor, p_cambios: cambios });
+    if (r.error) { boton.disabled = false; aviso('odoMsg', traducir(r.error), true); return; }
+    actual.odontograma = valor;
+    actual.actualizado = new Date().toISOString();
+    base = valor;
+    meta = {};
+    revisarCambios();
     pintarCabecera();
-    aviso('odoMsg', 'Odontograma guardado.');
+    aviso('odoMsg', cambios.length + ' cambio(s) guardado(s) en el historial.');
+    cargarHistorial();
+  }
+
+  function eliminarCambios(boton) {
+    if (!pedirConfirmacion(boton)) return;
+    odg.cargar(base);
+    meta = {};
+    revisarCambios();
+    aviso('odoMsg', 'Se eliminaron los cambios sin guardar. El odontograma quedó como estaba.');
+  }
+
+  async function cargarHistorial() {
+    if (!actual) return;
+    $('odoHist').innerHTML = '<tr><td colspan="6">Cargando…</td></tr>';
+    var r = await sb.from('odontograma_cambios').select('*').eq('paciente_id', actual.id)
+      .order('fecha_cambio', { ascending: false }).order('id', { ascending: false });
+    if (r.error) { $('odoHist').innerHTML = ''; aviso('odoHistMsg', traducir(r.error), true); return; }
+    historial = r.data;
+    pintarHistorial();
+  }
+
+  function pintarHistorial(editando) {
+    $('odoHist').innerHTML = historial.length ? historial.map(function (h) {
+      var pieza = h.pieza || 'General';
+      if (String(h.id) === String(editando)) {
+        return '<tr data-hist="' + h.id + '"><td style="min-width:215px"><input type="datetime-local" step="1" class="odo-input" data-e="fecha" value="' + valorFechaHora(new Date(h.fecha_cambio)) + '" aria-label="Fecha del cambio"></td>' +
+          '<td class="fecha"><strong>' + pieza + '</strong></td><td>' + esc(h.descripcion) + '</td>' +
+          '<td style="min-width:220px"><input type="text" maxlength="1000" class="odo-input" data-e="obs" value="' + esc(h.observaciones || '') + '" aria-label="Observaciones"></td>' +
+          '<td>' + esc(h.usuario || '—') + '</td><td><div class="acciones"><button type="button" class="adm-btn adm-primary" data-hist-guardar="' + h.id + '">Guardar</button>' +
+          '<button type="button" class="adm-btn" data-hist-cancelar>Cancelar</button></div></td></tr>';
+      }
+      return '<tr><td class="odo-hora">' + fechaHora(h.fecha_cambio) + '</td><td class="fecha"><strong>' + pieza + '</strong></td>' +
+        '<td>' + esc(h.descripcion) + '</td><td>' + esc(h.observaciones || '—') + '</td>' +
+        '<td>' + esc(h.usuario || '—') + '<span class="odo-meta">Registrado ' + fechaHora(h.registrado_en) + '</span>' +
+        (h.editado_en ? '<span class="odo-meta">Editado por ' + esc(h.editado_por || '—') + ' · ' + fechaHora(h.editado_en) + '</span>' : '') + '</td>' +
+        '<td><button type="button" class="adm-btn" data-hist-editar="' + h.id + '" style="min-height:36px;padding:6px 12px">Editar</button></td></tr>';
+    }).join('') : '<tr><td colspan="6">Todavía no hay cambios registrados. Se registran al guardar el odontograma.</td></tr>';
   }
 
   // ---------- Notas de visita ----------
@@ -234,11 +311,13 @@
 
   // Borrar pide un segundo clic en el mismo botón (la página no puede usar confirm())
   function pedirConfirmacion(b) {
-    if (b.dataset.confirmar === '1') return true;
+    function restaurar() { b.dataset.confirmar = '0'; b.textContent = b.dataset.texto; b.style.borderColor = ''; b.style.color = ''; }
+    if (b.dataset.confirmar === '1') { restaurar(); return true; }
+    b.dataset.texto = b.textContent;
     b.dataset.confirmar = '1';
-    b.textContent = '¿Seguro? Borrar';
+    b.textContent = '¿Seguro? ' + b.dataset.texto;
     b.style.borderColor = '#9A3B2E'; b.style.color = '#9A3B2E';
-    setTimeout(function () { if (b.isConnected) { b.dataset.confirmar = '0'; b.textContent = 'Borrar'; b.style.borderColor = ''; b.style.color = ''; } }, 4000);
+    setTimeout(function () { if (b.isConnected && b.dataset.confirmar === '1') restaurar(); }, 4000);
     return false;
   }
 
@@ -265,6 +344,27 @@
   });
 
   $('odoGuardar').addEventListener('click', function () { guardarOdonto(this); });
+  $('odoDescartar').addEventListener('click', function () { eliminarCambios(this); });
+  $('odoPendBody').addEventListener('input', function (e) {
+    var inp = e.target.closest('[data-m]');
+    if (!inp) return;
+    var m = meta[inp.closest('tr').dataset.clave];
+    if (m) m[inp.dataset.m] = inp.value;
+  });
+  $('odoHist').addEventListener('click', async function (e) {
+    var ed = e.target.closest('[data-hist-editar]');
+    if (ed) { pintarHistorial(ed.dataset.histEditar); return; }
+    if (e.target.closest('[data-hist-cancelar]')) { pintarHistorial(); return; }
+    var g = e.target.closest('[data-hist-guardar]');
+    if (!g) return;
+    var fila = g.closest('tr'), f = new Date(fila.querySelector('[data-e=fecha]').value);
+    if (isNaN(f)) { aviso('odoHistMsg', 'Escribe una fecha y hora válidas.', true); return; }
+    g.disabled = true;
+    var r = await sb.rpc('editar_cambio_odontograma', { p_id: +g.dataset.histGuardar, p_fecha: f.toISOString(), p_observaciones: fila.querySelector('[data-e=obs]').value });
+    if (r.error) { g.disabled = false; aviso('odoHistMsg', traducir(r.error), true); return; }
+    aviso('odoHistMsg', 'Registro actualizado.');
+    cargarHistorial();
+  });
 
   $('notaForm').addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -306,6 +406,9 @@
     limpiar: function () {
       pacientes = []; actual = null; odontoCambiado = false;
       odg.cargar(null);
+      base = odg.valor(); meta = {}; historial = [];
+      revisarCambios();
+      $('odoHist').innerHTML = '';
       rellenar(null);
       $('expBody').innerHTML = ''; $('notaLista').innerHTML = ''; $('rxGrid').innerHTML = '';
       $('expFicha').hidden = true; $('expLista').hidden = false;

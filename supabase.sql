@@ -628,6 +628,78 @@ create or replace view public.saldos_pacientes with (security_invoker = true) as
     left join public.movimientos_cuenta m on m.paciente_id = pa.id
    group by pa.id, pa.nombre, pa.telefono;
 
+-- ===== Historial de cambios del odontograma =====
+-- Cada cambio de una pieza queda registrado con su fecha (editable), observaciones (editables),
+-- usuario y hora de registro (automáticos).
+
+create table if not exists public.odontograma_cambios (
+  id            bigint generated always as identity primary key,
+  paciente_id   bigint not null references public.pacientes (id) on delete cascade,
+  pieza         int,            -- vacío = cambio general (por ejemplo, la dentición)
+  descripcion   text not null,
+  fecha_cambio  timestamptz not null default now(),
+  observaciones text,
+  usuario       text,
+  registrado_en timestamptz not null default now(),
+  editado_por   text,
+  editado_en    timestamptz
+);
+create index if not exists odontograma_cambios_paciente on public.odontograma_cambios (paciente_id, fecha_cambio desc);
+
+alter table public.odontograma_cambios enable row level security;
+drop policy if exists "personal ve cambios del odontograma" on public.odontograma_cambios;
+create policy "personal ve cambios del odontograma" on public.odontograma_cambios for select using (public.es_personal());
+-- Se escriben solo con las funciones de abajo
+
+-- Guardar el odontograma y su registro de cambios (todo o nada)
+create or replace function public.guardar_odontograma(p_paciente bigint, p_odontograma jsonb, p_cambios jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  update public.pacientes set odontograma = coalesce(p_odontograma, '{}'::jsonb) where id = p_paciente;
+  if not found then
+    raise exception 'Paciente no encontrado';
+  end if;
+  insert into public.odontograma_cambios (paciente_id, pieza, descripcion, fecha_cambio, observaciones, usuario)
+  select p_paciente,
+         nullif(c ->> 'pieza', '')::int,
+         left(c ->> 'descripcion', 500),
+         coalesce(nullif(c ->> 'fecha_cambio', '')::timestamptz, now()),
+         nullif(left(trim(c ->> 'observaciones'), 1000), ''),
+         v_usuario
+  from jsonb_array_elements(coalesce(p_cambios, '[]'::jsonb)) as c
+  where coalesce(c ->> 'descripcion', '') <> '';
+end;
+$$;
+
+-- Corregir la fecha o las observaciones de un cambio ya registrado (queda anotado quién lo editó)
+create or replace function public.editar_cambio_odontograma(p_id bigint, p_fecha timestamptz, p_observaciones text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  update public.odontograma_cambios
+     set fecha_cambio  = coalesce(p_fecha, fecha_cambio),
+         observaciones = nullif(left(trim(p_observaciones), 1000), ''),
+         editado_por   = (select usuario from public.perfiles where id = auth.uid()),
+         editado_en    = now()
+   where id = p_id;
+  if not found then
+    raise exception 'Registro no encontrado';
+  end if;
+end;
+$$;
+
+revoke execute on function public.guardar_odontograma(bigint, jsonb, jsonb) from public, anon;
+revoke execute on function public.editar_cambio_odontograma(bigint, timestamptz, text) from public, anon;
+grant execute on function public.guardar_odontograma(bigint, jsonb, jsonb) to authenticated;
+grant execute on function public.editar_cambio_odontograma(bigint, timestamptz, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

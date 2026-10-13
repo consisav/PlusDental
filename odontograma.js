@@ -304,5 +304,41 @@
     };
   }
 
-  window.Odontograma = { crear: crear };
+  // Qué cambió entre dos odontogramas, pieza por pieza: [{ clave, pieza, descripcion }]
+  function etiquetaCara(m, cara, n) { return POR_ID[m.h].nombre + ' ' + nombreCara(cara, n) + (m.h === 'caries' ? '' : m.c === 'r' ? ' (requerido)' : ' (realizado)'); }
+  function etiquetaEstado(k, c) { return POR_ID[k].nombre + (POR_ID[k].fijo ? '' : c === 'r' ? ' (requerido)' : ' (realizado)'); }
+  function diferencias(antes, despues) {
+    var a = normalizar(antes), b = normalizar(despues), out = [];
+    var nombreDent = {}; DENTICIONES.forEach(function (d) { nombreDent[d[0]] = d[1]; });
+    if (a.denticion !== b.denticion) {
+      out.push({ clave: 'denticion', pieza: null, descripcion: 'Dentición: ' + nombreDent[a.denticion] + ' → ' + nombreDent[b.denticion] });
+    }
+    var piezas = Object.keys(a.piezas).concat(Object.keys(b.piezas))
+      .filter(function (n, i, arr) { return arr.indexOf(n) === i; })
+      .sort(function (x, y) { return ORDEN.indexOf(+x) - ORDEN.indexOf(+y); });
+    piezas.forEach(function (n) {
+      var pa = a.piezas[n] || { caras: {}, estados: {} }, pb = b.piezas[n] || { caras: {}, estados: {} };
+      var agregado = [], quitado = [];
+      Object.keys(pa.caras).concat(Object.keys(pb.caras)).filter(function (c, i, arr) { return arr.indexOf(c) === i; }).forEach(function (cara) {
+        var ma = pa.caras[cara], mb = pb.caras[cara];
+        if (ma && mb && ma.h === mb.h && ma.c === mb.c) return;
+        if (ma) quitado.push(etiquetaCara(ma, cara, +n));
+        if (mb) agregado.push(etiquetaCara(mb, cara, +n));
+      });
+      Object.keys(pa.estados).concat(Object.keys(pb.estados)).filter(function (k, i, arr) { return arr.indexOf(k) === i; }).forEach(function (k) {
+        if (pa.estados[k] === pb.estados[k]) return;
+        if (pa.estados[k]) quitado.push(etiquetaEstado(k, pa.estados[k]));
+        if (pb.estados[k]) agregado.push(etiquetaEstado(k, pb.estados[k]));
+      });
+      if (agregado.length || quitado.length) {
+        out.push({
+          clave: String(n), pieza: +n,
+          descripcion: [agregado.length ? 'Agregado: ' + agregado.join(', ') : '', quitado.length ? 'Quitado: ' + quitado.join(', ') : ''].filter(Boolean).join(' · ')
+        });
+      }
+    });
+    return out;
+  }
+
+  window.Odontograma = { crear: crear, diferencias: diferencias };
 })();

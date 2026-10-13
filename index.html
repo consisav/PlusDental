@@ -115,6 +115,9 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 .anular-row td{background:#FFF7F5}
 #impresion{display:none}
 @media print{body.imprimir>*:not(#impresion){display:none !important}body.imprimir #impresion{display:block !important}body.imprimir{background:#FFFFFF}}
+.odo-input{font:inherit;font-size:14px;padding:8px 10px;border:1px solid #C9D4D2;border-radius:10px;min-height:40px;box-sizing:border-box;background:#FFFFFF;color:#0F2A2E;width:100%}
+.odo-hora{white-space:nowrap;font-variant-numeric:tabular-nums}
+.odo-meta{display:block;font-size:12px;color:#5B6E70;margin-top:2px}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -261,7 +264,23 @@ tr.anulado td{color:#9AA8AA}tr.anulado td.num{text-decoration:line-through}
 <div id="fOdonto" class="adm-pane" hidden>
 <p class="dlg-msg">Elige la dentición y una herramienta. Las de «Por cara» se aplican tocando la cara; las de «Pieza completa», tocando cualquier parte de la pieza. Toca de nuevo para quitar la marca.</p>
 <div id="odoComp"></div>
-<div class="exp-actions"><button type="button" id="odoGuardar" class="dlg-submit">Guardar odontograma</button><p id="odoMsg" class="dlg-msg" role="status"></p></div>
+<div id="odoPend" class="adm-box" hidden>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h3 style="margin: 0; font-size: 17px; font-weight: 700">Cambios sin guardar</h3>
+<p class="dlg-msg">El usuario y la hora de registro se anotan solos al guardar. Puedes ajustar la fecha del cambio y agregar observaciones.</p>
+</div>
+<div class="roles-wrap"><table><thead><tr><th>Pieza</th><th>Cambio</th><th>Fecha del cambio</th><th>Observaciones</th></tr></thead><tbody id="odoPendBody"></tbody></table></div>
+</div>
+<div class="exp-actions">
+<button type="button" id="odoGuardar" class="dlg-submit" disabled>Guardar cambios</button>
+<button type="button" id="odoDescartar" class="adm-btn" data-confirmar="0" disabled>Eliminar cambios</button>
+<p id="odoMsg" class="dlg-msg" role="status"></p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 19px; font-weight: 700">Historial de cambios</h3>
+<div class="roles-wrap"><table><thead><tr><th>Fecha del cambio</th><th>Pieza</th><th>Cambio</th><th>Observaciones</th><th>Usuario</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="odoHist"></tbody></table></div>
+<p id="odoHistMsg" class="dlg-msg" role="status"></p>
+</div>
 </div>
 
 <div id="fNotas" class="adm-pane" hidden>
