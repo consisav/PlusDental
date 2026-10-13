@@ -68,6 +68,41 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .adm-menu{flex-direction:row;overflow-x:auto;position:static;border-right:0;border-bottom:1px solid #DCE3E1;padding:0 0 8px}
 .adm-menu button{white-space:nowrap;flex:0 0 auto}
 }
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.exp-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.exp-form .full{grid-column:1/-1}
+.exp-form label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+.exp-form input,.exp-form textarea{font:inherit;font-weight:400;font-size:15px;padding:12px 14px;border:1px solid #C9D4D2;border-radius:12px;min-height:44px;box-sizing:border-box;background:#FFFFFF;color:#0F2A2E;width:100%}
+.exp-form textarea{resize:vertical;line-height:1.5}
+.exp-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.exp-actions .dlg-submit{padding:13px 24px}
+@media (max-width:640px){.exp-form{grid-template-columns:minmax(0,1fr)}}
+.odo-wrap{overflow-x:auto;padding:4px 0}
+.odo{display:flex;flex-direction:column;gap:14px;min-width:560px}
+.odo-row{display:grid;grid-template-columns:repeat(8,minmax(0,1fr)) 14px repeat(8,minmax(0,1fr));gap:5px}
+.odo-label{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#5B6E70;font-weight:600}
+.pieza{aspect-ratio:3/4;border:1.5px solid #C9D4D2;border-radius:7px 7px 14px 14px;background:#FFFFFF;color:#44585B;font:inherit;font-size:12px;font-weight:700;display:flex;align-items:flex-end;justify-content:center;padding:0 0 5px;cursor:pointer;font-variant-numeric:tabular-nums}
+.pieza:hover{border-color:#0F2A2E}
+.est-chip{display:inline-flex;align-items:center;gap:8px}
+.est-chip i{width:14px;height:14px;border-radius:4px;border:1.5px solid #C9D4D2;background:#FFFFFF;display:inline-block}
+.e-caries{background:#FDE2E4 !important;border-color:#E11D48 !important;color:#9F1239 !important}
+.e-obturado{background:#DBEAFE !important;border-color:#2563EB !important;color:#1E40AF !important}
+.e-corona{background:#FEF3C7 !important;border-color:#D97706 !important;color:#92400E !important}
+.e-endodoncia{background:#EDE9FE !important;border-color:#7C3AED !important;color:#5B21B6 !important}
+.e-implante{background:#DCF2EC !important;border-color:#0B6E69 !important;color:#08504C !important}
+.e-ausente{background:#ECEFEF !important;border-color:#9AA8AA !important;color:#7A8A8C !important;text-decoration:line-through}
+.e-extraccion{background:#FFFFFF !important;border:2px dashed #E11D48 !important;color:#9F1239 !important}
+.nota-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.nota-lista li{border-top:1px solid #DCE3E1;padding:16px 0;display:flex;flex-direction:column;gap:6px}
+.nota-lista .meta{font-size:13px;color:#5B6E70;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+.nota-lista .texto{font-size:15px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.rx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.rx-item{border:1px solid #DCE3E1;border-radius:14px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column}
+.rx-item a.ver{display:block;aspect-ratio:4/3;background:#0F2A2E;color:#FFFFFF;text-decoration:none}
+.rx-item img{width:100%;height:100%;object-fit:cover;display:block}
+.rx-item .pdf{display:grid;place-items:center;height:100%;font-weight:700;letter-spacing:1px}
+.rx-item .pie{padding:10px 12px;font-size:13px;color:#44585B;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rx-item .pie span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -148,7 +183,7 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 <div class="adm-layout">
 <div class="adm-menu" role="tablist" aria-label="Menú de administración" aria-orientation="vertical">
 <button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios">Administración de usuarios</button>
-<button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expedientes de pacientes <span class="pronto">Pronto</span></button>
+<button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expedientes de pacientes</button>
 <button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
 <button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuestos <span class="pronto">Pronto</span></button>
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta <span class="pronto">Pronto</span></button>
@@ -169,9 +204,73 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 
 <!-- 2. Expedientes de pacientes -->
 <div id="admExpedientes" role="tabpanel" aria-labelledby="tabExpedientes" hidden class="adm-pane">
-<div class="adm-pane-head"><h3 class="adm-h">Expedientes de pacientes</h3><span class="pronto-pill">En preparación</span></div>
-<p class="adm-intro">Una ficha por paciente con toda su información clínica en un solo lugar.</p>
-<ul class="adm-plan"><li>Datos personales y de contacto</li><li>Antecedentes médicos, alergias y medicamentos</li><li>Odontograma con el estado de cada pieza</li><li>Notas de evolución de cada visita</li><li>Radiografías y fotografías clínicas</li></ul>
+
+<!-- Lista de pacientes -->
+<div id="expLista" class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Expedientes de pacientes</h3><button type="button" id="expNuevo" class="adm-btn adm-primary">Nuevo paciente</button></div>
+<input id="expBuscar" type="search" class="adm-input" placeholder="Buscar por nombre, DPI o teléfono" aria-label="Buscar paciente" style="width: 100%; max-width: 420px">
+<div class="roles-wrap"><table><thead><tr><th>Paciente</th><th>DPI</th><th>Teléfono</th><th>Edad</th><th>Actualizado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="expBody"></tbody></table></div>
+<p id="expMsg" class="dlg-msg" role="status"></p>
+</div>
+
+<!-- Ficha del paciente -->
+<div id="expFicha" class="adm-pane" hidden>
+<button type="button" id="expVolver" class="dlg-link">← Todos los pacientes</button>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h3 id="expNombre" class="adm-h"></h3>
+<p id="expSub" class="dlg-msg"></p>
+</div>
+<div id="fichaTabs" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Partes del expediente">
+<button type="button" class="adm-btn" data-ficha="fDatos" aria-pressed="true">Datos</button>
+<button type="button" class="adm-btn" data-ficha="fHistoria" aria-pressed="false">Historia médica</button>
+<button type="button" class="adm-btn" data-ficha="fOdonto" aria-pressed="false">Odontograma</button>
+<button type="button" class="adm-btn" data-ficha="fNotas" aria-pressed="false">Notas de visita</button>
+<button type="button" class="adm-btn" data-ficha="fRx" aria-pressed="false">Radiografías</button>
+</div>
+
+<form id="fDatos" class="exp-form">
+<label class="full">Nombre completo *<input id="pNombre" type="text" maxlength="150" required></label>
+<label>DPI<input id="pDpi" type="text" inputmode="numeric" maxlength="20" placeholder="0000 00000 0000"></label>
+<label>Fecha de nacimiento<input id="pNacimiento" type="date"></label>
+<label>Teléfono / WhatsApp<input id="pTelefono" type="tel" maxlength="40"></label>
+<label class="full">Dirección<input id="pDireccion" type="text" maxlength="250"></label>
+<label>Contacto de emergencia<input id="pEmNombre" type="text" maxlength="150" placeholder="Nombre y parentesco"></label>
+<label>Teléfono de emergencia<input id="pEmTelefono" type="tel" maxlength="40"></label>
+<div class="full exp-actions"><button type="submit" class="dlg-submit">Guardar datos</button><p id="fDatosMsg" class="dlg-msg" role="status"></p></div>
+</form>
+
+<form id="fHistoria" class="exp-form" hidden>
+<label class="full">Alergias<textarea id="pAlergias" rows="3" maxlength="2000" placeholder="Ej.: penicilina, látex. Escribe «Ninguna» si no tiene."></textarea></label>
+<label class="full">Enfermedades y condiciones<textarea id="pEnfermedades" rows="3" maxlength="2000" placeholder="Ej.: diabetes, hipertensión, embarazo"></textarea></label>
+<label class="full">Medicamentos actuales<textarea id="pMedicamentos" rows="3" maxlength="2000" placeholder="Nombre y dosis"></textarea></label>
+<div class="full exp-actions"><button type="submit" class="dlg-submit">Guardar historia médica</button><p id="fHistoriaMsg" class="dlg-msg" role="status"></p></div>
+</form>
+
+<div id="fOdonto" class="adm-pane" hidden>
+<p class="dlg-msg">Elige un estado y toca las piezas para marcarlas. Toca de nuevo una pieza con el mismo estado para dejarla sana.</p>
+<div id="odoEstados" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Estado a marcar"></div>
+<div class="odo-wrap"><div id="odoGrid" class="odo"></div></div>
+<div class="exp-actions"><button type="button" id="odoGuardar" class="dlg-submit">Guardar odontograma</button><p id="odoMsg" class="dlg-msg" role="status"></p></div>
+</div>
+
+<div id="fNotas" class="adm-pane" hidden>
+<form id="notaForm" class="exp-form">
+<label>Fecha de la visita<input id="notaFecha" type="date" required></label>
+<label class="full">Nota<textarea id="notaTexto" rows="4" maxlength="5000" required placeholder="Motivo de consulta, hallazgos, tratamiento realizado e indicaciones"></textarea></label>
+<div class="full exp-actions"><button type="submit" class="dlg-submit">Agregar nota</button><p id="notaMsg" class="dlg-msg" role="status"></p></div>
+</form>
+<ul id="notaLista" class="nota-lista"></ul>
+</div>
+
+<div id="fRx" class="adm-pane" hidden>
+<form id="rxForm" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end">
+<label class="adm-field">Archivo (JPG, PNG, WEBP o PDF, hasta 10 MB)<input id="rxArchivo" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required class="adm-input" style="padding: 8px 12px"></label>
+<button type="submit" class="adm-btn adm-primary">Subir</button>
+</form>
+<p id="rxMsg" class="dlg-msg" role="status"></p>
+<div id="rxGrid" class="rx-grid"></div>
+</div>
+</div>
 </div>
 
 <!-- 3. Historial de citas -->
@@ -577,5 +676,6 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 <script src="supabase-client.js"></script>
 <script src="app.js"></script>
 <script src="auth.js"></script>
+<script src="expedientes.js"></script>
 </body>
 </html>

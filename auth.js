@@ -91,9 +91,13 @@
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     cargarPanel();
   }
-  function cargarPanel() { cargarCitas(); cargarBloqueos(); cargarUsuarios(); }
+  function cargarPanel() {
+    cargarCitas(); cargarBloqueos(); cargarUsuarios();
+    if (window.PD_EXPEDIENTES) window.PD_EXPEDIENTES.cargar();
+  }
   function cerrarPanel() {
     panel.hidden = true;
+    if (window.PD_EXPEDIENTES) window.PD_EXPEDIENTES.limpiar(); // no dejar datos clínicos en pantalla
     usuarios = []; citas = []; bloqueos = [];
     $('rolesBody').innerHTML = ''; $('citasBody').innerHTML = ''; $('bloqLista').innerHTML = '';
   }
@@ -414,6 +418,12 @@
     aviso('claveMsg', claveDe ? 'Listo. La clave de ' + nombreDe(claveDe) + ' se cambió.' : 'Listo. Tu clave se cambió.');
     if (!claveDe) aviso('rolesMsg', 'Tu clave se cambió.');
   });
+
+  // Lo que otros módulos del panel necesitan saber de la sesión
+  window.PD_SESION = {
+    esSuper: esSuper,
+    usuario: function () { return perfil ? nombreDe(perfil) : ''; }
+  };
 
   if (sb) {
     // No esperar llamadas a Supabase dentro del aviso de cambio de sesión (recomendación de supabase-js)

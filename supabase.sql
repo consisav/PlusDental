@@ -229,6 +229,89 @@ $$;
 grant execute on function public.disponibilidad(date, date) to anon, authenticated;
 grant execute on function public.solicitar_cita(date, text, text, text, text) to anon, authenticated;
 
+-- ===== Expedientes de pacientes (solo Administrador y Super Administrador) =====
+
+create table public.pacientes (
+  id                  bigint generated always as identity primary key,
+  nombre              text not null,
+  dpi                 text,
+  fecha_nacimiento    date,
+  telefono            text,
+  direccion           text,
+  emergencia_nombre   text,
+  emergencia_telefono text,
+  alergias            text,
+  enfermedades        text,
+  medicamentos        text,
+  odontograma         jsonb not null default '{}'::jsonb,  -- { "16": "caries", "21": "corona", ... }
+  creado              timestamptz not null default now(),
+  actualizado         timestamptz not null default now()
+);
+
+-- Un DPI no puede repetirse
+create unique index pacientes_dpi_unico on public.pacientes (dpi) where dpi is not null and dpi <> '';
+
+alter table public.pacientes enable row level security;
+create policy "personal ve pacientes" on public.pacientes for select using (public.es_personal());
+create policy "personal crea pacientes" on public.pacientes for insert with check (public.es_personal());
+create policy "personal edita pacientes" on public.pacientes for update
+  using (public.es_personal()) with check (public.es_personal());
+create policy "super administrador borra pacientes" on public.pacientes for delete using (public.es_super_administrador());
+
+create or replace function public.marcar_actualizado()
+returns trigger language plpgsql as $$
+begin
+  new.actualizado := now();
+  return new;
+end;
+$$;
+
+create trigger pacientes_actualizado before update on public.pacientes
+  for each row execute function public.marcar_actualizado();
+
+-- Notas de cada visita
+create table public.notas_visita (
+  id            bigint generated always as identity primary key,
+  paciente_id   bigint not null references public.pacientes (id) on delete cascade,
+  fecha         date not null default current_date,
+  texto         text not null,
+  autor         uuid references auth.users (id) on delete set null,
+  autor_usuario text,
+  creada        timestamptz not null default now()
+);
+create index notas_visita_paciente on public.notas_visita (paciente_id, fecha desc);
+
+alter table public.notas_visita enable row level security;
+create policy "personal ve notas" on public.notas_visita for select using (public.es_personal());
+create policy "personal escribe notas" on public.notas_visita for insert with check (public.es_personal());
+create policy "super administrador borra notas" on public.notas_visita for delete using (public.es_super_administrador());
+
+-- Quien escribe la nota queda registrado automáticamente
+create or replace function public.firmar_nota()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.autor := auth.uid();
+  new.autor_usuario := (select usuario from public.perfiles where id = auth.uid());
+  return new;
+end;
+$$;
+
+create trigger notas_visita_firma before insert on public.notas_visita
+  for each row execute function public.firmar_nota();
+
+-- Radiografías y fotografías clínicas: almacenamiento privado (máx. 10 MB por archivo)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('expedientes', 'expedientes', false, 10485760,
+        array['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+on conflict (id) do nothing;
+
+create policy "personal ve archivos de expedientes" on storage.objects for select
+  using (bucket_id = 'expedientes' and public.es_personal());
+create policy "personal sube archivos de expedientes" on storage.objects for insert
+  with check (bucket_id = 'expedientes' and public.es_personal());
+create policy "super administrador borra archivos de expedientes" on storage.objects for delete
+  using (bucket_id = 'expedientes' and public.es_super_administrador());
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
