@@ -417,7 +417,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <button type="button" class="adm-btn" data-filtro="cancelada" aria-pressed="false">Canceladas</button>
 <button type="button" class="adm-btn" data-filtro="todas" aria-pressed="false">Todas</button>
 </div>
-<div class="roles-wrap"><table><thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Servicio</th><th>Posición</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="citasBody"></tbody></table></div>
+<div class="roles-wrap"><table><thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Servicio</th><th>Dentista</th><th>Posición</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="citasBody"></tbody></table></div>
 <p id="citasMsg" class="dlg-msg" role="status"></p>
 
 <div class="adm-box">
@@ -781,6 +781,13 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <p id="deMsg" class="dlg-msg" role="status"></p>
 </div>
 </form>
+
+<!-- Próximas citas del dentista -->
+<div id="deCitasSec" class="adm-pane" hidden>
+<h3 style="margin: 0; font-size: 19px; font-weight: 700">Próximas citas · 7 días</h3>
+<div class="roles-wrap"><table><thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Servicio</th><th>Sala</th><th>Estado</th></tr></thead><tbody id="deCitasBody"></tbody></table></div>
+<p class="dlg-msg">Las citas nuevas se asignan solas al dentista que atiende a esa hora. Se pueden cambiar en «Historial de citas».</p>
+</div>
 
 <!-- Títulos -->
 <div id="deTitulosSec" class="adm-pane" hidden>

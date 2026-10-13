@@ -12,7 +12,7 @@
 
   var dlg = $('loginDlg'), claveDlg = $('claveDlg'), panel = $('administracion');
   var perfil = null, quiereAdmin = false, usuarios = [], claveDe = null;
-  var citas = [], bloqueos = [], filtro = 'pendiente', periodo = 'proximas', posicionesCita = [];
+  var citas = [], bloqueos = [], filtro = 'pendiente', periodo = 'proximas', posicionesCita = [], dentistasCita = [];
   var ESTADOS = { pendiente: 'Pendiente', confirmada: 'Confirmada', cancelada: 'Cancelada' };
   var DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -125,16 +125,18 @@
 
   async function cargarCitas() {
     aviso('citasMsg', '');
-    $('citasBody').innerHTML = '<tr><td colspan="6">Cargando…</td></tr>';
+    $('citasBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
     function consulta(campos) {
       var q = sb.from('citas').select(campos);
       return periodo === 'proximas'
         ? q.gte('fecha', hoyISO()).order('fecha').order('hora')
         : q.lt('fecha', hoyISO()).order('fecha', { ascending: false }).order('hora', { ascending: false }).limit(300);
     }
-    var r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id');
-    // Si todavía no existe la columna de posición, se muestran las citas sin ella
+    var r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id,dentista_id');
+    // Si todavía no existen las columnas nuevas, se muestran las citas sin ellas
+    if (r.error && /dentista_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id');
     if (r.error && /posicion_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada');
+    dentistasCita = window.PD_DENTISTAS ? await window.PD_DENTISTAS() : [];
     posicionesCita = window.PD_POSICIONES ? await window.PD_POSICIONES() : [];
     contarPendientes();
     if (r.error) {
@@ -163,7 +165,7 @@
     if (!lista.length) {
       var cuando = periodo === 'proximas' ? 'próximas' : 'anteriores';
       var vacio = { pendiente: 'No hay citas pendientes ' + cuando + '.', confirmada: 'No hay citas confirmadas ' + cuando + '.', cancelada: 'No hay citas canceladas ' + cuando + '.', todas: 'No hay citas ' + cuando + '.' };
-      $('citasBody').innerHTML = '<tr><td colspan="6">' + vacio[filtro] + '</td></tr>';
+      $('citasBody').innerHTML = '<tr><td colspan="7">' + vacio[filtro] + '</td></tr>';
       return;
     }
     $('citasBody').innerHTML = lista.map(function (c) {
@@ -174,6 +176,7 @@
       return '<tr><td class="fecha"><strong style="color:#0B2B40">' + fechaLarga(c.fecha) + '</strong><br>' + hhmm(c.hora) + '</td>' +
         '<td><strong>' + esc(c.nombre) + '</strong><br><span style="color:#5A6D7A">' + esc(c.telefono) + '</span></td>' +
         '<td>' + esc(c.servicio) + '</td>' +
+        '<td>' + selectorDentista(c) + '</td>' +
         '<td>' + selectorPosicion(c) + '</td>' +
         '<td><span class="estado estado-' + c.estado + '">' + ESTADOS[c.estado] + '</span></td>' +
         '<td><div class="acciones">' + acciones + '</div></td></tr>';
@@ -186,6 +189,30 @@
       (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Sin asignar</option>' +
       posicionesCita.map(function (p) { return '<option value="' + p.id + '"' + (p.id === c.posicion_id ? ' selected' : '') + '>' + esc(p.codigo + ' · ' + p.nombre) + '</option>'; }).join('') +
       '</select>';
+  }
+
+  function selectorDentista(c) {
+    if (!dentistasCita.length || !('dentista_id' in c)) return '<span style="color:#94A6B2">—</span>';
+    return '<select class="adm-input" data-den-cita="' + c.id + '" aria-label="Dentista de la cita de ' + esc(c.nombre) + '" style="border-radius:10px;min-height:38px;padding:6px 8px;max-width:190px"' +
+      (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Sin asignar</option>' +
+      dentistasCita.map(function (d) { return '<option value="' + d.id + '"' + (d.id === c.dentista_id ? ' selected' : '') + '>' + esc(d.nombre) + '</option>'; }).join('') +
+      '</select>';
+  }
+
+  // Al asignar un dentista, si la cita no tiene sala, toma la sala del dentista
+  async function asignarDentista(sel) {
+    sel.disabled = true;
+    var valor = sel.value ? +sel.value : null;
+    var cita = citas.filter(function (c) { return String(c.id) === sel.dataset.denCita; })[0];
+    var d = dentistasCita.filter(function (x) { return x.id === valor; })[0];
+    var cambios = { dentista_id: valor };
+    if (d && d.posicion_id && cita && !cita.posicion_id) cambios.posicion_id = d.posicion_id;
+    var r = await sb.from('citas').update(cambios).eq('id', sel.dataset.denCita).select('id');
+    sel.disabled = false;
+    if (r.error || !r.data || !r.data.length) { aviso('citasMsg', r.error ? traducir(r.error) : 'No tienes permiso para cambiar esta cita.', true); return; }
+    if (cita) { cita.dentista_id = valor; if (cambios.posicion_id) cita.posicion_id = cambios.posicion_id; }
+    aviso('citasMsg', d ? 'Cita asignada a ' + d.nombre + (cambios.posicion_id ? ' y a su sala.' : '.') : 'La cita quedó sin dentista asignado.');
+    if (cambios.posicion_id) pintarCitas();
   }
 
   async function asignarPosicion(sel) {
@@ -374,6 +401,8 @@
   $('citasBody').addEventListener('change', function (e) {
     var sel = e.target.closest('[data-pos-cita]');
     if (sel) asignarPosicion(sel);
+    var den = e.target.closest('[data-den-cita]');
+    if (den) asignarDentista(den);
   });
   $('citasBody').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-cita]');

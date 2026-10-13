@@ -223,6 +223,7 @@
         '<span>En la clínica desde <b>' + fechaCorta(actual.fecha_ingreso) + '</b>' + (actual.fecha_salida ? ' hasta <b>' + fechaCorta(actual.fecha_salida) + '</b>' : '') + '</span>';
     }
     $('deTitulosSec').hidden = !actual;
+    $('deCitasSec').hidden = !actual;
   }
 
   function aplicarModo() {
@@ -247,7 +248,23 @@
     ver('denFicha');
     $('denFicha').scrollIntoView({ block: 'start' });
     cargarTitulos();
+    cargarCitasDentista();
     sincronizarFotoPublica();
+  }
+
+  async function cargarCitasDentista() {
+    if (!actual) return;
+    var desde = hoy(), p = desde.split('-'), hasta = new Date(+p[0], p[1] - 1, +p[2] + 6);
+    hasta = hasta.getFullYear() + '-' + ('0' + (hasta.getMonth() + 1)).slice(-2) + '-' + ('0' + hasta.getDate()).slice(-2);
+    $('deCitasBody').innerHTML = '<tr><td colspan="5">Cargando…</td></tr>';
+    var r = await sb.from('citas').select('fecha,hora,nombre,servicio,estado,posicion_id').eq('dentista_id', actual.id)
+      .gte('fecha', desde).lte('fecha', hasta).neq('estado', 'cancelada').order('fecha').order('hora');
+    if (r.error) { $('deCitasBody').innerHTML = '<tr><td colspan="5">' + esc(traducir(r.error)) + '</td></tr>'; return; }
+    var est = { pendiente: 'Pendiente', confirmada: 'Confirmada' };
+    $('deCitasBody').innerHTML = r.data.length ? r.data.map(function (c) {
+      return '<tr><td class="fecha"><strong>' + fechaCorta(c.fecha) + '</strong> · ' + String(c.hora).slice(0, 5) + '</td><td>' + esc(c.nombre) + '</td><td>' + esc(c.servicio) + '</td>' +
+        '<td>' + esc(c.posicion_id ? nombrePosicion(c.posicion_id) : '—') + '</td><td><span class="estado estado-' + c.estado + '">' + (est[c.estado] || c.estado) + '</span></td></tr>';
+    }).join('') : '<tr><td colspan="5">Sin citas en los próximos 7 días.</td></tr>';
   }
 
   function nuevo() {
@@ -566,6 +583,11 @@
   });
 
   $('tabDentistas').addEventListener('click', function () { if (!$('denLista').hidden) cargar(); });
+
+  window.PD_DENTISTAS = async function () {
+    var r = await sb.from('dentistas').select('id,nombre,posicion_id').eq('estado', 'activo').order('nombre');
+    return r.error ? [] : r.data;
+  };
 
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { if (!$('denLista').hidden) cargar(); },

@@ -194,7 +194,8 @@ as $$
     end) as t;
 $$;
 
--- Horarios de un rango de fechas y si están libres (sin datos de pacientes)
+-- Horarios de un rango de fechas y si están libres (sin datos de pacientes).
+-- Más abajo («Agenda por dentista») se redefine para tener en cuenta el horario de los dentistas.
 create or replace function public.disponibilidad(desde date, hasta date)
 returns table (fecha date, hora text, libre boolean)
 language sql stable security definer set search_path = public
@@ -1050,6 +1051,89 @@ do $$ begin
       using (bucket_id = 'publico' and public.es_personal());
   end if;
 end $$;
+
+-- ===== Agenda por dentista =====
+-- La agenda pública ofrece solo los horarios en que atiende al menos un dentista activo
+-- (si aún no hay dentistas con horario, se usa el horario general de la clínica).
+-- Estas versiones de disponibilidad() y solicitar_cita() reemplazan a las de la sección de agenda.
+
+alter table public.citas add column if not exists dentista_id bigint references public.dentistas (id) on delete set null;
+create index if not exists citas_dentista on public.citas (dentista_id, fecha);
+
+-- ¿El dentista atiende ese día y a esa hora?
+create or replace function public.dentista_atiende(d public.dentistas, f date, h time)
+returns boolean language sql stable as $$
+  select d.estado = 'activo'
+     and f >= d.fecha_ingreso
+     and (d.fecha_salida is null or f <= d.fecha_salida)
+     and (d.horario -> extract(isodow from f)::int::text) is not null
+     and h >= ((d.horario -> extract(isodow from f)::int::text) ->> 'abre')::time
+     and h <  ((d.horario -> extract(isodow from f)::int::text) ->> 'cierra')::time;
+$$;
+
+create or replace function public.disponibilidad(desde date, hasta date)
+returns table (fecha date, hora text, libre boolean)
+language sql stable security definer set search_path = public
+as $$
+  with turnos as (
+    select dia::date as f, h
+    from generate_series(desde::timestamp, least(hasta, desde + 31)::timestamp, interval '1 day') as dia,
+         lateral public.turnos_del_dia(dia::date) as h
+  ),
+  con_horario as (
+    select exists (select 1 from public.dentistas where estado = 'activo' and horario <> '{}'::jsonb) as hay
+  )
+  select t.f,
+         to_char(t.h, 'HH24:MI'),
+         (t.f + t.h) > (now() at time zone 'America/Guatemala') + interval '1 hour'
+         and not exists (select 1 from public.citas c
+                         where c.fecha = t.f and c.hora = t.h and c.estado <> 'cancelada')
+         and not exists (select 1 from public.bloqueos b
+                         where b.fecha = t.f and (b.hora is null or b.hora = t.h))
+         and (not (select hay from con_horario)
+              or exists (select 1 from public.dentistas d where public.dentista_atiende(d, t.f, t.h)))
+  from turnos t
+  order by 1, 2;
+$$;
+
+create or replace function public.solicitar_cita(p_fecha date, p_hora text, p_servicio text, p_nombre text, p_telefono text)
+returns bigint
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_id bigint;
+  v_dentista bigint;
+  v_posicion bigint;
+begin
+  if coalesce(trim(p_nombre), '') = '' or coalesce(trim(p_telefono), '') = '' then
+    raise exception 'Escribe tu nombre y tu WhatsApp';
+  end if;
+  if length(p_nombre) > 120 or length(p_telefono) > 40 or length(p_servicio) > 60 then
+    raise exception 'Los datos son demasiado largos';
+  end if;
+  if not exists (select 1 from public.disponibilidad(p_fecha, p_fecha) d where d.hora = p_hora and d.libre) then
+    raise exception 'Ese horario ya no está disponible';
+  end if;
+
+  -- Dentista que atiende a esa hora (primero el principal de su sala) y su sala
+  select d.id, d.posicion_id into v_dentista, v_posicion
+    from public.dentistas d
+   where public.dentista_atiende(d, p_fecha, p_hora::time)
+   order by (d.rol_sala = 'alterno'), d.nombre
+   limit 1;
+
+  insert into public.citas (fecha, hora, servicio, nombre, telefono, usuario_id, dentista_id, posicion_id)
+  values (p_fecha, p_hora::time, trim(p_servicio), trim(p_nombre), trim(p_telefono), auth.uid(), v_dentista, v_posicion)
+  returning id into v_id;
+  return v_id;
+exception
+  when unique_violation then
+    raise exception 'Ese horario ya no está disponible';
+end;
+$$;
+
+grant execute on function public.disponibilidad(date, date) to anon, authenticated;
+grant execute on function public.solicitar_cita(date, text, text, text, text) to anon, authenticated;
 
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
