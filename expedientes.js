@@ -333,7 +333,7 @@
 
   pintarEstados();
 
-  window.PD_EXPEDIENTES = {
+  (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { if ($('expFicha').hidden) cargar(); },
     limpiar: function () {
       pacientes = []; actual = null; odonto = {}; odontoCambiado = false;
@@ -341,5 +341,5 @@
       $('expBody').innerHTML = ''; $('notaLista').innerHTML = ''; $('rxGrid').innerHTML = ''; $('odoGrid').innerHTML = '';
       $('expFicha').hidden = true; $('expLista').hidden = false;
     }
-  };
+  });
 })();

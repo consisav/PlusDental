@@ -93,11 +93,11 @@
   }
   function cargarPanel() {
     cargarCitas(); cargarBloqueos(); cargarUsuarios();
-    if (window.PD_EXPEDIENTES) window.PD_EXPEDIENTES.cargar();
+    (window.PD_MODULOS || []).forEach(function (m) { m.cargar(); });
   }
   function cerrarPanel() {
     panel.hidden = true;
-    if (window.PD_EXPEDIENTES) window.PD_EXPEDIENTES.limpiar(); // no dejar datos clínicos en pantalla
+    (window.PD_MODULOS || []).forEach(function (m) { m.limpiar(); }); // no dejar datos de pacientes en pantalla
     usuarios = []; citas = []; bloqueos = [];
     $('rolesBody').innerHTML = ''; $('citasBody').innerHTML = ''; $('bloqLista').innerHTML = '';
   }

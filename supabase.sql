@@ -312,6 +312,148 @@ create policy "personal sube archivos de expedientes" on storage.objects for ins
 create policy "super administrador borra archivos de expedientes" on storage.objects for delete
   using (bucket_id = 'expedientes' and public.es_super_administrador());
 
+-- ===== Presupuestos =====
+-- Precios con IVA incluido. El costo se carga a la cuenta del paciente cuando cada tratamiento
+-- de un presupuesto aprobado se marca como realizado.
+
+-- Catálogo de tratamientos con precio base
+create table public.tratamientos (
+  id     bigint generated always as identity primary key,
+  nombre text not null,
+  precio numeric(10,2) not null default 0 check (precio >= 0),
+  activo boolean not null default true,
+  creado timestamptz not null default now()
+);
+create unique index tratamientos_nombre_unico on public.tratamientos (lower(nombre));
+alter table public.tratamientos enable row level security;
+create policy "personal ve tratamientos" on public.tratamientos for select using (public.es_personal());
+create policy "personal crea tratamientos" on public.tratamientos for insert with check (public.es_personal());
+create policy "personal edita tratamientos" on public.tratamientos for update
+  using (public.es_personal()) with check (public.es_personal());
+
+create type public.estado_presupuesto as enum ('borrador', 'enviado', 'aprobado', 'rechazado');
+
+create table public.presupuestos (
+  id            bigint generated always as identity primary key,
+  paciente_id   bigint not null references public.pacientes (id) on delete cascade,
+  fecha         date not null default current_date,
+  estado        public.estado_presupuesto not null default 'borrador',
+  descuento_pct numeric(5,2) not null default 0 check (descuento_pct between 0 and 100),
+  notas         text,
+  creado_por    text,
+  creado        timestamptz not null default now(),
+  actualizado   timestamptz not null default now()
+);
+create index presupuestos_paciente on public.presupuestos (paciente_id);
+alter table public.presupuestos enable row level security;
+create policy "personal ve presupuestos" on public.presupuestos for select using (public.es_personal());
+create policy "personal crea presupuestos" on public.presupuestos for insert with check (public.es_personal());
+create policy "personal edita presupuestos" on public.presupuestos for update
+  using (public.es_personal()) with check (public.es_personal());
+create policy "super administrador borra presupuestos no aprobados" on public.presupuestos for delete
+  using (public.es_super_administrador() and estado <> 'aprobado');
+
+create table public.presupuesto_items (
+  id             bigint generated always as identity primary key,
+  presupuesto_id bigint not null references public.presupuestos (id) on delete cascade,
+  orden          int not null default 0,
+  tratamiento    text not null,
+  pieza          text,
+  cantidad       int not null default 1 check (cantidad > 0),
+  precio         numeric(10,2) not null default 0 check (precio >= 0),
+  realizado      boolean not null default false,
+  realizado_en   date
+);
+create index presupuesto_items_presupuesto on public.presupuesto_items (presupuesto_id);
+alter table public.presupuesto_items enable row level security;
+-- Se leen directo; se escriben solo con las funciones de abajo, que validan el estado
+create policy "personal ve items" on public.presupuesto_items for select using (public.es_personal());
+
+-- Quién creó el presupuesto
+create or replace function public.firmar_presupuesto()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.creado_por := (select usuario from public.perfiles where id = auth.uid());
+  return new;
+end;
+$$;
+create trigger presupuestos_firma before insert on public.presupuestos
+  for each row execute function public.firmar_presupuesto();
+
+-- Un presupuesto aprobado con tratamientos realizados no cambia de estado ni de descuento
+create or replace function public.antes_de_cambiar_presupuesto()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if old.estado = 'aprobado' and exists (
+       select 1 from public.presupuesto_items where presupuesto_id = old.id and realizado) then
+    if new.estado <> 'aprobado' then
+      raise exception 'Este presupuesto ya tiene tratamientos realizados; no puede dejar de estar aprobado';
+    end if;
+    if new.descuento_pct <> old.descuento_pct then
+      raise exception 'Este presupuesto ya tiene tratamientos realizados; el descuento no se puede cambiar';
+    end if;
+  end if;
+  new.actualizado := now();
+  return new;
+end;
+$$;
+create trigger presupuestos_cambio before update on public.presupuestos
+  for each row execute function public.antes_de_cambiar_presupuesto();
+
+-- Guardar tratamientos, descuento y notas de un presupuesto en borrador o enviado (todo o nada)
+create or replace function public.guardar_presupuesto(p_id bigint, p_descuento numeric, p_notas text, p_items jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_estado public.estado_presupuesto;
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  select estado into v_estado from public.presupuestos where id = p_id;
+  if v_estado is null then
+    raise exception 'Presupuesto no encontrado';
+  end if;
+  if v_estado in ('aprobado', 'rechazado') then
+    raise exception 'Un presupuesto aprobado o rechazado ya no se puede modificar';
+  end if;
+
+  update public.presupuestos
+     set descuento_pct = coalesce(p_descuento, 0), notas = nullif(trim(p_notas), '')
+   where id = p_id;
+
+  delete from public.presupuesto_items where presupuesto_id = p_id;
+  insert into public.presupuesto_items (presupuesto_id, orden, tratamiento, pieza, cantidad, precio)
+  select p_id, t.ord, trim(t.i ->> 'tratamiento'), nullif(trim(t.i ->> 'pieza'), ''),
+         greatest(coalesce((t.i ->> 'cantidad')::int, 1), 1), greatest(coalesce((t.i ->> 'precio')::numeric, 0), 0)
+  from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) with ordinality as t(i, ord)
+  where coalesce(trim(t.i ->> 'tratamiento'), '') <> '';
+end;
+$$;
+
+-- Marcar un tratamiento como realizado (solo en presupuestos aprobados)
+create or replace function public.marcar_realizado(p_item bigint, p_realizado boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if not exists (select 1 from public.presupuesto_items i
+                 join public.presupuestos p on p.id = i.presupuesto_id
+                 where i.id = p_item and p.estado = 'aprobado') then
+    raise exception 'Solo se marcan como realizados los tratamientos de un presupuesto aprobado';
+  end if;
+  update public.presupuesto_items
+     set realizado = p_realizado,
+         realizado_en = case when p_realizado then current_date else null end
+   where id = p_item;
+end;
+$$;
+
+revoke execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb) from public, anon;
+revoke execute on function public.marcar_realizado(bigint, boolean) from public, anon;
+grant execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb) to authenticated;
+grant execute on function public.marcar_realizado(bigint, boolean) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

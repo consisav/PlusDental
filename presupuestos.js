@@ -1,0 +1,396 @@
+// Plus Dental — Presupuestos y catálogo de tratamientos (solo Administrador y Super Administrador)
+// Precios con IVA incluido. Cada tratamiento de un presupuesto aprobado se carga a la cuenta al marcarlo como realizado.
+(function () {
+  var sb = window.PD_SB || null;
+  if (!sb) return;
+
+  var ESTADOS = { borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado', rechazado: 'Rechazado' };
+  var lista = [], pacientes = [], catalogo = [], filtro = 'todos';
+  var actual = null, items = [], cambios = false;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function aviso(id, texto, error) { $(id).textContent = texto || ''; $(id).style.color = error ? '#9A3B2E' : '#44585B'; }
+  function esSuper() { return window.PD_SESION && window.PD_SESION.esSuper(); }
+  function q(n) { return 'Q' + (Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function redondear(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+  function fechaCorta(f) { return f ? new Date(f + 'T12:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'; }
+  function editable() { return actual && (actual.estado === 'borrador' || actual.estado === 'enviado'); }
+  function traducir(err) {
+    var m = (err && err.message) || '';
+    if (/relation .*(tratamientos|presupuesto).* does not exist|could not find the (table|function)/i.test(m)) return 'Falta ejecutar en Supabase el script de presupuestos.';
+    if (/tratamientos_nombre_unico|duplicate key/i.test(m)) return 'Ese tratamiento ya está en el catálogo.';
+    if (/row-level security|permission denied|No tienes permiso/i.test(m)) return 'No tienes permiso para esta acción.';
+    return m.replace(/^.*?ERROR:\s*/, '') || 'No se pudo completar la acción.';
+  }
+
+  // Importe de una línea con el descuento del presupuesto aplicado
+  function importe(it) { return redondear(it.cantidad * it.precio); }
+  function totales(lineas, descuento) {
+    var sub = redondear(lineas.reduce(function (s, it) { return s + importe(it); }, 0));
+    var factor = 1 - (Number(descuento) || 0) / 100;
+    var realizado = redondear(lineas.filter(function (it) { return it.realizado; }).reduce(function (s, it) { return s + importe(it) * factor; }, 0));
+    return { subtotal: sub, descuento: redondear(sub - sub * factor), total: redondear(sub * factor), realizado: realizado };
+  }
+
+  // ---------- Lista ----------
+  async function cargar() {
+    aviso('preMsg', '');
+    $('preBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
+    var r = await sb.from('presupuestos')
+      .select('id,fecha,estado,descuento_pct,paciente_id,pacientes(nombre),presupuesto_items(cantidad,precio,realizado)')
+      .order('id', { ascending: false });
+    if (r.error) { $('preBody').innerHTML = ''; aviso('preMsg', traducir(r.error), true); return; }
+    lista = r.data;
+    pintarLista();
+    cargarPacientes();
+    cargarCatalogo();
+  }
+
+  async function cargarPacientes() {
+    var r = await sb.from('pacientes').select('id,nombre,dpi').order('nombre');
+    if (r.error) return;
+    pacientes = r.data;
+    $('prePaciente').innerHTML = pacientes.length
+      ? '<option value="">Elige un paciente…</option>' + pacientes.map(function (p) {
+        return '<option value="' + p.id + '">' + esc(p.nombre) + (p.dpi ? ' · DPI ' + esc(p.dpi) : '') + '</option>';
+      }).join('')
+      : '<option value="">Primero crea el expediente del paciente</option>';
+  }
+
+  function pintarLista() {
+    document.querySelectorAll('#preFiltros [data-pfiltro]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.pfiltro === filtro); });
+    var buscar = $('preBuscar').value.trim().toLowerCase();
+    var filas = lista.filter(function (p) {
+      var nombre = (p.pacientes && p.pacientes.nombre) || '';
+      return (filtro === 'todos' || p.estado === filtro) && (!buscar || nombre.toLowerCase().indexOf(buscar) >= 0 || String(p.id) === buscar);
+    });
+    if (!filas.length) {
+      $('preBody').innerHTML = '<tr><td colspan="7">' + (lista.length ? 'Ningún presupuesto coincide.' : 'Todavía no hay presupuestos. Elige un paciente y pulsa «Nuevo presupuesto».') + '</td></tr>';
+      return;
+    }
+    $('preBody').innerHTML = filas.map(function (p) {
+      var its = p.presupuesto_items || [];
+      var t = totales(its, p.descuento_pct);
+      var hechos = its.filter(function (i) { return i.realizado; }).length;
+      return '<tr><td class="fecha">' + p.id + '</td><td><strong>' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</strong></td>' +
+        '<td class="fecha">' + fechaCorta(p.fecha) + '</td><td class="num"><strong>' + q(t.total) + '</strong></td>' +
+        '<td><span class="estado estado-' + p.estado + '">' + ESTADOS[p.estado] + '</span></td>' +
+        '<td class="fecha">' + (p.estado === 'aprobado' ? hechos + ' de ' + its.length : '—') + '</td>' +
+        '<td><button type="button" class="adm-btn" data-abrir="' + p.id + '">Abrir</button></td></tr>';
+    }).join('');
+  }
+
+  function ver(id) {
+    ['preLista', 'preEditor', 'preCatalogo'].forEach(function (v) { $(v).hidden = v !== id; });
+  }
+
+  // ---------- Catálogo ----------
+  async function cargarCatalogo() {
+    var r = await sb.from('tratamientos').select('id,nombre,precio,activo').order('nombre');
+    if (r.error) { aviso('catMsg', traducir(r.error), true); return; }
+    catalogo = r.data;
+    $('preCatalogoLista').innerHTML = catalogo.filter(function (t) { return t.activo; })
+      .map(function (t) { return '<option value="' + esc(t.nombre) + '">' + q(t.precio) + '</option>'; }).join('');
+    pintarCatalogo();
+  }
+
+  function pintarCatalogo() {
+    $('catBody').innerHTML = catalogo.length
+      ? catalogo.map(function (t) {
+        return '<tr data-cat="' + t.id + '"><td><input class="adm-input" style="width:100%;border-radius:10px" maxlength="120" value="' + esc(t.nombre) + '" aria-label="Nombre del tratamiento" data-c="nombre"></td>' +
+          '<td class="num"><input class="adm-input" type="number" min="0" step="0.01" style="width:130px;border-radius:10px;text-align:right" value="' + Number(t.precio).toFixed(2) + '" aria-label="Precio de ' + esc(t.nombre) + '" data-c="precio"></td>' +
+          '<td><input type="checkbox" data-c="activo"' + (t.activo ? ' checked' : '') + ' aria-label="Activo" style="width:20px;height:20px;accent-color:#0B6E69"></td>' +
+          '<td><button type="button" class="adm-btn" data-guardar-cat="' + t.id + '">Guardar</button></td></tr>';
+      }).join('')
+      : '<tr><td colspan="4">El catálogo está vacío. Agrega los tratamientos que ofrece la clínica con su precio.</td></tr>';
+  }
+
+  // ---------- Editor ----------
+  async function abrir(id) {
+    aviso('preEdMsg', '');
+    var r = await sb.from('presupuestos').select('*,pacientes(nombre,telefono,dpi),presupuesto_items(*)').eq('id', id).single();
+    if (r.error) { aviso('preMsg', traducir(r.error), true); return; }
+    actual = r.data;
+    items = (actual.presupuesto_items || []).sort(function (a, b) { return a.orden - b.orden || a.id - b.id; })
+      .map(function (i) { return { id: i.id, tratamiento: i.tratamiento, pieza: i.pieza || '', cantidad: i.cantidad, precio: Number(i.precio), realizado: i.realizado, realizado_en: i.realizado_en }; });
+    cambios = false;
+    $('preDescuento').value = Number(actual.descuento_pct) || 0;
+    $('preNotas').value = actual.notas || '';
+    if (editable() && !items.length) items.push({ tratamiento: '', pieza: '', cantidad: 1, precio: 0 });
+    pintarEditor();
+    ver('preEditor');
+    $('preEditor').scrollIntoView({ block: 'start' });
+  }
+
+  function pintarEditor() {
+    var ed = editable();
+    $('preTitulo').textContent = 'Presupuesto N.º ' + actual.id;
+    $('preSub').textContent = (actual.pacientes ? actual.pacientes.nombre : '') + ' · ' + fechaCorta(actual.fecha) + (actual.creado_por ? ' · por ' + actual.creado_por : '');
+    $('preEstado').className = 'estado estado-' + actual.estado;
+    $('preEstado').textContent = ESTADOS[actual.estado];
+    $('preDescuento').disabled = !ed;
+    $('preNotas').disabled = !ed;
+    $('preAgregarWrap').hidden = !ed;
+
+    $('preItems').innerHTML = items.length ? items.map(function (it, i) {
+      if (ed) {
+        return '<tr data-i="' + i + '">' +
+          '<td class="c-trat"><input class="adm-input" list="preCatalogoLista" maxlength="150" data-f="tratamiento" value="' + esc(it.tratamiento) + '" aria-label="Tratamiento" placeholder="Elige o escribe"></td>' +
+          '<td class="c-pieza"><input class="adm-input" maxlength="20" data-f="pieza" value="' + esc(it.pieza) + '" aria-label="Pieza" placeholder="Ej.: 16"></td>' +
+          '<td class="c-cant"><input class="adm-input" type="number" min="1" step="1" data-f="cantidad" value="' + it.cantidad + '" aria-label="Cantidad"></td>' +
+          '<td class="c-precio"><input class="adm-input" type="number" min="0" step="0.01" data-f="precio" value="' + Number(it.precio).toFixed(2) + '" aria-label="Precio"></td>' +
+          '<td class="num" data-importe>' + q(importe(it)) + '</td>' +
+          '<td style="color:#5B6E70;font-size:13px">Al aprobar</td>' +
+          '<td><button type="button" class="adm-btn" data-quitar="' + i + '" style="min-height:38px;padding:6px 12px">Quitar</button></td></tr>';
+      }
+      var marcar = actual.estado === 'aprobado'
+        ? '<label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#5B6E70"><input type="checkbox" data-realizado="' + it.id + '"' + (it.realizado ? ' checked' : '') + ' aria-label="Realizado: ' + esc(it.tratamiento) + '">' + (it.realizado && it.realizado_en ? fechaCorta(it.realizado_en) : '') + '</label>'
+        : '—';
+      return '<tr><td><strong>' + esc(it.tratamiento) + '</strong></td><td>' + esc(it.pieza || '—') + '</td><td class="num">' + it.cantidad + '</td>' +
+        '<td class="num">' + q(it.precio) + '</td><td class="num">' + q(importe(it)) + '</td><td>' + marcar + '</td><td></td></tr>';
+    }).join('') : '<tr><td colspan="7">Sin tratamientos.</td></tr>';
+
+    pintarTotales();
+    pintarAcciones();
+  }
+
+  function pintarTotales() {
+    var t = totales(items, $('preDescuento').value);
+    $('preSubtotal').textContent = q(t.subtotal);
+    $('preTotal').textContent = q(t.total);
+    $('preRealizado').textContent = actual.estado === 'aprobado' ? q(t.realizado) : '—';
+    document.querySelectorAll('#preItems [data-importe]').forEach(function (td) {
+      var it = items[+td.parentNode.dataset.i];
+      if (it) td.textContent = q(importe(it));
+    });
+  }
+
+  function mensajeWhatsApp() {
+    var t = totales(items, $('preDescuento').value);
+    var lineas = items.filter(function (it) { return it.tratamiento.trim(); }).map(function (it) {
+      return '• ' + it.tratamiento.trim() + (it.pieza ? ' (pieza ' + it.pieza + ')' : '') + (it.cantidad > 1 ? ' x' + it.cantidad : '') + ': ' + q(importe(it));
+    });
+    var texto = 'Hola ' + (actual.pacientes ? actual.pacientes.nombre : '') + ', le compartimos su presupuesto de Plus Dental (N.º ' + actual.id + ', ' + fechaCorta(actual.fecha) + '):\n\n' +
+      lineas.join('\n') + '\n\n' +
+      (t.descuento ? 'Subtotal: ' + q(t.subtotal) + '\nDescuento (' + Number($('preDescuento').value) + '%): -' + q(t.descuento) + '\n' : '') +
+      'Total: ' + q(t.total) + ' (IVA incluido)' +
+      ($('preNotas').value.trim() ? '\n\n' + $('preNotas').value.trim() : '') +
+      '\n\nQuedamos a la orden para cualquier duda.';
+    var num = String((actual.pacientes && actual.pacientes.telefono) || '').replace(/\D/g, '');
+    if (num.length === 8) num = '502' + num;
+    return num ? 'https://wa.me/' + num + '?text=' + encodeURIComponent(texto) : '';
+  }
+
+  function pintarAcciones() {
+    var b = [];
+    var e = actual.estado;
+    if (editable()) b.push('<button type="button" class="dlg-submit" data-accion="guardar">Guardar</button>');
+    var wa = mensajeWhatsApp();
+    if (e !== 'rechazado') {
+      b.push(wa
+        ? '<a class="adm-btn" id="preWa" href="' + esc(wa) + '" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">' + (e === 'borrador' ? 'Enviar por WhatsApp' : 'Reenviar por WhatsApp') + '</a>'
+        : '<span class="dlg-msg">Agrega un teléfono en el expediente para enviarlo por WhatsApp.</span>');
+    }
+    if (e === 'borrador' || e === 'enviado') {
+      b.push('<button type="button" class="adm-btn adm-primary" data-accion="aprobado">Marcar aprobado</button>');
+      b.push('<button type="button" class="adm-btn" data-accion="rechazado">Marcar rechazado</button>');
+    }
+    if (e === 'enviado' || e === 'rechazado' || (e === 'aprobado' && !items.some(function (i) { return i.realizado; }))) {
+      b.push('<button type="button" class="adm-btn" data-accion="borrador">Volver a borrador</button>');
+    }
+    if (esSuper() && e !== 'aprobado') b.push('<button type="button" class="adm-btn" data-accion="borrar" data-confirmar="0">Borrar</button>');
+    $('preAcciones').innerHTML = b.join('');
+  }
+
+  async function guardar() {
+    var datos = items.map(function (it) { return { tratamiento: it.tratamiento, pieza: it.pieza, cantidad: it.cantidad, precio: it.precio }; });
+    var r = await sb.rpc('guardar_presupuesto', {
+      p_id: actual.id,
+      p_descuento: Math.min(Math.max(Number($('preDescuento').value) || 0, 0), 100),
+      p_notas: $('preNotas').value,
+      p_items: datos
+    });
+    if (r.error) { aviso('preEdMsg', traducir(r.error), true); return false; }
+    cambios = false;
+    return true;
+  }
+
+  async function cambiarEstado(estado) {
+    if (editable() && !(await guardar())) return false;
+    if (estado === 'aprobado' && !items.some(function (i) { return i.tratamiento.trim(); })) {
+      aviso('preEdMsg', 'Agrega al menos un tratamiento antes de aprobar.', true);
+      return false;
+    }
+    var r = await sb.from('presupuestos').update({ estado: estado }).eq('id', actual.id).select('id');
+    if (r.error || !r.data || !r.data.length) { aviso('preEdMsg', r.error ? traducir(r.error) : 'No tienes permiso para esta acción.', true); return false; }
+    await abrir(actual.id);
+    return true;
+  }
+
+  function pedirConfirmacion(b) {
+    if (b.dataset.confirmar === '1') return true;
+    b.dataset.confirmar = '1';
+    b.textContent = '¿Seguro? Borrar';
+    b.style.borderColor = '#9A3B2E'; b.style.color = '#9A3B2E';
+    setTimeout(function () { if (b.isConnected) { b.dataset.confirmar = '0'; b.textContent = 'Borrar'; b.style.borderColor = ''; b.style.color = ''; } }, 4000);
+    return false;
+  }
+
+  async function volverALista() {
+    var aviso_ = cambios && editable() ? 'Ojo: no se guardaron los últimos cambios del presupuesto N.º ' + actual.id + '.' : '';
+    actual = null; items = []; cambios = false;
+    ver('preLista');
+    await cargar();
+    if (aviso_) aviso('preMsg', aviso_, true);
+  }
+
+  // ---------- Eventos ----------
+  $('preFiltros').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pfiltro]');
+    if (b) { filtro = b.dataset.pfiltro; pintarLista(); }
+  });
+  $('preBuscar').addEventListener('input', pintarLista);
+  $('preBody').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-abrir]');
+    if (b) abrir(b.dataset.abrir);
+  });
+  $('preVolver').addEventListener('click', volverALista);
+  $('preVerCatalogo').addEventListener('click', function () { ver('preCatalogo'); aviso('catMsg', ''); cargarCatalogo(); });
+  $('preCatVolver').addEventListener('click', function () { ver('preLista'); cargar(); });
+
+  $('preNuevoForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var pid = $('prePaciente').value;
+    if (!pid) { aviso('preMsg', 'Elige un paciente.', true); return; }
+    var boton = this.querySelector('[type=submit]');
+    boton.disabled = true;
+    var r = await sb.from('presupuestos').insert({ paciente_id: +pid }).select('id').single();
+    boton.disabled = false;
+    if (r.error) { aviso('preMsg', traducir(r.error), true); return; }
+    abrir(r.data.id);
+  });
+
+  // Edición de líneas
+  $('preItems').addEventListener('input', function (e) {
+    var inp = e.target.closest('[data-f]');
+    if (!inp) return;
+    var it = items[+inp.closest('tr').dataset.i];
+    var f = inp.dataset.f;
+    if (f === 'cantidad') it.cantidad = Math.max(parseInt(inp.value, 10) || 1, 1);
+    else if (f === 'precio') it.precio = Math.max(Number(inp.value) || 0, 0);
+    else it[f] = inp.value;
+    // Al elegir un tratamiento del catálogo se propone su precio
+    if (f === 'tratamiento') {
+      var c = catalogo.filter(function (t) { return t.activo && t.nombre.toLowerCase() === inp.value.trim().toLowerCase(); })[0];
+      if (c) {
+        it.precio = Number(c.precio);
+        inp.closest('tr').querySelector('[data-f=precio]').value = it.precio.toFixed(2);
+      }
+    }
+    cambios = true;
+    pintarTotales();
+    var a = $('preWa'); if (a) a.href = mensajeWhatsApp();
+  });
+  $('preItems').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-quitar]');
+    if (!b) return;
+    items.splice(+b.dataset.quitar, 1);
+    cambios = true;
+    pintarEditor();
+  });
+  $('preItems').addEventListener('change', async function (e) {
+    var c = e.target.closest('[data-realizado]');
+    if (!c) return;
+    c.disabled = true;
+    var r = await sb.rpc('marcar_realizado', { p_item: +c.dataset.realizado, p_realizado: c.checked });
+    if (r.error) { c.checked = !c.checked; c.disabled = false; aviso('preEdMsg', traducir(r.error), true); return; }
+    aviso('preEdMsg', c.checked ? 'Tratamiento marcado como realizado. Su costo ya cuenta en el estado de cuenta del paciente.' : 'Se quitó la marca de realizado.');
+    await abrir(actual.id);
+  });
+  $('preAgregar').addEventListener('click', function () {
+    items.push({ tratamiento: '', pieza: '', cantidad: 1, precio: 0 });
+    cambios = true;
+    pintarEditor();
+    var filas = $('preItems').querySelectorAll('[data-f=tratamiento]');
+    if (filas.length) filas[filas.length - 1].focus();
+  });
+  ['preDescuento', 'preNotas'].forEach(function (id) {
+    $(id).addEventListener('input', function () {
+      cambios = true;
+      pintarTotales();
+      var a = $('preWa'); if (a) a.href = mensajeWhatsApp();
+    });
+  });
+
+  $('preAcciones').addEventListener('click', async function (e) {
+    // Enviar por WhatsApp: el enlace se abre solo; aquí se guarda y se marca como enviado
+    if (e.target.closest('#preWa')) {
+      if (actual.estado === 'borrador') cambiarEstado('enviado');
+      else if (editable() && cambios) guardar();
+      return;
+    }
+    var b = e.target.closest('[data-accion]');
+    if (!b) return;
+    var accion = b.dataset.accion;
+    if (accion === 'borrar') {
+      if (!pedirConfirmacion(b)) return;
+      b.disabled = true;
+      var r = await sb.from('presupuestos').delete().eq('id', actual.id).select('id');
+      if (r.error || !r.data || !r.data.length) { b.disabled = false; aviso('preEdMsg', r.error ? traducir(r.error) : 'No se pudo borrar.', true); return; }
+      cambios = false;
+      await volverALista();
+      aviso('preMsg', 'Presupuesto borrado.');
+      return;
+    }
+    b.disabled = true;
+    if (accion === 'guardar') {
+      aviso('preEdMsg', 'Guardando…');
+      if (await guardar()) { await abrir(actual.id); aviso('preEdMsg', 'Presupuesto guardado.'); }
+      else b.disabled = false;
+      return;
+    }
+    var textos = { aprobado: 'Presupuesto aprobado. Marca cada tratamiento como realizado cuando se haga.', rechazado: 'Presupuesto marcado como rechazado.', borrador: 'El presupuesto volvió a borrador y se puede editar.' };
+    if (await cambiarEstado(accion)) aviso('preEdMsg', textos[accion]);
+    else b.disabled = false;
+  });
+
+  $('catForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var boton = this.querySelector('[type=submit]');
+    boton.disabled = true;
+    var r = await sb.from('tratamientos').insert({ nombre: $('catNombre').value.trim(), precio: redondear($('catPrecio').value) });
+    boton.disabled = false;
+    if (r.error) { aviso('catMsg', traducir(r.error), true); return; }
+    this.reset();
+    aviso('catMsg', 'Tratamiento agregado al catálogo.');
+    $('catNombre').focus();
+    cargarCatalogo();
+  });
+  $('catBody').addEventListener('click', async function (e) {
+    var b = e.target.closest('[data-guardar-cat]');
+    if (!b) return;
+    var fila = b.closest('tr');
+    var datos = {
+      nombre: fila.querySelector('[data-c=nombre]').value.trim(),
+      precio: redondear(fila.querySelector('[data-c=precio]').value),
+      activo: fila.querySelector('[data-c=activo]').checked
+    };
+    if (!datos.nombre) { aviso('catMsg', 'El nombre no puede quedar vacío.', true); return; }
+    b.disabled = true;
+    var r = await sb.from('tratamientos').update(datos).eq('id', b.dataset.guardarCat).select('id');
+    b.disabled = false;
+    if (r.error || !r.data || !r.data.length) { aviso('catMsg', r.error ? traducir(r.error) : 'No tienes permiso para esta acción.', true); return; }
+    aviso('catMsg', 'Cambios guardados: ' + datos.nombre + '.');
+    cargarCatalogo();
+  });
+
+  (window.PD_MODULOS = window.PD_MODULOS || []).push({
+    cargar: function () { if (!$('preLista').hidden) cargar(); },
+    limpiar: function () {
+      lista = []; pacientes = []; actual = null; items = []; cambios = false;
+      $('preBody').innerHTML = ''; $('preItems').innerHTML = ''; $('prePaciente').innerHTML = '';
+      ver('preLista');
+    }
+  });
+})();

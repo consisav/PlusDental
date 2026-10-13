@@ -103,6 +103,21 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 .rx-item .pdf{display:grid;place-items:center;height:100%;font-weight:700;letter-spacing:1px}
 .rx-item .pie{padding:10px 12px;font-size:13px;color:#44585B;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .rx-item .pie span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.num{text-align:right !important;font-variant-numeric:tabular-nums}
+.adm-box.pre-nuevo{flex-direction:row;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:18px}
+.pre-items .adm-input{border-radius:10px;min-height:40px;padding:8px 10px;width:100%}
+.pre-items td{vertical-align:middle}
+.pre-items .c-trat{min-width:220px}.pre-items .c-pieza{width:80px}.pre-items .c-cant{width:80px}.pre-items .c-precio{width:120px}
+.pre-items input[type=number]{text-align:right}
+.pre-items input[type=checkbox]{width:20px;height:20px;accent-color:#0B6E69;cursor:pointer}
+.pre-bottom{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;justify-content:space-between}
+.pre-notas{font:inherit;font-weight:400;font-size:15px;padding:12px 14px;border:1px solid #C9D4D2;border-radius:12px;width:100%;box-sizing:border-box;resize:vertical;line-height:1.5;background:#FFFFFF;color:#0F2A2E}
+.pre-totales{display:flex;flex-direction:column;gap:10px;min-width:280px;flex:0 1 340px;background:#F7F8F6;border:1px solid #DCE3E1;border-radius:18px;padding:18px 20px}
+.pre-totales>div{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:15px;color:#44585B}
+.pre-totales b{color:#0F2A2E;font-variant-numeric:tabular-nums}
+.pre-totales .total{border-top:1px solid #C9D4D2;padding-top:10px;font-size:18px}.pre-totales .total b{font-size:22px}
+.pre-totales .cargado{font-size:14px}.pre-totales .cargado b{color:#0B6E69}
+.estado-borrador{background:#ECEFEF;color:#44585B}.estado-enviado{background:#DBEAFE;color:#1E40AF}.estado-aprobado{background:#DCF2EC;color:#08504C}.estado-rechazado{background:#FDE2E4;color:#9F1239}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F7F8F6;border:1px solid #DCE3E1;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -185,7 +200,7 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 <button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios">Administración de usuarios</button>
 <button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expedientes de pacientes</button>
 <button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
-<button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuestos <span class="pronto">Pronto</span></button>
+<button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuestos</button>
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta <span class="pronto">Pronto</span></button>
 <button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos <span class="pronto">Pronto</span></button>
 </div>
@@ -309,9 +324,66 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 
 <!-- 4. Presupuestos -->
 <div id="admPresupuestos" role="tabpanel" aria-labelledby="tabPresupuestos" hidden class="adm-pane">
-<div class="adm-pane-head"><h3 class="adm-h">Presupuestos</h3><span class="pronto-pill">En preparación</span></div>
-<p class="adm-intro">El plan de tratamiento de cada paciente con su costo, listo para enviar y aprobar.</p>
-<ul class="adm-plan"><li>Tratamientos propuestos con la pieza y el precio de cada uno</li><li>Descuentos y total</li><li>Estado: enviado, aprobado o rechazado</li><li>Envío al paciente por WhatsApp</li></ul>
+
+<!-- Lista de presupuestos -->
+<div id="preLista" class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Presupuestos</h3><button type="button" id="preVerCatalogo" class="adm-btn">Catálogo de tratamientos</button></div>
+<form id="preNuevoForm" class="adm-box pre-nuevo">
+<label class="adm-field" style="flex: 1 1 280px">Paciente<select id="prePaciente" class="adm-input" required style="width: 100%"></select></label>
+<button type="submit" class="adm-btn adm-primary">Nuevo presupuesto</button>
+</form>
+<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">
+<div id="preFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar presupuestos">
+<button type="button" class="adm-btn" data-pfiltro="todos" aria-pressed="true">Todos</button>
+<button type="button" class="adm-btn" data-pfiltro="borrador" aria-pressed="false">Borradores</button>
+<button type="button" class="adm-btn" data-pfiltro="enviado" aria-pressed="false">Enviados</button>
+<button type="button" class="adm-btn" data-pfiltro="aprobado" aria-pressed="false">Aprobados</button>
+<button type="button" class="adm-btn" data-pfiltro="rechazado" aria-pressed="false">Rechazados</button>
+</div>
+<input id="preBuscar" type="search" class="adm-input" placeholder="Buscar paciente" aria-label="Buscar presupuesto por paciente">
+</div>
+<div class="roles-wrap"><table><thead><tr><th>N.º</th><th>Paciente</th><th>Fecha</th><th class="num">Total</th><th>Estado</th><th>Realizado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="preBody"></tbody></table></div>
+<p id="preMsg" class="dlg-msg" role="status"></p>
+</div>
+
+<!-- Editor de presupuesto -->
+<div id="preEditor" class="adm-pane" hidden>
+<button type="button" id="preVolver" class="dlg-link">← Todos los presupuestos</button>
+<div class="adm-pane-head">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="preTitulo" class="adm-h"></h3><p id="preSub" class="dlg-msg"></p></div>
+<span id="preEstado" class="estado"></span>
+</div>
+<div class="roles-wrap"><table class="pre-items"><thead><tr><th>Tratamiento</th><th>Pieza</th><th class="num">Cant.</th><th class="num">Precio (Q)</th><th class="num">Importe</th><th>Realizado</th><th><span class="sr-only">Quitar</span></th></tr></thead><tbody id="preItems"></tbody></table></div>
+<datalist id="preCatalogoLista"></datalist>
+<div id="preAgregarWrap"><button type="button" id="preAgregar" class="adm-btn">+ Agregar tratamiento</button></div>
+<div class="pre-bottom">
+<label class="adm-field" style="flex: 1 1 300px">Notas para el paciente<textarea id="preNotas" rows="4" maxlength="2000" class="pre-notas" placeholder="Ej.: forma de pago, número de citas, cuidados"></textarea></label>
+<div class="pre-totales">
+<div><span>Subtotal</span><b id="preSubtotal"></b></div>
+<div><label for="preDescuento">Descuento (%)</label><input id="preDescuento" type="number" min="0" max="100" step="0.5" class="adm-input" style="width: 96px; text-align: right"></div>
+<div class="total"><span>Total</span><b id="preTotal"></b></div>
+<div class="cargado"><span>Realizado y cargado a la cuenta</span><b id="preRealizado"></b></div>
+</div>
+</div>
+<div id="preAcciones" class="exp-actions"></div>
+<p id="preEdMsg" class="dlg-msg" role="status"></p>
+</div>
+
+<!-- Catálogo de tratamientos -->
+<div id="preCatalogo" class="adm-pane" hidden>
+<button type="button" id="preCatVolver" class="dlg-link">← Presupuestos</button>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h3 class="adm-h">Catálogo de tratamientos</h3>
+<p class="dlg-msg">Precios base con IVA incluido. En cada presupuesto se pueden ajustar. Desactiva un tratamiento para que deje de ofrecerse sin borrarlo.</p>
+</div>
+<form id="catForm" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end">
+<label class="adm-field" style="flex: 1 1 260px">Tratamiento<input id="catNombre" type="text" maxlength="120" required class="adm-input" style="width: 100%" placeholder="Ej.: Limpieza dental"></label>
+<label class="adm-field">Precio (Q)<input id="catPrecio" type="number" min="0" step="0.01" required class="adm-input" style="width: 150px"></label>
+<button type="submit" class="adm-btn adm-primary">Agregar al catálogo</button>
+</form>
+<p id="catMsg" class="dlg-msg" role="status"></p>
+<div class="roles-wrap"><table><thead><tr><th>Tratamiento</th><th class="num">Precio (Q)</th><th>Activo</th><th><span class="sr-only">Guardar</span></th></tr></thead><tbody id="catBody"></tbody></table></div>
+</div>
 </div>
 
 <!-- 5. Estados de cuenta -->
@@ -677,5 +749,6 @@ html{scroll-behavior:smooth;scroll-padding-top:96px}
 <script src="app.js"></script>
 <script src="auth.js"></script>
 <script src="expedientes.js"></script>
+<script src="presupuestos.js"></script>
 </body>
 </html>
