@@ -531,7 +531,17 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <p class="dlg-msg">Al agendar, cada aviso se abre ya escrito en WhatsApp o en tu programa de correo: solo pulsa «Enviar».</p>
 </fieldset>
 <div id="agFijo" class="full" hidden></div>
-<div class="full exp-actions"><button type="submit" class="dlg-submit">Sugerir horarios</button><p id="agFormMsg" class="dlg-msg" role="status"></p></div>
+<div class="full exp-actions"><button type="submit" class="dlg-submit">Buscar los mejores horarios</button><p id="agFormMsg" class="dlg-msg" role="status"></p></div>
+<fieldset class="full pos-sec"><legend>O guarda la cita en un horario específico</legend>
+<p class="dlg-msg">Úsalo si ya acordaste el día y la hora con el paciente. Se asigna el médico elegido arriba (o el más adecuado para ese horario).</p>
+<div class="exp-form">
+<label>Fecha<input id="agFechaM" type="date"></label>
+<label>Hora<select id="agHoraM"></select></label>
+<label>Sala<select id="agSalaM"><option value="">La del médico</option></select></label>
+<div class="exp-actions" style="align-self: end"><button type="button" id="agGuardarM" class="dlg-submit">Guardar cita</button></div>
+</div>
+<p id="agMsgM" class="dlg-msg" role="status"></p>
+</fieldset>
 </div>
 <div id="agSugerencias" class="ag-sugerencias"></div>
 </form>

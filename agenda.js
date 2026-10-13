@@ -150,7 +150,7 @@
   function pintarSugerencias(res) {
     sugerencias = res.opciones;
     if (!sugerencias.length) {
-      $('agSugerencias').innerHTML = '<p class="dlg-msg">No encontré horarios con esas condiciones en los próximos ' + DIAS_BUSQUEDA + ' días. Prueba con otro médico, otra preferencia de horario u otra fecha de inicio. Revisa también que los dentistas tengan su horario cargado.</p>';
+      $('agSugerencias').innerHTML = '<p class="dlg-msg">No encontré horarios con esas condiciones en los próximos ' + DIAS_BUSQUEDA + ' días. Prueba con otro médico, otra preferencia de horario u otra fecha de inicio. Revisa también que los dentistas tengan su horario cargado, o guarda la cita abajo en un horario específico.</p>';
       return;
     }
     var max = sugerencias[0].puntos, min = sugerencias[sugerencias.length - 1].puntos;
@@ -229,6 +229,48 @@
         : '<span class="dlg-msg">El paciente no tiene correo registrado.</span>');
     }
     return b.length ? '<div class="ag-aviso-btns">' + b.join('') + '</div>' : '';
+  }
+
+  function opcionesHorario() {
+    var f = $('agFechaM').value, actual = $('agHoraM').value;
+    var lista = f && turnos(f).length ? turnos(f) : TURNOS.semana;
+    $('agHoraM').innerHTML = lista.map(function (h) { return '<option value="' + h + '">' + h + '</option>'; }).join('');
+    if (lista.indexOf(actual) >= 0) $('agHoraM').value = actual;
+    var sala = $('agSalaM').value;
+    $('agSalaM').innerHTML = '<option value="">La del médico</option>' + salas.filter(function (s) { return s.activa; }).map(function (s) {
+      return '<option value="' + s.id + '">' + esc(s.codigo + ' · ' + s.nombre) + '</option>';
+    }).join('');
+    $('agSalaM').value = sala;
+  }
+
+  // Guardar en el horario elegido: si hay médico elegido se usa; si no, el asistente elige el más adecuado para ese horario
+  async function guardarDirecto(boton) {
+    var f = $('agFechaM').value, h = $('agHoraM').value;
+    if (!$('agPaciente').value) { aviso('agMsgM', 'Elige el paciente arriba.', true); return; }
+    if (!$('agTratamiento').value.trim()) { aviso('agMsgM', 'Indica el tratamiento arriba.', true); return; }
+    if (!f || !h) { aviso('agMsgM', 'Elige la fecha y la hora.', true); return; }
+    if (bloqueado(f, h)) { aviso('agMsgM', 'Ese horario está bloqueado.', true); return; }
+    var salaElegida = $('agSalaM').value ? +$('agSalaM').value : null;
+    var medico = $('agMedico').value ? dentistas.filter(function (d) { return d.id === +$('agMedico').value; })[0] : null;
+    var opcion = null;
+    if (!medico) {
+      var anterior = fijo;
+      fijo = { fecha: f, hora: h, sala: salaElegida };
+      opcion = sugerir().opciones[0] || null;
+      fijo = anterior;
+    }
+    if (!opcion) {
+      var sala = salaElegida ? salas.filter(function (s) { return s.id === salaElegida; })[0]
+        : medico && medico.posicion_id ? salas.filter(function (s) { return s.id === medico.posicion_id; })[0] : null;
+      opcion = { fecha: f, hora: h, dentista: medico, sala: sala || null };
+    }
+    var avisoHorario = opcion.dentista && !atiende(opcion.dentista, f, h) ? ' Ojo: según su ficha, ' + opcion.dentista.nombre + ' no atiende a esa hora.' : '';
+    aviso('agMsgM', '');
+    aviso('agFormMsg', '');
+    await agendar(opcion, boton);
+    if (!$('agFormMsg').textContent) aviso('agMsgM', 'Cita guardada.' + avisoHorario, !!avisoHorario);
+    else aviso('agMsgM', $('agFormMsg').textContent, true);
+    $('agSugerencias').scrollIntoView({ block: 'nearest' });
   }
 
   async function agendar(o, boton) {
@@ -411,6 +453,8 @@
     }
     $('agTratamientos').innerHTML = catalogo.concat(SERVICIOS).filter(function (x, i, a) { return a.indexOf(x) === i; })
       .map(function (t) { return '<option value="' + esc(t) + '"></option>'; }).join('');
+    if (!$('agFechaM').value) $('agFechaM').value = sumar(hoyF, 1);
+    opcionesHorario();
     alCambiarPaciente();
     if (!dentistas.length) aviso('agFormMsg', 'Aún no hay dentistas activos con horario: registra a los dentistas para que el asistente pueda asignarlos.', true);
     await cargarCitas();
@@ -442,6 +486,8 @@
     var b = e.target.closest('[data-agendar]');
     if (b) agendar(sugerencias[+b.dataset.agendar], b);
   });
+  $('agFechaM').addEventListener('change', opcionesHorario);
+  $('agGuardarM').addEventListener('click', function () { guardarDirecto(this); });
   $('agFijo').addEventListener('click', function (e) { if (e.target.closest('#agQuitarFijo')) { fijo = null; pintarFijo(); } });
 
   $('agDia').addEventListener('change', cargarCitas);
