@@ -54,7 +54,9 @@
 
     '<div id="prFicha" class="adm-pane" hidden>' +
     '<button type="button" id="prVolver" class="dlg-link">← Todos los procedimientos</button>' +
-    '<div class="adm-pane-head"><div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="prTitulo" class="adm-h"></h3><p id="prSub" class="dlg-msg"></p></div></div>' +
+    // Encabezado destacado: deja claro a qué procedimiento se le está definiendo el precio
+    '<div class="pr-cabeza"><span class="pr-cabeza-lbl">Definiendo precios de</span><h3 id="prTitulo" class="pr-cabeza-nom"></h3>' +
+    '<div class="pr-cabeza-info"><span id="prTipoTag" class="pr-cabeza-tipo" hidden></span><span id="prSub"></span></div></div>' +
     '<div class="roles-wrap"><table><thead><tr><th>Tipo de precio</th><th class="num">Valor (Q)</th><th class="num">Valor (US$)</th><th class="num">% desc. máx.</th><th>Estado</th><th>Fecha</th><th>Última modificación</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody id="prPrecios"></tbody></table></div>' +
     '<form id="prForm" class="adm-pane pos-sec" novalidate><h4 id="prFormTitulo" class="pr-form-t">Nuevo precio</h4>' +
     '<p id="prSoloSuper" class="pr-solo-super" hidden>Solo el Super Administrador puede crear, modificar o eliminar precios. Tú puedes consultarlos.</p>' +
@@ -182,7 +184,7 @@
     $('prEstado').value = 'activo'; pintarEstadoSelect();
     $('prDescuento').value = ''; $('prValor').value = ''; $('prValorUsd').value = '';
     $('prFecha').value = hoyIso();
-    $('prFormTitulo').textContent = 'Nuevo precio';
+    $('prFormTitulo').innerHTML = 'Nuevo precio para <b>' + esc(actual.nombre) + '</b>';
     aplicarModo();
     aviso('prFormMsg', !libre ? 'Este procedimiento ya tiene los cinco tipos de precio. Pulsa «Ver» en uno y luego «Modificar».' : '');
   }
@@ -198,7 +200,7 @@
     modo = 'ver'; seleccionado = p; editandoId = null;
     [].forEach.call($('prTipo').options, function (o) { o.disabled = false; });
     mostrarPrecio(p);
-    $('prFormTitulo').textContent = 'Precio ' + nombreTipo(p.tipo);
+    $('prFormTitulo').innerHTML = 'Precio ' + nombreTipo(p.tipo) + ' de <b>' + esc(actual.nombre) + '</b>';
     aplicarModo(); pintarFicha();
     aviso('prFormMsg', puedeEditar() ? 'Pulsa «Modificar» para cambiar este precio.' : '');
     $('prForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -206,9 +208,11 @@
   function pintarFicha() {
     var tp = tiposProc.filter(function (x) { return x.id === actual.tipo_id; })[0];
     $('prTitulo').textContent = actual.nombre;
+    $('prTipoTag').hidden = !tp;
+    $('prTipoTag').textContent = tp ? tp.nombre : '';
     $('prSub').textContent = actual.virtual
-      ? 'Procedimiento sugerido de «' + (tp ? tp.nombre : '') + '». Se agregará a tu catálogo de tratamientos al grabar su primer precio.'
-      : (tp ? tp.nombre + ' · ' : '') + 'Precio de catálogo en presupuestos: ' + q(actual.precio) + (actual.activo ? '' : ' · procedimiento inactivo');
+      ? 'Se agregará a tu catálogo de tratamientos al grabar su primer precio.'
+      : 'Precio de catálogo en presupuestos: ' + q(actual.precio) + (actual.activo ? '' : ' · procedimiento inactivo');
     var ps = preciosDe(actual.id).sort(function (a, b) {
       return TIPOS.map(function (t) { return t[0]; }).indexOf(a.tipo) - TIPOS.map(function (t) { return t[0]; }).indexOf(b.tipo);
     });
@@ -229,7 +233,7 @@
   function modificar() {
     if (!seleccionado || !puedeEditar()) return;
     modo = 'editar'; editandoId = seleccionado.id;
-    $('prFormTitulo').textContent = 'Modificar precio · ' + nombreTipo(seleccionado.tipo);
+    $('prFormTitulo').innerHTML = 'Modificar precio ' + nombreTipo(seleccionado.tipo) + ' de <b>' + esc(actual.nombre) + '</b>';
     $('prFecha').value = hoyIso();
     aplicarModo();
     aviso('prFormMsg', 'Haz los cambios y pulsa «Grabar». El tipo de precio no se cambia.');
