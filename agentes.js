@@ -131,15 +131,10 @@
   }
 
   // ---------- Ficha ----------
-  // Los agentes se numeran desde el 1 (el 0 es «NINGUNO»)
-  function siguienteCodigo() {
-    var mayor = 0;
-    agentes.forEach(function (a) { if (/^\d+$/.test(a.codigo)) mayor = Math.max(mayor, +a.codigo); });
-    return String(mayor + 1);
-  }
   function pintarEstadoSelect() { $('acEstado').dataset.estado = $('acEstado').value; }
   function rellenar(a) {
-    $('acCodigo').value = a ? a.codigo : siguienteCodigo();
+    // El código lo asigna Supabase al grabar (1, 2, 3…); no se escribe ni se cambia
+    $('acCodigo').textContent = a ? a.codigo : 'Se asigna al grabar';
     $('acNombre').value = a ? a.nombre : '';
     $('acTelefono').value = a ? a.telefono || '' : '';
     $('acInicio').value = a ? a.fecha_inicio : hoy();
@@ -186,14 +181,13 @@
   }
 
   async function grabar() {
-    var codigo = $('acCodigo').value.trim(), nombre = $('acNombre').value.trim(), inicio = $('acInicio').value;
+    var nombre = $('acNombre').value.trim(), inicio = $('acInicio').value;
     var comision = $('acComision').value === '' ? NaN : Number($('acComision').value);
-    if (!codigo) { aviso('acFormMsg', 'Escribe el código del agente.', true); $('acCodigo').focus(); return; }
     if (!nombre) { aviso('acFormMsg', 'Escribe el nombre del agente.', true); $('acNombre').focus(); return; }
     if (!inicio) { aviso('acFormMsg', 'Indica la fecha de inicio.', true); $('acInicio').focus(); return; }
     if (isNaN(comision) || comision < 0 || comision > 100) { aviso('acFormMsg', 'La comisión debe ser un porcentaje entre 0 y 100.', true); $('acComision').focus(); return; }
     var datos = {
-      codigo: codigo, nombre: nombre, telefono: $('acTelefono').value.trim() || null, fecha_inicio: inicio,
+      nombre: nombre, telefono: $('acTelefono').value.trim() || null, fecha_inicio: inicio,
       comision: Math.round(comision * 100) / 100, estado: $('acEstado').value
     };
     if (quitarFoto && !fotoNueva) datos.foto = null;

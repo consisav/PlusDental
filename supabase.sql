@@ -1449,11 +1449,18 @@ declare
   v_usuario text := (select usuario from public.perfiles where id = auth.uid());
 begin
   if tg_op = 'INSERT' then
+    -- El código lo asigna el sistema: el siguiente número (1, 2, 3…). Lo que se envíe se ignora.
+    -- Solo el agente 0 «NINGUNO» se crea con su código, y únicamente si todavía no existe.
+    if new.codigo is distinct from '0' or exists (select 1 from public.agentes where codigo = '0') then
+      perform pg_advisory_xact_lock(hashtext('agentes_codigo'));   -- dos altas a la vez no reciben el mismo número
+      new.codigo := (select coalesce(max(codigo::int), 0) + 1 from public.agentes where codigo ~ '^\d+$')::text;
+    end if;
     new.registrado_por := coalesce(v_usuario, 'sistema');
     new.creado := now();
     new.estado_cambiado := null;
     new.estado_cambiado_por := null;
   else
+    new.codigo := old.codigo;   -- el código no se puede cambiar
     new.registrado_por := old.registrado_por;
     new.creado := old.creado;
     if new.estado is distinct from old.estado then
@@ -1464,7 +1471,6 @@ begin
       new.estado_cambiado_por := old.estado_cambiado_por;
     end if;
   end if;
-  new.codigo := upper(trim(new.codigo));
   new.nombre := trim(new.nombre);
   new.actualizado := now();
   return new;
@@ -1502,6 +1508,24 @@ end $$;
 insert into public.agentes (codigo, nombre, fecha_inicio, comision, estado)
 select '0', 'NINGUNO', current_date, 0, 'activo'
 where not exists (select 1 from public.agentes where codigo = '0');
+
+-- Agentes que se grabaron antes con códigos escritos a mano (p. ej. «AGE-001»): reciben el siguiente número,
+-- en el orden en que se ingresaron. Solo hace algo la primera vez.
+do $$
+declare
+  r record;
+  n int;
+begin
+  if exists (select 1 from public.agentes where codigo !~ '^\d+$') then
+    alter table public.agentes disable trigger agentes_auditoria;   -- este trigger impide cambiar códigos
+    select coalesce(max(codigo::int), 0) into n from public.agentes where codigo ~ '^\d+$';
+    for r in select id from public.agentes where codigo !~ '^\d+$' order by creado, id loop
+      n := n + 1;
+      update public.agentes set codigo = n::text where id = r.id;
+    end loop;
+    alter table public.agentes enable trigger agentes_auditoria;
+  end if;
+end $$;
 
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
