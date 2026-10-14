@@ -5,7 +5,7 @@
   var sb = window.PD_SB || null;
   if (!sb || !document.getElementById('admPrecios')) return;
 
-  var TIPOS = [['directo', 'Cliente directo'], ['institucional', 'Institucional'], ['vip', 'VIP'], ['paquete', 'Paquete'], ['especial', 'Especial']];
+  var TIPOS = [['directo', 'Cliente directo'], ['institucional', 'Institucional'], ['vip', 'VIP'], ['referido', 'Referido'], ['paquete', 'Paquete'], ['especial', 'Especial']];
   var ESTADOS = { activo: 'Activo', suspendido: 'Suspendido', baja: 'Baja' };
   var tratamientos = [], precios = [], actual = null, editandoId = null, filtro = 'todos';
   var tiposProc = [];   // tipos de procedimientos: la tabla se agrupa por tipo
@@ -43,7 +43,7 @@
   $('admPrecios').innerHTML =
     '<div id="prLista" class="adm-pane">' +
     '<div class="adm-pane-head"><h3 class="adm-h">Precios por procedimiento</h3></div>' +
-    '<p class="dlg-msg">Los procedimientos salen del catálogo de <b>Tipos de procedimientos</b> (y de tu catálogo de tratamientos). Elige un tipo, pulsa «Definir precios» o «Abrir» y graba un precio por cada tipo de precio: Cliente directo, Institucional, VIP, Paquete y Especial. Al grabar el primer precio de un procedimiento sugerido, se agrega solo a tu catálogo de tratamientos.</p>' +
+    '<p class="dlg-msg">Los procedimientos salen del catálogo de <b>Tipos de procedimientos</b> (y de tu catálogo de tratamientos). Elige un tipo, pulsa «Definir precios» o «Abrir» y graba un precio por cada tipo de precio: Cliente directo, Institucional, VIP, Referido, Paquete y Especial. Al grabar el primer precio de un procedimiento sugerido, se agrega solo a tu catálogo de tratamientos.</p>' +
     '<div class="pr-barra"><label class="pr-tipo-proc">Tipo de procedimiento<select id="prTipoProc" class="adm-input"><option value="">Todos los tipos</option></select></label></div>' +
     '<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">' +
     '<div id="prFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar por estado">' +
@@ -178,7 +178,7 @@
     var usados = preciosDe(actual.id).map(function (p) { return p.tipo; });
     [].forEach.call($('prTipo').options, function (o) { o.disabled = usados.indexOf(o.value) >= 0; });
     // por defecto «Especial» (o el siguiente tipo que falte, si ya existe)
-    var libre = ['especial', 'directo', 'institucional', 'vip', 'paquete'].filter(function (t) { return usados.indexOf(t) < 0; })[0];
+    var libre = ['especial', 'directo', 'institucional', 'vip', 'referido', 'paquete'].filter(function (t) { return usados.indexOf(t) < 0; })[0];
     $('prTipo').value = libre || 'especial';
     $('prTipo').dataset.completo = libre ? '0' : '1';
     $('prEstado').value = 'activo'; pintarEstadoSelect();
@@ -186,7 +186,7 @@
     $('prFecha').value = hoyIso();
     $('prFormTitulo').innerHTML = 'Nuevo precio para <b>' + esc(actual.nombre) + '</b>';
     aplicarModo();
-    aviso('prFormMsg', !libre ? 'Este procedimiento ya tiene los cinco tipos de precio. Pulsa «Ver» en uno y luego «Modificar».' : '');
+    aviso('prFormMsg', !libre ? 'Este procedimiento ya tiene los seis tipos de precio. Pulsa «Ver» en uno y luego «Modificar».' : '');
   }
   function mostrarPrecio(p) {
     $('prTipo').value = p.tipo;

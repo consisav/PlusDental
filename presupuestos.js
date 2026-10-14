@@ -10,7 +10,7 @@
   // Precios activos por tratamiento y tipo (de «Precios y paquetes»): { idTratamiento: { directo: {valor, max}, … } }
   var preciosAct = {};
   var tiposCat = [];   // tipos de procedimientos (para clasificar los tratamientos del catálogo)
-  var TIPOS = { directo: 'Cliente directo', institucional: 'Institucional', vip: 'VIP', paquete: 'Paquete', especial: 'Especial' };
+  var TIPOS = { directo: 'Cliente directo', institucional: 'Institucional', vip: 'VIP', referido: 'Referido', paquete: 'Paquete', especial: 'Especial' };
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }

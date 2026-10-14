@@ -1566,7 +1566,7 @@ end $$;
 create table if not exists public.precios (
   id              bigint generated always as identity primary key,
   tratamiento_id  bigint not null references public.tratamientos (id) on delete cascade,
-  tipo            text not null default 'especial' check (tipo in ('directo', 'institucional', 'vip', 'paquete', 'especial')),
+  tipo            text not null default 'especial' check (tipo in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial')),
   valor           numeric(10,2) not null check (valor >= 0),
   descuento_max   numeric(5,2) not null default 0 check (descuento_max between 0 and 100),
   estado          text not null default 'activo' check (estado in ('activo', 'suspendido', 'baja')),
@@ -1580,6 +1580,9 @@ create unique index if not exists precios_tratamiento_tipo on public.precios (tr
 alter table public.precios alter column estado set default 'activo';
 alter table public.precios add column if not exists valor_usd numeric(10,2) check (valor_usd >= 0);
 alter table public.precios add column if not exists fecha date not null default current_date;
+-- Tipo de precio «Referido» (también en tablas ya creadas)
+alter table public.precios drop constraint if exists precios_tipo_check;
+alter table public.precios add constraint precios_tipo_check check (tipo in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial'));
 
 create or replace function public.precios_auditoria()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -1780,7 +1783,9 @@ grant execute on function public.paquetes_publicos() to anon, authenticated;
 -- Esta versión de guardar_presupuesto reemplaza a la de la sección de presupuestos.
 
 alter table public.presupuestos add column if not exists tipo_precio text not null default 'directo'
-  check (tipo_precio in ('directo', 'institucional', 'vip', 'paquete', 'especial'));
+  check (tipo_precio in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial'));
+alter table public.presupuestos drop constraint if exists presupuestos_tipo_precio_check;
+alter table public.presupuestos add constraint presupuestos_tipo_precio_check check (tipo_precio in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial'));
 
 drop function if exists public.guardar_presupuesto(bigint, numeric, text, jsonb);
 create or replace function public.guardar_presupuesto(p_id bigint, p_descuento numeric, p_notas text, p_items jsonb, p_tipo text default 'directo')
@@ -1793,7 +1798,7 @@ begin
   if not public.es_personal() then
     raise exception 'No tienes permiso para esta acción';
   end if;
-  if v_tipo not in ('directo', 'institucional', 'vip', 'paquete', 'especial') then
+  if v_tipo not in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial') then
     raise exception 'Tipo de precio no válido';
   end if;
   select estado into v_estado from public.presupuestos where id = p_id;
