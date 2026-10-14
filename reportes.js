@@ -1,0 +1,365 @@
+// Plus Dental — Reportes: listado de pacientes, estados de cuenta, citas agendadas, cobros por paciente
+// y comisiones generadas. Parámetros: fecha inicial y final; estados con colores (se pueden filtrar).
+// Cada reporte se puede imprimir o exportar a Excel (CSV). Solo Administrador y Super Administrador.
+(function () {
+  var sb = window.PD_SB || null;
+  if (!sb || !document.getElementById('admRepPacientes')) return;
+
+  var CLINICA = { nombre: 'Plus Dental', direccion: 'Reforma Montúfar, zona 10, Ciudad de Guatemala', telefono: '+502 3756-5739' };
+  var METODOS = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', deposito: 'Depósito' };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function hoy() { return iso(new Date()); }
+  function inicioMes() { var d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); }
+  function fechaCorta(f) {
+    if (!f) return '—';
+    var d = /^\d{4}-\d{2}-\d{2}$/.test(f) ? new Date(f + 'T12:00:00') : new Date(f);
+    return d.toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function q(n) { n = Number(n) || 0; return (n < -0.004 ? '-Q' : 'Q') + Math.abs(n).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function pct(n) { return (Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' %'; }
+  function num(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+  // Inicio y fin del día en hora local (para campos con fecha y hora)
+  function desdeHora(f) { return new Date(f + 'T00:00:00').toISOString(); }
+  function hastaHora(f) { return new Date(f + 'T23:59:59.999').toISOString(); }
+  function traducir(err) {
+    var m = (err && err.message) || '';
+    if (/does not exist|could not find|schema cache/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql).';
+    if (/row-level security|permission denied/i.test(m)) return 'No tienes permiso para ver este reporte.';
+    return m || 'No se pudo generar el reporte.';
+  }
+
+  // ---------- Definición de los reportes ----------
+  var REPORTES = {
+    pacientes: {
+      panel: 'admRepPacientes', titulo: 'Listado de pacientes',
+      nota: 'Pacientes registrados entre las dos fechas.',
+      estados: { activo: ['Activo', 'verde'], suspendido: ['Suspendido', 'ambar'], inactivo: ['Inactivo', 'gris'], baja: ['Baja', 'rojo'] },
+      columnas: [
+        ['Registro', function (f) { return fechaCorta(f.creado); }],
+        ['Paciente', function (f) { return f.nombre; }],
+        ['DPI', function (f) { return f.dpi || '—'; }],
+        ['Teléfono', function (f) { return f.telefono || '—'; }],
+        ['Correo', function (f) { return f.correo || '—'; }],
+        ['Médico asignado', function (f) { return f.medico ? f.medico.nombre : '—'; }],
+        ['Agente comercial', function (f) { return f.agente ? f.agente.codigo + ' · ' + f.agente.nombre : '—'; }]
+      ],
+      cargar: async function (d, h) {
+        var r = await sb.from('pacientes').select('id,nombre,dpi,telefono,correo,creado,estado,medico:dentistas(nombre),agente:agentes(codigo,nombre)')
+          .gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado');
+        if (r.error) throw r.error;
+        return r.data;
+      },
+      totales: function (filas) { return [['Pacientes', filas.length]]; }
+    },
+
+    cuentas: {
+      panel: 'admRepCuentas', titulo: 'Estados de cuenta',
+      nota: 'Saldo de cada paciente al inicio y al final del período, con los cargos (tratamientos realizados) y pagos entre las dos fechas.',
+      estados: { pendiente: ['Saldo pendiente', 'ambar'], aldia: ['Al día', 'verde'], favor: ['Saldo a favor', 'azul'] },
+      columnas: [
+        ['Paciente', function (f) { return f.nombre; }],
+        ['Teléfono', function (f) { return f.telefono || '—'; }],
+        ['Saldo anterior', function (f) { return f.anterior; }, 'q'],
+        ['Cargos', function (f) { return f.cargos; }, 'q'],
+        ['Pagos', function (f) { return f.abonos; }, 'q'],
+        ['Saldo final', function (f) { return f.final; }, 'q']
+      ],
+      cargar: async function (d, h) {
+        var r = await Promise.all([
+          sb.from('movimientos_cuenta').select('fecha,paciente_id,cargo,abono').lte('fecha', h),
+          sb.from('pacientes').select('id,nombre,telefono')
+        ]);
+        if (r[0].error) throw r[0].error;
+        if (r[1].error) throw r[1].error;
+        var pac = {};
+        r[1].data.forEach(function (p) { pac[p.id] = { nombre: p.nombre, telefono: p.telefono, anterior: 0, cargos: 0, abonos: 0, mov: 0 }; });
+        r[0].data.forEach(function (m) {
+          var p = pac[m.paciente_id]; if (!p) return;
+          var f = String(m.fecha).slice(0, 10), c = Number(m.cargo) || 0, a = Number(m.abono) || 0;
+          if (f < d) p.anterior += c - a;
+          else { p.cargos += c; p.abonos += a; p.mov++; }
+        });
+        return Object.keys(pac).map(function (k) {
+          var p = pac[k];
+          p.anterior = num(p.anterior); p.cargos = num(p.cargos); p.abonos = num(p.abonos);
+          p.final = num(p.anterior + p.cargos - p.abonos);
+          p.estado = p.final > 0.004 ? 'pendiente' : p.final < -0.004 ? 'favor' : 'aldia';
+          return p;
+        }).filter(function (p) { return p.mov > 0 || Math.abs(p.anterior) > 0.004; })
+          .sort(function (a, b) { return b.final - a.final || a.nombre.localeCompare(b.nombre); });
+      },
+      totales: function (filas) {
+        var s = function (k) { return filas.reduce(function (t, f) { return t + f[k]; }, 0); };
+        return [['Pacientes', filas.length], ['Cargos', q(s('cargos'))], ['Pagos', q(s('abonos'))], ['Saldo final', q(s('final'))]];
+      },
+      sumar: ['anterior', 'cargos', 'abonos', 'final']
+    },
+
+    citas: {
+      panel: 'admRepCitas', titulo: 'Citas agendadas',
+      nota: 'Citas con fecha entre las dos fechas.',
+      estados: { pendiente: ['Pendiente', 'ambar'], confirmada: ['Confirmada', 'verde'], cancelada: ['Cancelada', 'gris'] },
+      columnas: [
+        ['Fecha', function (f) { return fechaCorta(f.fecha); }],
+        ['Hora', function (f) { return String(f.hora || '').slice(0, 5); }],
+        ['Paciente', function (f) { return f.nombre; }],
+        ['Teléfono', function (f) { return f.telefono || '—'; }],
+        ['Servicio', function (f) { return f.servicio; }],
+        ['Dentista', function (f) { return f.dentista ? f.dentista.nombre : '—'; }],
+        ['Sala', function (f) { return f.sala ? f.sala.codigo + ' · ' + f.sala.nombre : '—'; }]
+      ],
+      cargar: async function (d, h) {
+        var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista:dentistas(nombre),sala:posiciones(codigo,nombre)')
+          .gte('fecha', d).lte('fecha', h).order('fecha').order('hora');
+        if (r.error) throw r.error;
+        return r.data;
+      },
+      totales: function (filas) { return [['Citas', filas.length]]; }
+    },
+
+    cobros: {
+      panel: 'admRepCobros', titulo: 'Cobros por paciente',
+      nota: 'Pagos con fecha entre las dos fechas, agrupados por paciente. Los recibos anulados no suman al total.',
+      estados: { valido: ['Válido', 'verde'], anulado: ['Anulado', 'rojo'] },
+      columnas: [
+        ['Paciente', function (f) { return f.paciente; }],
+        ['Recibo', function (f) { return 'N.º ' + f.id; }],
+        ['Fecha', function (f) { return fechaCorta(f.fecha); }],
+        ['Forma de pago', function (f) { return METODOS[f.metodo] || f.metodo; }],
+        ['Concepto', function (f) { return f.anulado ? 'ANULADO: ' + (f.anulado_motivo || '') : (f.concepto || '—'); }],
+        ['Monto', function (f) { return Number(f.monto); }, 'q']
+      ],
+      grupo: function (f) { return f.paciente; },
+      cuenta: function (f) { return f.estado === 'valido'; },
+      cargar: async function (d, h) {
+        var r = await sb.from('pagos').select('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,pac:pacientes(nombre)')
+          .gte('fecha', d).lte('fecha', h).order('fecha');
+        if (r.error) throw r.error;
+        return r.data.map(function (p) { p.paciente = p.pac ? p.pac.nombre : '—'; p.estado = p.anulado ? 'anulado' : 'valido'; return p; })
+          .sort(function (a, b) { return a.paciente.localeCompare(b.paciente) || String(a.fecha).localeCompare(String(b.fecha)) || a.id - b.id; });
+      },
+      totales: function (filas) {
+        var v = filas.filter(function (f) { return f.estado === 'valido'; });
+        var pacientes = {}; v.forEach(function (f) { pacientes[f.paciente_id] = 1; });
+        return [['Pacientes', Object.keys(pacientes).length], ['Cobros válidos', v.length], ['Total cobrado', q(v.reduce(function (t, f) { return t + Number(f.monto); }, 0))]];
+      },
+      sumar: ['monto']
+    },
+
+    comisiones: {
+      panel: 'admRepComisiones', titulo: 'Comisiones generadas',
+      nota: 'Comisión de cada agente comercial sobre los pagos cobrados (no anulados) entre las dos fechas a los pacientes que tiene asignados.',
+      estados: { activo: ['Activo', 'verde'], suspendido: ['Suspendido', 'ambar'], inactivo: ['Inactivo', 'gris'] },
+      columnas: [
+        ['Código', function (f) { return f.codigo; }],
+        ['Agente comercial', function (f) { return f.nombre; }],
+        ['Pacientes', function (f) { return f.pacientes; }, 'n'],
+        ['Cobros', function (f) { return f.cobros; }, 'n'],
+        ['Total cobrado', function (f) { return f.total; }, 'q'],
+        ['% comisión', function (f) { return f.comision; }, 'pct'],
+        ['Comisión', function (f) { return f.monto; }, 'q']
+      ],
+      cargar: async function (d, h) {
+        var r = await Promise.all([
+          sb.from('pagos').select('monto,paciente_id,pac:pacientes(agente_id)').eq('anulado', false).gte('fecha', d).lte('fecha', h),
+          sb.from('agentes').select('id,codigo,nombre,comision,estado')
+        ]);
+        if (r[0].error) throw r[0].error;
+        if (r[1].error) throw r[1].error;
+        var ag = {};
+        r[1].data.forEach(function (a) { ag[a.id] = { codigo: a.codigo, nombre: a.nombre, comision: Number(a.comision), estado: a.estado, total: 0, cobros: 0, pac: {} }; });
+        r[0].data.forEach(function (p) {
+          var a = ag[p.pac && p.pac.agente_id]; if (!a) return;
+          a.total += Number(p.monto); a.cobros++; a.pac[p.paciente_id] = 1;
+        });
+        function orden(c) { return /^\d+$/.test(c) ? +c : Infinity; }
+        return Object.keys(ag).map(function (k) {
+          var a = ag[k];
+          a.total = num(a.total); a.pacientes = Object.keys(a.pac).length; a.monto = num(a.total * a.comision / 100);
+          return a;
+        }).filter(function (a) { return a.cobros > 0 || a.estado === 'activo'; })
+          .sort(function (a, b) { return orden(a.codigo) - orden(b.codigo); });
+      },
+      totales: function (filas) {
+        var s = function (k) { return filas.reduce(function (t, f) { return t + f[k]; }, 0); };
+        return [['Agentes', filas.length], ['Total cobrado', q(s('total'))], ['Comisiones', q(s('monto'))]];
+      },
+      sumar: ['pacientes', 'cobros', 'total', 'monto']
+    }
+  };
+
+  // ---------- Motor común ----------
+  var estadoRep = {};   // por reporte: { filas, desde, hasta, ocultos: {estado: true}, generado }
+
+  function valor(col, f) { return col[1](f); }
+  function texto(col, f) {
+    var v = valor(col, f);
+    return col[2] === 'q' ? q(v) : col[2] === 'pct' ? pct(v) : String(v == null ? '' : v);
+  }
+  function pill(def, e) { var x = def.estados[e] || [e, 'gris']; return '<span class="estado rep-e-' + x[1] + '">' + esc(x[0]) + '</span>'; }
+  function visibles(clave) {
+    var s = estadoRep[clave];
+    return (s.filas || []).filter(function (f) { return !s.ocultos[f.estado]; });
+  }
+
+  function montar(clave) {
+    var def = REPORTES[clave], p = $(def.panel);
+    p.innerHTML =
+      '<div class="adm-pane-head"><h3 class="adm-h">' + esc(def.titulo) + '</h3>' +
+      '<div class="hi-botones"><button type="button" class="adm-btn" data-rep-imprimir="' + clave + '" disabled>Imprimir</button>' +
+      '<button type="button" class="adm-btn" data-rep-excel="' + clave + '" disabled>Exportar a Excel</button></div></div>' +
+      '<p class="dlg-msg">' + esc(def.nota) + '</p>' +
+      '<form class="rep-param" data-rep-form="' + clave + '">' +
+      '<label>Fecha inicial<input type="date" name="desde" value="' + inicioMes() + '" required></label>' +
+      '<label>Fecha final<input type="date" name="hasta" value="' + hoy() + '" required></label>' +
+      '<button type="submit" class="dlg-submit">Generar reporte</button></form>' +
+      '<div class="rep-chips" data-rep-chips="' + clave + '" aria-label="Filtrar por estado"></div>' +
+      '<div class="rep-totales" data-rep-totales="' + clave + '"></div>' +
+      '<div class="roles-wrap"><table class="rep-tabla"><thead><tr>' +
+      def.columnas.map(function (c) { return '<th' + (c[2] ? ' class="num"' : '') + '>' + esc(c[0]) + '</th>'; }).join('') + '<th>Estado</th></tr></thead>' +
+      '<tbody data-rep-body="' + clave + '"></tbody></table></div>' +
+      '<p class="dlg-msg" role="status" data-rep-msg="' + clave + '"></p>';
+    estadoRep[clave] = { filas: null, ocultos: {}, generado: false };
+  }
+
+  async function generar(clave) {
+    var def = REPORTES[clave], p = $(def.panel), s = estadoRep[clave];
+    var form = p.querySelector('[data-rep-form]'), d = form.desde.value, h = form.hasta.value;
+    var msg = p.querySelector('[data-rep-msg]');
+    if (!d || !h) { msg.textContent = 'Indica la fecha inicial y la final.'; msg.style.color = '#9A3B2E'; return; }
+    if (d > h) { msg.textContent = 'La fecha inicial no puede ser posterior a la final.'; msg.style.color = '#9A3B2E'; return; }
+    msg.textContent = 'Generando…'; msg.style.color = '#475B68';
+    form.querySelector('button').disabled = true;
+    try {
+      s.filas = await def.cargar(d, h);
+      s.desde = d; s.hasta = h; s.generado = true;
+      msg.textContent = '';
+    } catch (e) {
+      s.filas = []; s.generado = false;
+      msg.textContent = traducir(e); msg.style.color = '#9A3B2E';
+    }
+    form.querySelector('button').disabled = false;
+    pintar(clave);
+  }
+
+  function filaHtml(def, f) {
+    return '<tr>' + def.columnas.map(function (c) { return '<td' + (c[2] ? ' class="num"' : '') + '>' + esc(texto(c, f)) + '</td>'; }).join('') + '<td>' + pill(def, f.estado) + '</td></tr>';
+  }
+  function filaSuma(def, filas, etiqueta, clase) {
+    var cuenta = def.cuenta ? filas.filter(def.cuenta) : filas;
+    var primera = true;
+    return '<tr class="' + clase + '">' + def.columnas.map(function (c) {
+      var sumable = c[2] && def.sumar && def.columnas.indexOf(c) >= 0 && c[2] !== 'pct';
+      if (sumable) {
+        var t = cuenta.reduce(function (a, f) { return a + (Number(valor(c, f)) || 0); }, 0);
+        return '<td class="num">' + esc(c[2] === 'q' ? q(t) : String(Math.round(t))) + '</td>';
+      }
+      if (primera) { primera = false; return '<td>' + esc(etiqueta) + '</td>'; }
+      return '<td></td>';
+    }).join('') + '<td></td></tr>';
+  }
+
+  function pintar(clave) {
+    var def = REPORTES[clave], p = $(def.panel), s = estadoRep[clave];
+    var todas = s.filas || [], filas = visibles(clave);
+    // Botones de estado con su color y cantidad (tocar para mostrar u ocultar)
+    p.querySelector('[data-rep-chips]').innerHTML = !s.generado ? '' : Object.keys(def.estados).map(function (e) {
+      var n = todas.filter(function (f) { return f.estado === e; }).length;
+      return '<button type="button" class="rep-chip" data-rep-estado="' + e + '" aria-pressed="' + !s.ocultos[e] + '">' +
+        '<span class="rep-dot rep-d-' + def.estados[e][1] + '"></span>' + esc(def.estados[e][0]) + ' <b>' + n + '</b></button>';
+    }).join('');
+    p.querySelector('[data-rep-totales]').innerHTML = !s.generado ? '' :
+      def.totales(filas).map(function (t) { return '<div class="rep-total-caja"><span>' + esc(t[0]) + '</span><b>' + esc(String(t[1])) + '</b></div>'; }).join('');
+    var cols = def.columnas.length + 1, cuerpo;
+    if (!s.generado) cuerpo = '';
+    else if (!filas.length) cuerpo = '<tr><td colspan="' + cols + '">No hay datos para esas fechas' + (todas.length ? ' con los estados elegidos' : '') + '.</td></tr>';
+    else if (def.grupo) {
+      cuerpo = ''; var grupos = [], porGrupo = {};
+      filas.forEach(function (f) { var g = def.grupo(f); if (!porGrupo[g]) { porGrupo[g] = []; grupos.push(g); } porGrupo[g].push(f); });
+      grupos.forEach(function (g) { cuerpo += porGrupo[g].map(function (f) { return filaHtml(def, f); }).join('') + filaSuma(def, porGrupo[g], 'Subtotal ' + g, 'rep-sub'); });
+    } else cuerpo = filas.map(function (f) { return filaHtml(def, f); }).join('');
+    if (s.generado && filas.length && def.sumar) cuerpo += filaSuma(def, filas, 'TOTAL', 'rep-total');
+    p.querySelector('[data-rep-body]').innerHTML = cuerpo;
+    p.querySelector('[data-rep-imprimir]').disabled = !s.generado || !filas.length;
+    p.querySelector('[data-rep-excel]').disabled = !s.generado || !filas.length;
+  }
+
+  // ---------- Imprimir y exportar ----------
+  function rango(s) { return 'Del ' + fechaCorta(s.desde) + ' al ' + fechaCorta(s.hasta); }
+  function imprimir(clave) {
+    var def = REPORTES[clave], s = estadoRep[clave], tabla = $(def.panel).querySelector('.rep-tabla').cloneNode(true);
+    var celda = 'padding:6px 5px;border-bottom:1px solid #D9E4EC;text-align:left';
+    tabla.setAttribute('style', 'width:100%;border-collapse:collapse;font-size:11.5px');
+    tabla.querySelectorAll('th,td').forEach(function (c) { c.setAttribute('style', celda + (c.classList.contains('num') ? ';text-align:right' : '')); });
+    tabla.querySelectorAll('tr.rep-sub td').forEach(function (c) { c.style.fontWeight = '700'; c.style.background = '#F5F9FC'; });
+    tabla.querySelectorAll('tr.rep-total td').forEach(function (c) { c.style.fontWeight = '800'; c.style.borderTop = '2px solid #0B2B40'; });
+    var ocultos = Object.keys(s.ocultos).filter(function (e) { return s.ocultos[e]; });
+    $('impresion').innerHTML =
+      '<div style="font-family:Manrope,system-ui,sans-serif;color:#0B2B40;max-width:1000px;margin:0 auto;padding:20px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid #0B2B40;padding-bottom:12px;margin-bottom:14px">' +
+      '<div><div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:28px">' + CLINICA.nombre + '</div>' +
+      '<div style="font-size:12px;color:#475B68">' + CLINICA.direccion + ' · ' + CLINICA.telefono + '</div></div>' +
+      '<div style="text-align:right;font-size:12.5px;color:#475B68"><div style="font-size:18px;font-weight:700;color:#0B2B40">' + esc(def.titulo) + '</div>' +
+      rango(s) + '<br>Impreso el ' + fechaCorta(hoy()) + '</div></div>' +
+      (ocultos.length ? '<div style="font-size:12px;color:#475B68;margin-bottom:8px">Sin incluir: ' + ocultos.map(function (e) { return esc(def.estados[e][0]); }).join(', ') + '</div>' : '') +
+      '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin-bottom:12px">' +
+      def.totales(visibles(clave)).map(function (t) { return '<div>' + esc(t[0]) + ': <b>' + esc(String(t[1])) + '</b></div>'; }).join('') + '</div>' +
+      tabla.outerHTML + '</div>';
+    document.body.classList.add('imprimir');
+    window.print();
+  }
+  window.addEventListener('afterprint', function () {
+    if (!$('impresion').querySelector('table')) return;
+    document.body.classList.remove('imprimir');
+    $('impresion').innerHTML = '';
+  });
+
+  function exportar(clave) {
+    var def = REPORTES[clave], s = estadoRep[clave], filas = visibles(clave);
+    function celda(v) { v = String(v == null ? '' : v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+    var lineas = [[def.titulo + ' · ' + rango(s)].map(celda).join(','), ''];
+    lineas.push(def.columnas.map(function (c) { return celda(c[0]); }).concat(['Estado']).join(','));
+    filas.forEach(function (f) {
+      lineas.push(def.columnas.map(function (c) {
+        var v = valor(c, f);
+        return celda(c[2] === 'q' || c[2] === 'n' || c[2] === 'pct' ? num(v).toFixed(c[2] === 'n' ? 0 : 2) : v);
+      }).concat([celda((def.estados[f.estado] || [f.estado])[0])]).join(','));
+    });
+    var blob = new Blob(['﻿' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'reporte-' + clave + '-' + s.desde + '-al-' + s.hasta + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  // ---------- Eventos ----------
+  Object.keys(REPORTES).forEach(montar);
+  var TABS = { tabRepPacientes: 'pacientes', tabRepCuentas: 'cuentas', tabRepCitas: 'citas', tabRepCobros: 'cobros', tabRepComisiones: 'comisiones' };
+  Object.keys(TABS).forEach(function (t) {
+    $(t).addEventListener('click', function () { if (!estadoRep[TABS[t]].generado) generar(TABS[t]); });
+  });
+  document.addEventListener('submit', function (e) {
+    var f = e.target.closest('[data-rep-form]');
+    if (!f) return;
+    e.preventDefault();
+    generar(f.dataset.repForm);
+  });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rep-estado],[data-rep-imprimir],[data-rep-excel]');
+    if (!b) return;
+    if (b.dataset.repImprimir) { imprimir(b.dataset.repImprimir); return; }
+    if (b.dataset.repExcel) { exportar(b.dataset.repExcel); return; }
+    var clave = b.closest('[data-rep-chips]').dataset.repChips, s = estadoRep[clave];
+    s.ocultos[b.dataset.repEstado] = !s.ocultos[b.dataset.repEstado];
+    pintar(clave);
+  });
+
+  (window.PD_MODULOS = window.PD_MODULOS || []).push({
+    cargar: function () { /* los reportes se generan al abrirlos o al pulsar «Generar reporte» */ },
+    limpiar: function () { Object.keys(REPORTES).forEach(montar); }   // no dejar datos en pantalla al cerrar sesión
+  });
+})();

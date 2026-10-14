@@ -324,6 +324,25 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .bandera{width:24px;height:16px;border-radius:3px;box-shadow:0 0 0 1px rgba(11,43,64,.18);display:block;flex:0 0 auto}
 @media (max-width:1430px){.idioma-fila{justify-content:center;padding:12px 0 6px;border-bottom:1px solid #D9E4EC}.idioma button{min-height:40px;padding:8px 16px;font-size:14px}.bandera{width:27px;height:18px}}
 .ac-acciones .dlg-submit:disabled{opacity:.45;cursor:not-allowed}
+.rep-param{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.rep-param label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+.rep-param input{font:inherit;font-size:15px;padding:10px 14px;border:1px solid #C4D4DF;border-radius:12px;min-height:44px;box-sizing:border-box;background:#FFFFFF;color:#0B2B40}
+.rep-param .dlg-submit{padding:12px 22px}
+.rep-chips{display:flex;gap:8px;flex-wrap:wrap}
+.rep-chips:empty,.rep-totales:empty{display:none}
+.rep-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid #D9E4EC;background:#FFFFFF;color:#0B2B40;border-radius:999px;padding:7px 14px;min-height:38px;font:inherit;font-weight:600;font-size:14px;cursor:pointer}
+.rep-chip b{background:#EEF5FA;border-radius:999px;padding:1px 8px;font-size:12.5px}
+.rep-chip[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+.rep-dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+.rep-d-verde{background:#1F9D7A}.rep-d-ambar{background:#F59E0B}.rep-d-gris{background:#94A6B2}.rep-d-rojo{background:#E11D48}.rep-d-azul{background:#3B82F6}
+.rep-e-verde{background:#DCF2EC;color:#08504C}.rep-e-ambar{background:#FEF3C7;color:#92400E}.rep-e-gris{background:#EBF0F4;color:#475B68}.rep-e-rojo{background:#FDE2E4;color:#9F1239}.rep-e-azul{background:#DBEAFE;color:#1E40AF}
+.rep-totales{display:flex;gap:12px;flex-wrap:wrap}
+.rep-total-caja{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:10px 16px;display:flex;flex-direction:column;gap:2px;min-width:130px}
+.rep-total-caja span{font-size:12.5px;color:#5A6D7A;font-weight:600}
+.rep-total-caja b{font-size:19px;color:#0B2B40}
+.rep-tabla .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rep-tabla tr.rep-sub td{background:#F5F9FC;font-weight:700}
+.rep-tabla tr.rep-total td{border-top:2px solid #0B2B40;font-weight:800}
 .ac-fijo{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:#E8F3FA;color:#005A87;font-size:11.5px;font-weight:700;vertical-align:middle}
 .ac-quien{display:flex;align-items:center;gap:10px;min-width:180px}
 .ac-pct{position:relative;display:block}
@@ -427,6 +446,12 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuesto</button>
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
 <button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
+<span class="adm-grupo" id="grpReportes" role="presentation">Reportes</span>
+<button type="button" role="tab" id="tabRepPacientes" data-tab="admRepPacientes" aria-selected="false" aria-controls="admRepPacientes">Listado de pacientes</button>
+<button type="button" role="tab" id="tabRepCuentas" data-tab="admRepCuentas" aria-selected="false" aria-controls="admRepCuentas">Estados de cuenta</button>
+<button type="button" role="tab" id="tabRepCitas" data-tab="admRepCitas" aria-selected="false" aria-controls="admRepCitas">Citas agendadas</button>
+<button type="button" role="tab" id="tabRepCobros" data-tab="admRepCobros" aria-selected="false" aria-controls="admRepCobros">Cobros por paciente</button>
+<button type="button" role="tab" id="tabRepComisiones" data-tab="admRepComisiones" aria-selected="false" aria-controls="admRepComisiones">Comisiones generadas</button>
 <span class="adm-grupo" id="grpWeb" role="presentation">Página web</span>
 <button type="button" role="tab" id="tabHistorias" data-tab="admHistorias" aria-selected="false" aria-controls="admHistorias">Historias de impacto</button>
 </div>
@@ -918,6 +943,13 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </div>
 
 <!-- 8. Dentistas -->
+<!-- Reportes -->
+<div id="admRepPacientes" role="tabpanel" aria-labelledby="tabRepPacientes" hidden class="adm-pane"></div>
+<div id="admRepCuentas" role="tabpanel" aria-labelledby="tabRepCuentas" hidden class="adm-pane"></div>
+<div id="admRepCitas" role="tabpanel" aria-labelledby="tabRepCitas" hidden class="adm-pane"></div>
+<div id="admRepCobros" role="tabpanel" aria-labelledby="tabRepCobros" hidden class="adm-pane"></div>
+<div id="admRepComisiones" role="tabpanel" aria-labelledby="tabRepComisiones" hidden class="adm-pane"></div>
+
 <div id="admAgentes" role="tabpanel" aria-labelledby="tabAgentes" hidden class="adm-pane">
 
 <!-- Lista de agentes -->
@@ -1537,6 +1569,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <script src="dentistas.js"></script>
 <script src="agenda.js"></script>
 <script src="agentes.js"></script>
+<script src="reportes.js"></script>
 <script src="historias.js"></script>
 <script src="idiomas.js"></script>
 </body>
