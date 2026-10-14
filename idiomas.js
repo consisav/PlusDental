@@ -288,6 +288,10 @@
     'Tu usuario es de tipo Cliente. Administración es solo para el personal de la clínica.': 'Your account is a Client account. Administration is for clinic staff only.'
   };
 
+  // Traducciones que traen otros programas (p. ej. las preguntas frecuentes de faq.js)
+  var extra = window.PD_EN_EXTRA || {};
+  Object.keys(extra).forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(EN, k)) EN[k] = extra[k]; });
+
   // Textos que llevan datos variables (fechas, números, nombres)
   var DIAS = { Dom: 'Sun', Lun: 'Mon', Mar: 'Tue', 'Mié': 'Wed', Jue: 'Thu', Vie: 'Fri', 'Sáb': 'Sat' };
   var REGLAS = [

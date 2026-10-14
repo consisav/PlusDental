@@ -313,8 +313,12 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .hi-vista img,.hi-vista video{width:100%;height:100%;object-fit:contain;display:block;background:#0B2B40}
 .hi-botones{display:flex;gap:8px;flex-wrap:wrap}
 @media (max-width:640px){.hi-subidas{grid-template-columns:minmax(0,1fr)}}
-.mainmenu{flex-wrap:wrap;justify-content:flex-end;row-gap:6px}
-.idioma-fila{order:-1;flex-basis:100%;display:flex;justify-content:flex-end}
+.mainmenu{flex-wrap:wrap;justify-content:flex-end;row-gap:8px}
+.mainmenu .btn,.mainmenu .menu-login{order:-2}
+.idioma-fila{order:-1;display:flex;justify-content:flex-end}
+.nav-salto{order:0;flex-basis:100%;height:0}
+@media (min-width:1280px){.marca{flex-shrink:0}.mainmenu{flex:0 1 auto;min-width:0}}
+.mainmenu>a:not(.btn){order:1}
 .idioma{display:inline-flex;gap:4px;padding:3px;border:1px solid #C4D4DF;border-radius:999px;background:#FFFFFF}
 .idioma button{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;border-radius:999px;padding:5px 11px;min-height:30px;font:inherit;font-weight:700;font-size:12.5px;letter-spacing:.04em;color:#5A6D7A;cursor:pointer}
 .idioma button:hover{color:#005A87}
@@ -322,7 +326,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .idioma button:not(.on) .bandera{opacity:.6;filter:saturate(.6)}
 .idioma button:focus-visible{outline:2px solid #188EC0;outline-offset:1px}
 .bandera{width:24px;height:16px;border-radius:3px;box-shadow:0 0 0 1px rgba(11,43,64,.18);display:block;flex:0 0 auto}
-@media (max-width:1430px){.idioma-fila{justify-content:center;padding:12px 0 6px;border-bottom:1px solid #D9E4EC}.idioma button{min-height:40px;padding:8px 16px;font-size:14px}.bandera{width:27px;height:18px}}
+@media (max-width:1279px){.nav-salto{display:none}.mainmenu .btn,.mainmenu .menu-login{order:2}.idioma-fila{justify-content:center;padding:12px 0 6px;border-bottom:1px solid #D9E4EC}.idioma button{min-height:40px;padding:8px 16px;font-size:14px}.bandera{width:27px;height:18px}}
 .ac-acciones .dlg-submit:disabled{opacity:.45;cursor:not-allowed}
 .rep-param{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
 .rep-param label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -355,6 +359,46 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .campos:disabled select.ac-estado[data-estado="activo"]{background:#DCF2EC;color:#08504C;-webkit-text-fill-color:#08504C}
 .campos:disabled select.ac-estado[data-estado="suspendido"]{background:#FEF3C7;color:#92400E;-webkit-text-fill-color:#92400E}
 .campos:disabled select.ac-estado[data-estado="inactivo"]{background:#EBF0F4;color:#475B68;-webkit-text-fill-color:#475B68}
+.faq-buscar{display:flex;align-items:center;gap:10px;border:1px solid #C4D4DF;border-radius:999px;padding:6px 6px 6px 18px;background:#F5F9FC;max-width:760px;transition:border-color .2s,box-shadow .2s}
+.faq-buscar:focus-within{border-color:#188EC0;box-shadow:0 0 0 4px rgba(24,142,192,.15);background:#FFFFFF}
+.faq-buscar input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:16px;color:#0B2B40;padding:10px 0;outline:none}
+.faq-buscar input::-webkit-search-cancel-button{display:none}
+.faq-ir{border:0;background:#005A87;color:#FFFFFF;font:inherit;font-weight:700;font-size:14.5px;padding:12px 20px;border-radius:999px;cursor:pointer;white-space:nowrap;min-height:44px}
+.faq-ir:hover{background:#00476B}
+.faq-limpiar{border:0;background:#E2EEF6;color:#0B2B40;width:32px;height:32px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer;flex:0 0 auto}
+.faq-temas{display:flex;gap:8px;flex-wrap:wrap}
+.faq-temas button{font:inherit;font-weight:600;font-size:14px;border:1px solid #D9E4EC;background:#FFFFFF;color:#0B2B40;padding:8px 15px;border-radius:999px;min-height:38px;cursor:pointer}
+.faq-temas button:hover{border-color:#188EC0}
+.faq-temas button[aria-pressed="true"]{background:#0B2B40;border-color:#0B2B40;color:#FFFFFF}
+.faq-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:28px;align-items:start}
+.faq-mejor{background:linear-gradient(140deg,#0B2B40 0%,#14537A 100%);color:#FFFFFF;border-radius:24px;padding:30px;display:flex;flex-direction:column;gap:10px;position:sticky;top:150px;box-shadow:0 18px 40px rgba(11,43,64,.18)}
+.faq-mejor-tag{font-size:11.5px;letter-spacing:.16em;font-weight:800;color:#9FD3EE;text-transform:uppercase}
+.faq-mejor .faq-tema{color:#9FD3EE}
+.faq-mejor h3{margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:32px;line-height:1.12}
+.faq-mejor p{margin:0;font-size:16.5px;line-height:1.7;color:#DCEBF5}
+.faq-rec{font-size:12px;letter-spacing:.12em;font-weight:800;color:#9FD3EE;text-transform:uppercase;margin-top:6px}
+.faq-mejor ul,.faq-resp ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+.faq-mejor li,.faq-resp li{position:relative;padding-left:24px;line-height:1.5}
+.faq-mejor li::before,.faq-resp li::before{content:"✓";position:absolute;left:0;font-weight:800;color:#7FD6B5}
+.faq-resp li::before{color:#1F9D7A}
+.faq-agendar{align-self:flex-start;margin-top:8px;color:#FFFFFF;font-weight:700;text-decoration:none;border-bottom:2px solid #7FD6B5;padding-bottom:2px}
+.faq-col{display:flex;flex-direction:column;gap:6px;min-width:0}
+.faq-lista-t{margin:0 0 4px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#5A6D7A;font-weight:700}
+.faq-lista{border-top:1px solid #D9E4EC}
+.faq-item{border-bottom:1px solid #D9E4EC}
+.faq-item>button{width:100%;background:transparent;border:0;padding:18px 0;display:flex;justify-content:space-between;align-items:center;gap:16px;font:inherit;font-size:17px;font-weight:600;color:#0B2B40;text-align:left;cursor:pointer;min-height:44px}
+.faq-item>button:hover{color:#005A87}
+.faq-tema{display:block;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#188EC0;margin-bottom:4px}
+.faq-mas{font-size:26px;font-weight:400;color:#005A87;flex:0 0 auto;line-height:1}
+.faq-resp{padding:0 0 20px;display:flex;flex-direction:column;gap:10px}
+.faq-resp p{margin:0;font-size:16px;line-height:1.7;color:#475B68}
+.faq-resp li{color:#475B68;font-size:15px}
+.faq-vermas{align-self:flex-start;margin-top:10px}
+.faq-nada{display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:#FEF3C7;color:#92400E;border-radius:14px;padding:12px 16px;font-weight:600;font-size:15px}
+.faq-nada a{color:#08504C;font-weight:800}
+.faq-nota{margin:0;font-size:13.5px;color:#5A6D7A}
+@media (max-width:900px){.faq-grid{grid-template-columns:minmax(0,1fr)}.faq-mejor{position:static}.faq-mejor h3{font-size:27px}}
+@media (max-width:560px){.faq-buscar{flex-wrap:wrap;border-radius:18px;padding:8px 10px 10px 14px}.faq-buscar input{flex-basis:calc(100% - 40px)}.faq-ir{width:100%}}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -372,7 +416,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .wa-float:hover{background:#178F47;transform:translateY(-2px)}
 @media (max-width:560px){.wa-float span{display:none}.wa-float{padding:16px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn,.card,.wa-float{transition:none}}
-@media (max-width:1430px){
+@media (max-width:1279px){
 .menu-btn{display:inline-flex}
 .mainmenu{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:0;background:#F5F9FC;padding:8px 20px 24px;border-bottom:1px solid #D9E4EC;box-shadow:0 18px 30px rgba(11,43,64,.08)}
 .mainmenu.open{display:flex}
@@ -407,10 +451,12 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <a href="#nosotros">Nosotros</a>
 <a href="#tratamientos">Servicios</a>
 <a href="#historias">Historias de impacto</a>
+<a href="#preguntas">Preguntas frecuentes</a>
 <a href="#administracion" data-login="admin">Administración</a>
 <a href="#contacto">Contactarnos</a>
 <a class="btn" href="#agenda" style="background: #005A87; color: #FFFFFF; text-decoration: none; padding: 13px 22px; border-radius: 999px; font-weight: 600; font-size: 15px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Programar consulta</a>
 <button type="button" class="menu-login" data-login="user"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg><span id="loginLabel">Conectarse</span></button>
+<span class="nav-salto" aria-hidden="true"></span>
 <div class="idioma-fila" data-no-traducir><div class="idioma" role="group" aria-label="Idioma / Language"><button type="button" data-idioma="es" lang="es" aria-pressed="true" aria-label="Español" class="on"><svg class="bandera" viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#FFFFFF"/><rect width="10" height="20" fill="#4997D0"/><rect x="20" width="10" height="20" fill="#4997D0"/><circle cx="15" cy="10" r="3.6" fill="none" stroke="#5B8C3A" stroke-width="1.1"/><circle cx="15" cy="10" r="1.6" fill="#C9A227"/></svg>ES</button><button type="button" data-idioma="en" lang="en" aria-pressed="false" aria-label="English"><svg class="bandera" viewBox="0 0 38 20" preserveAspectRatio="none" aria-hidden="true"><rect width="38" height="20" fill="#FFFFFF"/><g fill="#B22234"><rect width="38" height="1.54"/><rect y="3.08" width="38" height="1.54"/><rect y="6.15" width="38" height="1.54"/><rect y="9.23" width="38" height="1.54"/><rect y="12.3" width="38" height="1.54"/><rect y="15.4" width="38" height="1.54"/><rect y="18.46" width="38" height="1.54"/></g><rect width="15.2" height="10.77" fill="#3C3B6E"/><g fill="#FFFFFF"><circle cx="2.5" cy="2" r=".6"/><circle cx="6" cy="2" r=".6"/><circle cx="9.5" cy="2" r=".6"/><circle cx="13" cy="2" r=".6"/><circle cx="4.2" cy="4.3" r=".6"/><circle cx="7.7" cy="4.3" r=".6"/><circle cx="11.2" cy="4.3" r=".6"/><circle cx="2.5" cy="6.6" r=".6"/><circle cx="6" cy="6.6" r=".6"/><circle cx="9.5" cy="6.6" r=".6"/><circle cx="13" cy="6.6" r=".6"/><circle cx="4.2" cy="8.9" r=".6"/><circle cx="7.7" cy="8.9" r=".6"/><circle cx="11.2" cy="8.9" r=".6"/></g></svg>EN</button></div></div>
 </nav>
 </header>
@@ -1423,10 +1469,27 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </section>
 
 <!-- FAQ -->
-<section id="preguntas" class="pad" style="max-width: 920px; margin: 0 auto; padding: 24px 48px 104px; display: flex; flex-direction: column; gap: 32px">
-<h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05; text-align: center">Preguntas frecuentes</h2>
-<div style="display: flex; flex-direction: column; border-top: 1px solid #D9E4EC">
-<div id="faqs" style="display:contents"></div>
+<section id="preguntas" style="background: #FFFFFF; border-top: 1px solid #D9E4EC; border-bottom: 1px solid #D9E4EC">
+<div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 104px 48px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 14px; max-width: 720px">
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #005A87">Preguntas frecuentes</span>
+<h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05">Resolvemos tus dudas antes de tu cita.</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #475B68">Escribe tu duda o elige un tema. Te mostramos la respuesta más adecuada, explicada de forma sencilla.</p>
+</div>
+<form id="faqBuscar" class="faq-buscar" role="search">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5A6D7A" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+<input id="faqTexto" type="search" autocomplete="off" maxlength="200" placeholder="Escribe tu duda, por ejemplo: me duele una muela con lo frío" aria-label="Buscar en preguntas frecuentes">
+<button type="button" id="faqLimpiar" class="faq-limpiar" aria-label="Limpiar búsqueda" hidden>×</button>
+<button type="submit" class="faq-ir">Buscar respuesta</button>
+</form>
+<div id="faqTemas" class="faq-temas" role="group" aria-label="Temas"></div>
+<div id="faqNada" class="faq-nada" hidden><span>No encontramos una respuesta exacta a tu pregunta.</span><a id="faqWa" href="#" target="_blank" rel="noopener">Pregúntanos por WhatsApp →</a></div>
+<div class="faq-grid">
+<article id="faqMejor" class="faq-mejor" aria-live="polite"></article>
+<div class="faq-col"><h3 id="faqListaTitulo" class="faq-lista-t"></h3><div id="faqLista" class="faq-lista"></div>
+<button type="button" id="faqVerMas" class="adm-btn faq-vermas" hidden>Ver más preguntas</button></div>
+</div>
+<p class="faq-nota">Información general orientativa. Tu odontólogo confirma el diagnóstico y el tratamiento en la evaluación.</p>
 </div>
 </section>
 
@@ -1571,6 +1634,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <script src="agentes.js"></script>
 <script src="reportes.js"></script>
 <script src="historias.js"></script>
+<script src="faq.js"></script>
 <script src="idiomas.js"></script>
 </body>
 </html>

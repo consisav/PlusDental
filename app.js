@@ -7,7 +7,7 @@
   // Si no se pueden cargar, la agenda ofrece los horarios fijos y envía la solicitud por WhatsApp.
   var avail = null;
 
-  var state = { concern: 'dolor', service: 'Evaluación general', day: 0, time: '09:30', faq: 0 };
+  var state = { concern: 'dolor', service: 'Evaluación general', day: 0, time: '09:30' };
 
   var recs = {
     dolor: { title: 'Evaluación de urgencia y endodoncia', short: 'evaluación de urgencia', text: 'Ubicamos la causa del dolor con examen clínico y radiografía digital. Si el nervio está comprometido, el tratamiento de conductos elimina el dolor y conserva tu pieza.', time: '60–90 min', visits: '1–2', service: 'Urgencia / dolor' },
@@ -23,12 +23,6 @@
     ['encias', 'Encías que sangran'], ['revision', 'Solo un chequeo']
   ];
   var serviceList = ['Evaluación general', 'Limpieza', 'Urgencia / dolor', 'Estética', 'Ortodoncia', 'Implantes'];
-  var faqList = [
-    ['¿Cuánto cuesta la primera evaluación?', '[PRECIO DE EVALUACIÓN]. Incluye revisión clínica, diagnóstico y un plan de tratamiento por escrito.'],
-    ['¿Aceptan seguros o pagos en cuotas?', '[DETALLE DE SEGUROS Y FINANCIAMIENTO]. Te explicamos todas las opciones antes de iniciar cualquier tratamiento.'],
-    ['¿Atienden urgencias?', '[POLÍTICA DE URGENCIAS]. Si tienes dolor intenso, escríbenos por WhatsApp al +502 3756-5739 para buscarte el espacio más cercano.'],
-    ['¿Qué pasa si necesito cambiar mi cita?', 'Puedes reprogramar sin costo avisando con al menos [HORAS] horas de anticipación.']
-  ];
   var wd = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
   // Próximos 6 días hábiles (sin domingos)
@@ -121,19 +115,10 @@
       }).join('');
 
     document.querySelectorAll('.summary').forEach(function (el) { el.textContent = summary(); });
-
-    $('faqs').innerHTML = faqList.map(function (f, i) {
-      var open = state.faq === i;
-      return '<div style="border-bottom:1px solid #D9E4EC">' +
-        '<button type="button" data-faq="' + i + '" aria-expanded="' + open + '" style="width:100%;background:transparent;border:0;padding:24px 0;display:flex;justify-content:space-between;align-items:center;gap:16px;font:inherit;font-size:19px;font-weight:600;color:#0B2B40;text-align:left;cursor:pointer;min-height:44px">' +
-        esc(f[0]) + '<span aria-hidden="true" style="font-size:26px;font-weight:400;color:#005A87">' + (open ? '−' : '+') + '</span></button>' +
-        (open ? '<p style="margin:0;padding:0 0 24px;font-size:16px;line-height:1.7;color:#475B68;max-width:720px">' + esc(f[1]) + '</p>' : '') +
-        '</div>';
-    }).join('');
   }
 
   document.addEventListener('click', function (e) {
-    var b = e.target.closest('button[data-concern],button[data-service],button[data-day],button[data-time],button[data-faq]');
+    var b = e.target.closest('button[data-concern],button[data-service],button[data-day],button[data-time]');
     if (!b) return;
     if (b.dataset.concern) state.concern = b.dataset.concern;
     if (b.dataset.service) state.service = b.dataset.service;
@@ -142,7 +127,6 @@
       if (!libre(state.time)) state.time = primerLibre();
     }
     if (b.dataset.time) state.time = b.dataset.time;
-    if (b.dataset.faq) { var i = +b.dataset.faq; state.faq = state.faq === i ? -1 : i; }
     render();
   });
 
