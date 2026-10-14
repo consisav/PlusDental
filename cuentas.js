@@ -158,8 +158,14 @@
     $('ecConSaldo').textContent = conSaldo.length;
     document.querySelectorAll('#ecFiltros [data-ecfiltro]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.ecfiltro === ecFiltro); });
 
-    var buscar = $('ecBuscar').value.trim().toLowerCase();
-    var filas = (ecFiltro === 'saldo' ? conSaldo : saldos).filter(function (s) { return !buscar || s.nombre.toLowerCase().indexOf(buscar) >= 0; });
+    // Lista de pacientes: «Todos los pacientes» o uno en particular (este muestra su fila aunque no tenga saldo)
+    var elegido = $('ecBuscar').value;
+    $('ecBuscar').innerHTML = '<option value="">Todos los pacientes</option>' + saldos.slice().sort(function (a, b) { return a.nombre.localeCompare(b.nombre, 'es'); }).map(function (s) {
+      return '<option value="' + s.paciente_id + '">' + esc(s.nombre) + '</option>';
+    }).join('');
+    if (saldoDe[elegido]) $('ecBuscar').value = elegido; else elegido = '';
+    var buscar = elegido;
+    var filas = buscar ? saldos.filter(function (s) { return String(s.paciente_id) === buscar; }) : (ecFiltro === 'saldo' ? conSaldo : saldos);
     if (ecFiltro === 'saldo') filas = filas.slice().sort(function (a, b) { return b.saldo - a.saldo; });
     if (!filas.length) {
       $('ecBody').innerHTML = '<tr><td colspan="6">' + (buscar ? 'Ningún paciente coincide.' : ecFiltro === 'saldo' ? 'Ningún paciente tiene saldo pendiente.' : 'Todavía no hay expedientes de pacientes.') + '</td></tr>';
@@ -385,7 +391,12 @@
     var b = e.target.closest('[data-ecfiltro]');
     if (b) { ecFiltro = b.dataset.ecfiltro; pintarSaldos(); }
   });
-  $('ecBuscar').addEventListener('input', pintarSaldos);
+  $('ecBuscar').addEventListener('change', pintarSaldos);
+  // Mostrar: con un paciente elegido abre su estado de cuenta; con «Todos» muestra la lista
+  $('ecMostrar').addEventListener('click', function () {
+    var pid = $('ecBuscar').value;
+    if (pid) abrirEstado(pid); else pintarSaldos();
+  });
   $('ecBody').addEventListener('click', function (e) {
     var b = e.target.closest('[data-ec]');
     if (b) abrirEstado(b.dataset.ec);

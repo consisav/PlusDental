@@ -113,6 +113,8 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .anular-row td{background:#FFF7F5}
 #impresion{display:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.ec-buscar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ec-buscar select{min-width:260px;max-width:100%}
 .pg-imprimir{display:flex;align-items:flex-end}
 .pg-imprimir .adm-btn{width:100%;min-height:46px;justify-content:center}
 #pgImprimir:disabled{opacity:.5;cursor:not-allowed}
@@ -1025,7 +1027,7 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 <button type="button" class="adm-btn" data-ecfiltro="saldo" aria-pressed="true">Con saldo pendiente</button>
 <button type="button" class="adm-btn" data-ecfiltro="todos" aria-pressed="false">Todos los pacientes</button>
 </div>
-<input id="ecBuscar" type="search" class="adm-input" placeholder="Buscar paciente" aria-label="Buscar paciente">
+<div class="ec-buscar"><select id="ecBuscar" class="adm-input" aria-label="Paciente"><option value="">Todos los pacientes</option></select><button type="button" id="ecMostrar" class="adm-btn adm-primary">Mostrar</button></div>
 </div>
 <div class="roles-wrap"><table><thead><tr><th>Paciente</th><th class="num">Tratamientos realizados</th><th class="num">Pagos</th><th class="num">Saldo</th><th>Último movimiento</th><th><span class="sr-only">Ver</span></th></tr></thead><tbody id="ecBody"></tbody></table></div>
 <p id="ecMsg" class="dlg-msg" role="status"></p>
