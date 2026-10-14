@@ -1924,6 +1924,10 @@ select v.nombre, v.descripcion, v.sugeridos, v.orden
  where not exists (select 1 from public.tipos_procedimiento t where lower(t.nombre) = lower(v.nombre))
  order by v.orden;
 
+-- ===== NIT del paciente =====
+-- Número de identificación tributaria (texto; p. ej. «1234567-8» o «CF» para consumidor final).
+alter table public.pacientes add column if not exists nit text check (char_length(nit) <= 20);
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

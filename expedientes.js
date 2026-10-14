@@ -5,7 +5,7 @@
 
   var BUCKET = 'expedientes';
   var CAMPOS = {
-    nombre: 'pNombre', dpi: 'pDpi', fecha_nacimiento: 'pNacimiento', telefono: 'pTelefono', direccion: 'pDireccion',
+    nombre: 'pNombre', dpi: 'pDpi', nit: 'pNit', fecha_nacimiento: 'pNacimiento', telefono: 'pTelefono', direccion: 'pDireccion',
     emergencia_nombre: 'pEmNombre', emergencia_telefono: 'pEmTelefono', estado: 'pEstado', correo: 'pCorreo',
     alergias: 'pAlergias', enfermedades: 'pEnfermedades', medicamentos: 'pMedicamentos'
   };
@@ -508,7 +508,7 @@
   $('fDatos').addEventListener('submit', function (e) {
     e.preventDefault();
     if (!editando) return;
-    guardar(['nombre', 'dpi', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'emergencia_nombre', 'emergencia_telefono', 'estado'], 'fDatosMsg', this.querySelector('[type=submit]'));
+    guardar(['nombre', 'dpi', 'nit', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'emergencia_nombre', 'emergencia_telefono', 'estado'], 'fDatosMsg', this.querySelector('[type=submit]'));
   });
   $('fHistoria').addEventListener('submit', function (e) {
     e.preventDefault();
