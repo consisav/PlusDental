@@ -24,10 +24,12 @@
   function sinTildes(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   function iniciales(n) { return String(n || '?').trim().split(/\s+/).slice(0, 2).map(function (x) { return x.charAt(0).toUpperCase(); }).join('') || '?'; }
   function usuarioActual() { return (window.PD_SESION && window.PD_SESION.usuario()) || '—'; }
+  function esFijo(a) { return !!a && a.codigo === '0'; } // agente 0 «NINGUNO»: del sistema, no se modifica ni se elimina
   function pill(estado) { return '<span class="estado estado-' + estado + '">' + ESTADOS[estado] + '</span>'; }
   function traducir(err) {
     var m = (err && err.message) || '';
     if (/agentes.*(does not exist|could not find)|could not find the table|column .*(telefono|foto)/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los agentes comerciales.';
+    if (/agente_fijo/i.test(m)) return 'El agente 0 (NINGUNO) es del sistema: no se puede modificar ni eliminar.';
     if (/agentes_codigo_unico|duplicate key/i.test(m)) return 'Ya existe un agente con ese código.';
     if (/agentes_comision/i.test(m)) return 'La comisión debe estar entre 0 y 100 %.';
     if (/row-level security|permission denied/i.test(m)) return 'No tienes permiso para esta acción.';
@@ -52,9 +54,14 @@
     $('acBody').innerHTML = '<tr><td colspan="6">Cargando…</td></tr>';
     var r = await sb.from('agentes').select('*').order('codigo');
     if (r.error) { $('acBody').innerHTML = ''; aviso('acMsg', traducir(r.error), true); return; }
-    agentes = r.data || [];
+    agentes = ordenar(r.data || []);
     pintarLista();
     cargarFotosLista();
+  }
+  // Orden por número de código (0, 1, 2… 10); después, los códigos con letras
+  function ordenar(lista) {
+    function n(a) { return /^\d+$/.test(a.codigo) ? +a.codigo : Infinity; }
+    return lista.slice().sort(function (a, b) { return (n(a) - n(b)) || a.codigo.localeCompare(b.codigo); });
   }
   // Enlaces temporales para las fotos de la lista (una sola consulta)
   async function cargarFotosLista() {
@@ -78,7 +85,7 @@
     });
     $('acBody').innerHTML = lista.length ? lista.map(function (a) {
       return '<tr><td><b>' + esc(a.codigo) + '</b></td>' +
-        '<td><div class="ac-quien">' + avatar(a) + '<span>' + esc(a.nombre) + (a.telefono ? '<br><span class="hi-desc">' + esc(a.telefono) + '</span>' : '') + '</span></div></td>' +
+        '<td><div class="ac-quien">' + avatar(a) + '<span>' + esc(a.nombre) + (esFijo(a) ? ' <span class="ac-fijo">Del sistema</span>' : '') + (a.telefono ? '<br><span class="hi-desc">' + esc(a.telefono) + '</span>' : '') + '</span></div></td>' +
         '<td class="fecha">' + fechaCorta(a.fecha_inicio) + '</td><td>' + porcentaje(a.comision) + '</td><td>' + pill(a.estado) + '</td>' +
         '<td><button type="button" class="adm-btn" data-acabrir="' + a.id + '">Abrir</button></td></tr>';
     }).join('') : '<tr><td colspan="6">' + (agentes.length ? 'No hay agentes con ese filtro.' : 'Aún no hay agentes. Pulsa «Nuevo agente» para agregar el primero.') + '</td></tr>';
@@ -124,10 +131,11 @@
   }
 
   // ---------- Ficha ----------
+  // Los agentes se numeran desde el 1 (el 0 es «NINGUNO»)
   function siguienteCodigo() {
     var mayor = 0;
-    agentes.forEach(function (a) { var m = /^AGE-(\d+)$/i.exec(a.codigo); if (m) mayor = Math.max(mayor, +m[1]); });
-    return 'AGE-' + ('00' + (mayor + 1)).slice(-3);
+    agentes.forEach(function (a) { if (/^\d+$/.test(a.codigo)) mayor = Math.max(mayor, +a.codigo); });
+    return String(mayor + 1);
   }
   function pintarEstadoSelect() { $('acEstado').dataset.estado = $('acEstado').value; }
   function rellenar(a) {
@@ -147,7 +155,7 @@
   }
   function pintarCabecera() {
     $('acTitulo').textContent = actual ? actual.nombre : 'Nuevo agente';
-    $('acSub').textContent = actual ? [actual.codigo, actual.telefono, 'Comisión ' + porcentaje(actual.comision)].filter(Boolean).join(' · ') : 'Llena los datos y pulsa «Grabar».';
+    $('acSub').textContent = esFijo(actual) ? 'Agente del sistema para cuando no hay agente comercial. No se puede modificar ni eliminar.' : actual ? [actual.codigo, actual.telefono, 'Comisión ' + porcentaje(actual.comision)].filter(Boolean).join(' · ') : 'Llena los datos y pulsa «Grabar».';
     $('acPill').hidden = !actual;
     if (actual) { $('acPill').className = 'estado estado-' + actual.estado; $('acPill').textContent = ESTADOS[actual.estado]; }
   }
@@ -156,11 +164,12 @@
     $('acCampos').disabled = !editando;
     $('acGrabar').disabled = !editando;
     $('acCancelar').disabled = !editando;
-    $('acModificar').disabled = editando || !actual;
-    $('acEliminar').disabled = editando || !actual;
-    $('acGrabar').title = editando ? '' : 'Pulsa «Modificar» para hacer cambios.';
-    $('acModificar').title = !actual ? 'Disponible después de grabar el agente.' : editando ? 'Ya estás modificando este agente.' : '';
-    $('acEliminar').title = !actual ? 'Disponible después de grabar el agente.' : editando ? 'Termina o cancela la modificación primero.' : '';
+    var fijo = esFijo(actual) ? 'Agente del sistema: no se puede modificar ni eliminar.' : '';
+    $('acModificar').disabled = editando || !actual || !!fijo;
+    $('acEliminar').disabled = editando || !actual || !!fijo;
+    $('acGrabar').title = editando ? '' : fijo || 'Pulsa «Modificar» para hacer cambios.';
+    $('acModificar').title = fijo || (!actual ? 'Disponible después de grabar el agente.' : editando ? 'Ya estás modificando este agente.' : '');
+    $('acEliminar').title = fijo || (!actual ? 'Disponible después de grabar el agente.' : editando ? 'Termina o cancela la modificación primero.' : '');
     $('acCancelar').title = editando ? '' : 'Solo se usa mientras haces cambios.';
     if ($('acEliminar').dataset.confirmar === '1') { $('acEliminar').dataset.confirmar = '0'; $('acEliminar').textContent = 'Eliminar'; $('acEliminar').style.borderColor = ''; $('acEliminar').style.color = ''; }
     pintarFoto();
@@ -207,7 +216,7 @@
       }
     }
     actual = guardado;
-    agentes = nuevo ? agentes.concat([actual]) : agentes.map(function (a) { return a.id === actual.id ? actual : a; });
+    agentes = nuevo ? ordenar(agentes.concat([actual])) : agentes.map(function (a) { return a.id === actual.id ? actual : a; });
     editando = false;
     rellenar(actual); pintarCabecera(); aplicarModo();
     aviso('acFormMsg', (nuevo ? 'Agente grabado.' : cambioEstado ? 'Cambios grabados. Se registró el cambio de estado.' : 'Cambios grabados.') + avisoFoto, !!avisoFoto);
@@ -248,7 +257,7 @@
   });
   $('acForm').addEventListener('submit', function (e) { e.preventDefault(); if (editando) grabar(); });
   $('acModificar').addEventListener('click', function () {
-    if (!actual) return;
+    if (!actual || esFijo(actual)) return;
     editando = true; aplicarModo();
     aviso('acFormMsg', 'Modo modificación: haz los cambios y pulsa «Grabar».');
     $('acNombre').focus();
@@ -260,7 +269,7 @@
   });
   $('acEliminar').addEventListener('click', async function () {
     var b = this;
-    if (!actual || editando || !pedirConfirmacion(b)) return;
+    if (!actual || editando || esFijo(actual) || !pedirConfirmacion(b)) return;
     b.disabled = true;
     var r = await sb.from('agentes').delete().eq('id', actual.id);
     b.disabled = false;

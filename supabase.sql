@@ -1449,7 +1449,7 @@ declare
   v_usuario text := (select usuario from public.perfiles where id = auth.uid());
 begin
   if tg_op = 'INSERT' then
-    new.registrado_por := v_usuario;
+    new.registrado_por := coalesce(v_usuario, 'sistema');
     new.creado := now();
     new.estado_cambiado := null;
     new.estado_cambiado_por := null;
@@ -1482,6 +1482,26 @@ drop policy if exists "personal administra agentes" on public.agentes;
 create policy "personal administra agentes" on public.agentes for all
   using (public.es_personal()) with check (public.es_personal());
 grant select, insert, update, delete on public.agentes to authenticated;
+
+-- Agente 0 «NINGUNO»: se usa cuando no hay agente comercial. Es fijo: no se puede modificar ni eliminar.
+create or replace function public.agentes_fijo()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if old.codigo = '0' then
+    raise exception 'agente_fijo: el agente 0 (NINGUNO) es del sistema y no se puede modificar ni eliminar';
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'agentes_fijo' and tgrelid = 'public.agentes'::regclass) then
+    create trigger agentes_fijo before update or delete on public.agentes
+      for each row execute function public.agentes_fijo();
+  end if;
+end $$;
+insert into public.agentes (codigo, nombre, fecha_inicio, comision, estado)
+select '0', 'NINGUNO', current_date, 0, 'activo'
+where not exists (select 1 from public.agentes where codigo = '0');
 
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
