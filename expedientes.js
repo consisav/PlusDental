@@ -145,6 +145,13 @@
     opcionesMedicos(p ? p.dentista_id : null);
     if (!p) $('pDentista').value = medicoPorDefecto();
     opcionesAgentes(p ? p.agente_id : null);
+    pintarDerivados();
+  }
+
+  // Edad (calculada) y color del estado
+  function pintarDerivados() {
+    $('pEdad').textContent = $('pNacimiento').value ? edad($('pNacimiento').value) : '—';
+    $('pEstado').dataset.estado = $('pEstado').value;
   }
 
   // Modo consulta / modo edición ("Modificar registro")
@@ -233,6 +240,13 @@
     var est = actual && (actual.estado || 'activo');
     $('expEstado').hidden = !actual;
     if (actual) { $('expEstado').className = 'estado estado-' + est; $('expEstado').textContent = ESTADOS_PAC[est]; }
+    // Encabezado de la pestaña Datos: nombre, estado, edad, DPI y NIT
+    $('pPerfilNombre').textContent = actual ? actual.nombre : ($('pNombre').value.trim() || 'Nuevo paciente');
+    $('pPerfilChips').innerHTML = actual ? [
+      '<span class="pac-chip est-' + est + '">' + ESTADOS_PAC[est] + '</span>',
+      actual.fecha_nacimiento ? '<span class="pac-chip">' + edad(actual.fecha_nacimiento) + '</span>' : '',
+      actual.dpi ? '<span class="pac-chip">DPI ' + esc(actual.dpi) + '</span>' : '',
+      actual.nit ? '<span class="pac-chip">NIT ' + esc(actual.nit) + '</span>' : ''].join('') : '';
     $('pMeta').hidden = !actual;
     if (actual) {
       $('pMeta').innerHTML = '<span>Paciente desde <b>' + fechaHoraCorta(actual.creado) + '</b></span>' +
@@ -499,6 +513,9 @@
     if (b.dataset.expAccion === 'cancelar') b.addEventListener('click', cancelar);
   });
   $('pFotoBtn').addEventListener('click', function () { $('pFotoArchivo').click(); });
+  $('pNacimiento').addEventListener('input', pintarDerivados);
+  $('pEstado').addEventListener('change', pintarDerivados);
+  $('pNombre').addEventListener('input', function () { if (!actual) $('pPerfilNombre').textContent = this.value.trim() || 'Nuevo paciente'; });
   $('pFotoArchivo').addEventListener('change', function () { var f = this.files[0]; this.value = ''; subirFoto(f); });
   $('expFiltros').addEventListener('click', function (e) {
     var b = e.target.closest('[data-efiltro]');

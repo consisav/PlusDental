@@ -159,6 +159,26 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .avatar.grande{width:112px;height:112px;font-size:36px;border:3px solid #FFFFFF;box-shadow:0 0 0 1px #D9E4EC}
 .pac-foto{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
 .pac-nombre{display:flex;align-items:center;gap:12px}
+.pac-perfil{display:flex;align-items:center;gap:20px;flex-wrap:wrap;background:linear-gradient(135deg,#0B2B40,#00476B);color:#FFFFFF;border-radius:20px;padding:20px 22px}
+.pac-perfil .avatar.grande{width:96px;height:96px;font-size:32px;box-shadow:none;background:#DCEAF3;color:#005A87}
+.pac-perfil-txt{flex:1;min-width:220px;display:flex;flex-direction:column;gap:10px}
+.pac-perfil-txt h4{margin:0;font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:30px;line-height:1.1;overflow-wrap:anywhere}
+.pac-chips{display:flex;gap:8px;flex-wrap:wrap}.pac-chips:empty{display:none}
+.pac-chip{border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;background:rgba(255,255,255,.14);color:#FFFFFF}
+.pac-chip.est-activo{background:#DCF2EC;color:#08504C}.pac-chip.est-inactivo{background:#E5E7EB;color:#374151}.pac-chip.est-suspendido{background:#FEF3C7;color:#92400E}.pac-chip.est-baja{background:#FDE2E4;color:#9F1239}
+.pac-perfil .pac-meta{background:none;border:0;padding:0;font-size:12.5px;color:#B9D5E6;gap:4px 18px}
+.pac-perfil .pac-meta b{color:#FFFFFF}
+.pac-perfil-foto{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.pac-perfil-foto .adm-btn{background:transparent;color:#FFFFFF;border-color:rgba(255,255,255,.55)}
+.pac-perfil-foto .adm-btn:hover:not(:disabled){background:rgba(255,255,255,.12)}
+.pac-perfil-foto .dlg-msg{color:#B9D5E6;margin:0;max-width:240px;text-align:right}
+.pac-secciones{display:flex;flex-direction:column;gap:14px}
+.pac-s3{grid-column:span 3}
+.campos:disabled select.pac-estado[data-estado="activo"]{background:#DCF2EC;color:#08504C;-webkit-text-fill-color:#08504C;font-weight:700}
+.campos:disabled select.pac-estado[data-estado="suspendido"]{background:#FEF3C7;color:#92400E;-webkit-text-fill-color:#92400E;font-weight:700}
+.campos:disabled select.pac-estado[data-estado="baja"]{background:#FDE2E4;color:#9F1239;-webkit-text-fill-color:#9F1239;font-weight:700}
+@media (max-width: 860px){.pac-s3{grid-column:1/-1}.pac-perfil-foto{align-items:flex-start}.pac-perfil-foto .dlg-msg{text-align:left}}
+@media (max-width: 520px){.pac-perfil{padding:18px}.pac-perfil-txt h4{font-size:25px}}
 .pac-meta{display:flex;flex-wrap:wrap;gap:6px 24px;font-size:14px;color:#475B68;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:12px 16px}
 .pac-meta b{color:#0B2B40}
 .estado-activo{background:#DCF2EC;color:#08504C}.estado-inactivo{background:#EBF0F4;color:#475B68}.estado-suspendido{background:#FEF3C7;color:#92400E}.estado-baja{background:#FDE2E4;color:#9F1239}
@@ -715,29 +735,45 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 </div>
 
 <form id="fDatos" class="exp-form">
-<div class="full pac-foto">
+<div class="full pac-perfil">
 <div id="pFotoVista" class="avatar grande" aria-hidden="true"></div>
-<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
-<span style="font-size: 14px; font-weight: 600">Foto del paciente</span>
-<div style="display: flex; gap: 8px; flex-wrap: wrap"><button type="button" id="pFotoBtn" class="adm-btn">Subir foto</button></div>
+<div class="pac-perfil-txt">
+<h4 id="pPerfilNombre">Nuevo paciente</h4>
+<div id="pPerfilChips" class="pac-chips"></div>
+<div id="pMeta" class="pac-meta" hidden></div>
+</div>
+<div class="pac-perfil-foto">
+<button type="button" id="pFotoBtn" class="adm-btn">Subir foto</button>
 <input id="pFotoArchivo" type="file" accept="image/jpeg,image/png,image/webp" hidden>
 <p id="pFotoMsg" class="dlg-msg" role="status"></p>
 </div>
 </div>
-<div id="pMeta" class="full pac-meta" hidden></div>
-<fieldset id="pDatosCampos" class="full campos"><div class="exp-form">
-<label class="full">Nombre completo *<input id="pNombre" type="text" maxlength="150" required></label>
-<label>DPI<input id="pDpi" type="text" inputmode="numeric" maxlength="20" placeholder="0000 00000 0000"></label>
-<label>NIT<input id="pNit" type="text" maxlength="20" placeholder="Ej.: 1234567-8 o CF" autocomplete="off"></label>
+<fieldset id="pDatosCampos" class="full campos"><div class="pac-secciones">
+<div class="pg-sec"><b aria-hidden="true">1</b>Identificación</div>
+<div class="pg-grid">
+<label class="pg-s2">Nombre completo *<input id="pNombre" type="text" maxlength="150" required></label>
 <label>Fecha de nacimiento<input id="pNacimiento" type="date"></label>
+<label>Edad<output id="pEdad" class="pg-auto pg-out">—</output></label>
+<label class="pg-s2">DPI<input id="pDpi" type="text" inputmode="numeric" maxlength="20" placeholder="0000 00000 0000"></label>
+<label class="pg-s2">NIT<input id="pNit" type="text" maxlength="20" placeholder="Ej.: 1234567-8 o CF" autocomplete="off"></label>
+</div>
+<div class="pg-sec"><b aria-hidden="true">2</b>Contacto</div>
+<div class="pg-grid">
 <label>Teléfono / WhatsApp<input id="pTelefono" type="tel" maxlength="40"></label>
-<label>Correo electrónico<input id="pCorreo" type="email" maxlength="120" placeholder="paciente@correo.com"></label>
-<label class="full">Dirección<input id="pDireccion" type="text" maxlength="250"></label>
-<label>Contacto de emergencia<input id="pEmNombre" type="text" maxlength="150" placeholder="Nombre y parentesco"></label>
-<label>Teléfono de emergencia<input id="pEmTelefono" type="tel" maxlength="40"></label>
-<label>Médico asignado<select id="pDentista"><option value="">Sin asignar</option></select></label>
-<label>Estado del paciente<select id="pEstado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="suspendido">Suspendido</option><option value="baja">Baja</option></select></label>
+<label class="pac-s3">Correo electrónico<input id="pCorreo" type="email" maxlength="120" placeholder="paciente@correo.com"></label>
+<label class="pg-s4">Dirección<input id="pDireccion" type="text" maxlength="250"></label>
+</div>
+<div class="pg-sec"><b aria-hidden="true">3</b>Contacto de emergencia</div>
+<div class="pg-grid">
+<label class="pac-s3">Nombre y parentesco<input id="pEmNombre" type="text" maxlength="150" placeholder="Ej.: María López (esposa)"></label>
+<label>Teléfono<input id="pEmTelefono" type="tel" maxlength="40"></label>
+</div>
+<div class="pg-sec"><b aria-hidden="true">4</b>Atención y seguimiento</div>
+<div class="pg-grid">
+<label class="pg-s2">Médico asignado<select id="pDentista"><option value="">Sin asignar</option></select></label>
 <label>Agente comercial<select id="pAgente"><option value="">0 · NINGUNO</option></select></label>
+<label>Estado del paciente<select id="pEstado" class="pac-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="suspendido">Suspendido</option><option value="baja">Baja</option></select></label>
+</div>
 </div></fieldset>
 <div class="full exp-actions">
 <button type="button" class="adm-btn adm-primary" data-exp-accion="editar">Modificar registro</button>
