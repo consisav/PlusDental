@@ -276,6 +276,12 @@
     aviso('acMsg', 'Agente «' + nombre + '» eliminado.');
   });
 
+  // Catálogo para otras pantallas (p. ej. el agente comercial del paciente), ordenado por código
+  window.PD_AGENTES = async function () {
+    var r = await sb.from('agentes').select('id,codigo,nombre,estado');
+    return r.error ? [] : ordenar(r.data || []);
+  };
+
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { if (!$('acLista').hidden) cargar(); },
     limpiar: function () {

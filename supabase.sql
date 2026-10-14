@@ -1527,6 +1527,37 @@ begin
   end if;
 end $$;
 
+-- Agente comercial de cada paciente. Si no se elige (o se elimina el agente), queda el 0 «NINGUNO».
+alter table public.pacientes add column if not exists agente_id bigint references public.agentes (id) on delete set null;
+create index if not exists pacientes_agente on public.pacientes (agente_id);
+
+create or replace function public.paciente_agente_defecto()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.agente_id is null then
+    new.agente_id := (select id from public.agentes where codigo = '0');
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'pacientes_agente_defecto' and tgrelid = 'public.pacientes'::regclass) then
+    create trigger pacientes_agente_defecto before insert or update of agente_id on public.pacientes
+      for each row execute function public.paciente_agente_defecto();
+  end if;
+end $$;
+
+-- Pacientes que ya existían: quedan con el agente 0 (sin tocar su fecha ni usuario de última modificación)
+do $$ begin
+  if exists (select 1 from public.pacientes where agente_id is null) then
+    alter table public.pacientes disable trigger pacientes_actualizado;
+    alter table public.pacientes disable trigger pacientes_firma;
+    update public.pacientes set agente_id = (select id from public.agentes where codigo = '0') where agente_id is null;
+    alter table public.pacientes enable trigger pacientes_actualizado;
+    alter table public.pacientes enable trigger pacientes_firma;
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

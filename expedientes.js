@@ -12,7 +12,7 @@
 
   var ESTADOS_PAC = { activo: 'Activo', inactivo: 'Inactivo', suspendido: 'Suspendido', baja: 'Baja' };
   var pacientes = [], actual = null, odontoCambiado = false;
-  var filtroEstado = 'activo', editando = false, fotos = {}, medicos = [];
+  var filtroEstado = 'activo', editando = false, fotos = {}, medicos = [], agentesCat = [];
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -124,13 +124,27 @@
     }).join('');
     $('pDentista').value = elegido ? String(elegido) : '';
   }
-  async function cargarMedicos() { medicos = window.PD_DENTISTAS ? await window.PD_DENTISTAS() : []; }
+  async function cargarMedicos() {
+    var r = await Promise.all([window.PD_DENTISTAS ? window.PD_DENTISTAS() : [], window.PD_AGENTES ? window.PD_AGENTES() : []]);
+    medicos = r[0]; agentesCat = r[1];
+  }
+
+  // Agente comercial: lista del catálogo (solo activos, más el que ya tenga el paciente). Por defecto el 0 «NINGUNO».
+  function agenteCero() { var a = agentesCat.filter(function (x) { return x.codigo === '0'; })[0]; return a ? String(a.id) : ''; }
+  function opcionesAgentes(elegido) {
+    var lista = agentesCat.filter(function (a) { return a.estado === 'activo' || a.id === elegido; });
+    $('pAgente').innerHTML = lista.length ? lista.map(function (a) {
+      return '<option value="' + a.id + '">' + esc(a.codigo + ' · ' + a.nombre) + (a.estado !== 'activo' ? ' (' + a.estado + ')' : '') + '</option>';
+    }).join('') : '<option value="">0 · NINGUNO</option>';
+    $('pAgente').value = elegido && lista.some(function (a) { return a.id === elegido; }) ? String(elegido) : agenteCero();
+  }
 
   function rellenar(p) {
     Object.keys(CAMPOS).forEach(function (k) { $(CAMPOS[k]).value = (p && p[k]) || ''; });
     $('pEstado').value = (p && p.estado) || 'activo';
     opcionesMedicos(p ? p.dentista_id : null);
     if (!p) $('pDentista').value = medicoPorDefecto();
+    opcionesAgentes(p ? p.agente_id : null);
   }
 
   // Modo consulta / modo edición ("Modificar registro")
@@ -266,7 +280,10 @@
   function valores(claves) {
     var o = {};
     claves.forEach(function (k) { var v = $(CAMPOS[k]).value.trim(); o[k] = v === '' ? null : v; });
-    if (claves.indexOf('nombre') >= 0) o.dentista_id = $('pDentista').value ? +$('pDentista').value : null;
+    if (claves.indexOf('nombre') >= 0) {
+      o.dentista_id = $('pDentista').value ? +$('pDentista').value : null;
+      o.agente_id = $('pAgente').value ? +$('pAgente').value : null;   // vacío = Supabase pone el agente 0
+    }
     return o;
   }
 
