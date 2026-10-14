@@ -19,8 +19,8 @@ input:focus{outline:2px solid #005A87;outline-offset:1px}
 button:focus-visible,a:focus-visible{outline:2px solid #005A87;outline-offset:2px}
 html{scroll-behavior:smooth;scroll-padding-top:170px}
 .topbar{position:sticky;top:0;z-index:20;background:rgba(245,249,252,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid #D9E4EC}
-.mainmenu{display:flex;align-items:center;gap:28px;font-size:15px;font-weight:500}
-.mainmenu a:not(.btn){color:#0B2B40;text-decoration:none;padding:10px 0}
+.mainmenu{display:flex;align-items:center;gap:18px;font-size:14.5px;font-weight:500}
+.mainmenu a:not(.btn){color:#0B2B40;text-decoration:none;padding:10px 0;white-space:nowrap}
 .mainmenu a:not(.btn):hover{color:#005A87}
 .menu-login{display:inline-flex;align-items:center;gap:8px;font:inherit;font-weight:600;font-size:15px;color:#0B2B40;background:transparent;border:1px solid #C4D4DF;border-radius:999px;padding:11px 18px;min-height:44px;cursor:pointer}
 .menu-login:hover{border-color:#005A87;color:#005A87}
@@ -257,6 +257,62 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .pie-logo{background:#FFFFFF;border-radius:18px;padding:12px 16px;display:inline-flex}
 .pie-logo img{height:84px;width:auto;display:block}
 .pie-frase{font-family:'Playfair Display',Georgia,serif;font-style:italic;font-weight:600;font-size:19px;color:#FFFFFF;max-width:300px;line-height:1.3}
+.his-fil{display:flex;gap:8px;flex-wrap:wrap}
+.his-fil button{font:inherit;font-weight:600;font-size:14px;border:1px solid #D9E4EC;background:#FFFFFF;color:#0B2B40;padding:9px 16px;border-radius:999px;min-height:40px;cursor:pointer}
+.his-fil button:hover{border-color:#188EC0}
+.his-fil button[aria-pressed="true"]{background:#005A87;border-color:#005A87;color:#FFFFFF}
+.his-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.his-grid:empty{display:none}
+.his-card{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:22px;overflow:hidden;display:flex;flex-direction:column}
+.his-abrir{display:block;width:100%;padding:0;border:0;background:none;cursor:pointer;font:inherit;text-align:left}
+.his-abrir:focus-visible{outline:3px solid #188EC0;outline-offset:-3px}
+.his-med{position:relative;display:block;aspect-ratio:4/3;background:linear-gradient(135deg,#BFD9EA,#E8F3FA);overflow:hidden}
+.his-med.his-v{background:linear-gradient(135deg,#0B2B40,#1E5A80)}
+.his-med img,.his-med video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
+.his-abrir:hover .his-med img,.his-abrir:hover .his-med video{transform:scale(1.04)}
+.his-tag{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.92);color:#005A87;font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-radius:999px}
+.his-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.95);box-shadow:0 8px 24px rgba(0,0,0,.25);display:grid;place-items:center}
+.his-play::after{content:"";border-left:18px solid #005A87;border-top:11px solid transparent;border-bottom:11px solid transparent;margin-left:5px}
+.his-ad{position:relative;display:block;aspect-ratio:4/3;overflow:hidden;background:#E8F3FA;--p:50%}
+.his-ad img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.his-ad .his-desp{clip-path:inset(0 0 0 var(--p))}
+.his-ad-bar{position:absolute;top:0;bottom:0;left:var(--p);width:3px;background:#FFFFFF;transform:translateX(-50%);pointer-events:none}
+.his-ad-bar::after{content:"⇆";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:#FFFFFF;color:#005A87;display:grid;place-items:center;font-weight:800;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+.his-ea,.his-eb{position:absolute;bottom:12px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:rgba(11,43,64,.75);color:#FFFFFF;padding:4px 9px;border-radius:999px;pointer-events:none}
+.his-ea{left:12px}.his-eb{right:12px}
+.his-ad input[type=range]{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:ew-resize}
+.his-ad:focus-within .his-ad-bar::after{box-shadow:0 0 0 3px #188EC0}
+.his-txt{padding:20px 22px 22px;display:flex;flex-direction:column;gap:8px}
+.his-txt h3{margin:0;font-size:19px;font-weight:700}
+.his-txt p{margin:0;color:#475B68;font-size:15px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.his-meta{font-size:13px;color:#5A6D7A;font-weight:600}
+.his-vacio{margin:0;padding:28px;border:1px dashed #C4D4DF;border-radius:22px;text-align:center;color:#475B68;font-size:16px}
+.his-dlg{border:0;padding:0;border-radius:22px;width:min(960px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;background:#FFFFFF;color:#0B2B40}
+.his-dlg::backdrop{background:rgba(11,43,64,.82)}
+.his-dlg-medio{background:#0B2B40;display:flex;justify-content:center}
+.his-dlg-medio>img,.his-dlg-medio>video{display:block;width:100%;max-height:70vh;object-fit:contain}
+.his-dlg-medio iframe{width:100%;aspect-ratio:16/9;border:0;display:block}
+.his-dlg-medio .his-ad{width:min(100%,calc(70vh * 4 / 3))}
+.his-dlg-pie{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:20px 24px 24px}
+.his-dlg-pie h3{margin:0;font-size:21px}
+.his-dlg-pie p{margin:0;color:#475B68;font-size:15.5px;line-height:1.6}
+.his-nav{display:flex;gap:8px;flex:0 0 auto}
+.his-nav button,.his-cerrar{width:44px;height:44px;border-radius:50%;border:1px solid #D9E4EC;background:#FFFFFF;color:#005A87;font:inherit;font-size:18px;font-weight:800;cursor:pointer;display:grid;place-items:center}
+.his-nav button:hover{border-color:#005A87}
+.his-cerrar{position:absolute;top:12px;right:12px;z-index:2;font-size:24px;border:0;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+@media (max-width:1100px){.his-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){.his-grid{grid-template-columns:minmax(0,1fr)}.his-dlg-pie{flex-direction:column}}
+@media (prefers-reduced-motion:reduce){.his-med img,.his-med video{transition:none}}
+.hi-fila{display:flex;align-items:center;gap:12px;min-width:220px}
+.hi-mini{width:56px;height:42px;border-radius:8px;overflow:hidden;background:#E8F3FA;flex:0 0 auto}
+.hi-mini img,.hi-mini video{width:100%;height:100%;object-fit:cover;display:block}
+.hi-desc{color:#5A6D7A;font-size:13.5px}
+.hi-subidas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.hi-subida{display:flex;flex-direction:column;gap:8px;min-width:0}
+.hi-vista{aspect-ratio:4/3;border:1px dashed #C4D4DF;border-radius:14px;background:#F5F9FC;overflow:hidden;display:grid;place-items:center;color:#5A6D7A;font-size:14px}
+.hi-vista img,.hi-vista video{width:100%;height:100%;object-fit:contain;display:block;background:#0B2B40}
+.hi-botones{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:640px){.hi-subidas{grid-template-columns:minmax(0,1fr)}}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -274,7 +330,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .wa-float:hover{background:#178F47;transform:translateY(-2px)}
 @media (max-width:560px){.wa-float span{display:none}.wa-float{padding:16px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn,.card,.wa-float{transition:none}}
-@media (max-width:1320px){
+@media (max-width:1430px){
 .menu-btn{display:inline-flex}
 .mainmenu{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:0;background:#F5F9FC;padding:8px 20px 24px;border-bottom:1px solid #D9E4EC;box-shadow:0 18px 30px rgba(11,43,64,.08)}
 .mainmenu.open{display:flex}
@@ -308,6 +364,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <nav class="mainmenu" id="mainMenu" aria-label="Principal">
 <a href="#nosotros">Nosotros</a>
 <a href="#tratamientos">Servicios</a>
+<a href="#historias">Historias de impacto</a>
 <a href="#administracion" data-login="admin">Administración</a>
 <a href="#contacto">Contactarnos</a>
 <a class="btn" href="#agenda" style="background: #005A87; color: #FFFFFF; text-decoration: none; padding: 13px 22px; border-radius: 999px; font-weight: 600; font-size: 15px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Programar consulta</a>
@@ -345,6 +402,8 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuesto</button>
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
 <button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
+<span class="adm-grupo" id="grpWeb" role="presentation">Página web</span>
+<button type="button" role="tab" id="tabHistorias" data-tab="admHistorias" aria-selected="false" aria-controls="admHistorias">Historias de impacto</button>
 </div>
 <div class="adm-main">
 
@@ -833,6 +892,52 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </div>
 
 <!-- 8. Dentistas -->
+<div id="admHistorias" role="tabpanel" aria-labelledby="tabHistorias" hidden class="adm-pane">
+
+<!-- Lista de historias -->
+<div id="hiLista" class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Historias de impacto</h3><button type="button" id="hiNueva" class="adm-btn adm-primary">Nueva historia</button></div>
+<p class="dlg-msg">Fotos, videos y casos de antes y después que se muestran en la sección «Historias de impacto» de la página. Solo se publican las que tienen la autorización firmada del paciente.</p>
+<div class="roles-wrap"><table><thead><tr><th>Historia</th><th>Tipo</th><th>Tratamiento</th><th>Orden</th><th>Estado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="hiBody"></tbody></table></div>
+<p id="hiMsg" class="dlg-msg" role="status"></p>
+</div>
+
+<!-- Ficha de la historia -->
+<div id="hiFicha" class="adm-pane" hidden>
+<button type="button" id="hiVolver" class="dlg-link">← Todas las historias</button>
+<div class="adm-pane-head"><h3 id="hiTituloFicha" class="adm-h">Nueva historia</h3></div>
+<form id="hiForm" class="adm-pane" novalidate>
+<fieldset class="pos-sec"><legend>Datos de la historia</legend>
+<div class="exp-form">
+<label>Tipo *<select id="hiTipo"><option value="foto">Foto</option><option value="video">Video</option><option value="antes_despues">Antes y después</option></select></label>
+<label>Orden en la página (0 = primero)<input id="hiOrden" type="number" min="0" max="999" value="0"></label>
+<label class="full">Título *<input id="hiTituloIn" type="text" maxlength="120" required placeholder="Ej.: «Volví a sonreír en las fotos»"></label>
+<label>Tratamiento<input id="hiTrat" type="text" maxlength="80" list="hiTratLista" placeholder="Ej.: Ortodoncia"></label>
+<label>Detalle<input id="hiDetalle" type="text" maxlength="80" placeholder="Ej.: 14 meses · 3 citas"></label>
+<label class="full">Descripción<textarea id="hiDesc" rows="3" maxlength="600" placeholder="Cuenta brevemente la historia (sin apellidos, teléfonos ni otros datos personales)."></textarea></label>
+</div>
+<datalist id="hiTratLista"><option value="Limpieza y prevención"><option value="Estética dental"><option value="Ortodoncia"><option value="Implantes dentales"><option value="Endodoncia"><option value="Odontopediatría"></datalist>
+</fieldset>
+<fieldset class="pos-sec"><legend>Fotos y video</legend>
+<div class="hi-subidas">
+<div class="hi-subida"><span id="hiLbl1" class="pos-lbl">Foto</span><div id="hiVista1" class="hi-vista"></div><div class="hi-botones"><button type="button" id="hiBtn1" class="adm-btn">Elegir archivo</button><button type="button" id="hiQuitar1" class="adm-btn" hidden>Quitar</button></div><input id="hiArch1" type="file" hidden></div>
+<div id="hiCaja2" class="hi-subida" hidden><span class="pos-lbl">Foto de después</span><div id="hiVista2" class="hi-vista"></div><div class="hi-botones"><button type="button" id="hiBtn2" class="adm-btn">Elegir archivo</button><button type="button" id="hiQuitar2" class="adm-btn" hidden>Quitar</button></div><input id="hiArch2" type="file" accept="image/jpeg,image/png,image/webp" hidden></div>
+</div>
+<div id="hiYtCaja" class="exp-form" hidden><label class="full">O enlace de YouTube<input id="hiYoutube" type="url" maxlength="300" placeholder="https://www.youtube.com/watch?v=…"></label></div>
+<p id="hiAyuda" class="dlg-msg"></p>
+</fieldset>
+<fieldset class="pos-sec"><legend>Autorización y publicación</legend>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<label class="pos-activa"><input id="hiConsent" type="checkbox"> El paciente firmó la autorización para publicar sus fotos o videos</label>
+<label class="pos-activa"><input id="hiPublicada" type="checkbox"> Mostrar en la página pública</label>
+</div>
+</fieldset>
+<div class="exp-actions"><button type="submit" id="hiGuardar" class="dlg-submit">Guardar</button><button type="button" id="hiBorrar" class="adm-btn" hidden>Borrar historia</button></div>
+<p id="hiFormMsg" class="dlg-msg" role="status"></p>
+</form>
+</div>
+</div>
+
 <div id="admDentistas" role="tabpanel" aria-labelledby="tabDentistas" hidden class="adm-pane">
 
 <!-- Lista de dentistas -->
@@ -1098,6 +1203,20 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </div>
 </section>
 
+<!-- HISTORIAS DE IMPACTO -->
+<section id="historias" style="background: #FFFFFF; border-top: 1px solid #D9E4EC; border-bottom: 1px solid #D9E4EC">
+<div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 104px 48px; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 14px; max-width: 680px">
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #005A87">Historias de impacto</span>
+<h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05">Sonrisas que cambiaron una vida.</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #475B68">Pacientes reales que nos permitieron compartir su experiencia. Toca cualquier foto o video para verlo en grande.</p>
+</div>
+<div id="hisFiltros" class="his-fil" role="group" aria-label="Filtrar historias" hidden></div>
+<div id="hisGrid" class="his-grid"></div>
+<p id="hisVacio" class="his-vacio">Muy pronto compartiremos aquí las historias de nuestros pacientes.</p>
+</div>
+</section>
+
 <!-- PROCESS -->
 <section id="proceso" style="background: #E8F3FA">
 <div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 96px 48px; display: flex; flex-direction: column; gap: 48px">
@@ -1228,6 +1347,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap">
 <a href="#nosotros" style="color: #FFFFFF">Nosotros</a>
 <a href="#tratamientos" style="color: #FFFFFF">Servicios</a>
+<a href="#historias" style="color: #FFFFFF">Historias de impacto</a>
 <a href="#agenda" style="color: #FFFFFF">Programar consulta</a>
 <a href="#preguntas" style="color: #FFFFFF">Preguntas</a>
 <a href="#contacto" style="color: #FFFFFF">Contactarnos</a>
@@ -1305,6 +1425,15 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </form>
 </dialog>
 
+<dialog id="hisDlg" class="his-dlg" aria-labelledby="hisDlgTitulo">
+<button type="button" id="hisCerrar" class="his-cerrar" aria-label="Cerrar">×</button>
+<div id="hisDlgMedio" class="his-dlg-medio"></div>
+<div class="his-dlg-pie">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="hisDlgTitulo"></h3><p id="hisDlgDesc"></p><span id="hisDlgMeta" class="his-meta"></span></div>
+<div id="hisNav" class="his-nav"><button type="button" id="hisPrev" aria-label="Historia anterior">←</button><button type="button" id="hisNext" aria-label="Historia siguiente">→</button></div>
+</div>
+</dialog>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="supabase-client.js"></script>
@@ -1317,5 +1446,6 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <script src="posiciones.js"></script>
 <script src="dentistas.js"></script>
 <script src="agenda.js"></script>
+<script src="historias.js"></script>
 </body>
 </html>

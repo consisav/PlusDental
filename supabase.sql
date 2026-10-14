@@ -1343,6 +1343,85 @@ $$;
 grant execute on function public.recordatorios_pendientes(text) to anon, authenticated;
 grant execute on function public.marcar_recordatorio(text, bigint) to anon, authenticated;
 
+-- ===== Historias de impacto =====
+-- Fotos, videos y casos de antes y después de pacientes que autorizaron su publicación.
+-- La página pública solo ve las historias marcadas como publicadas; el personal las administra.
+
+create table if not exists public.historias (
+  id bigint generated always as identity primary key,
+  tipo text not null default 'foto' check (tipo in ('foto', 'video', 'antes_despues')),
+  titulo text not null check (char_length(titulo) between 1 and 120),
+  descripcion text check (char_length(descripcion) <= 600),
+  tratamiento text check (char_length(tratamiento) <= 80),
+  detalle text check (char_length(detalle) <= 80),          -- ej.: «14 meses», «3 citas»
+  archivo text,                                              -- foto, video subido o foto de «antes»
+  archivo2 text,                                             -- foto de «después»
+  video_url text check (char_length(video_url) <= 300),     -- enlace de YouTube
+  consentimiento boolean not null default false,             -- el paciente firmó la autorización
+  publicada boolean not null default false,
+  orden int not null default 0,
+  creado_por uuid default auth.uid() references auth.users (id) on delete set null,
+  creado timestamptz not null default now(),
+  actualizado timestamptz not null default now(),
+  constraint historias_con_permiso check (not publicada or consentimiento),
+  constraint historias_con_medios check (not publicada or case tipo
+    when 'foto' then archivo is not null
+    when 'video' then archivo is not null or video_url is not null
+    else archivo is not null and archivo2 is not null end)
+);
+create index if not exists historias_publicadas on public.historias (publicada, orden, creado desc);
+
+create or replace function public.historias_actualizado()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  new.actualizado := now();
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'historias_actualizado' and tgrelid = 'public.historias'::regclass) then
+    create trigger historias_actualizado before update on public.historias
+      for each row execute function public.historias_actualizado();
+  end if;
+end $$;
+
+alter table public.historias enable row level security;
+drop policy if exists "historias publicadas visibles" on public.historias;
+create policy "historias publicadas visibles" on public.historias for select
+  using (publicada and consentimiento);
+drop policy if exists "personal administra historias" on public.historias;
+create policy "personal administra historias" on public.historias for all
+  using (public.es_personal()) with check (public.es_personal());
+grant select on public.historias to anon, authenticated;
+grant insert, update, delete on public.historias to authenticated;
+
+-- Almacenamiento de las historias: fotos y videos (máx. 50 MB por archivo). Cualquiera puede verlos; solo el personal los sube.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('historias', 'historias', true, 52428800,
+        array['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'])
+on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal sube historias') then
+    create policy "personal sube historias" on storage.objects for insert
+      with check (bucket_id = 'historias' and public.es_personal());
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal reemplaza historias') then
+    create policy "personal reemplaza historias" on storage.objects for update
+      using (bucket_id = 'historias' and public.es_personal())
+      with check (bucket_id = 'historias' and public.es_personal());
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal borra historias') then
+    create policy "personal borra historias" on storage.objects for delete
+      using (bucket_id = 'historias' and public.es_personal());
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal ve historias') then
+    create policy "personal ve historias" on storage.objects for select
+      using (bucket_id = 'historias' and public.es_personal());
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
