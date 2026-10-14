@@ -65,8 +65,7 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .pronto-pill{background:#EBF0F4;color:#5A6D7A;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700}
 @media (max-width:960px){
 .adm-layout{grid-template-columns:minmax(0,1fr);gap:20px}
-.adm-menu{flex-direction:row;overflow-x:auto;position:static;border-right:0;border-bottom:1px solid #D9E4EC;padding:0 0 8px}
-.adm-menu button{white-space:nowrap;flex:0 0 auto}
+.adm-menu{position:static;border-right:0;border:1px solid #D9E4EC;border-radius:18px;padding:6px 10px;background:#FFFFFF}
 }
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .exp-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
@@ -242,12 +241,21 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-avisos label{flex-direction:row}
 .ag-aviso-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .ag-aviso-btns a{text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:38px}
-.adm-grupo{display:block;font-size:13.5px;letter-spacing:1.4px;text-transform:uppercase;font-weight:800;color:#0B2B40;padding:18px 14px 8px;border-top:1px solid #D9E4EC;margin-top:8px}
+.adm-g{border-bottom:1px solid #E3EBF1}
+.adm-g:last-child{border-bottom:0}
+.adm-menu .adm-grupo{width:100%;font-size:13.5px;letter-spacing:1.4px;text-transform:uppercase;font-weight:800;color:#0B2B40;padding:16px 12px}
+.adm-menu .adm-grupo:hover{background:#F5F9FC;color:#0B2B40}
+.adm-chev{width:9px;height:9px;border-right:2px solid #188EC0;border-bottom:2px solid #188EC0;transform:rotate(45deg) translate(-2px,-2px);transition:transform .25s ease;flex:0 0 auto}
+.adm-g.abierto .adm-chev{transform:rotate(-135deg) translate(-2px,-2px)}
+.adm-g-items{display:none;flex-direction:column;gap:2px;padding:0 0 12px}
+.adm-g.abierto .adm-g-items{display:flex}
+.adm-g:not(.abierto):has(.adm-count:not([hidden])) .adm-grupo::before{content:"";width:9px;height:9px;border-radius:50%;background:#B45309;margin-left:auto;margin-right:12px;order:1}
+.adm-g:not(.abierto):has(.adm-count:not([hidden])) .adm-chev{order:2}
+@media (prefers-reduced-motion:reduce){.adm-chev{transition:none}}
 .adm-menu button[data-tab]{margin-left:16px;position:relative}
 .adm-menu button[data-tab]::before{content:"";position:absolute;left:-10px;top:50%;width:4px;height:4px;border-radius:50%;background:#94A6B2;transform:translateY(-50%)}
 .adm-menu button[data-tab][aria-selected="true"]::before{background:#005A87}
-.adm-grupo:first-child{border-top:0;margin-top:0;padding-top:4px}
-@media (max-width:960px){.adm-grupo{border-top:0;margin:0;padding:12px 4px 0 12px;white-space:nowrap;align-self:center;color:#005A87;font-size:12px}.adm-menu button[data-tab]{margin-left:0}.adm-menu button[data-tab]::before{display:none}}
+@media (max-width:960px){.adm-menu button[data-tab]{margin-left:12px}}
 .marca-logo{height:104px;width:auto;display:block;flex:0 0 auto;transition:height .25s ease}
 .marca-frase{font-family:'Playfair Display',Georgia,serif;font-style:italic;font-weight:600;font-size:18px;line-height:1.3;color:#0B2B40;max-width:260px;padding-left:18px;border-left:1px solid #C4D4DF;transition:font-size .25s ease}
 .topbar.compacta .marca-logo{height:74px}.topbar.compacta .marca-frase{font-size:15px}
@@ -479,27 +487,47 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 
 <div class="adm-layout">
 <div class="adm-menu" role="tablist" aria-label="Menú de administración" aria-orientation="vertical">
-<span class="adm-grupo" id="grpCatalogos" role="presentation">Catálogos iniciales</span>
+<div class="adm-g">
+<button type="button" class="adm-grupo" id="grpCatalogos" aria-expanded="false" aria-controls="grpCatalogosItems">Catálogos iniciales<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-g-items" id="grpCatalogosItems" role="presentation">
 <button type="button" role="tab" id="tabDentistas" data-tab="admDentistas" aria-selected="false" aria-controls="admDentistas">Dentistas</button>
 <button type="button" role="tab" id="tabPosiciones" data-tab="admPosiciones" aria-selected="false" aria-controls="admPosiciones">Posiciones y clínicas</button>
 <button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios">Administración de usuarios</button>
 <button type="button" role="tab" id="tabAgentes" data-tab="admAgentes" aria-selected="false" aria-controls="admAgentes">Agente comercial</button>
-<span class="adm-grupo" id="grpAgendas" role="presentation">Agendas</span>
+</div>
+</div>
+<div class="adm-g">
+<button type="button" class="adm-grupo" id="grpAgendas" aria-expanded="false" aria-controls="grpAgendasItems">Agendas<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-g-items" id="grpAgendasItems" role="presentation">
 <button type="button" role="tab" id="tabAgenda" data-tab="admAgenda" aria-selected="false" aria-controls="admAgenda">Agendas clínicas</button>
 <button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
-<span class="adm-grupo" id="grpPacientes" role="presentation">Pacientes</span>
+</div>
+</div>
+<div class="adm-g">
+<button type="button" class="adm-grupo" id="grpPacientes" aria-expanded="false" aria-controls="grpPacientesItems">Pacientes<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-g-items" id="grpPacientesItems" role="presentation">
 <button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expediente de pacientes</button>
 <button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuesto</button>
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
 <button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
-<span class="adm-grupo" id="grpReportes" role="presentation">Reportes</span>
+</div>
+</div>
+<div class="adm-g">
+<button type="button" class="adm-grupo" id="grpReportes" aria-expanded="false" aria-controls="grpReportesItems">Reportes<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-g-items" id="grpReportesItems" role="presentation">
 <button type="button" role="tab" id="tabRepPacientes" data-tab="admRepPacientes" aria-selected="false" aria-controls="admRepPacientes">Listado de pacientes</button>
 <button type="button" role="tab" id="tabRepCuentas" data-tab="admRepCuentas" aria-selected="false" aria-controls="admRepCuentas">Estados de cuenta</button>
 <button type="button" role="tab" id="tabRepCitas" data-tab="admRepCitas" aria-selected="false" aria-controls="admRepCitas">Citas agendadas</button>
 <button type="button" role="tab" id="tabRepCobros" data-tab="admRepCobros" aria-selected="false" aria-controls="admRepCobros">Cobros por paciente</button>
 <button type="button" role="tab" id="tabRepComisiones" data-tab="admRepComisiones" aria-selected="false" aria-controls="admRepComisiones">Comisiones generadas</button>
-<span class="adm-grupo" id="grpWeb" role="presentation">Página web</span>
+</div>
+</div>
+<div class="adm-g">
+<button type="button" class="adm-grupo" id="grpWeb" aria-expanded="false" aria-controls="grpWebItems">Página web<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-g-items" id="grpWebItems" role="presentation">
 <button type="button" role="tab" id="tabHistorias" data-tab="admHistorias" aria-selected="false" aria-controls="admHistorias">Historias de impacto</button>
+</div>
+</div>
 </div>
 <div class="adm-main">
 

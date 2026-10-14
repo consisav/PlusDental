@@ -106,6 +106,15 @@
       b.setAttribute('aria-selected', b.dataset.tab === id);
       $(b.dataset.tab).hidden = b.dataset.tab !== id;
     });
+    var elegido = document.querySelector('.adm-menu [data-tab="' + id + '"]');
+    if (elegido) abrirGrupo(elegido.closest('.adm-g'));
+  }
+  // Menú por grupos: solo uno abierto a la vez (null = todos cerrados)
+  function abrirGrupo(g) {
+    document.querySelectorAll('.adm-menu .adm-g').forEach(function (x) {
+      x.classList.toggle('abierto', x === g);
+      x.querySelector('.adm-grupo').setAttribute('aria-expanded', x === g);
+    });
   }
 
   // ---- Citas ----
@@ -381,11 +390,18 @@
 
   $('admRecargar').addEventListener('click', cargarPanel);
   document.querySelectorAll('.adm-menu [data-tab]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      pestana(b.dataset.tab);
-      b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); // en celular el menú se desliza de lado
+    b.addEventListener('click', function () { pestana(b.dataset.tab); });
+  });
+  // Títulos de grupo: abren su lista de opciones (y cierran las demás); si ya estaba abierta, la cierran
+  document.querySelectorAll('.adm-menu .adm-grupo').forEach(function (t) {
+    t.addEventListener('click', function () {
+      var g = t.closest('.adm-g');
+      abrirGrupo(g.classList.contains('abierto') ? null : g);
     });
   });
+  // Al empezar, se abre el grupo de la opción seleccionada
+  var inicial = document.querySelector('.adm-menu [data-tab][aria-selected="true"]');
+  if (inicial) abrirGrupo(inicial.closest('.adm-g'));
   $('citaFiltros').addEventListener('click', function (e) {
     var b = e.target.closest('[data-filtro]');
     if (b) { filtro = b.dataset.filtro; pintarCitas(); }
