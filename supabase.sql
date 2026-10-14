@@ -1558,6 +1558,56 @@ do $$ begin
   end if;
 end $$;
 
+-- ===== Precios por procedimiento =====
+-- Cada procedimiento del catálogo de tratamientos puede tener un precio por tipo:
+-- Cliente directo, Institucional, VIP, Paquete y Especial; con su % de descuento máximo y su estado.
+-- Quién lo registró y quién lo modificó por última vez los pone el sistema. Solo para el personal.
+
+create table if not exists public.precios (
+  id              bigint generated always as identity primary key,
+  tratamiento_id  bigint not null references public.tratamientos (id) on delete cascade,
+  tipo            text not null default 'especial' check (tipo in ('directo', 'institucional', 'vip', 'paquete', 'especial')),
+  valor           numeric(10,2) not null check (valor >= 0),
+  descuento_max   numeric(5,2) not null default 0 check (descuento_max between 0 and 100),
+  estado          text not null default 'baja' check (estado in ('activo', 'suspendido', 'baja')),
+  registrado_por  text,
+  creado          timestamptz not null default now(),
+  actualizado_por text,
+  actualizado     timestamptz not null default now()
+);
+create unique index if not exists precios_tratamiento_tipo on public.precios (tratamiento_id, tipo);
+
+create or replace function public.precios_auditoria()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    new.registrado_por := coalesce(v_usuario, 'sistema');
+    new.creado := now();
+  else
+    new.registrado_por := old.registrado_por;
+    new.creado := old.creado;
+    new.tratamiento_id := old.tratamiento_id;   -- un precio no se mueve a otro procedimiento
+  end if;
+  new.actualizado_por := coalesce(v_usuario, 'sistema');
+  new.actualizado := now();
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'precios_auditoria' and tgrelid = 'public.precios'::regclass) then
+    create trigger precios_auditoria before insert or update on public.precios
+      for each row execute function public.precios_auditoria();
+  end if;
+end $$;
+
+alter table public.precios enable row level security;
+drop policy if exists "personal administra precios" on public.precios;
+create policy "personal administra precios" on public.precios for all
+  using (public.es_personal()) with check (public.es_personal());
+grant select, insert, update, delete on public.precios to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

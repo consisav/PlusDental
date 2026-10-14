@@ -355,6 +355,15 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .rep-tabla .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .rep-tabla tr.rep-sub td{background:#F5F9FC;font-weight:700}
 .rep-tabla tr.rep-total td{border-top:2px solid #0B2B40;font-weight:800}
+.pr-tabla td,.pr-tabla th{white-space:nowrap}
+.pr-celda{display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px}
+.pr-celda b{font-size:14.5px;font-variant-numeric:tabular-nums}
+.pr-celda small{font-size:12px;color:#5A6D7A}
+.pr-celda .estado{padding:2px 9px;font-size:11.5px}
+.pr-vacio{color:#94A6B2}
+.pr-editando td{background:#E8F3FA}
+.pr-form-t{margin:0;font-size:16px;font-weight:700}
+.exp-form select.ac-estado[data-estado="baja"]{background:#FDE2E4;color:#9F1239;border-color:#F5B5BE}
 .ac-fijo{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:#E8F3FA;color:#005A87;font-size:11.5px;font-weight:700;vertical-align:middle}
 .ac-quien{display:flex;align-items:center;gap:10px;min-width:180px}
 .ac-pct{position:relative;display:block}
@@ -510,6 +519,12 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuesto</button>
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
 <button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
+</div>
+</div>
+<div class="adm-g">
+<button type="button" class="adm-grupo" id="grpPrecios" aria-expanded="false" aria-controls="grpPreciosItems">Precios y paquetes<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-g-items" id="grpPreciosItems" role="presentation">
+<button type="button" role="tab" id="tabPrecios" data-tab="admPrecios" aria-selected="false" aria-controls="admPrecios">Precios</button>
 </div>
 </div>
 <div class="adm-g">
@@ -1017,6 +1032,9 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </div>
 
 <!-- 8. Dentistas -->
+<!-- Precios -->
+<div id="admPrecios" role="tabpanel" aria-labelledby="tabPrecios" hidden class="adm-pane"></div>
+
 <!-- Reportes -->
 <div id="admRepPacientes" role="tabpanel" aria-labelledby="tabRepPacientes" hidden class="adm-pane"></div>
 <div id="admRepCuentas" role="tabpanel" aria-labelledby="tabRepCuentas" hidden class="adm-pane"></div>
@@ -1661,6 +1679,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <script src="agenda.js"></script>
 <script src="agentes.js"></script>
 <script src="reportes.js"></script>
+<script src="precios.js"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="idiomas.js"></script>
