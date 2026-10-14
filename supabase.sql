@@ -1440,6 +1440,8 @@ create table if not exists public.agentes (
   actualizado timestamptz not null default now()
 );
 create unique index if not exists agentes_codigo_unico on public.agentes (upper(codigo));
+alter table public.agentes add column if not exists telefono text check (char_length(telefono) <= 40);
+alter table public.agentes add column if not exists foto text;   -- ruta en el almacenamiento privado (expedientes/fotos/agente-ID.jpg)
 
 create or replace function public.agentes_auditoria()
 returns trigger language plpgsql security definer set search_path = public as $$

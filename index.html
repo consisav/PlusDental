@@ -323,6 +323,8 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .idioma button:focus-visible{outline:2px solid #188EC0;outline-offset:1px}
 .bandera{width:24px;height:16px;border-radius:3px;box-shadow:0 0 0 1px rgba(11,43,64,.18);display:block;flex:0 0 auto}
 @media (max-width:1430px){.idioma-fila{justify-content:center;padding:12px 0 6px;border-bottom:1px solid #D9E4EC}.idioma button{min-height:40px;padding:8px 16px;font-size:14px}.bandera{width:27px;height:18px}}
+.ac-acciones .dlg-submit:disabled{opacity:.45;cursor:not-allowed}
+.ac-quien{display:flex;align-items:center;gap:10px;min-width:180px}
 .ac-pct{position:relative;display:block}
 .ac-pct input{padding-right:36px}
 .ac-pct span{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-weight:700;color:#5A6D7A;pointer-events:none}
@@ -940,10 +942,20 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <span id="acPill" class="estado" hidden></span>
 </div>
 <form id="acForm" class="adm-pane" novalidate>
+<div class="pac-foto">
+<div id="acFotoVista" class="avatar grande" aria-hidden="true"></div>
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+<span style="font-size: 14px; font-weight: 600">Fotografía</span>
+<div class="hi-botones"><button type="button" id="acFotoBtn" class="adm-btn">Subir foto</button><button type="button" id="acFotoQuitar" class="adm-btn" hidden>Quitar foto</button></div>
+<input id="acFotoArchivo" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+<p id="acFotoMsg" class="dlg-msg" role="status"></p>
+</div>
+</div>
 <fieldset id="acCampos" class="campos pos-sec"><legend>Datos del agente</legend>
 <div class="exp-form">
 <label>Código de agente *<input id="acCodigo" type="text" maxlength="20" required placeholder="AGE-001" autocomplete="off"></label>
 <label>Nombre del agente *<input id="acNombre" type="text" maxlength="150" required autocomplete="off"></label>
+<label>Teléfono<input id="acTelefono" type="tel" maxlength="40" placeholder="+502 0000 0000" autocomplete="off"></label>
 <label>Fecha de inicio *<input id="acInicio" type="date" required></label>
 <label>Porcentaje de comisión *<span class="ac-pct"><input id="acComision" type="number" min="0" max="100" step="0.01" required inputmode="decimal" placeholder="0.00"><span aria-hidden="true">%</span></span></label>
 <label>Estado<select id="acEstado" class="ac-estado"><option value="activo">Activo</option><option value="suspendido">Suspendido</option><option value="inactivo">Inactivo</option></select></label>
@@ -957,7 +969,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <div class="exp-campo"><span class="pos-lbl">Usuario que cambió el estado</span><div id="acCambioPor" class="exp-calc">—</div></div>
 </div>
 </fieldset>
-<div class="exp-actions">
+<div class="exp-actions ac-acciones">
 <button type="submit" id="acGrabar" class="dlg-submit" data-ac-accion="grabar">Grabar</button>
 <button type="button" id="acModificar" class="adm-btn adm-primary" data-ac-accion="modificar">Modificar</button>
 <button type="button" id="acEliminar" class="adm-btn" data-ac-accion="eliminar">Eliminar</button>
