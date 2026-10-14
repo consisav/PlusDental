@@ -432,6 +432,8 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .pr-form-t b{color:#005A87;font-weight:800}
 @media (max-width:640px){.pr-cabeza-nom{font-size:32px}.pr-cabeza{padding:18px}}
 .paq-usd{color:#9FD3EE;font-size:15px;font-weight:700}
+/* foto de la clínica en la portada (si el archivo no existe, se ve el espacio reservado) */
+.hero-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 40%;border-radius:inherit;display:block}
 .ac-fijo{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:#E8F3FA;color:#005A87;font-size:11.5px;font-weight:700;vertical-align:middle}
 .ac-quien{display:flex;align-items:center;gap:10px;min-width:180px}
 .ac-pct{position:relative;display:block}
@@ -1375,7 +1377,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </div>
 </div>
 <div style="position: relative; min-height: 560px">
-<div role="img" aria-label="Espacio para fotografía de la clínica" style="position: absolute; inset: 0 0 0 48px; border-radius: 28px; background: linear-gradient(140deg, #E8F3FA 0%, #D3E9F6 55%, #BFDFF2 100%); display: flex; align-items: center; justify-content: center; color: #5A6D7A; font-size: 14px; letter-spacing: 1px; text-transform: uppercase">[FOTO DE LA CLÍNICA]</div>
+<div role="img" aria-label="Espacio para fotografía de la clínica" style="position: absolute; inset: 0 0 0 48px; border-radius: 28px; background: linear-gradient(140deg, #E8F3FA 0%, #D3E9F6 55%, #BFDFF2 100%); display: flex; align-items: center; justify-content: center; color: #5A6D7A; font-size: 14px; letter-spacing: 1px; text-transform: uppercase">[FOTO DE LA CLÍNICA]<img class="hero-foto" src="foto-clinica.jpg" alt="Recepción de la clínica PlusDental en zona 10, Guatemala" onerror="this.remove()"></div>
 <div style="position: absolute; left: 0; bottom: 40px; width: 300px; background: #FFFFFF; border-radius: 20px; padding: 22px; box-shadow: 0 24px 48px rgba(11,43,64,.12); display: flex; flex-direction: column; gap: 14px">
 <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: #005A87; text-transform: uppercase; letter-spacing: 1.2px">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#005A87" stroke-width="1.8" aria-hidden="true"><path d="M12 3l2.2 5.4L20 9l-4.4 3.8L17 19l-5-3-5 3 1.4-6.2L4 9l5.8-.6z"></path></svg>Asistente inteligente</div>

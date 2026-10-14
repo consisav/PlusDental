@@ -379,6 +379,7 @@
     'No hay personal con este rol. Agrégalo en «Personal».': 'There is no staff with this role. Add them under “Staff”.',
     'Llena los datos, agrega los procedimientos y pulsa «Grabar».': 'Fill in the details, add the procedures and press “Save”.',
     'Se muestra en la página pública': 'Shown on the public website',
+    'Recepción de la clínica PlusDental en zona 10, Guatemala': 'Reception of the PlusDental clinic in Zone 10, Guatemala',
     'Aún no hay agentes. Pulsa «Nuevo agente» para agregar el primero.': 'There are no agents yet. Press “New agent” to add the first one.',
     'No hay agentes con ese filtro.': 'There are no agents with that filter.',
     'No hay datos para esas fechas.': 'There is no data for those dates.',
