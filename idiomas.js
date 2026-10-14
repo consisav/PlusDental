@@ -332,6 +332,14 @@
     [/^Pago registrado con el correlativo (\S+) \(recibo N\.º (\d+)\)\. Puedes imprimirlo o enviarlo desde la lista\.$/, 'Payment registered with sequence No. $1 (receipt No. $2). You can print or send it from the list.'],
     [/^(Factura|Recibo)( [A-Za-z0-9-]+)?$/, function (m, t, n) { return (t === 'Factura' ? 'Invoice' : 'Receipt') + (n || ''); }],
     [/^Cuota (\d+)$/, 'Installment $1'],
+    [/^Impreso el (\d{1,2}) (\S+?)\.? (\d{4})(, \d{1,2}:\d{2})?$/, function (m, d, mes, a, h) {
+      var M = { ene: 'Jan', feb: 'Feb', mar: 'Mar', abr: 'Apr', may: 'May', jun: 'Jun', jul: 'Jul', ago: 'Aug', sept: 'Sep', sep: 'Sep', oct: 'Oct', nov: 'Nov', dic: 'Dec' };
+      return 'Printed on ' + (M[mes.toLowerCase()] || mes) + ' ' + d + ', ' + a + (h || '');
+    }],
+    [/^Recibido por: (.+)$/, 'Received by: $1'],
+    [/^PAGO ANULADO — (.*)$/, 'PAYMENT VOIDED — $1'],
+    [/^A favor (Q[\d,.]+)$/, 'In favor $1'],
+    [/^(.+) · Comprobante interno$/, '$1 · Internal voucher'],
     [/^(Tipo de procedimiento|Clasificación|Monto en quetzales|Monto en dólares) de la línea (\d+)$/, function (m, c, n) { return { 'Tipo de procedimiento': 'Procedure type', 'Clasificación': 'Classification', 'Monto en quetzales': 'Amount in quetzales', 'Monto en dólares': 'Amount in dollars' }[c] + ' for line ' + n; }],
     [/^(\d{1,2}:\d{2}), ocupado$/, '$1, booked'],
     [/^(\d+(?:–\d+)?) meses$/, '$1 months'],

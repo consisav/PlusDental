@@ -112,7 +112,9 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .saldo-debe{color:#9A3B2E !important}.saldo-favor{color:#005A87 !important}
 tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .anular-row td{background:#FFF7F5}
-#impresion{display:none}
+#impresion{display:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pg-botones{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+#pgImprimir:disabled{opacity:.5;cursor:not-allowed}
 @media print{body.imprimir>*:not(#impresion){display:none !important}body.imprimir #impresion{display:block !important}body.imprimir{background:#FFFFFF}}
 .odo-input{font:inherit;font-size:14px;padding:8px 10px;border:1px solid #C4D4DF;border-radius:10px;min-height:40px;box-sizing:border-box;background:#FFFFFF;color:#0B2B40;width:100%}
 .odo-hora{white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -1050,7 +1052,7 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 <div class="pg-totales"><label class="pg-tot">Total Q<input id="pgMonto" type="text" readonly tabindex="-1" value="Q0.00"></label>
 <label class="pg-tot">Total US$<input id="pgMontoUsd" type="text" readonly tabindex="-1" value="US$0.00"></label></div>
 </div>
-<div class="pg-fin"><p class="pg-saldo">El correlativo se asigna al registrar y nadie lo puede cambiar.</p><button type="submit" class="dlg-submit">Registrar pago</button></div>
+<div class="pg-fin"><p class="pg-saldo">El correlativo se asigna al registrar y nadie lo puede cambiar.</p><div class="pg-botones"><button type="button" id="pgImprimir" class="adm-btn" disabled title="Se activa al registrar el pago">Imprimir comprobante</button><button type="submit" class="dlg-submit">Registrar pago</button></div></div>
 <p id="pgMsg" class="dlg-msg" role="status"></p>
 </form>
 

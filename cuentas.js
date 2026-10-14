@@ -12,7 +12,7 @@
   var TIPOS_DOC = { factura: 'Factura', recibo: 'Recibo' };
   var ESTADOS_DOC = { emitido: 'Emitido', aplicado: 'Aplicado', certificado: 'Certificado', anulado: 'Anulado' };
   var CLASIF = { bien: 'Bien', servicio: 'Servicio' };
-  var tiposProc = [], lineas = [];
+  var tiposProc = [], lineas = [], ultimoPago = null;
   function usd(n) { return 'US$' + (Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function redondear(n) { return Math.round((Number(n) || 0) * 100) / 100; }
 
@@ -36,17 +36,29 @@
   }
 
   // ---------- Impresión (recibos y estados de cuenta) ----------
+  // Logo y datos de la clínica (izquierda del encabezado de los reportes impresos)
+  function logoClinica() {
+    return '<div style="display:flex;align-items:center;gap:16px">' +
+      '<img src="logo-plusdental-marca.png?v=2" alt="' + CLINICA.nombre + '" style="width:118px;height:auto">' +
+      '<div style="font-size:12px;color:#475B68;line-height:1.55"><b style="display:block;font-size:11px;letter-spacing:.16em;color:#005A87">ODONTOLOGÍA INTEGRAL</b>' +
+      CLINICA.direccion.replace(', Ciudad', '<br>Ciudad') + '<br>Tel. ' + CLINICA.telefono + '</div></div>';
+  }
   function encabezado(titulo) {
     return '<div style="font-family:Manrope,system-ui,sans-serif;color:#0B2B40;max-width:720px;margin:0 auto;padding:24px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid #0B2B40;padding-bottom:14px;margin-bottom:18px">' +
-      '<div><div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:30px">' + CLINICA.nombre + '</div>' +
-      '<div style="font-size:12px;color:#475B68">' + CLINICA.direccion + ' · ' + CLINICA.telefono + '</div></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;border-bottom:3px solid #0B2B40;padding-bottom:14px;margin-bottom:18px">' +
+      logoClinica() +
       '<div style="text-align:right;font-size:13px;color:#475B68"><div style="font-size:18px;font-weight:700;color:#0B2B40">' + titulo + '</div>Impreso el ' + fechaCorta(hoy()) + '</div></div>';
   }
   function imprimir(html) {
     $('impresion').innerHTML = html;
     document.body.classList.add('imprimir');
-    window.print();
+    // esperar a que cargue el logo antes de abrir la ventana de impresión
+    var imgs = [].slice.call($('impresion').querySelectorAll('img')).filter(function (i) { return !i.complete; });
+    if (!imgs.length) { window.print(); return; }
+    var faltan = imgs.length, listo = false;
+    var seguir = function () { if (!listo && --faltan <= 0) { listo = true; window.print(); } };
+    imgs.forEach(function (i) { i.addEventListener('load', seguir); i.addEventListener('error', seguir); });
+    setTimeout(function () { if (!listo) { listo = true; window.print(); } }, 2500);
   }
   window.addEventListener('afterprint', function () {
     document.body.classList.remove('imprimir');
@@ -57,34 +69,77 @@
     var num = [p.serie, p.numero_factura].filter(Boolean).join('-');
     return (TIPOS_DOC[p.tipo_documento] || 'Recibo') + (num ? ' ' + num : '');
   }
+  // Comprobante de pago impreso: logo a la izquierda; correlativo, recibo y estado a la derecha
+  var COLOR_ESTADO = { emitido: ['#DBEAFE', '#1E40AF'], aplicado: ['#FEF3C7', '#92400E'], certificado: ['#DCF2EC', '#08504C'], anulado: ['#FDE2E4', '#9F1239'] };
   function htmlRecibo(p, detalle) {
-    var fila = function (k, v) { return '<tr><td style="padding:8px 0;color:#475B68;width:200px">' + k + '</td><td style="padding:8px 0;font-weight:600">' + v + '</td></tr>'; };
     var s = saldoDe[p.paciente_id];
-    var celda = 'padding:7px 6px;border-bottom:1px solid #D9E4EC';
-    var tabla = (detalle || []).length ? '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:14px"><thead><tr>' +
-      ['Línea', 'Tipo de procedimiento', 'Clasificación', 'Monto Q', 'Monto US$'].map(function (h, i) { return '<th style="' + celda + ';text-align:' + (i > 2 ? 'right' : 'left') + '">' + h + '</th>'; }).join('') +
-      '</tr></thead><tbody>' + detalle.map(function (d) {
-        return '<tr><td style="' + celda + '">' + d.linea + '</td><td style="' + celda + '">' + esc(d.tipo ? d.tipo.nombre : '—') + '</td><td style="' + celda + '">' + (CLASIF[d.clasificacion] || '') + '</td>' +
-          '<td style="' + celda + ';text-align:right">' + q(d.monto) + '</td><td style="' + celda + ';text-align:right">' + usd(d.monto_usd) + '</td></tr>';
-      }).join('') + '<tr><td colspan="3" style="' + celda + ';font-weight:800">TOTALES</td><td style="' + celda + ';text-align:right;font-weight:800">' + q(p.monto) + '</td><td style="' + celda + ';text-align:right;font-weight:800">' + usd(p.monto_usd) + '</td></tr></tbody></table>' : '';
-    return encabezado(documento(p) + ' · ' + recibo(p.id)) +
-      (p.anulado ? '<div style="border:2px solid #9A3B2E;color:#9A3B2E;font-weight:700;padding:10px 14px;margin-bottom:14px">RECIBO ANULADO — ' + esc(p.anulado_motivo) + '</div>' : '') +
-      '<table style="width:100%;border-collapse:collapse;font-size:15px">' +
-      (p.correlativo ? fila('Correlativo interno', esc(p.correlativo)) : '') +
-      fila('Fecha', fechaCorta(p.fecha)) +
-      fila('Recibimos de', esc(p.pacientes ? p.pacientes.nombre : '')) +
-      (p.nit ? fila('NIT', esc(p.nit)) : '') +
-      (p.numero_dte ? fila('Número DTE', esc(p.numero_dte)) : '') +
-      fila('La cantidad de', '<span style="font-size:22px">' + q(p.monto) + '</span>' + (Number(p.monto_usd) > 0 ? ' · ' + usd(p.monto_usd) : '')) +
-      (p.numero_cuota ? fila('Número de cuota', p.numero_cuota) : '') +
-      fila('Estado', ESTADOS_DOC[p.estado_doc] || '—') +
-      fila('Forma de pago', METODOS[p.metodo] + (p.referencia ? ' · ' + esc(p.referencia) : '')) +
-      (p.concepto ? fila('Concepto', esc(p.concepto)) : '') +
-      (p.presupuesto_id ? fila('Presupuesto', 'N.º ' + p.presupuesto_id) : '') +
-      (s && !p.anulado ? fila('Saldo pendiente a la fecha', q(Math.max(s.saldo, 0))) : '') +
-      fila('Registrado por', esc(p.registrado_por || '—')) +
-      (p.observaciones ? fila('Observaciones', esc(p.observaciones)) : '') +
-      '</table>' + tabla + '<div style="margin-top:60px;display:flex;justify-content:flex-end"><div style="border-top:1px solid #0B2B40;width:260px;text-align:center;padding-top:6px;font-size:13px">Firma y sello</div></div></div>';
+    var est = p.anulado ? 'anulado' : (p.estado_doc || 'emitido');
+    var ce = COLOR_ESTADO[est] || COLOR_ESTADO.emitido;
+    var sec = function (t) { return '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#005A87;font-weight:800;margin:20px 0 8px;border-bottom:1px solid #D9E4EC;padding-bottom:5px">' + t + '</div>'; };
+    var dato = function (k, v, ancho) {
+      return '<div style="' + (ancho ? 'grid-column:' + ancho + ';' : '') + 'font-weight:600;font-size:13px;min-width:0;overflow-wrap:anywhere">' +
+        '<span style="display:block;font-size:10.5px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">' + k + '</span>' + v + '</div>';
+    };
+    var grilla = function (h) { return '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 18px">' + h + '</div>'; };
+    var th = 'background:#0B2B40;color:#FFFFFF;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:8px';
+    var td = 'padding:8px;border-bottom:1px solid #E3EAF0';
+    var tf = 'padding:8px;font-weight:800;background:#EEF5FA;border-top:2px solid #0B2B40';
+    var saldo = s && !p.anulado ? (s.saldo < -0.004 ? 'A favor ' + q(-s.saldo) : q(Math.max(s.saldo, 0))) : '—';
+    var lineas = detalle || [];
+    var ahora = new Date();
+    return '<div style="font-family:Manrope,system-ui,sans-serif;color:#0B2B40;max-width:740px;margin:0 auto;padding:24px">' +
+      // Encabezado
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:20px;border-bottom:3px solid #0B2B40;padding-bottom:16px">' +
+      logoClinica() +
+      '<div style="text-align:right"><div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:28px;line-height:1">Comprobante de pago</div>' +
+      (p.correlativo ? '<div style="display:inline-block;margin-top:8px;background:#0B2B40;color:#FFFFFF;border-radius:10px;padding:6px 12px;font-weight:800;font-size:15px">' +
+        '<small style="display:block;font-size:9.5px;letter-spacing:.14em;color:#9CC3DA">CORRELATIVO INTERNO</small>' + esc(p.correlativo) + '</div>' : '') +
+      '<div style="font-size:12px;color:#475B68;margin-top:6px">Recibo ' + recibo(p.id) + ' · <span style="display:inline-block;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:800;background:' + ce[0] + ';color:' + ce[1] + '">' + ESTADOS_DOC[est].toUpperCase() + '</span></div>' +
+      '</div></div>' +
+      (p.anulado ? '<div style="border:2px solid #9A3B2E;color:#9A3B2E;font-weight:700;padding:10px 14px;margin-top:14px">PAGO ANULADO — ' + esc(p.anulado_motivo || '') + '</div>' : '') +
+      // Paciente
+      sec('Paciente') + grilla(
+        dato('Nombre', esc(p.pacientes ? p.pacientes.nombre : '—'), 'span 2') + dato('NIT', esc(p.nit || 'CF')) + dato('Saldo a la fecha', saldo)) +
+      // Documento fiscal
+      sec('Documento fiscal') + grilla(
+        dato('Tipo', TIPOS_DOC[p.tipo_documento] || 'Recibo') + dato('Serie', esc(p.serie || '—')) + dato('Número', esc(p.numero_factura || '—')) + dato('Cuota', p.numero_cuota || '—') +
+        (p.numero_dte ? dato('Número DTE (FEL)', esc(p.numero_dte), '1/-1') : '')) +
+      // Datos del pago
+      sec('Datos del pago') + grilla(
+        dato('Fecha', fechaCorta(p.fecha)) + dato('Método', METODOS[p.metodo] || '—') + dato('Autorización', esc(p.referencia || '—')) +
+        dato('Presupuesto', p.presupuesto_id ? 'N.º ' + p.presupuesto_id : '—') +
+        (p.concepto ? dato('Concepto', esc(p.concepto), '1/-1') : '')) +
+      // Detalle
+      sec('Detalle') +
+      '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>' +
+      ['Línea', 'Tipo de procedimiento', 'Clasificación', 'Monto Q', 'Monto US$'].map(function (h, i) { return '<th style="' + th + ';text-align:' + (i > 2 ? 'right' : 'left') + '">' + h + '</th>'; }).join('') +
+      '</tr></thead><tbody>' +
+      (lineas.length ? lineas.map(function (d) {
+        return '<tr><td style="' + td + '">' + d.linea + '</td><td style="' + td + '">' + esc(d.tipo ? d.tipo.nombre : '—') + '</td><td style="' + td + '">' + (CLASIF[d.clasificacion] || '') + '</td>' +
+          '<td style="' + td + ';text-align:right">' + q(d.monto) + '</td><td style="' + td + ';text-align:right">' + usd(d.monto_usd) + '</td></tr>';
+      }).join('') : '<tr><td colspan="5" style="' + td + ';color:#5A6D7A">' + esc(p.concepto || 'Pago') + '</td></tr>') +
+      '</tbody><tfoot><tr><td style="' + tf + '"></td><td style="' + tf + '">TOTALES</td><td style="' + tf + '"></td>' +
+      '<td style="' + tf + ';text-align:right">' + q(p.monto) + '</td><td style="' + tf + ';text-align:right">' + usd(p.monto_usd) + '</td></tr></tfoot></table>' +
+      (p.observaciones ? sec('Observaciones') + '<div style="font-size:13px;white-space:pre-line">' + esc(p.observaciones) + '</div>' : '') +
+      // Firmas y pie
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:56px;font-size:12px;text-align:center;color:#475B68">' +
+      '<div style="border-top:1px solid #0B2B40;padding-top:6px">Recibido por: ' + esc(p.registrado_por || '—') + '</div>' +
+      '<div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div>' +
+      '<div style="margin-top:26px;font-size:10.5px;color:#7A8C98;display:flex;justify-content:space-between;border-top:1px solid #D9E4EC;padding-top:8px">' +
+      '<span>' + CLINICA.nombre + ' · Comprobante interno</span><span>Impreso el ' + fechaCorta(hoy()) + ', ' + ('0' + ahora.getHours()).slice(-2) + ':' + ('0' + ahora.getMinutes()).slice(-2) + '</span></div>' +
+      '</div>';
+  }
+
+  // Imprime el comprobante de un pago guardado (con su detalle)
+  async function imprimirComprobante(id) {
+    var p = pagos.filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!p) {
+      var r = await sb.from('pagos').select('*,pacientes(nombre,telefono)').eq('id', id).maybeSingle();
+      if (r.error || !r.data) return;
+      p = r.data;
+    }
+    var det = await sb.from('pago_detalle').select('linea,clasificacion,monto,monto_usd,tipo:tipos_procedimiento(nombre)').eq('pago_id', p.id).order('linea');
+    imprimir(htmlRecibo(p, det.error ? [] : det.data));
   }
 
   // ---------- Saldos ----------
@@ -378,6 +433,7 @@
     s[s.length - 1].focus();
   });
   $('pgEstado').addEventListener('change', pintarEstadoNuevo);
+  $('pgImprimir').addEventListener('click', function () { if (ultimoPago) imprimirComprobante(ultimoPago); });
 
   $('pagoForm').addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -410,6 +466,7 @@
     if (r.error) { aviso('pgMsg', /registrar_pago|could not find the function/i.test(r.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los cobros con factura.' : traducir(r.error), true); return; }
     var pid = datos.paciente_id;
     limpiarFormulario();
+    ultimoPago = r.data; $('pgImprimir').disabled = false; $('pgImprimir').title = '';
     var c = await sb.from('pagos').select('correlativo').eq('id', r.data).maybeSingle();
     var corr = !c.error && c.data && c.data.correlativo;
     aviso('pgMsg', (corr ? 'Pago registrado con el correlativo ' + corr + ' (recibo ' + recibo(r.data) + ')' : 'Pago registrado con el recibo ' + recibo(r.data)) + '. Puedes imprimirlo o enviarlo desde la lista.');
@@ -439,10 +496,7 @@
   $('cpBody').addEventListener('click', async function (e) {
     var rb = e.target.closest('[data-recibo]');
     if (rb) {
-      var p = pagos.filter(function (x) { return String(x.id) === rb.dataset.recibo; })[0];
-      if (!p) return;
-      var det = await sb.from('pago_detalle').select('linea,clasificacion,monto,monto_usd,tipo:tipos_procedimiento(nombre)').eq('pago_id', p.id).order('linea');
-      imprimir(htmlRecibo(p, det.error ? [] : det.data));
+      imprimirComprobante(rb.dataset.recibo);
       return;
     }
     // Anular: pide el motivo en una fila debajo del pago
@@ -487,6 +541,7 @@
     limpiar: function () {
       saldos = []; saldoDe = {}; pagos = []; ecActual = null; movimientos = [];
       tiposProc = []; limpiarFormulario();
+      ultimoPago = null; $('pgImprimir').disabled = true;
       ['ecBody', 'ecMovs', 'cpBody', 'pgPaciente', 'cpMetodos'].forEach(function (id) { $(id).innerHTML = ''; });
       $('ecDetalle').hidden = true; $('ecLista').hidden = false;
     }
