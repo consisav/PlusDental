@@ -1422,6 +1422,65 @@ do $$ begin
   end if;
 end $$;
 
+-- ===== Agentes comerciales (vendedores) =====
+-- Código, nombre, fecha de inicio, % de comisión y estado. Quién lo ingresó, cuándo, y el último
+-- cambio de estado (fecha y usuario) los pone el sistema automáticamente. Solo para el personal.
+
+create table if not exists public.agentes (
+  id bigint generated always as identity primary key,
+  codigo text not null check (char_length(codigo) between 1 and 20),
+  nombre text not null check (char_length(nombre) between 1 and 150),
+  fecha_inicio date not null default current_date,
+  comision numeric(5,2) not null default 0 check (comision between 0 and 100),
+  estado text not null default 'activo' check (estado in ('activo', 'suspendido', 'inactivo')),
+  registrado_por text,
+  creado timestamptz not null default now(),
+  estado_cambiado timestamptz,
+  estado_cambiado_por text,
+  actualizado timestamptz not null default now()
+);
+create unique index if not exists agentes_codigo_unico on public.agentes (upper(codigo));
+
+create or replace function public.agentes_auditoria()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    new.registrado_por := v_usuario;
+    new.creado := now();
+    new.estado_cambiado := null;
+    new.estado_cambiado_por := null;
+  else
+    new.registrado_por := old.registrado_por;
+    new.creado := old.creado;
+    if new.estado is distinct from old.estado then
+      new.estado_cambiado := now();
+      new.estado_cambiado_por := v_usuario;
+    else
+      new.estado_cambiado := old.estado_cambiado;
+      new.estado_cambiado_por := old.estado_cambiado_por;
+    end if;
+  end if;
+  new.codigo := upper(trim(new.codigo));
+  new.nombre := trim(new.nombre);
+  new.actualizado := now();
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'agentes_auditoria' and tgrelid = 'public.agentes'::regclass) then
+    create trigger agentes_auditoria before insert or update on public.agentes
+      for each row execute function public.agentes_auditoria();
+  end if;
+end $$;
+
+alter table public.agentes enable row level security;
+drop policy if exists "personal administra agentes" on public.agentes;
+create policy "personal administra agentes" on public.agentes for all
+  using (public.es_personal()) with check (public.es_personal());
+grant select, insert, update, delete on public.agentes to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

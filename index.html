@@ -323,6 +323,16 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .idioma button:focus-visible{outline:2px solid #188EC0;outline-offset:1px}
 .bandera{width:24px;height:16px;border-radius:3px;box-shadow:0 0 0 1px rgba(11,43,64,.18);display:block;flex:0 0 auto}
 @media (max-width:1430px){.idioma-fila{justify-content:center;padding:12px 0 6px;border-bottom:1px solid #D9E4EC}.idioma button{min-height:40px;padding:8px 16px;font-size:14px}.bandera{width:27px;height:18px}}
+.ac-pct{position:relative;display:block}
+.ac-pct input{padding-right:36px}
+.ac-pct span{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-weight:700;color:#5A6D7A;pointer-events:none}
+.exp-form select.ac-estado{font-weight:700}
+.exp-form select.ac-estado[data-estado="activo"]{background:#DCF2EC;color:#08504C;border-color:#9FD8C6}
+.exp-form select.ac-estado[data-estado="suspendido"]{background:#FEF3C7;color:#92400E;border-color:#F3D58A}
+.exp-form select.ac-estado[data-estado="inactivo"]{background:#EBF0F4;color:#475B68;border-color:#C4D4DF}
+.campos:disabled select.ac-estado[data-estado="activo"]{background:#DCF2EC;color:#08504C;-webkit-text-fill-color:#08504C}
+.campos:disabled select.ac-estado[data-estado="suspendido"]{background:#FEF3C7;color:#92400E;-webkit-text-fill-color:#92400E}
+.campos:disabled select.ac-estado[data-estado="inactivo"]{background:#EBF0F4;color:#475B68;-webkit-text-fill-color:#475B68}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -405,6 +415,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <button type="button" role="tab" id="tabDentistas" data-tab="admDentistas" aria-selected="false" aria-controls="admDentistas">Dentistas</button>
 <button type="button" role="tab" id="tabPosiciones" data-tab="admPosiciones" aria-selected="false" aria-controls="admPosiciones">Posiciones y clínicas</button>
 <button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios">Administración de usuarios</button>
+<button type="button" role="tab" id="tabAgentes" data-tab="admAgentes" aria-selected="false" aria-controls="admAgentes">Agente comercial</button>
 <span class="adm-grupo" id="grpAgendas" role="presentation">Agendas</span>
 <button type="button" role="tab" id="tabAgenda" data-tab="admAgenda" aria-selected="false" aria-controls="admAgenda">Agendas clínicas</button>
 <button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
@@ -903,6 +914,60 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 </div>
 
 <!-- 8. Dentistas -->
+<div id="admAgentes" role="tabpanel" aria-labelledby="tabAgentes" hidden class="adm-pane">
+
+<!-- Lista de agentes -->
+<div id="acLista" class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Agentes comerciales</h3><button type="button" id="acNuevo" class="adm-btn adm-primary">Nuevo agente</button></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">
+<div id="acFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar por estado">
+<button type="button" class="adm-btn" data-acfiltro="todos" aria-pressed="true">Todos</button>
+<button type="button" class="adm-btn" data-acfiltro="activo" aria-pressed="false">Activos</button>
+<button type="button" class="adm-btn" data-acfiltro="suspendido" aria-pressed="false">Suspendidos</button>
+<button type="button" class="adm-btn" data-acfiltro="inactivo" aria-pressed="false">Inactivos</button>
+</div>
+<input id="acBuscar" type="search" class="adm-input" placeholder="Buscar por código o nombre" aria-label="Buscar agente" style="width: 100%; max-width: 320px">
+</div>
+<div class="roles-wrap"><table><thead><tr><th>Código</th><th>Agente</th><th>Inicio</th><th>Comisión</th><th>Estado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="acBody"></tbody></table></div>
+<p id="acMsg" class="dlg-msg" role="status"></p>
+</div>
+
+<!-- Ficha del agente -->
+<div id="acFicha" class="adm-pane" hidden>
+<button type="button" id="acVolver" class="dlg-link">← Todos los agentes</button>
+<div class="adm-pane-head">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="acTitulo" class="adm-h"></h3><p id="acSub" class="dlg-msg"></p></div>
+<span id="acPill" class="estado" hidden></span>
+</div>
+<form id="acForm" class="adm-pane" novalidate>
+<fieldset id="acCampos" class="campos pos-sec"><legend>Datos del agente</legend>
+<div class="exp-form">
+<label>Código de agente *<input id="acCodigo" type="text" maxlength="20" required placeholder="AGE-001" autocomplete="off"></label>
+<label>Nombre del agente *<input id="acNombre" type="text" maxlength="150" required autocomplete="off"></label>
+<label>Fecha de inicio *<input id="acInicio" type="date" required></label>
+<label>Porcentaje de comisión *<span class="ac-pct"><input id="acComision" type="number" min="0" max="100" step="0.01" required inputmode="decimal" placeholder="0.00"><span aria-hidden="true">%</span></span></label>
+<label>Estado<select id="acEstado" class="ac-estado"><option value="activo">Activo</option><option value="suspendido">Suspendido</option><option value="inactivo">Inactivo</option></select></label>
+</div>
+</fieldset>
+<fieldset class="pos-sec"><legend>Registro automático</legend>
+<div class="exp-form">
+<div class="exp-campo"><span class="pos-lbl">Usuario que ingresa</span><div id="acRegPor" class="exp-calc">—</div></div>
+<div class="exp-campo"><span class="pos-lbl">Fecha de ingreso</span><div id="acRegFecha" class="exp-calc">—</div></div>
+<div class="exp-campo"><span class="pos-lbl">Fecha de cambio de estado</span><div id="acCambioFecha" class="exp-calc">—</div></div>
+<div class="exp-campo"><span class="pos-lbl">Usuario que cambió el estado</span><div id="acCambioPor" class="exp-calc">—</div></div>
+</div>
+</fieldset>
+<div class="exp-actions">
+<button type="submit" id="acGrabar" class="dlg-submit" data-ac-accion="grabar">Grabar</button>
+<button type="button" id="acModificar" class="adm-btn adm-primary" data-ac-accion="modificar">Modificar</button>
+<button type="button" id="acEliminar" class="adm-btn" data-ac-accion="eliminar">Eliminar</button>
+<button type="button" id="acCancelar" class="adm-btn" data-ac-accion="cancelar">Cancelar</button>
+</div>
+<p id="acFormMsg" class="dlg-msg" role="status"></p>
+</form>
+</div>
+</div>
+
 <div id="admHistorias" role="tabpanel" aria-labelledby="tabHistorias" hidden class="adm-pane">
 
 <!-- Lista de historias -->
@@ -1457,6 +1522,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <script src="posiciones.js"></script>
 <script src="dentistas.js"></script>
 <script src="agenda.js"></script>
+<script src="agentes.js"></script>
 <script src="historias.js"></script>
 <script src="idiomas.js"></script>
 </body>
