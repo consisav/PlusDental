@@ -364,6 +364,32 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .pr-editando td{background:#E8F3FA}
 .pr-form-t{margin:0;font-size:16px;font-weight:700}
 .exp-form select.ac-estado[data-estado="baja"]{background:#FDE2E4;color:#9F1239;border-color:#F5B5BE}
+.pa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.pa-card{display:flex;flex-direction:column;gap:8px;text-align:left;background:#FFFFFF;border:1px solid #D9E4EC;border-radius:18px;padding:18px;font:inherit;color:#0B2B40;cursor:pointer}
+.pa-card:hover{border-color:#188EC0;box-shadow:0 10px 24px rgba(11,43,64,.08)}
+.pa-card ul{margin:0;padding-left:18px;font-size:14px;color:#475B68;line-height:1.6}
+.pa-card small{color:#5A6D7A;font-size:12.5px}
+.pa-fila{display:flex;justify-content:space-between;align-items:center;gap:8px}.pa-fila b{font-size:17px}
+.pa-precio{font-size:22px;font-weight:800}.pa-antes{color:#94A6B2;margin-left:8px;font-size:14px}
+.pa-ahorro{align-self:flex-start;background:#DCF2EC;color:#08504C;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:800}
+.pa-aviso{color:#9A3B2E;font-weight:700;font-size:13.5px}
+.pa-agregar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.pa-agregar select{flex:1;min-width:220px;font:inherit;font-size:15px;padding:10px 12px;border:1px solid #C4D4DF;border-radius:12px;background:#FFFFFF;min-height:44px}
+.pa-agregar input,.pa-cant{width:80px;font:inherit;font-size:15px;padding:8px 10px;border:1px solid #C4D4DF;border-radius:10px;text-align:right;min-height:40px;box-sizing:border-box}
+.pa-totales{display:flex;gap:18px;flex-wrap:wrap;justify-content:flex-end;align-items:center;font-size:15px}
+.pa-totales b{font-size:17px}
+.paq-wrap{background:linear-gradient(140deg,#0B2B40 0%,#14537A 100%);border-radius:28px;padding:40px;display:flex;flex-direction:column;gap:24px}
+.paq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}
+.paq-card{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:10px;color:#FFFFFF}
+.paq-card h3{margin:0;font-size:21px}
+.paq-card p{margin:0;color:#DCEBF5;font-size:15px;line-height:1.55}
+.paq-tag,.paq-inc{font-size:11.5px;letter-spacing:.14em;font-weight:800;color:#9FD3EE;text-transform:uppercase}
+.paq-precio{display:flex;align-items:baseline;gap:10px}.paq-precio b{font-size:30px}.paq-precio s{color:#9FB4C4;font-size:16px}
+.paq-ahorro{align-self:flex-start;background:#7FD6B5;color:#0B2B40;border-radius:999px;padding:3px 11px;font-size:13px;font-weight:800}
+.paq-card ul{margin:0;padding-left:18px;color:#DCEBF5;font-size:15px;line-height:1.6}
+.paq-card small{color:#9FD3EE;font-size:13px}
+.paq-agendar{margin-top:auto;align-self:flex-start;color:#FFFFFF;font-weight:700;text-decoration:none;border-bottom:2px solid #7FD6B5;padding-bottom:2px}
+@media (max-width:640px){.paq-wrap{padding:26px 20px;border-radius:22px}}
 .ac-fijo{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:#E8F3FA;color:#005A87;font-size:11.5px;font-weight:700;vertical-align:middle}
 .ac-quien{display:flex;align-items:center;gap:10px;min-width:180px}
 .ac-pct{position:relative;display:block}
@@ -525,6 +551,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <button type="button" class="adm-grupo" id="grpPrecios" aria-expanded="false" aria-controls="grpPreciosItems">Precios y paquetes<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-g-items" id="grpPreciosItems" role="presentation">
 <button type="button" role="tab" id="tabPrecios" data-tab="admPrecios" aria-selected="false" aria-controls="admPrecios">Precios</button>
+<button type="button" role="tab" id="tabPaquetes" data-tab="admPaquetes" aria-selected="false" aria-controls="admPaquetes">Paquetes</button>
 </div>
 </div>
 <div class="adm-g">
@@ -1034,6 +1061,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <!-- 8. Dentistas -->
 <!-- Precios -->
 <div id="admPrecios" role="tabpanel" aria-labelledby="tabPrecios" hidden class="adm-pane"></div>
+<div id="admPaquetes" role="tabpanel" aria-labelledby="tabPaquetes" hidden class="adm-pane"></div>
 
 <!-- Reportes -->
 <div id="admRepPacientes" role="tabpanel" aria-labelledby="tabRepPacientes" hidden class="adm-pane"></div>
@@ -1415,6 +1443,13 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #475B68">Atención amable para niños, con enfoque preventivo y un ambiente sin miedo.</p>
 </article>
 </div>
+<div id="paqWrap" class="paq-wrap" hidden>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #9FD3EE">Paquetes y promociones</span>
+<h3 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 40px; line-height: 1.1; color: #FFFFFF">Tratamientos combinados a un precio especial.</h3>
+</div>
+<div id="paqGrid" class="paq-grid"></div>
+</div>
 </section>
 
 <!-- HISTORIAS DE IMPACTO -->
@@ -1680,6 +1715,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <script src="agentes.js"></script>
 <script src="reportes.js"></script>
 <script src="precios.js"></script>
+<script src="paquetes.js"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="idiomas.js"></script>

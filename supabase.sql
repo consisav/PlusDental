@@ -1608,6 +1608,129 @@ create policy "personal administra precios" on public.precios for all
   using (public.es_personal()) with check (public.es_personal());
 grant select, insert, update, delete on public.precios to authenticated;
 
+-- ===== Paquetes =====
+-- Un paquete agrupa procedimientos del catálogo (con cantidad) a un precio especial, con vigencia,
+-- % de descuento máximo y estado. El código (PAQ-1, PAQ-2…) lo asigna el sistema.
+-- Los paquetes activos y vigentes se muestran en la página pública (función paquetes_publicos).
+
+create table if not exists public.paquetes (
+  id              bigint generated always as identity primary key,
+  codigo          text,
+  nombre          text not null check (char_length(nombre) between 1 and 120),
+  descripcion     text check (char_length(descripcion) <= 500),
+  precio          numeric(10,2) not null check (precio >= 0),
+  descuento_max   numeric(5,2) not null default 0 check (descuento_max between 0 and 100),
+  vigente_desde   date not null default current_date,
+  vigente_hasta   date,
+  estado          text not null default 'baja' check (estado in ('activo', 'suspendido', 'baja')),
+  registrado_por  text,
+  creado          timestamptz not null default now(),
+  actualizado_por text,
+  actualizado     timestamptz not null default now(),
+  constraint paquetes_vigencia check (vigente_hasta is null or vigente_hasta >= vigente_desde)
+);
+create unique index if not exists paquetes_codigo_unico on public.paquetes (codigo);
+
+create table if not exists public.paquete_items (
+  id             bigint generated always as identity primary key,
+  paquete_id     bigint not null references public.paquetes (id) on delete cascade,
+  tratamiento_id bigint not null references public.tratamientos (id) on delete cascade,
+  cantidad       int not null default 1 check (cantidad between 1 and 99)
+);
+create unique index if not exists paquete_items_unico on public.paquete_items (paquete_id, tratamiento_id);
+
+create or replace function public.paquetes_auditoria()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    perform pg_advisory_xact_lock(hashtext('paquetes_codigo'));
+    new.codigo := 'PAQ-' || (select coalesce(max(substring(codigo from 5)::int), 0) + 1 from public.paquetes where codigo ~ '^PAQ-\d+$');
+    new.registrado_por := coalesce(v_usuario, 'sistema');
+    new.creado := now();
+  else
+    new.codigo := old.codigo;
+    new.registrado_por := old.registrado_por;
+    new.creado := old.creado;
+  end if;
+  new.nombre := trim(new.nombre);
+  new.actualizado_por := coalesce(v_usuario, 'sistema');
+  new.actualizado := now();
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'paquetes_auditoria' and tgrelid = 'public.paquetes'::regclass) then
+    create trigger paquetes_auditoria before insert or update on public.paquetes
+      for each row execute function public.paquetes_auditoria();
+  end if;
+end $$;
+
+alter table public.paquetes enable row level security;
+alter table public.paquete_items enable row level security;
+drop policy if exists "personal administra paquetes" on public.paquetes;
+create policy "personal administra paquetes" on public.paquetes for all
+  using (public.es_personal()) with check (public.es_personal());
+drop policy if exists "personal administra paquete_items" on public.paquete_items;
+create policy "personal administra paquete_items" on public.paquete_items for all
+  using (public.es_personal()) with check (public.es_personal());
+grant select, insert, update, delete on public.paquetes, public.paquete_items to authenticated;
+
+-- Graba el paquete y sus procedimientos en un solo paso (si algo falla, no se guarda nada)
+create or replace function public.guardar_paquete(
+  p_id bigint, p_nombre text, p_descripcion text, p_precio numeric, p_descuento numeric,
+  p_desde date, p_hasta date, p_estado text, p_items jsonb)
+returns bigint language plpgsql security invoker set search_path = public as $$
+declare
+  v_id bigint;
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if p_id is null then
+    insert into public.paquetes (nombre, descripcion, precio, descuento_max, vigente_desde, vigente_hasta, estado)
+    values (p_nombre, nullif(trim(p_descripcion), ''), p_precio, coalesce(p_descuento, 0), coalesce(p_desde, current_date), p_hasta, coalesce(p_estado, 'baja'))
+    returning id into v_id;
+  else
+    update public.paquetes set nombre = p_nombre, descripcion = nullif(trim(p_descripcion), ''), precio = p_precio,
+           descuento_max = coalesce(p_descuento, 0), vigente_desde = coalesce(p_desde, current_date), vigente_hasta = p_hasta,
+           estado = coalesce(p_estado, 'baja')
+     where id = p_id
+    returning id into v_id;
+    if v_id is null then raise exception 'El paquete no existe'; end if;
+    delete from public.paquete_items where paquete_id = v_id;
+  end if;
+  insert into public.paquete_items (paquete_id, tratamiento_id, cantidad)
+  select v_id, (e->>'tratamiento_id')::bigint, greatest(1, coalesce((e->>'cantidad')::int, 1))
+    from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) e;
+  return v_id;
+end;
+$$;
+revoke execute on function public.guardar_paquete(bigint, text, text, numeric, numeric, date, date, text, jsonb) from public, anon;
+grant execute on function public.guardar_paquete(bigint, text, text, numeric, numeric, date, date, text, jsonb) to authenticated;
+
+-- Paquetes para la página pública: solo los activos y vigentes hoy, con sus procedimientos y el precio normal
+-- (precio «Cliente directo» activo de cada procedimiento o, si no tiene, el del catálogo).
+create or replace function public.paquetes_publicos()
+returns table (nombre text, descripcion text, precio numeric, precio_normal numeric, vigente_hasta date, incluye jsonb)
+language sql stable security definer set search_path = public as $$
+  select p.nombre, p.descripcion, p.precio,
+         coalesce(sum(i.cantidad * coalesce(pr.valor, t.precio)), 0) as precio_normal,
+         p.vigente_hasta,
+         coalesce(jsonb_agg(jsonb_build_object('nombre', t.nombre, 'cantidad', i.cantidad) order by t.nombre) filter (where t.id is not null), '[]'::jsonb)
+    from public.paquetes p
+    left join public.paquete_items i on i.paquete_id = p.id
+    left join public.tratamientos t on t.id = i.tratamiento_id
+    left join public.precios pr on pr.tratamiento_id = t.id and pr.tipo = 'directo' and pr.estado = 'activo'
+   where p.estado = 'activo'
+     and p.vigente_desde <= current_date
+     and (p.vigente_hasta is null or p.vigente_hasta >= current_date)
+   group by p.id
+   order by p.precio;
+$$;
+grant execute on function public.paquetes_publicos() to anon, authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
