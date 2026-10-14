@@ -1569,13 +1569,17 @@ create table if not exists public.precios (
   tipo            text not null default 'especial' check (tipo in ('directo', 'institucional', 'vip', 'paquete', 'especial')),
   valor           numeric(10,2) not null check (valor >= 0),
   descuento_max   numeric(5,2) not null default 0 check (descuento_max between 0 and 100),
-  estado          text not null default 'baja' check (estado in ('activo', 'suspendido', 'baja')),
+  estado          text not null default 'activo' check (estado in ('activo', 'suspendido', 'baja')),
   registrado_por  text,
   creado          timestamptz not null default now(),
   actualizado_por text,
   actualizado     timestamptz not null default now()
 );
 create unique index if not exists precios_tratamiento_tipo on public.precios (tratamiento_id, tipo);
+-- Estado por defecto: Activo. Valor en dólares (opcional). Fecha del precio: por defecto la de hoy al ingresarlo o actualizarlo.
+alter table public.precios alter column estado set default 'activo';
+alter table public.precios add column if not exists valor_usd numeric(10,2) check (valor_usd >= 0);
+alter table public.precios add column if not exists fecha date not null default current_date;
 
 create or replace function public.precios_auditoria()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -1590,6 +1594,7 @@ begin
     new.creado := old.creado;
     new.tratamiento_id := old.tratamiento_id;   -- un precio no se mueve a otro procedimiento
   end if;
+  new.fecha := coalesce(new.fecha, current_date);
   new.actualizado_por := coalesce(v_usuario, 'sistema');
   new.actualizado := now();
   return new;
@@ -1602,10 +1607,18 @@ do $$ begin
   end if;
 end $$;
 
+-- El personal ve los precios; solo el Super Administrador los crea, modifica o elimina
 alter table public.precios enable row level security;
 drop policy if exists "personal administra precios" on public.precios;
-create policy "personal administra precios" on public.precios for all
-  using (public.es_personal()) with check (public.es_personal());
+drop policy if exists "personal ve precios" on public.precios;
+create policy "personal ve precios" on public.precios for select using (public.es_personal());
+drop policy if exists "super administrador crea precios" on public.precios;
+create policy "super administrador crea precios" on public.precios for insert with check (public.es_super_administrador());
+drop policy if exists "super administrador modifica precios" on public.precios;
+create policy "super administrador modifica precios" on public.precios for update
+  using (public.es_super_administrador()) with check (public.es_super_administrador());
+drop policy if exists "super administrador elimina precios" on public.precios;
+create policy "super administrador elimina precios" on public.precios for delete using (public.es_super_administrador());
 grant select, insert, update, delete on public.precios to authenticated;
 
 -- ===== Paquetes =====

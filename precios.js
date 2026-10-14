@@ -25,7 +25,8 @@
     if (/precios_tratamiento_tipo|duplicate key/i.test(m)) return 'Este procedimiento ya tiene un precio de ese tipo. Usa «Modificar».';
     if (/precios_descuento/i.test(m)) return 'El descuento máximo debe estar entre 0 y 100 %.';
     if (/precios_valor/i.test(m)) return 'El valor no puede ser negativo.';
-    if (/row-level security|permission denied/i.test(m)) return 'No tienes permiso para esta acción.';
+    if (/row-level security|permission denied|JSON object requested|0 rows/i.test(m)) return 'Solo el Super Administrador puede crear, modificar o eliminar precios.';
+    if (/valor_usd/i.test(m)) return 'El valor en dólares no puede ser negativo.';
     return m || 'Ocurrió un error. Intenta de nuevo.';
   }
   function pedirConfirmacion(b) {
@@ -54,15 +55,18 @@
     '<div id="prFicha" class="adm-pane" hidden>' +
     '<button type="button" id="prVolver" class="dlg-link">← Todos los procedimientos</button>' +
     '<div class="adm-pane-head"><div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="prTitulo" class="adm-h"></h3><p id="prSub" class="dlg-msg"></p></div></div>' +
-    '<div class="roles-wrap"><table><thead><tr><th>Tipo de precio</th><th class="num">Valor</th><th class="num">% descuento máximo</th><th>Estado</th><th>Última modificación</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody id="prPrecios"></tbody></table></div>' +
+    '<div class="roles-wrap"><table><thead><tr><th>Tipo de precio</th><th class="num">Valor (Q)</th><th class="num">Valor (US$)</th><th class="num">% desc. máx.</th><th>Estado</th><th>Fecha</th><th>Última modificación</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody id="prPrecios"></tbody></table></div>' +
     '<form id="prForm" class="adm-pane pos-sec" novalidate><h4 id="prFormTitulo" class="pr-form-t">Nuevo precio</h4>' +
-    '<div class="exp-form">' +
+    '<p id="prSoloSuper" class="pr-solo-super" hidden>Solo el Super Administrador puede crear, modificar o eliminar precios. Tú puedes consultarlos.</p>' +
+    '<fieldset id="prCampos" class="campos"><div class="exp-form">' +
     '<label>Tipo de precio<select id="prTipo">' + TIPOS.map(function (t) { return '<option value="' + t[0] + '">' + t[1] + '</option>'; }).join('') + '</select></label>' +
     '<label>Estado<select id="prEstado" class="ac-estado"><option value="activo">Activo</option><option value="suspendido">Suspendido</option><option value="baja">Baja</option></select></label>' +
-    '<label>Porcentaje de descuento máximo<span class="ac-pct"><input id="prDescuento" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="0.00"><span aria-hidden="true">%</span></span></label>' +
     '<label>Valor (Q) *<input id="prValor" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" required></label>' +
-    '</div>' +
-    '<div class="exp-actions"><button type="submit" id="prGrabar" class="dlg-submit">Grabar</button><button type="button" id="prCancelar" class="adm-btn">Cancelar</button></div>' +
+    '<label>Valor (US$)<input id="prValorUsd" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></label>' +
+    '<label>Porcentaje de descuento máximo<span class="ac-pct"><input id="prDescuento" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="0.00"><span aria-hidden="true">%</span></span></label>' +
+    '<label>Fecha *<input id="prFecha" type="date" required></label>' +
+    '</div></fieldset>' +
+    '<div class="exp-actions ac-acciones"><button type="submit" id="prGrabar" class="dlg-submit">Grabar</button><button type="button" id="prModificar" class="adm-btn adm-primary">Modificar</button><button type="button" id="prCancelar" class="adm-btn">Cancelar</button></div>' +
     '<p id="prFormMsg" class="dlg-msg" role="status"></p></form></div>';
 
   function ver(id) { ['prLista', 'prFicha'].forEach(function (v) { $(v).hidden = v !== id; }); }
@@ -119,7 +123,7 @@
 
   function celda(p) {
     if (!p || (filtro !== 'todos' && p.estado !== filtro)) return '<td class="num pr-vacio">—</td>';
-    return '<td class="num"><span class="pr-celda"><b>' + q(p.valor) + '</b><small>máx. ' + pct(p.descuento_max) + '</small>' + pill(p.estado) + '</span></td>';
+    return '<td class="num"><span class="pr-celda"><b>' + q(p.valor) + '</b>' + (p.valor_usd != null ? '<small>' + usd(p.valor_usd) + '</small>' : '') + '<small>máx. ' + pct(p.descuento_max) + '</small>' + pill(p.estado) + '</span></td>';
   }
   var filasVisibles = [];
   function pintarLista() {
@@ -148,22 +152,56 @@
 
   // ---------- Ficha del procedimiento ----------
   function pintarEstadoSelect() { $('prEstado').dataset.estado = $('prEstado').value; }
+  function hoyIso() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function fechaCorta(f) { if (!f) return '—'; var p = String(f).slice(0, 10).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  function usd(n) { return n == null || n === '' ? '—' : 'US$' + Number(n).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  // Solo el Super Administrador crea, modifica o elimina precios (Supabase también lo exige)
+  function puedeEditar() { return !!(window.PD_SESION && window.PD_SESION.esSuper()); }
+
+  // Formulario en tres modos: nuevo precio · ver un precio (botón Modificar) · modificar
+  var modo = 'nuevo', seleccionado = null;
+  function aplicarModo() {
+    var permiso = puedeEditar();
+    $('prSoloSuper').hidden = permiso;
+    $('prCampos').disabled = !permiso || modo === 'ver';
+    $('prTipo').disabled = modo !== 'nuevo';
+    $('prGrabar').disabled = !permiso || modo === 'ver' || (modo === 'nuevo' && $('prTipo').dataset.completo === '1');
+    $('prModificar').disabled = !permiso || modo !== 'ver';
+    $('prCancelar').disabled = modo === 'nuevo';
+    $('prModificar').title = !permiso ? 'Solo el Super Administrador puede modificar precios.' : modo === 'nuevo' ? 'Elige un precio de la tabla («Ver») para modificarlo.' : '';
+    document.querySelectorAll('#prPrecios [data-prdel]').forEach(function (b) { b.disabled = !permiso; });
+  }
   function limpiarForm() {
-    editandoId = null;
+    modo = 'nuevo'; seleccionado = null; editandoId = null;
     var usados = preciosDe(actual.id).map(function (p) { return p.tipo; });
     [].forEach.call($('prTipo').options, function (o) { o.disabled = usados.indexOf(o.value) >= 0; });
-    $('prTipo').disabled = false;
     // por defecto «Especial» (o el siguiente tipo que falte, si ya existe)
     var libre = ['especial', 'directo', 'institucional', 'vip', 'paquete'].filter(function (t) { return usados.indexOf(t) < 0; })[0];
     $('prTipo').value = libre || 'especial';
-    $('prEstado').value = 'baja'; pintarEstadoSelect();
-    $('prDescuento').value = ''; $('prValor').value = '';
+    $('prTipo').dataset.completo = libre ? '0' : '1';
+    $('prEstado').value = 'activo'; pintarEstadoSelect();
+    $('prDescuento').value = ''; $('prValor').value = ''; $('prValorUsd').value = '';
+    $('prFecha').value = hoyIso();
     $('prFormTitulo').textContent = 'Nuevo precio';
-    $('prCancelar').hidden = true;
-    var completo = !libre;
-    $('prGrabar').disabled = completo;
-    ['prTipo', 'prEstado', 'prDescuento', 'prValor'].forEach(function (id) { $(id).disabled = completo; });
-    aviso('prFormMsg', completo ? 'Este procedimiento ya tiene los cinco tipos de precio. Usa «Modificar» en la tabla.' : '');
+    aplicarModo();
+    aviso('prFormMsg', !libre ? 'Este procedimiento ya tiene los cinco tipos de precio. Pulsa «Ver» en uno y luego «Modificar».' : '');
+  }
+  function mostrarPrecio(p) {
+    $('prTipo').value = p.tipo;
+    $('prEstado').value = p.estado; pintarEstadoSelect();
+    $('prValor').value = Number(p.valor);
+    $('prValorUsd').value = p.valor_usd == null ? '' : Number(p.valor_usd);
+    $('prDescuento').value = Number(p.descuento_max);
+    $('prFecha').value = p.fecha || hoyIso();
+  }
+  function verPrecio(p) {
+    modo = 'ver'; seleccionado = p; editandoId = null;
+    [].forEach.call($('prTipo').options, function (o) { o.disabled = false; });
+    mostrarPrecio(p);
+    $('prFormTitulo').textContent = 'Precio ' + nombreTipo(p.tipo);
+    aplicarModo(); pintarFicha();
+    aviso('prFormMsg', puedeEditar() ? 'Pulsa «Modificar» para cambiar este precio.' : '');
+    $('prForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   function pintarFicha() {
     var tp = tiposProc.filter(function (x) { return x.id === actual.tipo_id; })[0];
@@ -174,38 +212,43 @@
     var ps = preciosDe(actual.id).sort(function (a, b) {
       return TIPOS.map(function (t) { return t[0]; }).indexOf(a.tipo) - TIPOS.map(function (t) { return t[0]; }).indexOf(b.tipo);
     });
+    var sel = seleccionado ? seleccionado.id : editandoId;
     $('prPrecios').innerHTML = ps.length ? ps.map(function (p) {
-      return '<tr' + (p.id === editandoId ? ' class="pr-editando"' : '') + '><td><b>' + nombreTipo(p.tipo) + '</b></td><td class="num">' + q(p.valor) + '</td><td class="num">' + pct(p.descuento_max) + '</td><td>' + pill(p.estado) + '</td>' +
+      return '<tr' + (p.id === sel ? ' class="pr-editando"' : '') + '><td><b>' + nombreTipo(p.tipo) + '</b></td><td class="num">' + q(p.valor) + '</td><td class="num">' + usd(p.valor_usd) + '</td><td class="num">' + pct(p.descuento_max) + '</td><td>' + pill(p.estado) + '</td>' +
+        '<td class="fecha">' + fechaCorta(p.fecha) + '</td>' +
         '<td class="fecha">' + fechaHora(p.actualizado) + (p.actualizado_por ? '<br><span class="hi-desc">por ' + esc(p.actualizado_por) + '</span>' : '') + '</td>' +
-        '<td><div class="hi-botones"><button type="button" class="adm-btn" data-prmod="' + p.id + '">Modificar</button><button type="button" class="adm-btn" data-prdel="' + p.id + '">Eliminar</button></div></td></tr>';
-    }).join('') : '<tr><td colspan="6">Este procedimiento todavía no tiene precios. Agrega el primero abajo.</td></tr>';
+        '<td><div class="hi-botones"><button type="button" class="adm-btn" data-prver="' + p.id + '">Ver</button><button type="button" class="adm-btn" data-prdel="' + p.id + '"' + (puedeEditar() ? '' : ' disabled title="Solo el Super Administrador puede eliminar precios."') + '>Eliminar</button></div></td></tr>';
+    }).join('') : '<tr><td colspan="8">Este procedimiento todavía no tiene precios.' + (puedeEditar() ? ' Agrega el primero abajo.' : '') + '</td></tr>';
   }
   function abrir(t) {
     actual = t;
+    seleccionado = null; editandoId = null;
     pintarFicha(); limpiarForm(); ver('prFicha');
   }
-  function modificar(p) {
-    editandoId = p.id;
-    $('prFormTitulo').textContent = 'Modificar precio · ' + nombreTipo(p.tipo);
-    [].forEach.call($('prTipo').options, function (o) { o.disabled = false; });
-    $('prTipo').value = p.tipo; $('prTipo').disabled = true;   // el tipo no se cambia: se elimina y se crea otro
-    ['prEstado', 'prDescuento', 'prValor'].forEach(function (id) { $(id).disabled = false; });
-    $('prEstado').value = p.estado; pintarEstadoSelect();
-    $('prDescuento').value = Number(p.descuento_max); $('prValor').value = Number(p.valor);
-    $('prGrabar').disabled = false; $('prCancelar').hidden = false;
-    aviso('prFormMsg', 'Haz los cambios y pulsa «Grabar».');
-    pintarFicha();
-    $('prForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  // «Modificar»: habilita el precio que se está viendo; la fecha pasa a la de hoy (se puede cambiar)
+  function modificar() {
+    if (!seleccionado || !puedeEditar()) return;
+    modo = 'editar'; editandoId = seleccionado.id;
+    $('prFormTitulo').textContent = 'Modificar precio · ' + nombreTipo(seleccionado.tipo);
+    $('prFecha').value = hoyIso();
+    aplicarModo();
+    aviso('prFormMsg', 'Haz los cambios y pulsa «Grabar». El tipo de precio no se cambia.');
     $('prValor').focus();
   }
 
   async function grabar(e) {
     e.preventDefault();
+    if (!puedeEditar()) { aviso('prFormMsg', 'Solo el Super Administrador puede crear o modificar precios.', true); return; }
+    if (modo === 'ver') return;
     var valor = $('prValor').value === '' ? NaN : Number($('prValor').value);
+    var valorUsd = $('prValorUsd').value === '' ? null : Number($('prValorUsd').value);
     var desc = $('prDescuento').value === '' ? 0 : Number($('prDescuento').value);
-    if (isNaN(valor) || valor < 0) { aviso('prFormMsg', 'Escribe el valor del precio (0 o más).', true); $('prValor').focus(); return; }
+    if (isNaN(valor) || valor < 0) { aviso('prFormMsg', 'Escribe el valor del precio en quetzales (0 o más).', true); $('prValor').focus(); return; }
+    if (valorUsd != null && (isNaN(valorUsd) || valorUsd < 0)) { aviso('prFormMsg', 'El valor en dólares no puede ser negativo.', true); $('prValorUsd').focus(); return; }
     if (isNaN(desc) || desc < 0 || desc > 100) { aviso('prFormMsg', 'El descuento máximo debe estar entre 0 y 100 %.', true); $('prDescuento').focus(); return; }
-    var datos = { valor: Math.round(valor * 100) / 100, descuento_max: Math.round(desc * 100) / 100, estado: $('prEstado').value };
+    if (!$('prFecha').value) { aviso('prFormMsg', 'Indica la fecha del precio.', true); $('prFecha').focus(); return; }
+    var datos = { valor: Math.round(valor * 100) / 100, valor_usd: valorUsd == null ? null : Math.round(valorUsd * 100) / 100,
+      descuento_max: Math.round(desc * 100) / 100, estado: $('prEstado').value, fecha: $('prFecha').value };
     $('prGrabar').disabled = true;
     aviso('prFormMsg', 'Grabando…');
     // Procedimiento sugerido: primero se agrega al catálogo de tratamientos, ya clasificado en su tipo
@@ -224,7 +267,8 @@
     if (r.error) { aviso('prFormMsg', traducir(r.error), true); return; }
     var nuevo = !editandoId;
     precios = nuevo ? precios.concat([r.data]) : precios.map(function (p) { return p.id === r.data.id ? r.data : p; });
-    pintarFicha(); limpiarForm(); pintarLista();
+    pintarLista();
+    verPrecio(r.data);   // queda a la vista, con «Modificar» disponible
     aviso('prFormMsg', (nuevo ? 'Precio ' : 'Cambios del precio ') + nombreTipo(r.data.tipo) + (nuevo ? ' grabado.' : ' grabados.'));
   }
 
@@ -239,11 +283,15 @@
   $('prVolver').addEventListener('click', function () { actual = null; ver('prLista'); pintarLista(); });
   $('prEstado').addEventListener('change', pintarEstadoSelect);
   $('prForm').addEventListener('submit', grabar);
-  $('prCancelar').addEventListener('click', function () { limpiarForm(); pintarFicha(); });
+  $('prModificar').addEventListener('click', modificar);
+  $('prCancelar').addEventListener('click', function () {
+    if (modo === 'editar' && seleccionado) { verPrecio(seleccionado); aviso('prFormMsg', 'Se descartaron los cambios.'); return; }
+    limpiarForm(); pintarFicha();
+  });
   $('prPrecios').addEventListener('click', async function (e) {
-    var m = e.target.closest('[data-prmod]'), d = e.target.closest('[data-prdel]');
-    if (m) { modificar(precios.filter(function (p) { return String(p.id) === m.dataset.prmod; })[0]); return; }
-    if (!d || !pedirConfirmacion(d)) return;
+    var v = e.target.closest('[data-prver]'), d = e.target.closest('[data-prdel]');
+    if (v) { verPrecio(precios.filter(function (p) { return String(p.id) === v.dataset.prver; })[0]); return; }
+    if (!d || !puedeEditar() || !pedirConfirmacion(d)) return;
     d.disabled = true;
     var p = precios.filter(function (x) { return String(x.id) === d.dataset.prdel; })[0];
     var r = await sb.from('precios').delete().eq('id', p.id);
