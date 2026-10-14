@@ -1785,6 +1785,97 @@ $$;
 revoke execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb, text) from public, anon;
 grant execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb, text) to authenticated;
 
+-- ===== Tipos de procedimientos =====
+-- Catálogo de los tipos de procedimientos dentales que se ofrecen en Guatemala, cada uno con su descripción y
+-- sus procedimientos más comunes (sugeridos). Los tratamientos del catálogo se clasifican en un tipo.
+-- El código (TP-01, TP-02…) lo asigna el sistema. Solo para el personal.
+
+create table if not exists public.tipos_procedimiento (
+  id              bigint generated always as identity primary key,
+  codigo          text,
+  nombre          text not null check (char_length(nombre) between 1 and 120),
+  descripcion     text check (char_length(descripcion) <= 500),
+  sugeridos       text[] not null default '{}',
+  estado          text not null default 'activo' check (estado in ('activo', 'inactivo')),
+  orden           int not null default 0,
+  registrado_por  text,
+  creado          timestamptz not null default now(),
+  actualizado_por text,
+  actualizado     timestamptz not null default now()
+);
+create unique index if not exists tipos_procedimiento_nombre on public.tipos_procedimiento (lower(nombre));
+create unique index if not exists tipos_procedimiento_codigo on public.tipos_procedimiento (codigo);
+
+create or replace function public.tipos_procedimiento_auditoria()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    perform pg_advisory_xact_lock(hashtext('tipos_procedimiento_codigo'));
+    new.codigo := 'TP-' || lpad(((select coalesce(max(substring(codigo from 4)::int), 0) from public.tipos_procedimiento where codigo ~ '^TP-\d+$') + 1)::text, 2, '0');
+    new.registrado_por := coalesce(v_usuario, 'sistema');
+    new.creado := now();
+  else
+    new.codigo := old.codigo;
+    new.registrado_por := old.registrado_por;
+    new.creado := old.creado;
+  end if;
+  new.nombre := trim(new.nombre);
+  new.actualizado_por := coalesce(v_usuario, 'sistema');
+  new.actualizado := now();
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'tipos_procedimiento_auditoria' and tgrelid = 'public.tipos_procedimiento'::regclass) then
+    create trigger tipos_procedimiento_auditoria before insert or update on public.tipos_procedimiento
+      for each row execute function public.tipos_procedimiento_auditoria();
+  end if;
+end $$;
+
+alter table public.tipos_procedimiento enable row level security;
+drop policy if exists "personal administra tipos de procedimiento" on public.tipos_procedimiento;
+create policy "personal administra tipos de procedimiento" on public.tipos_procedimiento for all
+  using (public.es_personal()) with check (public.es_personal());
+grant select, insert, update, delete on public.tipos_procedimiento to authenticated;
+
+-- Cada tratamiento del catálogo puede pertenecer a un tipo
+alter table public.tratamientos add column if not exists tipo_id bigint references public.tipos_procedimiento (id) on delete set null;
+create index if not exists tratamientos_tipo on public.tratamientos (tipo_id);
+
+-- Tipos de procedimientos que se ofrecen en Guatemala (solo se agregan los que falten)
+insert into public.tipos_procedimiento (nombre, descripcion, sugeridos, orden)
+select v.nombre, v.descripcion, v.sugeridos, v.orden
+  from (values
+    (1, 'Odontología general y preventiva', 'Revisión, diagnóstico, limpieza y tratamientos básicos para mantener la boca sana y prevenir problemas.',
+     array['Examen y diagnóstico', 'Limpieza dental (profilaxis)', 'Aplicación de flúor', 'Selladores de fosas y fisuras', 'Resina de una superficie', 'Resina de varias superficies', 'Extracción simple']),
+    (2, 'Endodoncia', 'Tratamiento del nervio y los conductos del diente para eliminar el dolor o la infección y conservar la pieza.',
+     array['Tratamiento de conductos unirradicular', 'Tratamiento de conductos birradicular', 'Tratamiento de conductos multirradicular (molar)', 'Retratamiento de conductos', 'Pulpotomía', 'Apicectomía']),
+    (3, 'Periodoncia', 'Prevención y tratamiento de las enfermedades de las encías y del hueso que sostiene los dientes.',
+     array['Raspado y alisado radicular (por cuadrante)', 'Curetaje', 'Cirugía periodontal', 'Injerto de encía', 'Alargamiento de corona', 'Mantenimiento periodontal']),
+    (4, 'Ortodoncia y ortopedia maxilar', 'Corrección de la posición de los dientes y del crecimiento de los maxilares.',
+     array['Estudio de ortodoncia', 'Brackets metálicos', 'Brackets estéticos', 'Alineadores transparentes', 'Control mensual de ortodoncia', 'Retenedor', 'Aparato de ortopedia maxilar']),
+    (5, 'Prostodoncia y rehabilitación oral', 'Reposición y restauración de dientes dañados o perdidos con coronas, puentes y prótesis.',
+     array['Corona de porcelana', 'Corona de zirconia', 'Puente fijo (por pieza)', 'Prótesis removible parcial', 'Prótesis total (placa completa)', 'Incrustación (inlay/onlay)', 'Perno o poste']),
+    (6, 'Implantología', 'Reemplazo de dientes perdidos con implantes de titanio y las coronas o prótesis que van sobre ellos.',
+     array['Evaluación con tomografía', 'Implante dental', 'Corona sobre implante', 'Injerto óseo', 'Elevación de seno maxilar', 'Prótesis sobre implantes (All-on-4)']),
+    (7, 'Cirugía oral y maxilofacial', 'Procedimientos quirúrgicos de la boca y los maxilares.',
+     array['Extracción quirúrgica', 'Extracción de cordal (muela del juicio)', 'Frenectomía', 'Biopsia oral', 'Drenaje de absceso']),
+    (8, 'Odontología estética', 'Tratamientos para mejorar el color, la forma y la armonía de la sonrisa.',
+     array['Blanqueamiento en consultorio', 'Blanqueamiento en casa (férulas)', 'Carillas de resina', 'Carillas de porcelana', 'Diseño de sonrisa', 'Contorneado de encía']),
+    (9, 'Odontopediatría', 'Atención dental de bebés, niños y adolescentes, con enfoque preventivo.',
+     array['Primera consulta infantil', 'Limpieza y flúor infantil', 'Selladores infantiles', 'Pulpotomía en diente de leche', 'Corona de acero', 'Mantenedor de espacio']),
+    (10, 'Radiología y diagnóstico por imagen', 'Estudios de imagen para diagnosticar y planificar tratamientos con precisión.',
+     array['Radiografía periapical', 'Radiografía panorámica', 'Radiografía cefálica lateral', 'Tomografía 3D (CBCT)', 'Fotografías clínicas']),
+    (11, 'Trastornos de la ATM y bruxismo', 'Diagnóstico y tratamiento del dolor de mandíbula y del apretamiento o rechinido de dientes.',
+     array['Evaluación de ATM', 'Férula de descarga (placa miorrelajante)', 'Ajuste oclusal']),
+    (12, 'Urgencias dentales', 'Atención inmediata del dolor, las infecciones y los golpes o fracturas dentales.',
+     array['Consulta de urgencia', 'Drenaje y control de infección', 'Recementado de corona', 'Reparación de fractura dental'])
+  ) as v(orden, nombre, descripcion, sugeridos)
+ where not exists (select 1 from public.tipos_procedimiento t where lower(t.nombre) = lower(v.nombre))
+ order by v.orden;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

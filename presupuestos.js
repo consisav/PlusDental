@@ -9,6 +9,7 @@
   var actual = null, items = [], cambios = false;
   // Precios activos por tratamiento y tipo (de «Precios y paquetes»): { idTratamiento: { directo: {valor, max}, … } }
   var preciosAct = {};
+  var tiposCat = [];   // tipos de procedimientos (para clasificar los tratamientos del catálogo)
   var TIPOS = { directo: 'Cliente directo', institucional: 'Institucional', vip: 'VIP', paquete: 'Paquete', especial: 'Especial' };
 
   function $(id) { return document.getElementById(id); }
@@ -90,9 +91,11 @@
 
   // ---------- Catálogo ----------
   async function cargarCatalogo() {
-    var r = await sb.from('tratamientos').select('id,nombre,precio,activo').order('nombre');
+    var r = await sb.from('tratamientos').select('id,nombre,precio,activo,tipo_id').order('nombre');
+    if (r.error && /tipo_id/.test(r.error.message || '')) r = await sb.from('tratamientos').select('id,nombre,precio,activo').order('nombre');
     if (r.error) { aviso('catMsg', traducir(r.error), true); return; }
     catalogo = r.data;
+    tiposCat = window.PD_TIPOS ? await window.PD_TIPOS() : [];
     var p = await sb.from('precios').select('tratamiento_id,tipo,valor,descuento_max').eq('estado', 'activo');
     preciosAct = {};
     if (!p.error) p.data.forEach(function (x) { (preciosAct[x.tratamiento_id] = preciosAct[x.tratamiento_id] || {})[x.tipo] = { valor: Number(x.valor), max: Number(x.descuento_max) }; });
@@ -104,12 +107,15 @@
   function pintarCatalogo() {
     $('catBody').innerHTML = catalogo.length
       ? catalogo.map(function (t) {
+        var opcTipo = '<option value="">Sin tipo</option>' + tiposCat.filter(function (x) { return x.estado === 'activo' || x.id === t.tipo_id; })
+          .map(function (x) { return '<option value="' + x.id + '"' + (x.id === t.tipo_id ? ' selected' : '') + '>' + esc(x.nombre) + '</option>'; }).join('');
         return '<tr data-cat="' + t.id + '"><td><input class="adm-input" style="width:100%;border-radius:10px" maxlength="120" value="' + esc(t.nombre) + '" aria-label="Nombre del tratamiento" data-c="nombre"></td>' +
+          '<td><select class="adm-input" style="width:100%;min-width:170px;border-radius:10px" data-c="tipo" aria-label="Tipo de ' + esc(t.nombre) + '">' + opcTipo + '</select></td>' +
           '<td class="num"><input class="adm-input" type="number" min="0" step="0.01" style="width:130px;border-radius:10px;text-align:right" value="' + Number(t.precio).toFixed(2) + '" aria-label="Precio de ' + esc(t.nombre) + '" data-c="precio"></td>' +
           '<td><input type="checkbox" data-c="activo"' + (t.activo ? ' checked' : '') + ' aria-label="Activo" style="width:20px;height:20px;accent-color:#005A87"></td>' +
           '<td><button type="button" class="adm-btn" data-guardar-cat="' + t.id + '">Guardar</button></td></tr>';
       }).join('')
-      : '<tr><td colspan="4">El catálogo está vacío. Agrega los tratamientos que ofrece la clínica con su precio.</td></tr>';
+      : '<tr><td colspan="5">El catálogo está vacío. Agrega los tratamientos que ofrece la clínica con su precio.</td></tr>';
   }
 
   // ---------- Precio según el tipo ----------
@@ -432,6 +438,7 @@
       precio: redondear(fila.querySelector('[data-c=precio]').value),
       activo: fila.querySelector('[data-c=activo]').checked
     };
+    if (tiposCat.length) { var tp = fila.querySelector('[data-c=tipo]').value; datos.tipo_id = tp ? +tp : null; }
     if (!datos.nombre) { aviso('catMsg', 'El nombre no puede quedar vacío.', true); return; }
     b.disabled = true;
     var r = await sb.from('tratamientos').update(datos).eq('id', b.dataset.guardarCat).select('id');

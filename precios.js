@@ -8,6 +8,7 @@
   var TIPOS = [['directo', 'Cliente directo'], ['institucional', 'Institucional'], ['vip', 'VIP'], ['paquete', 'Paquete'], ['especial', 'Especial']];
   var ESTADOS = { activo: 'Activo', suspendido: 'Suspendido', baja: 'Baja' };
   var tratamientos = [], precios = [], actual = null, editandoId = null, filtro = 'todos';
+  var tiposProc = [];   // tipos de procedimientos: la tabla se agrupa por tipo
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -70,11 +71,13 @@
     aviso('prMsg', '');
     $('prBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
     var r = await Promise.all([
-      sb.from('tratamientos').select('id,nombre,precio,activo').order('nombre'),
-      sb.from('precios').select('*')
+      sb.from('tratamientos').select('id,nombre,precio,activo,tipo_id').order('nombre'),
+      sb.from('precios').select('*'),
+      window.PD_TIPOS ? window.PD_TIPOS() : []
     ]);
+    if (r[0].error && /tipo_id/.test(r[0].error.message || '')) r[0] = await sb.from('tratamientos').select('id,nombre,precio,activo').order('nombre');
     if (r[0].error || r[1].error) { $('prBody').innerHTML = ''; aviso('prMsg', traducir(r[0].error || r[1].error), true); return; }
-    tratamientos = r[0].data || []; precios = r[1].data || [];
+    tratamientos = r[0].data || []; precios = r[1].data || []; tiposProc = r[2] || [];
     pintarLista();
     if (actual && !$('prFicha').hidden) { actual = tratamientos.filter(function (t) { return t.id === actual.id; })[0] || null; if (actual) pintarFicha(); else ver('prLista'); }
   }
@@ -93,12 +96,22 @@
     $('prBody').innerHTML = !tratamientos.length
       ? '<tr><td colspan="7">Aún no hay procedimientos. Agrégalos en Pacientes → Presupuesto → catálogo de tratamientos.</td></tr>'
       : !filas.length ? '<tr><td colspan="7">No hay procedimientos con ese filtro.</td></tr>'
-      : filas.map(function (t) {
-        var ps = preciosDe(t.id);
-        return '<tr><td><b>' + esc(t.nombre) + '</b>' + (t.activo ? '' : ' <span class="ac-fijo">Inactivo</span>') + '</td>' +
-          TIPOS.map(function (tp) { return celda(ps.filter(function (p) { return p.tipo === tp[0]; })[0]); }).join('') +
-          '<td><button type="button" class="adm-btn" data-prabrir="' + t.id + '">Abrir</button></td></tr>';
+      : grupos(filas).map(function (g) {
+        return (g.titulo ? '<tr class="pr-grupo"><td colspan="7">' + esc(g.titulo) + '</td></tr>' : '') + g.filas.map(fila).join('');
       }).join('');
+  }
+  function fila(t) {
+    var ps = preciosDe(t.id);
+    return '<tr><td><b>' + esc(t.nombre) + '</b>' + (t.activo ? '' : ' <span class="ac-fijo">Inactivo</span>') + '</td>' +
+      TIPOS.map(function (tp) { return celda(ps.filter(function (p) { return p.tipo === tp[0]; })[0]); }).join('') +
+      '<td><button type="button" class="adm-btn" data-prabrir="' + t.id + '">Abrir</button></td></tr>';
+  }
+  // Agrupa por tipo de procedimiento (en el orden del catálogo de tipos); al final, los que no tienen tipo
+  function grupos(filas) {
+    if (!tiposProc.length) return [{ titulo: '', filas: filas }];
+    var res = tiposProc.map(function (tp) { return { titulo: tp.nombre, filas: filas.filter(function (t) { return t.tipo_id === tp.id; }) }; });
+    res.push({ titulo: 'Sin tipo', filas: filas.filter(function (t) { return !t.tipo_id || !tiposProc.some(function (tp) { return tp.id === t.tipo_id; }); }) });
+    return res.filter(function (g) { return g.filas.length; });
   }
 
   // ---------- Ficha del procedimiento ----------
