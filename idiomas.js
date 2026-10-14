@@ -329,6 +329,7 @@
     [/^Recibo (N\.º )?(\d+)$/, 'Receipt No. $2'],
     [/^Recibo N\.º (\d+): estado cambiado a (Emitido|Aplicado|Certificado)\.$/, function (m, n, e) { return 'Receipt No. ' + n + ': status changed to ' + { Emitido: 'Issued', Aplicado: 'Applied', Certificado: 'Certified' }[e] + '.'; }],
     [/^Pago registrado con el recibo N\.º (\d+)\. Puedes imprimirlo o enviarlo desde la lista\.$/, 'Payment registered with receipt No. $1. You can print or send it from the list.'],
+    [/^Pago registrado con el correlativo (\S+) \(recibo N\.º (\d+)\)\. Puedes imprimirlo o enviarlo desde la lista\.$/, 'Payment registered with sequence No. $1 (receipt No. $2). You can print or send it from the list.'],
     [/^(Factura|Recibo)( [A-Za-z0-9-]+)?$/, function (m, t, n) { return (t === 'Factura' ? 'Invoice' : 'Receipt') + (n || ''); }],
     [/^Cuota (\d+)$/, 'Installment $1'],
     [/^(Tipo de procedimiento|Clasificación|Monto en quetzales|Monto en dólares) de la línea (\d+)$/, function (m, c, n) { return { 'Tipo de procedimiento': 'Procedure type', 'Clasificación': 'Classification', 'Monto en quetzales': 'Amount in quetzales', 'Monto en dólares': 'Amount in dollars' }[c] + ' for line ' + n; }],

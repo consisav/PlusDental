@@ -70,6 +70,7 @@
     return encabezado(documento(p) + ' · ' + recibo(p.id)) +
       (p.anulado ? '<div style="border:2px solid #9A3B2E;color:#9A3B2E;font-weight:700;padding:10px 14px;margin-bottom:14px">RECIBO ANULADO — ' + esc(p.anulado_motivo) + '</div>' : '') +
       '<table style="width:100%;border-collapse:collapse;font-size:15px">' +
+      (p.correlativo ? fila('Correlativo interno', esc(p.correlativo)) : '') +
       fila('Fecha', fechaCorta(p.fecha)) +
       fila('Recibimos de', esc(p.pacientes ? p.pacientes.nombre : '')) +
       (p.nit ? fila('NIT', esc(p.nit)) : '') +
@@ -204,7 +205,7 @@
     document.querySelectorAll('#cpPeriodo [data-cpperiodo]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.cpperiodo === cpPeriodo); });
     var buscar = $('cpBuscar').value.trim().toLowerCase().replace(/^n\.?º?\s*/, '');
     var filas = pagos.filter(function (p) {
-      return !buscar || String(p.id) === String(parseInt(buscar, 10)) || ((p.pacientes && p.pacientes.nombre) || '').toLowerCase().indexOf(buscar) >= 0;
+      return !buscar || String(p.id) === String(parseInt(buscar, 10)) || (p.correlativo || '').indexOf(buscar) === 0 || ((p.pacientes && p.pacientes.nombre) || '').toLowerCase().indexOf(buscar) >= 0;
     });
     if (!filas.length) {
       $('cpBody').innerHTML = '<tr><td colspan="9">' + (buscar ? 'Ningún pago coincide.' : 'No hay pagos en este periodo.') + '</td></tr>';
@@ -221,7 +222,7 @@
         ? '<span class="estado estado-cancelada" title="' + esc(p.anulado_motivo || '') + '">Anulado</span>'
         : '<select class="pg-estado-lista" data-estado-pago="' + p.id + '" data-estado="' + (p.estado_doc || 'emitido') + '" aria-label="Estado del documento ' + recibo(p.id) + '">' +
           ['emitido', 'aplicado', 'certificado'].map(function (k) { return '<option value="' + k + '"' + ((p.estado_doc || 'emitido') === k ? ' selected' : '') + '>' + ESTADOS_DOC[k] + '</option>'; }).join('') + '</select>';
-      return '<tr class="' + (p.anulado ? 'anulado' : '') + '" data-pago="' + p.id + '"><td class="fecha"><strong>' + recibo(p.id) + '</strong></td>' +
+      return '<tr class="' + (p.anulado ? 'anulado' : '') + '" data-pago="' + p.id + '"><td class="fecha"><strong>' + recibo(p.id) + '</strong>' + (p.correlativo ? '<br><span style="color:#005A87;font-size:12.5px;font-weight:700">' + esc(p.correlativo) + '</span>' : '') + '</td>' +
         '<td class="fecha">' + fechaCorta(p.fecha) + '</td><td><strong>' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</strong>' + (p.nit ? '<br><span style="color:#5A6D7A;font-size:13px">NIT ' + esc(p.nit) + '</span>' : '') + '</td>' +
         '<td>' + esc(documento(p)) + (p.numero_dte ? '<br><span style="color:#5A6D7A;font-size:12px">DTE ' + esc(p.numero_dte) + '</span>' : '') + (p.numero_cuota ? '<br><span style="color:#5A6D7A;font-size:12px">Cuota ' + p.numero_cuota + '</span>' : '') + '</td>' +
         '<td>' + esc(p.concepto || (p.presupuesto_id ? 'Presupuesto N.º ' + p.presupuesto_id : '—')) + '</td>' +
@@ -307,9 +308,18 @@
     pintarDetalle();
   }
 
+  // Próximo correlativo interno (Año-Mes-Número); el definitivo lo asigna la base de datos al registrar
+  async function cargarCorrelativo() {
+    var r = await sb.rpc('siguiente_correlativo_pago');
+    $('pgCorrelativo').textContent = !r.error && r.data ? r.data : '—';
+    $('pgCorrelativo').parentElement.classList.toggle('pg-prox', !r.error && !!r.data);
+    $('pgCorrelativo').previousElementSibling.textContent = !r.error && r.data ? 'Próximo correlativo' : 'Correlativo interno';
+  }
+
   async function cargarTodo() {
     $('pgUsuario').textContent = (window.PD_SESION && window.PD_SESION.usuario()) || '—';
     if (!tiposProc.length) cargarTiposProc();
+    cargarCorrelativo();
     if (await cargarSaldos()) { pintarSaldos(); pintarSelectorPacientes(); }
     cargarResumen();
     cargarPagos();
@@ -400,7 +410,9 @@
     if (r.error) { aviso('pgMsg', /registrar_pago|could not find the function/i.test(r.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los cobros con factura.' : traducir(r.error), true); return; }
     var pid = datos.paciente_id;
     limpiarFormulario();
-    aviso('pgMsg', 'Pago registrado con el recibo ' + recibo(r.data) + '. Puedes imprimirlo o enviarlo desde la lista.');
+    var c = await sb.from('pagos').select('correlativo').eq('id', r.data).maybeSingle();
+    var corr = !c.error && c.data && c.data.correlativo;
+    aviso('pgMsg', (corr ? 'Pago registrado con el correlativo ' + corr + ' (recibo ' + recibo(r.data) + ')' : 'Pago registrado con el recibo ' + recibo(r.data)) + '. Puedes imprimirlo o enviarlo desde la lista.');
     cpPeriodo = 'mes';
     await cargarTodo();
     pintarSelectorPacientes(pid);

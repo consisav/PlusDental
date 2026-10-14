@@ -2046,6 +2046,76 @@ $$;
 revoke execute on function public.cambiar_estado_pago(bigint, text) from public, anon;
 grant execute on function public.cambiar_estado_pago(bigint, text) to authenticated;
 
+-- ===== Correlativo interno de pagos (Año-Mes-Número, ej. 2026-10-0001) =====
+-- Se asigna solo al registrar el pago, según el año y mes de registro (hora de Guatemala),
+-- reinicia en 0001 cada mes y nadie lo puede modificar.
+
+alter table public.pagos add column if not exists correlativo text;
+create unique index if not exists pagos_correlativo on public.pagos (correlativo);
+
+create table if not exists public.pago_correlativos (
+  periodo text primary key,
+  ultimo  int not null default 0
+);
+alter table public.pago_correlativos enable row level security;
+revoke all on public.pago_correlativos from anon, authenticated;
+
+-- Pagos anteriores: se numeran por su fecha de registro, en orden
+do $$
+declare r record; v_n int;
+begin
+  for r in select id, to_char(creado at time zone 'America/Guatemala', 'YYYY-MM') as periodo
+             from public.pagos where correlativo is null order by creado, id loop
+    insert into public.pago_correlativos as c (periodo, ultimo) values (r.periodo, 1)
+      on conflict (periodo) do update set ultimo = c.ultimo + 1
+      returning ultimo into v_n;
+    update public.pagos set correlativo = r.periodo || '-' || lpad(v_n::text, 4, '0') where id = r.id;
+  end loop;
+end $$;
+
+create or replace function public.pago_correlativo_asignar()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_periodo text := to_char(now() at time zone 'America/Guatemala', 'YYYY-MM'); v_n int;
+begin
+  insert into public.pago_correlativos as c (periodo, ultimo) values (v_periodo, 1)
+    on conflict (periodo) do update set ultimo = c.ultimo + 1
+    returning ultimo into v_n;
+  new.correlativo := v_periodo || '-' || lpad(v_n::text, 4, '0');
+  return new;
+end;
+$$;
+
+create or replace function public.pago_correlativo_fijo()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if old.correlativo is not null and new.correlativo is distinct from old.correlativo then
+    raise exception 'El correlativo interno no se puede modificar';
+  end if;
+  return new;
+end;
+$$;
+
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'pagos_correlativo_asignar' and tgrelid = 'public.pagos'::regclass) then
+    create trigger pagos_correlativo_asignar before insert on public.pagos
+      for each row execute function public.pago_correlativo_asignar();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'pagos_correlativo_fijo' and tgrelid = 'public.pagos'::regclass) then
+    create trigger pagos_correlativo_fijo before update on public.pagos
+      for each row execute function public.pago_correlativo_fijo();
+  end if;
+end $$;
+
+-- Próximo correlativo (solo para mostrarlo en el formulario; el definitivo se asigna al registrar)
+create or replace function public.siguiente_correlativo_pago()
+returns text language sql stable security definer set search_path = public as $$
+  select p || '-' || lpad((coalesce((select ultimo from public.pago_correlativos where periodo = p), 0) + 1)::text, 4, '0')
+    from (select to_char(now() at time zone 'America/Guatemala', 'YYYY-MM') as p) x
+   where public.es_personal();
+$$;
+revoke execute on function public.siguiente_correlativo_pago() from public, anon;
+grant execute on function public.siguiente_correlativo_pago() to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

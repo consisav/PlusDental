@@ -449,7 +449,26 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 @media (max-width:560px){.hero-foto-caja{height:340px}.hero-asistente{flex-wrap:wrap}.hero-asis-cta{width:100%;text-align:center}}
 @media (prefers-reduced-motion:reduce){.hero-asistente{transition:none}}
 .hero-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:4% center;border-radius:inherit;display:block}
-.pg-sec{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:#005A87;font-weight:800;margin-top:6px}
+.pg-cab{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.pg-corr{background:#0B2B40;color:#FFFFFF;border-radius:12px;padding:8px 14px;font-weight:800;font-size:16px;letter-spacing:.04em;text-align:right}
+.pg-corr small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.12em;color:#9CC3DA;text-transform:uppercase}
+.pg-corr.pg-prox span{opacity:.75}
+.pg-sec{display:flex;align-items:center;gap:10px;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:#005A87;font-weight:800;margin-top:8px}
+.pg-sec b{width:22px;height:22px;border-radius:50%;background:#005A87;color:#FFFFFF;display:grid;place-items:center;font-size:11px;letter-spacing:0;flex-shrink:0}
+.pg-sec:after{content:"";flex:1;height:1px;background:#D9E4EC}
+.pg-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.pg-grid label,.pg-cierre label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600;min-width:0}
+.pg-grid input,.pg-grid select,.pg-cierre textarea,.pg-out{font:inherit;font-size:15px;font-weight:500;padding:11px 14px;border:1px solid #C4D4DF;border-radius:12px;background:#FFFFFF;min-height:46px;box-sizing:border-box;width:100%;color:#0B2B40}
+.pg-grid input.pg-auto,.pg-out{background:#EEF5FA;border-style:dashed;color:#00476B;font-weight:700;cursor:default;display:flex;align-items:center}
+.pg-s2{grid-column:span 2}.pg-s4{grid-column:1/-1}
+.pg-saldo{font-size:13px;font-weight:500;color:#5A6D7A;margin:0}
+.pg-cierre{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:end}
+.pg-totales{display:flex;gap:12px;flex-wrap:wrap}
+.pg-tot{background:#0B2B40;color:#9CC3DA !important;border-radius:14px;padding:10px 16px;font-size:11px !important;letter-spacing:.1em;text-transform:uppercase;font-weight:700 !important;min-width:150px;text-align:right}
+.pg-tot input{background:transparent;border:0;color:#FFFFFF;font:inherit;font-size:21px;font-weight:800;letter-spacing:0;text-align:right;padding:0;width:100%;cursor:default}
+.pg-fin{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+@media (max-width: 860px){.pg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pg-cierre{grid-template-columns:1fr}.pg-totales{justify-content:flex-end}}
+@media (max-width: 520px){.pg-grid{grid-template-columns:1fr}.pg-s2{grid-column:auto}}
 .pg-nota{font-size:12px;font-weight:500;color:#9A3B2E;line-height:1.35}
 .exp-form input.pg-auto{background:#EEF5FA;border-style:dashed;color:#00476B;font-weight:700;cursor:default}
 .pg-detalle td{vertical-align:middle}
@@ -995,34 +1014,44 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 </div>
 
 <form id="pagoForm" class="adm-box">
-<h3 style="margin: 0; font-size: 19px; font-weight: 700">Registrar pago</h3>
-<div class="pg-sec">Documento</div>
-<div class="exp-form">
-<label class="full">Paciente *<select id="pgPaciente" required></select></label>
-<p id="pgSaldo" class="full dlg-msg" hidden></p>
+<div class="pg-cab"><h3 style="margin: 0; font-size: 19px; font-weight: 700">Registrar pago</h3>
+<div class="pg-corr"><small>Correlativo interno</small><span id="pgCorrelativo">—</span></div></div>
+<div class="pg-sec"><b aria-hidden="true">1</b>Paciente</div>
+<div class="pg-grid">
+<label class="pg-s2">Paciente *<select id="pgPaciente" required></select><small id="pgSaldo" class="pg-saldo" hidden></small></label>
 <label>NIT del paciente<input id="pgNit" type="text" readonly tabindex="-1" class="pg-auto" placeholder="Se llena al elegir el paciente"><small id="pgNitNota" class="pg-nota" hidden>El expediente no tiene NIT; se usa CF (consumidor final). Para cambiarlo, edítalo en Expediente de pacientes.</small></label>
+<label>Usuario que registra<output id="pgUsuario" class="pg-auto pg-out">—</output></label>
+</div>
+<div class="pg-sec"><b aria-hidden="true">2</b>Documento fiscal</div>
+<div class="pg-grid">
 <label>Tipo de documento *<select id="pgTipoDoc"><option value="factura">Factura</option><option value="recibo">Recibo</option></select></label>
 <label>Serie factura<input id="pgSerie" type="text" maxlength="20" autocomplete="off"></label>
 <label>Número factura<input id="pgNumFactura" type="text" maxlength="30" autocomplete="off"></label>
-<label class="full">Número DTE (autorización FEL)<input id="pgDte" type="text" maxlength="60" autocomplete="off"></label>
-<label>Monto (Q) — total del detalle<input id="pgMonto" type="text" readonly tabindex="-1" class="pg-auto"></label>
-<label>Monto (US$) — total del detalle<input id="pgMontoUsd" type="text" readonly tabindex="-1" class="pg-auto"></label>
+<label>Estado<select id="pgEstado" class="pg-estado"><option value="emitido">Emitido</option><option value="aplicado">Aplicado</option><option value="certificado">Certificado</option></select></label>
+<label class="pg-s4">Número DTE (autorización FEL)<input id="pgDte" type="text" maxlength="60" autocomplete="off"></label>
+</div>
+<div class="pg-sec"><b aria-hidden="true">3</b>Datos del pago</div>
+<div class="pg-grid">
 <label>Fecha *<input id="pgFecha" type="date" required></label>
 <label>Método *<select id="pgMetodo"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option><option value="deposito">Depósito</option></select></label>
 <label id="pgRefWrap" hidden>N.º de autorización o boleta<input id="pgReferencia" type="text" maxlength="60"></label>
 <label>Número de cuota<input id="pgCuota" type="number" min="1" max="999" step="1" inputmode="numeric"></label>
-<label>Estado<select id="pgEstado" class="pg-estado"><option value="emitido">Emitido</option><option value="aplicado">Aplicado</option><option value="certificado">Certificado</option></select></label>
-<div class="exp-campo"><span class="pos-lbl">Usuario que registra</span><div id="pgUsuario" class="exp-calc">—</div></div>
-<label>Presupuesto (opcional)<select id="pgPresupuesto"><option value="">Sin presupuesto</option></select></label>
-<label>Concepto<input id="pgConcepto" type="text" maxlength="150" placeholder="Ej.: abono, pago de limpieza"></label>
-<label class="full">Observaciones<textarea id="pgObservaciones" rows="2" maxlength="500"></textarea></label>
+<label class="pg-s2">Presupuesto (opcional)<select id="pgPresupuesto"><option value="">Sin presupuesto</option></select></label>
+<label class="pg-s2">Concepto<input id="pgConcepto" type="text" maxlength="150" placeholder="Ej.: abono, pago de limpieza"></label>
 </div>
-<div class="pg-sec">Detalle del pago</div>
+<div class="pg-sec"><b aria-hidden="true">4</b>Detalle del pago</div>
 <div class="roles-wrap"><table class="pg-detalle"><thead><tr><th>Línea</th><th>Tipo de procedimiento</th><th>Clasificación</th><th class="num">Monto Q</th><th class="num">Monto US$</th><th><span class="sr-only">Quitar</span></th></tr></thead>
 <tbody id="pgDetalle"></tbody>
 <tfoot><tr><td></td><td>TOTALES</td><td></td><td class="num" id="pgTotalQ">Q0.00</td><td class="num" id="pgTotalUsd">US$0.00</td><td></td></tr></tfoot></table></div>
 <div><button type="button" id="pgAgregarLinea" class="adm-btn">+ Agregar línea</button></div>
-<div class="exp-actions"><button type="submit" class="dlg-submit">Registrar pago</button><p id="pgMsg" class="dlg-msg" role="status"></p></div>
+<div class="pg-sec"><b aria-hidden="true">5</b>Cierre</div>
+<div class="pg-cierre">
+<label>Observaciones<textarea id="pgObservaciones" rows="3" maxlength="500"></textarea></label>
+<div class="pg-totales"><label class="pg-tot">Total Q<input id="pgMonto" type="text" readonly tabindex="-1" value="Q0.00"></label>
+<label class="pg-tot">Total US$<input id="pgMontoUsd" type="text" readonly tabindex="-1" value="US$0.00"></label></div>
+</div>
+<div class="pg-fin"><p class="pg-saldo">El correlativo se asigna al registrar y nadie lo puede cambiar.</p><button type="submit" class="dlg-submit">Registrar pago</button></div>
+<p id="pgMsg" class="dlg-msg" role="status"></p>
 </form>
 
 <div class="adm-pane-head">
