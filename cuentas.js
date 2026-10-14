@@ -252,11 +252,14 @@
           : 'No tiene saldo pendiente. El pago quedará como saldo a favor.';
     }
     $('pgPresupuesto').innerHTML = '<option value="">Sin presupuesto</option>';
-    $('pgNit').value = '';
+    $('pgNit').value = ''; $('pgNitNota').hidden = true;
     if (!pid) return;
-    // NIT del paciente (se puede corregir, p. ej. si la factura sale a nombre de otra persona o CF)
+    // NIT del expediente del paciente (no se modifica aquí; sin NIT se usa CF, consumidor final)
     sb.from('pacientes').select('nit').eq('id', pid).maybeSingle().then(function (n) {
-      if (!n.error && n.data && $('pgPaciente').value === pid && !$('pgNit').value) $('pgNit').value = n.data.nit || '';
+      if (n.error || $('pgPaciente').value !== pid) return;
+      var nit = n.data && n.data.nit ? String(n.data.nit).trim() : '';
+      $('pgNit').value = nit || 'CF';
+      $('pgNitNota').hidden = !!nit;
     });
     var r = await sb.from('presupuestos').select('id,fecha').eq('paciente_id', pid).eq('estado', 'aprobado').order('id', { ascending: false });
     if (r.error || $('pgPaciente').value !== pid) return;
@@ -296,6 +299,7 @@
   function pintarEstadoNuevo() { $('pgEstado').dataset.estado = $('pgEstado').value; }
   function limpiarFormulario() {
     lineas = [lineaNueva()];
+    $('pgNitNota').hidden = true;
     ['pgNit', 'pgSerie', 'pgNumFactura', 'pgDte', 'pgReferencia', 'pgCuota', 'pgConcepto', 'pgObservaciones'].forEach(function (id) { $(id).value = ''; });
     $('pgTipoDoc').value = 'factura'; $('pgMetodo').value = 'efectivo'; $('pgEstado').value = 'emitido'; pintarEstadoNuevo();
     $('pgFecha').value = hoy(); $('pgRefWrap').hidden = true;
