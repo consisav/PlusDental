@@ -30,7 +30,7 @@
       return '<article class="paq-card">' +
         '<span class="paq-tag">Paquete</span><h3>' + esc(p.nombre) + '</h3>' +
         (p.descripcion ? '<p>' + esc(p.descripcion) + '</p>' : '') +
-        '<div class="paq-precio"><b>' + q(p.precio, true) + '</b>' + (a ? '<s>' + q(p.precio_normal, true) + '</s>' : '') + '</div>' +
+        '<div class="paq-precio"><b>' + q(p.precio, true) + '</b>' + (a ? '<s>' + q(p.precio_normal, true) + '</s>' : '') + (p.precio_usd != null ? '<span class="paq-usd">US$' + Number(p.precio_usd).toLocaleString('en-US', { maximumFractionDigits: 2 }) + '</span>' : '') + '</div>' +
         (a ? '<span class="paq-ahorro"><span>Ahorras</span> ' + q(a.monto, true) + ' (' + a.pct + ' %)</span>' : '') +
         ((p.incluye || []).length ? '<span class="paq-inc">Incluye</span><ul>' + p.incluye.map(function (i) { return '<li>' + esc(i.nombre) + (i.cantidad > 1 ? ' ×' + i.cantidad : '') + '</li>'; }).join('') + '</ul>' : '') +
         (p.vigente_hasta ? '<small><span>Válido hasta el</span> ' + fechaNum(p.vigente_hasta) + '</small>' : '') +
@@ -52,7 +52,8 @@
     if (/paquete.*(does not exist|could not find)|could not find the (table|function)/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los paquetes.';
     if (/paquetes_vigencia/i.test(m)) return 'La fecha final de vigencia no puede ser anterior a la inicial.';
     if (/paquetes_descuento/i.test(m)) return 'El descuento máximo debe estar entre 0 y 100 %.';
-    if (/permiso|row-level security|permission denied/i.test(m)) return 'No tienes permiso para esta acción.';
+    if (/Solo el Super Administrador|row-level security|permission denied|permiso/i.test(m)) return 'Solo el Super Administrador puede crear, modificar o eliminar paquetes.';
+    if (/precio_usd/i.test(m)) return 'El precio en dólares no puede ser negativo.';
     return m || 'Ocurrió un error. Intenta de nuevo.';
   }
   function pedirConfirmacion(b) {
@@ -65,13 +66,20 @@
     return false;
   }
   // Precio normal de un procedimiento: «Cliente directo» activo o, si no tiene, el del catálogo
+  // (los procedimientos sugeridos que aún no están en el catálogo no tienen precio: cuentan Q0.00)
   function precioNormal(id) {
+    if (!id) return 0;
     if (precioDirecto[id] != null) return precioDirecto[id];
     var t = catalogo.filter(function (x) { return x.id === id; })[0];
     return t ? Number(t.precio) : 0;
   }
   function nombreTrat(id) { var t = catalogo.filter(function (x) { return x.id === id; })[0]; return t ? t.nombre : '—'; }
+  function nombreLinea(l) { return l.tratamiento_id ? nombreTrat(l.tratamiento_id) : l.nombre; }
   function normalDe(ls) { return ls.reduce(function (s, l) { return s + l.cantidad * precioNormal(l.tratamiento_id); }, 0); }
+  // Solo el Super Administrador crea, modifica o elimina paquetes (Supabase también lo exige)
+  function puedeEditar() { return !!(window.PD_SESION && window.PD_SESION.esSuper()); }
+  function usd(n) { return 'US$' + Number(n).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  var tiposProc = [];
 
   $('admPaquetes').innerHTML =
     '<div id="paLista" class="adm-pane">' +
@@ -84,7 +92,9 @@
     '<div id="paFicha" class="adm-pane" hidden>' +
     '<button type="button" id="paVolver" class="dlg-link">← Todos los paquetes</button>' +
     '<div class="adm-pane-head"><div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="paTitulo" class="adm-h"></h3><p id="paSub" class="dlg-msg"></p></div><span id="paPill" class="estado" hidden></span></div>' +
-    '<form id="paForm" class="adm-pane" novalidate><fieldset id="paCampos" class="campos pos-sec"><legend>Datos del paquete</legend><div class="exp-form">' +
+    '<form id="paForm" class="adm-pane" novalidate>' +
+    '<p id="paSoloSuper" class="pr-solo-super" hidden>Solo el Super Administrador puede crear, modificar o eliminar paquetes. Tú puedes consultarlos.</p>' +
+    '<fieldset id="paCampos" class="campos pos-sec"><legend>Datos del paquete</legend><div class="exp-form">' +
     '<div class="exp-campo"><span class="pos-lbl">Código (automático)</span><div id="paCodigo" class="exp-calc">—</div></div>' +
     '<label>Estado<select id="paEstado" class="ac-estado"><option value="activo">Activo</option><option value="suspendido">Suspendido</option><option value="baja">Baja</option></select></label>' +
     '<label class="full">Nombre del paquete *<input id="paNombre" type="text" maxlength="120" required></label>' +
@@ -92,7 +102,9 @@
     '<label>Vigente desde *<input id="paDesde" type="date" required></label>' +
     '<label>Vigente hasta (opcional)<input id="paHasta" type="date"></label>' +
     '<label>Precio del paquete (Q) *<input id="paPrecio" type="number" min="0" step="0.01" inputmode="decimal" required></label>' +
+    '<label>Precio del paquete (US$)<input id="paPrecioUsd" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></label>' +
     '<label>Porcentaje de descuento máximo<span class="ac-pct"><input id="paDescuento" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="0.00"><span aria-hidden="true">%</span></span></label>' +
+    '<label>Fecha *<input id="paFecha" type="date" required></label>' +
     '</div></fieldset>' +
     '<fieldset id="paItemsCampos" class="campos pos-sec"><legend>Procedimientos incluidos</legend>' +
     '<div class="roles-wrap"><table><thead><tr><th>Procedimiento</th><th class="num">Cantidad</th><th class="num">Precio normal</th><th class="num">Subtotal</th><th><span class="sr-only">Quitar</span></th></tr></thead><tbody id="paItems"></tbody></table></div>' +
@@ -110,11 +122,15 @@
       sb.from('paquetes').select('*').order('creado', { ascending: false }),
       sb.from('paquete_items').select('paquete_id,tratamiento_id,cantidad'),
       sb.from('tratamientos').select('id,nombre,precio,activo').order('nombre'),
-      sb.from('precios').select('tratamiento_id,valor').eq('tipo', 'directo').eq('estado', 'activo')
+      sb.from('precios').select('tratamiento_id,valor').eq('tipo', 'directo').eq('estado', 'activo'),
+      sb.from('tipos_procedimiento').select('id,nombre,estado,orden,sugeridos').order('orden').order('codigo')
     ]);
-    var err = r.map(function (x) { return x.error; }).filter(Boolean)[0];
+    var err = r.slice(0, 4).map(function (x) { return x.error; }).filter(Boolean)[0];
     if (err) { $('paGrid').innerHTML = ''; aviso('paMsg', traducir(err), true); return; }
     paquetes = r[0].data; catalogo = r[2].data; items = {}; precioDirecto = {};
+    tiposProc = r[4].error ? [] : r[4].data.filter(function (t) { return t.estado === 'activo'; });
+    $('paNuevo').disabled = !puedeEditar();
+    $('paNuevo').title = puedeEditar() ? '' : 'Solo el Super Administrador puede crear paquetes.';
     r[1].data.forEach(function (i) { (items[i.paquete_id] = items[i.paquete_id] || []).push({ tratamiento_id: i.tratamiento_id, cantidad: i.cantidad }); });
     r[3].data.forEach(function (p) { precioDirecto[p.tratamiento_id] = Number(p.valor); });
     pintarLista();
@@ -131,7 +147,7 @@
         return '<button type="button" class="pa-card" data-paabrir="' + p.id + '">' +
           '<span class="pa-fila"><b>' + esc(p.nombre) + '</b>' + pill(p.estado) + '</span>' +
           '<span class="hi-desc">' + esc(p.codigo || '') + '</span>' +
-          '<span><span class="pa-precio">' + q(p.precio) + '</span>' + (a ? '<s class="pa-antes">' + q(normal) + '</s>' : '') + '</span>' +
+          '<span><span class="pa-precio">' + q(p.precio) + '</span>' + (a ? '<s class="pa-antes">' + q(normal) + '</s>' : '') + (p.precio_usd != null ? ' <span class="hi-desc">· ' + usd(p.precio_usd) + '</span>' : '') + '</span>' +
           (a ? '<span class="pa-ahorro">Ahorra ' + q(a.monto) + ' (' + a.pct + ' %)</span>' : '') +
           '<ul>' + ls.map(function (l) { return '<li>' + esc(nombreTrat(l.tratamiento_id)) + ' ×' + l.cantidad + '</li>'; }).join('') + '</ul>' +
           '<small>' + (p.vigente_hasta ? 'Vigente del ' + fechaNum(p.vigente_desde) + ' al ' + fechaNum(p.vigente_hasta) : 'Desde el ' + fechaNum(p.vigente_desde) + ', sin vencimiento') +
@@ -141,17 +157,34 @@
 
   // ---------- Ficha ----------
   function pintarEstadoSelect() { $('paEstado').dataset.estado = $('paEstado').value; }
+  // Lista de procedimientos por tipo (de «Tipos de procedimientos») más los del catálogo sin tipo.
+  // Valor: «t:ID» si ya está en el catálogo, o «s:TIPO:NOMBRE» si es un sugerido que se agregará al grabar.
   function opcionesCatalogo() {
-    var usados = lineas.map(function (l) { return l.tratamiento_id; });
-    var disp = catalogo.filter(function (t) { return t.activo && usados.indexOf(t.id) < 0; });
-    $('paTrat').innerHTML = disp.length ? disp.map(function (t) { return '<option value="' + t.id + '">' + esc(t.nombre) + ' · ' + q(precioNormal(t.id)) + '</option>'; }).join('')
-      : '<option value="">' + (catalogo.length ? 'Ya están todos los procedimientos' : 'No hay procedimientos en el catálogo') + '</option>';
-    $('paAgregar').disabled = !disp.length || !editando;
+    var usados = lineas.map(function (l) { return clave(nombreLinea(l)); }), vistos = {}, grupos = [];
+    function opcion(nombre, tipoId) {
+      var k = clave(nombre); if (vistos[k] || usados.indexOf(k) >= 0) return '';
+      vistos[k] = 1;
+      var t = catalogo.filter(function (x) { return clave(x.nombre) === k; })[0];
+      if (t && !t.activo) return '';
+      return t ? '<option value="t:' + t.id + '">' + esc(t.nombre) + ' · ' + q(precioNormal(t.id)) + '</option>'
+        : '<option value="s:' + tipoId + ':' + esc(nombre) + '">' + esc(nombre) + ' · sin precio</option>';
+    }
+    tiposProc.forEach(function (tp) {
+      var html = (tp.sugeridos || []).map(function (n) { return opcion(n, tp.id); }).join('') +
+        catalogo.filter(function (t) { return t.tipo_id === tp.id; }).map(function (t) { return opcion(t.nombre, tp.id); }).join('');
+      if (html) grupos.push('<optgroup label="' + esc(tp.nombre) + '">' + html + '</optgroup>');
+    });
+    var resto = catalogo.map(function (t) { return opcion(t.nombre, ''); }).join('');
+    if (resto) grupos.push(tiposProc.length ? '<optgroup label="Sin tipo">' + resto + '</optgroup>' : resto);
+    $('paTrat').innerHTML = grupos.length ? '<option value="">Elige un procedimiento…</option>' + grupos.join('')
+      : '<option value="">' + (catalogo.length || tiposProc.length ? 'Ya están todos los procedimientos' : 'No hay procedimientos: créalos en Tipos de procedimientos') + '</option>';
+    $('paAgregar').disabled = !grupos.length || !editando;
   }
+  function clave(t) { return String(t || '').trim().toLowerCase(); }
   function pintarItems() {
     $('paItems').innerHTML = lineas.length ? lineas.map(function (l, k) {
       var pn = precioNormal(l.tratamiento_id);
-      return '<tr><td>' + esc(nombreTrat(l.tratamiento_id)) + '</td>' +
+      return '<tr><td>' + esc(nombreLinea(l)) + (l.tratamiento_id ? '' : ' <span class="hi-desc">(se agregará al catálogo)</span>') + '</td>' +
         '<td class="num"><input type="number" min="1" max="99" value="' + l.cantidad + '" data-pacant="' + k + '" class="pa-cant" aria-label="Cantidad"></td>' +
         '<td class="num">' + q(pn) + '</td><td class="num">' + q(pn * l.cantidad) + '</td>' +
         '<td><button type="button" class="adm-btn" data-paquitar="' + k + '">Quitar</button></td></tr>';
@@ -163,7 +196,9 @@
   }
   function rellenar(p) {
     $('paCodigo').textContent = p ? p.codigo : 'Se asigna al grabar';
-    $('paEstado').value = p ? p.estado : 'baja'; pintarEstadoSelect();
+    $('paEstado').value = p ? p.estado : 'activo'; pintarEstadoSelect();
+    $('paPrecioUsd').value = p && p.precio_usd != null ? Number(p.precio_usd) : '';
+    $('paFecha').value = p ? (p.fecha || hoy()) : hoy();
     $('paNombre').value = p ? p.nombre : '';
     $('paDesc').value = p ? p.descripcion || '' : '';
     $('paDesde').value = p ? p.vigente_desde : hoy();
@@ -180,11 +215,14 @@
     if (actual) { $('paPill').className = 'estado estado-' + actual.estado; $('paPill').textContent = ESTADOS[actual.estado]; }
   }
   function aplicarModo() {
+    var permiso = puedeEditar();
+    if (!permiso) editando = false;
+    $('paSoloSuper').hidden = permiso;
     $('paCampos').disabled = !editando; $('paItemsCampos').disabled = !editando;
     $('paGrabar').disabled = !editando; $('paCancelar').disabled = !editando;
-    $('paModificar').disabled = editando || !actual; $('paEliminar').disabled = editando || !actual;
-    $('paModificar').title = !actual ? 'Disponible después de grabar el paquete.' : '';
-    $('paEliminar').title = !actual ? 'Disponible después de grabar el paquete.' : '';
+    $('paModificar').disabled = !permiso || editando || !actual; $('paEliminar').disabled = !permiso || editando || !actual;
+    $('paModificar').title = !permiso ? 'Solo el Super Administrador puede modificar paquetes.' : !actual ? 'Disponible después de grabar el paquete.' : '';
+    $('paEliminar').title = !permiso ? 'Solo el Super Administrador puede eliminar paquetes.' : !actual ? 'Disponible después de grabar el paquete.' : '';
     if ($('paEliminar').dataset.confirmar === '1') { $('paEliminar').dataset.confirmar = '0'; $('paEliminar').textContent = 'Eliminar'; $('paEliminar').style.borderColor = ''; $('paEliminar').style.color = ''; }
     opcionesCatalogo();
   }
@@ -201,7 +239,11 @@
     var nombre = $('paNombre').value.trim(), desde = $('paDesde').value, hasta = $('paHasta').value;
     var precio = $('paPrecio').value === '' ? NaN : Number($('paPrecio').value);
     var desc = $('paDescuento').value === '' ? 0 : Number($('paDescuento').value);
+    var precioUsd = $('paPrecioUsd').value === '' ? null : Number($('paPrecioUsd').value), fecha = $('paFecha').value;
+    if (!puedeEditar()) { aviso('paFormMsg', 'Solo el Super Administrador puede crear o modificar paquetes.', true); return; }
     if (!nombre) { aviso('paFormMsg', 'Escribe el nombre del paquete.', true); $('paNombre').focus(); return; }
+    if (precioUsd != null && (isNaN(precioUsd) || precioUsd < 0)) { aviso('paFormMsg', 'El precio en dólares no puede ser negativo.', true); $('paPrecioUsd').focus(); return; }
+    if (!fecha) { aviso('paFormMsg', 'Indica la fecha del paquete.', true); $('paFecha').focus(); return; }
     if (!desde) { aviso('paFormMsg', 'Indica desde cuándo está vigente.', true); $('paDesde').focus(); return; }
     if (hasta && hasta < desde) { aviso('paFormMsg', 'La fecha final de vigencia no puede ser anterior a la inicial.', true); $('paHasta').focus(); return; }
     if (isNaN(precio) || precio < 0) { aviso('paFormMsg', 'Escribe el precio del paquete.', true); $('paPrecio').focus(); return; }
@@ -211,7 +253,9 @@
     aviso('paFormMsg', 'Grabando…');
     var r = await sb.rpc('guardar_paquete', {
       p_id: actual ? actual.id : null, p_nombre: nombre, p_descripcion: $('paDesc').value, p_precio: Math.round(precio * 100) / 100,
-      p_descuento: Math.round(desc * 100) / 100, p_desde: desde, p_hasta: hasta || null, p_estado: $('paEstado').value, p_items: lineas
+      p_descuento: Math.round(desc * 100) / 100, p_desde: desde, p_hasta: hasta || null, p_estado: $('paEstado').value,
+      p_items: lineas.map(function (l) { return l.tratamiento_id ? { tratamiento_id: l.tratamiento_id, cantidad: l.cantidad } : { nombre: l.nombre, tipo_id: l.tipo_id, cantidad: l.cantidad }; }),
+      p_precio_usd: precioUsd == null ? null : Math.round(precioUsd * 100) / 100, p_fecha: fecha
     });
     if (r.error) { $('paGrabar').disabled = false; aviso('paFormMsg', traducir(r.error), true); return; }
     var nuevo = !actual, id = r.data;
@@ -234,9 +278,10 @@
   $('paEstado').addEventListener('change', pintarEstadoSelect);
   $('paPrecio').addEventListener('input', pintarItems);
   $('paAgregar').addEventListener('click', function () {
-    var id = +$('paTrat').value, c = Math.max(1, Math.min(99, parseInt($('paCant').value, 10) || 1));
-    if (!id) return;
-    lineas.push({ tratamiento_id: id, cantidad: c });
+    var v = $('paTrat').value, c = Math.max(1, Math.min(99, parseInt($('paCant').value, 10) || 1));
+    if (!v) return;
+    if (v.indexOf('t:') === 0) lineas.push({ tratamiento_id: +v.slice(2), cantidad: c });
+    else { var p = v.split(':'); lineas.push({ tratamiento_id: null, nombre: p.slice(2).join(':'), tipo_id: p[1] ? +p[1] : null, cantidad: c }); }
     $('paCant').value = 1;
     pintarItems();
   });
@@ -254,8 +299,9 @@
   });
   $('paForm').addEventListener('submit', grabar);
   $('paModificar').addEventListener('click', function () {
-    if (!actual) return;
+    if (!actual || !puedeEditar()) return;
     editando = true; aplicarModo();
+    $('paFecha').value = hoy();   // al actualizar, la fecha pasa a la de hoy (se puede cambiar)
     aviso('paFormMsg', 'Modo modificación: haz los cambios y pulsa «Grabar».');
     $('paNombre').focus();
   });
@@ -266,7 +312,7 @@
   });
   $('paEliminar').addEventListener('click', async function () {
     var b = this;
-    if (!actual || editando || !pedirConfirmacion(b)) return;
+    if (!actual || editando || !puedeEditar() || !pedirConfirmacion(b)) return;
     b.disabled = true;
     var r = await sb.from('paquetes').delete().eq('id', actual.id);
     b.disabled = false;
