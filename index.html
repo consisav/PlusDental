@@ -242,6 +242,9 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-avisos label{flex-direction:row}
 .ag-aviso-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .ag-aviso-btns a{text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:38px}
+.adm-grupo{display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;font-weight:700;color:#5A6D7A;padding:18px 14px 6px;border-top:1px solid #D9E4EC;margin-top:8px}
+.adm-grupo:first-child{border-top:0;margin-top:0;padding-top:4px}
+@media (max-width:960px){.adm-grupo{border-top:0;margin:0;padding:12px 4px 0 12px;white-space:nowrap;align-self:center;color:#005A87}}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
@@ -318,15 +321,18 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 
 <div class="adm-layout">
 <div class="adm-menu" role="tablist" aria-label="Menú de administración" aria-orientation="vertical">
+<span class="adm-grupo" id="grpCatalogos" role="presentation">Catálogos iniciales</span>
+<button type="button" role="tab" id="tabDentistas" data-tab="admDentistas" aria-selected="false" aria-controls="admDentistas">Dentistas</button>
+<button type="button" role="tab" id="tabPosiciones" data-tab="admPosiciones" aria-selected="false" aria-controls="admPosiciones">Posiciones y clínicas</button>
 <button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios">Administración de usuarios</button>
-<button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expedientes de pacientes</button>
+<span class="adm-grupo" id="grpAgendas" role="presentation">Agendas</span>
+<button type="button" role="tab" id="tabAgenda" data-tab="admAgenda" aria-selected="false" aria-controls="admAgenda">Agendas clínicas</button>
 <button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
-<button type="button" role="tab" id="tabAgenda" data-tab="admAgenda" aria-selected="false" aria-controls="admAgenda">Agenda de clínicas</button>
-<button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuestos</button>
+<span class="adm-grupo" id="grpPacientes" role="presentation">Pacientes</span>
+<button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expediente de pacientes</button>
+<button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuesto</button>
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
 <button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
-<button type="button" role="tab" id="tabPosiciones" data-tab="admPosiciones" aria-selected="false" aria-controls="admPosiciones">Posiciones y clínicas</button>
-<button type="button" role="tab" id="tabDentistas" data-tab="admDentistas" aria-selected="false" aria-controls="admDentistas">Dentistas</button>
 </div>
 <div class="adm-main">
 
