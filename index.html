@@ -113,7 +113,8 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .anular-row td{background:#FFF7F5}
 #impresion{display:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.pg-botones{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.pg-imprimir{display:flex;align-items:flex-end}
+.pg-imprimir .adm-btn{width:100%;min-height:46px;justify-content:center}
 #pgImprimir:disabled{opacity:.5;cursor:not-allowed}
 @media print{body.imprimir>*:not(#impresion){display:none !important}body.imprimir #impresion{display:block !important}body.imprimir{background:#FFFFFF}}
 .odo-input{font:inherit;font-size:14px;padding:8px 10px;border:1px solid #C4D4DF;border-radius:10px;min-height:40px;box-sizing:border-box;background:#FFFFFF;color:#0B2B40;width:100%}
@@ -1074,6 +1075,7 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 <label>Método *<select id="pgMetodo"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option><option value="deposito">Depósito</option></select></label>
 <label id="pgRefWrap" hidden>N.º de autorización o boleta<input id="pgReferencia" type="text" maxlength="60"></label>
 <label>Número de cuota<input id="pgCuota" type="number" min="1" max="999" step="1" inputmode="numeric"></label>
+<div class="pg-imprimir"><button type="button" id="pgImprimir" class="adm-btn" disabled title="Se activa al registrar el pago">Imprimir documento</button></div>
 <label class="pg-s2">Presupuesto (opcional)<select id="pgPresupuesto"><option value="">Sin presupuesto</option></select></label>
 <label class="pg-s2">Concepto<input id="pgConcepto" type="text" maxlength="150" placeholder="Ej.: abono, pago de limpieza"></label>
 </div>
@@ -1088,7 +1090,7 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 <div class="pg-totales"><label class="pg-tot">Total Q<input id="pgMonto" type="text" readonly tabindex="-1" value="Q0.00"></label>
 <label class="pg-tot">Total US$<input id="pgMontoUsd" type="text" readonly tabindex="-1" value="US$0.00"></label></div>
 </div>
-<div class="pg-fin"><p class="pg-saldo">El correlativo se asigna al registrar y nadie lo puede cambiar.</p><div class="pg-botones"><button type="button" id="pgImprimir" class="adm-btn" disabled title="Se activa al registrar el pago">Imprimir comprobante</button><button type="submit" class="dlg-submit">Registrar pago</button></div></div>
+<div class="pg-fin"><p class="pg-saldo">El correlativo se asigna al registrar y nadie lo puede cambiar.</p><button type="submit" class="dlg-submit">Registrar pago</button></div>
 <p id="pgMsg" class="dlg-msg" role="status"></p>
 </form>
 
