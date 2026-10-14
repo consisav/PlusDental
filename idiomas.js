@@ -1,7 +1,7 @@
 // Plus Dental — Página en Español o Inglés (selector con banderas de Guatemala y Estados Unidos)
 //
 // Cómo funciona: cada texto de la página pública se busca en la lista EN (español → inglés).
-// Si está, se cambia; si no, se queda en español. El panel de Administración no se traduce.
+// Si está, se cambia; si no, se queda en español. Los textos del panel de Administración están en idiomas-admin.js.
 //
 // PARA AGREGAR UN TEXTO NUEVO: escribe una línea con el texto en español a la izquierda
 // y su traducción a la derecha, por ejemplo:   'Mi texto nuevo': 'My new text',
@@ -294,8 +294,39 @@
 
   // Textos que llevan datos variables (fechas, números, nombres)
   var DIAS = { Dom: 'Sun', Lun: 'Mon', Mar: 'Tue', 'Mié': 'Wed', Jue: 'Thu', Vie: 'Fri', 'Sáb': 'Sat' };
+  var MESES = { ene: 'Jan', feb: 'Feb', mar: 'Mar', abr: 'Apr', may: 'May', jun: 'Jun', jul: 'Jul', ago: 'Aug', sep: 'Sep', sept: 'Sep', oct: 'Oct', nov: 'Nov', dic: 'Dec' };
+  var ROLES = { 'Super Administrador': 'Super Administrator', 'Administrador': 'Administrator', 'Cliente': 'Client' };
+  var M = '(ene|feb|mar|abr|may|jun|jul|ago|sept?|oct|nov|dic)\\.?';
   var REGLAS = [
     [/^(Dom|Lun|Mar|Mié|Jue|Vie|Sáb) (\d{1,2})$/, function (m, d, n) { return DIAS[d] + ' ' + n; }],
+    // fechas del panel: «Sáb 17 oct», «17 oct 2026», «14 oct 2026, 09:32»
+    [new RegExp('^(Dom|Lun|Mar|Mié|Jue|Vie|Sáb) (\\d{1,2}) ' + M + '$', 'i'), function (m, d, n, mes) { return DIAS[d] + ' ' + MESES[mes.toLowerCase()] + ' ' + n; }],
+    [new RegExp('^(\\d{1,2}) ' + M + ' (\\d{4})(,? \\d{1,2}:\\d{2})?$', 'i'), function (m, n, mes, a, h) { return MESES[mes.toLowerCase()] + ' ' + n + ', ' + a + (h ? ', ' + h.replace(/^,? /, '') : ''); }],
+    [new RegExp('^(\\d{1,2}) ' + M + '$', 'i'), function (m, n, mes) { return MESES[mes.toLowerCase()] + ' ' + n; }],
+    [/^Conectado como (.+?) · (Super Administrador|Administrador|Cliente)\.\s*(.*)$/, function (m, u, r, resto) { return 'Signed in as ' + u + ' · ' + ROLES[r] + '. ' + (simple(resto) || resto); }],
+    [/^Presupuesto N\.º (\d+)$/, 'Quote No. $1'],
+    [/^Subtotal (.+)$/, 'Subtotal $1'],
+    [/^(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo): (desde|hasta|abre|cierra)$/, function (m, d, q) {
+      var D = { Lunes: 'Monday', Martes: 'Tuesday', 'Miércoles': 'Wednesday', Jueves: 'Thursday', Viernes: 'Friday', 'Sábado': 'Saturday', Domingo: 'Sunday' };
+      return D[d] + ': ' + { desde: 'from', hasta: 'until', abre: 'opens', cierra: 'closes' }[q];
+    }],
+    [/^registrado por (.+)$/, 'registered by $1'],
+    [/^última modificación por (.+)$/, 'last modified by $1'],
+    [/^máx\. (.+)$/, 'max. $1'],
+    [/^(\d+) en tu catálogo$/, '$1 in your catalog'],
+    [/^(\d+) sugeridos? por agregar$/, '$1 suggested to add'],
+    [/^Comisión (.+)$/, 'Commission $1'],
+    [/^Ahorra (.+)$/, 'Save $1'],
+    [/^Ahorro (.+)$/, 'Savings $1'],
+    [/^Vigente del (.+) al (.+)$/, 'Valid from $1 to $2'],
+    [/^Desde el (.+), sin vencimiento$/, 'From $1, no expiry'],
+    [/^desc\. máx\. (.+)$/, 'max. disc. $1'],
+    [/^(\d+) (tratamientos?|citas?|pacientes?|cobros?|agentes?)$/, function (m, n, p) { var e = { tratamiento: 'treatment', tratamientos: 'treatments', cita: 'appointment', citas: 'appointments', paciente: 'patient', pacientes: 'patients', cobro: 'payment', cobros: 'payments', agente: 'agent', agentes: 'agents' }; return n + ' ' + e[p]; }],
+    [/^ANULADO: (.*)$/, 'VOIDED: $1'],
+    [/^(\d+) años?$/, function (m, n) { return n + (n === '1' ? ' year' : ' years'); }],
+    [/^Registrado por (.+)$/, 'Registered by $1'],
+    [/^por (.+)$/, 'by $1'],
+    [/^Recibo (N\.º )?(\d+)$/, 'Receipt No. $2'],
     [/^(\d{1,2}:\d{2}), ocupado$/, '$1, booked'],
     [/^(\d+(?:–\d+)?) meses$/, '$1 months'],
     [/^1 mes$/, '1 month'],
@@ -351,7 +382,7 @@
     return inicio + r + fin;
   }
 
-  function excluido(el) { return !el || !!el.closest('#administracion, script, style, [data-no-traducir]'); }
+  function excluido(el) { return !el || !!el.closest('script, style, [data-no-traducir]'); }
 
   function hacerTexto(n) {
     if (excluido(n.parentElement)) return;
@@ -382,7 +413,7 @@
     hacerAtributos(raiz);
     var w = document.createTreeWalker(raiz, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
       acceptNode: function (n) {
-        if (n.nodeType === 1 && (n.id === 'administracion' || n.tagName === 'SCRIPT' || n.tagName === 'STYLE' || n.hasAttribute('data-no-traducir'))) return NodeFilter.FILTER_REJECT;
+        if (n.nodeType === 1 && (n.tagName === 'SCRIPT' || n.tagName === 'STYLE' || n.hasAttribute('data-no-traducir'))) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
     });
