@@ -1731,6 +1731,60 @@ language sql stable security definer set search_path = public as $$
 $$;
 grant execute on function public.paquetes_publicos() to anon, authenticated;
 
+-- ===== Presupuestos con tipo de precio =====
+-- Cada presupuesto usa un tipo de precio (por defecto «Cliente directo»). El descuento del presupuesto no puede
+-- pasar del % máximo más bajo de los precios activos de ese tipo para sus tratamientos.
+-- Esta versión de guardar_presupuesto reemplaza a la de la sección de presupuestos.
+
+alter table public.presupuestos add column if not exists tipo_precio text not null default 'directo'
+  check (tipo_precio in ('directo', 'institucional', 'vip', 'paquete', 'especial'));
+
+drop function if exists public.guardar_presupuesto(bigint, numeric, text, jsonb);
+create or replace function public.guardar_presupuesto(p_id bigint, p_descuento numeric, p_notas text, p_items jsonb, p_tipo text default 'directo')
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_estado public.estado_presupuesto;
+  v_tipo text := coalesce(p_tipo, 'directo');
+  v_max numeric;
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if v_tipo not in ('directo', 'institucional', 'vip', 'paquete', 'especial') then
+    raise exception 'Tipo de precio no válido';
+  end if;
+  select estado into v_estado from public.presupuestos where id = p_id;
+  if v_estado is null then
+    raise exception 'Presupuesto no encontrado';
+  end if;
+  if v_estado in ('aprobado', 'rechazado') then
+    raise exception 'Un presupuesto aprobado o rechazado ya no se puede modificar';
+  end if;
+
+  -- Descuento máximo: el más bajo de los precios activos de este tipo para los tratamientos del presupuesto
+  select min(pr.descuento_max) into v_max
+    from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) e
+    join public.tratamientos t on lower(t.nombre) = lower(trim(e ->> 'tratamiento'))
+    join public.precios pr on pr.tratamiento_id = t.id and pr.tipo = v_tipo and pr.estado = 'activo';
+  if v_max is not null and coalesce(p_descuento, 0) > v_max then
+    raise exception 'El descuento máximo permitido con este tipo de precio es % %%', trim(trailing '.' from trim(trailing '0' from v_max::text));
+  end if;
+
+  update public.presupuestos
+     set descuento_pct = coalesce(p_descuento, 0), notas = nullif(trim(p_notas), ''), tipo_precio = v_tipo
+   where id = p_id;
+
+  delete from public.presupuesto_items where presupuesto_id = p_id;
+  insert into public.presupuesto_items (presupuesto_id, orden, tratamiento, pieza, cantidad, precio)
+  select p_id, t.ord, trim(t.i ->> 'tratamiento'), nullif(trim(t.i ->> 'pieza'), ''),
+         greatest(coalesce((t.i ->> 'cantidad')::int, 1), 1), greatest(coalesce((t.i ->> 'precio')::numeric, 0), 0)
+  from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) with ordinality as t(i, ord)
+  where coalesce(trim(t.i ->> 'tratamiento'), '') <> '';
+end;
+$$;
+revoke execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb, text) from public, anon;
+grant execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

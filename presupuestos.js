@@ -7,6 +7,9 @@
   var ESTADOS = { borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado', rechazado: 'Rechazado' };
   var lista = [], pacientes = [], catalogo = [], filtro = 'todos';
   var actual = null, items = [], cambios = false;
+  // Precios activos por tratamiento y tipo (de «Precios y paquetes»): { idTratamiento: { directo: {valor, max}, … } }
+  var preciosAct = {};
+  var TIPOS = { directo: 'Cliente directo', institucional: 'Institucional', vip: 'VIP', paquete: 'Paquete', especial: 'Especial' };
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -90,6 +93,9 @@
     var r = await sb.from('tratamientos').select('id,nombre,precio,activo').order('nombre');
     if (r.error) { aviso('catMsg', traducir(r.error), true); return; }
     catalogo = r.data;
+    var p = await sb.from('precios').select('tratamiento_id,tipo,valor,descuento_max').eq('estado', 'activo');
+    preciosAct = {};
+    if (!p.error) p.data.forEach(function (x) { (preciosAct[x.tratamiento_id] = preciosAct[x.tratamiento_id] || {})[x.tipo] = { valor: Number(x.valor), max: Number(x.descuento_max) }; });
     $('preCatalogoLista').innerHTML = catalogo.filter(function (t) { return t.activo; })
       .map(function (t) { return '<option value="' + esc(t.nombre) + '">' + q(t.precio) + '</option>'; }).join('');
     pintarCatalogo();
@@ -106,6 +112,34 @@
       : '<tr><td colspan="4">El catálogo está vacío. Agrega los tratamientos que ofrece la clínica con su precio.</td></tr>';
   }
 
+  // ---------- Precio según el tipo ----------
+  function tipoActual() { return $('preTipo').value || 'directo'; }
+  function tratamientoDe(nombre) {
+    var n = String(nombre || '').trim().toLowerCase();
+    return catalogo.filter(function (t) { return t.nombre.toLowerCase() === n; })[0] || null;
+  }
+  // Precio activo del tipo elegido; si el tratamiento no lo tiene, el del catálogo
+  function precioDe(t) {
+    var p = preciosAct[t.id] && preciosAct[t.id][tipoActual()];
+    return p ? p.valor : Number(t.precio);
+  }
+  // Descuento máximo: el más bajo de los precios activos de este tipo usados en el presupuesto (null = sin límite)
+  function descuentoMax() {
+    var max = null;
+    items.forEach(function (it) {
+      var t = tratamientoDe(it.tratamiento), p = t && preciosAct[t.id] && preciosAct[t.id][tipoActual()];
+      if (p) max = max == null ? p.max : Math.min(max, p.max);
+    });
+    return max;
+  }
+  function pintarDescMax() {
+    var max = descuentoMax(), d = Number($('preDescuento').value) || 0, aviso = $('preDescMax');
+    aviso.hidden = max == null || !editable();
+    if (aviso.hidden) return;
+    aviso.textContent = 'Descuento máximo con precio ' + TIPOS[tipoActual()] + ': ' + max + ' %' + (d > max ? ' — reduce el descuento para poder guardar.' : '');
+    aviso.classList.toggle('pre-max-error', d > max);
+  }
+
   // ---------- Editor ----------
   async function abrir(id) {
     aviso('preEdMsg', '');
@@ -116,6 +150,7 @@
       .map(function (i) { return { id: i.id, tratamiento: i.tratamiento, pieza: i.pieza || '', cantidad: i.cantidad, precio: Number(i.precio), realizado: i.realizado, realizado_en: i.realizado_en }; });
     cambios = false;
     $('preDescuento').value = Number(actual.descuento_pct) || 0;
+    $('preTipo').value = actual.tipo_precio || 'directo';
     $('preNotas').value = actual.notas || '';
     if (editable() && !items.length) items.push({ tratamiento: '', pieza: '', cantidad: 1, precio: 0 });
     pintarEditor();
@@ -130,6 +165,7 @@
     $('preEstado').className = 'estado estado-' + actual.estado;
     $('preEstado').textContent = ESTADOS[actual.estado];
     $('preDescuento').disabled = !ed;
+    $('preTipo').disabled = !ed;
     $('preNotas').disabled = !ed;
     $('preAgregarWrap').hidden = !ed;
 
@@ -164,6 +200,7 @@
       var it = items[+td.parentNode.dataset.i];
       if (it) td.textContent = q(importe(it));
     });
+    pintarDescMax();
   }
 
   function mensajeWhatsApp() {
@@ -204,12 +241,19 @@
   }
 
   async function guardar() {
+    var max = descuentoMax(), d = Number($('preDescuento').value) || 0;
+    if (max != null && d > max) {
+      aviso('preEdMsg', 'El descuento máximo con precio ' + TIPOS[tipoActual()] + ' es ' + max + ' %. Reduce el descuento.', true);
+      $('preDescuento').focus();
+      return false;
+    }
     var datos = items.map(function (it) { return { tratamiento: it.tratamiento, pieza: it.pieza, cantidad: it.cantidad, precio: it.precio }; });
     var r = await sb.rpc('guardar_presupuesto', {
       p_id: actual.id,
-      p_descuento: Math.min(Math.max(Number($('preDescuento').value) || 0, 0), 100),
+      p_descuento: Math.min(Math.max(d, 0), 100),
       p_notas: $('preNotas').value,
-      p_items: datos
+      p_items: datos,
+      p_tipo: tipoActual()
     });
     if (r.error) { aviso('preEdMsg', traducir(r.error), true); return false; }
     cambios = false;
@@ -280,11 +324,11 @@
     if (f === 'cantidad') it.cantidad = Math.max(parseInt(inp.value, 10) || 1, 1);
     else if (f === 'precio') it.precio = Math.max(Number(inp.value) || 0, 0);
     else it[f] = inp.value;
-    // Al elegir un tratamiento del catálogo se propone su precio
+    // Al elegir un tratamiento del catálogo se propone su precio (el activo del tipo elegido, o el del catálogo)
     if (f === 'tratamiento') {
-      var c = catalogo.filter(function (t) { return t.activo && t.nombre.toLowerCase() === inp.value.trim().toLowerCase(); })[0];
-      if (c) {
-        it.precio = Number(c.precio);
+      var c = tratamientoDe(inp.value);
+      if (c && c.activo) {
+        it.precio = precioDe(c);
         inp.closest('tr').querySelector('[data-f=precio]').value = it.precio.toFixed(2);
       }
     }
@@ -314,6 +358,18 @@
     pintarEditor();
     var filas = $('preItems').querySelectorAll('[data-f=tratamiento]');
     if (filas.length) filas[filas.length - 1].focus();
+  });
+  // Al cambiar el tipo de precio se actualizan los precios de los tratamientos del catálogo
+  $('preTipo').addEventListener('change', function () {
+    var n = 0;
+    items.forEach(function (it) {
+      var t = tratamientoDe(it.tratamiento);
+      if (t) { it.precio = precioDe(t); n++; }
+    });
+    cambios = true;
+    pintarEditor();
+    aviso('preEdMsg', n ? 'Se aplicaron los precios «' + TIPOS[tipoActual()] + '» a ' + n + (n === 1 ? ' tratamiento' : ' tratamientos') + '. Pulsa «Guardar».' : 'Tipo de precio cambiado. Pulsa «Guardar».');
+    var a = $('preWa'); if (a) a.href = mensajeWhatsApp();
   });
   ['preDescuento', 'preNotas'].forEach(function (id) {
     $(id).addEventListener('input', function () {
