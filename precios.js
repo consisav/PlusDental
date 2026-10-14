@@ -145,7 +145,7 @@
   }
   function fila(t) {
     var ps = t.virtual ? [] : preciosDe(t.id);
-    return '<tr' + (t.virtual ? ' class="pr-sugerido"' : '') + '><td><b>' + esc(t.nombre) + '</b>' + (t.virtual ? ' <span class="ac-fijo">Sugerido</span>' : t.activo ? '' : ' <span class="ac-fijo">Inactivo</span>') + '</td>' +
+    return '<tr' + (t.virtual ? ' class="pr-sugerido"' : '') + '><td><b>' + esc(t.nombre) + '</b>' + (!t.virtual && !t.activo ? ' <span class="ac-fijo">Inactivo</span>' : '') + '</td>' +
       TIPOS.map(function (tp) { return celda(ps.filter(function (p) { return p.tipo === tp[0]; })[0]); }).join('') +
       '<td><button type="button" class="adm-btn" data-prabrir="' + t.id + '">' + (t.virtual ? 'Definir precios' : 'Abrir') + '</button></td></tr>';
   }
