@@ -11,7 +11,7 @@ const CLINICA = {
   nombre: 'Plus Dental',
   direccion: 'Reforma Montúfar, zona 10, Ciudad de Guatemala',
   telefono: '+502 3756-5739',
-  eslogan: 'Precisión clínica para sonrisas naturales.'
+  eslogan: 'La tranquilidad también es parte del tratamiento.'
 };
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];

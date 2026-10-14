@@ -224,7 +224,7 @@
       var asunto = 'Recordatorio de su cita en Plus Dental · ' + a.cuando;
       var cuerpo = 'Hola ' + c.nombre + ':\n\nLe recordamos su cita en Plus Dental:\n\n' +
         '• Fecha y hora: ' + a.cuando + '\n• Tratamiento: ' + c.servicio + (a.dentista ? '\n• Dentista: ' + a.dentista.nombre : '') + (a.sala ? '\n• Sala: ' + a.sala : '') +
-        '\n\nDirección: ' + CLINICA + '.\nSi necesita cambiar su cita, escríbanos o llame al ' + TEL_CLINICA + '.\n\nPlus Dental · Precisión clínica para sonrisas naturales.';
+        '\n\nDirección: ' + CLINICA + '.\nSi necesita cambiar su cita, escríbanos o llame al ' + TEL_CLINICA + '.\n\nPlus Dental · La tranquilidad también es parte del tratamiento.';
       b.push(correo ? '<a class="adm-btn" href="mailto:' + encodeURIComponent(correo) + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo) + '">Recordatorio por correo</a>'
         : '<span class="dlg-msg">El paciente no tiene correo registrado.</span>');
     }
