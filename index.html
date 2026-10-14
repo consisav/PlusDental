@@ -50,7 +50,7 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .adm-btn[aria-pressed="true"]{background:#0B2B40;color:#FFFFFF;border-color:#0B2B40}
 .adm-primary{background:#005A87;color:#FFFFFF;border-color:#005A87}
 .adm-primary:hover:not(:disabled){background:#00476B;color:#FFFFFF}
-.adm-layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:36px;align-items:start}
+.adm-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:36px;align-items:start}
 .adm-menu{display:flex;flex-direction:column;gap:4px;position:sticky;top:96px;border-right:1px solid #D9E4EC;padding-right:20px}
 .adm-menu button{font:inherit;font-size:15px;font-weight:600;text-align:left;color:#475B68;background:transparent;border:0;border-radius:12px;padding:12px 14px;min-height:44px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .adm-menu button:hover{background:#EEF5FA;color:#0B2B40}
@@ -242,9 +242,12 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-avisos label{flex-direction:row}
 .ag-aviso-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .ag-aviso-btns a{text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:38px}
-.adm-grupo{display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;font-weight:700;color:#5A6D7A;padding:18px 14px 6px;border-top:1px solid #D9E4EC;margin-top:8px}
+.adm-grupo{display:block;font-size:13.5px;letter-spacing:1.4px;text-transform:uppercase;font-weight:800;color:#0B2B40;padding:18px 14px 8px;border-top:1px solid #D9E4EC;margin-top:8px}
+.adm-menu button[data-tab]{margin-left:16px;position:relative}
+.adm-menu button[data-tab]::before{content:"";position:absolute;left:-10px;top:50%;width:4px;height:4px;border-radius:50%;background:#94A6B2;transform:translateY(-50%)}
+.adm-menu button[data-tab][aria-selected="true"]::before{background:#005A87}
 .adm-grupo:first-child{border-top:0;margin-top:0;padding-top:4px}
-@media (max-width:960px){.adm-grupo{border-top:0;margin:0;padding:12px 4px 0 12px;white-space:nowrap;align-self:center;color:#005A87}}
+@media (max-width:960px){.adm-grupo{border-top:0;margin:0;padding:12px 4px 0 12px;white-space:nowrap;align-self:center;color:#005A87;font-size:12px}.adm-menu button[data-tab]{margin-left:0}.adm-menu button[data-tab]::before{display:none}}
 .adm-count{background:#B45309;color:#FFFFFF;border-radius:999px;padding:1px 9px;font-size:13px;font-variant-numeric:tabular-nums}
 .adm-box{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px}
 .adm-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
