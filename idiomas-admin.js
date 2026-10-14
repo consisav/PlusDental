@@ -388,6 +388,22 @@
     'Aún no hay historias. Pulsa «Nueva historia» para agregar la primera': 'There are no stories yet. Press “New story” to add the first one',
     'Lunes': 'Monday', 'Martes': 'Tuesday', 'Miércoles': 'Wednesday', 'Jueves': 'Thursday', 'Viernes': 'Friday', 'Sábado': 'Saturday', 'Domingo': 'Sunday',
     'Abre': 'Opens', 'Cierra': 'Closes', 'Desde': 'From', 'Hasta': 'Until', 'Atiende': 'Works',
+    // ---- Cobros con documento y detalle ----
+    'Documento': 'Document', 'NIT (se llena con el del paciente)': 'Tax ID (NIT, filled from the patient)', 'Tipo de documento *': 'Document type *',
+    'Factura': 'Invoice', 'Serie factura': 'Invoice series', 'Número factura': 'Invoice number', 'Número DTE (autorización FEL)': 'DTE number (FEL authorization)',
+    'Número DTE': 'DTE number', 'Monto (Q) — total del detalle': 'Amount (Q) — detail total', 'Monto (US$) — total del detalle': 'Amount (US$) — detail total',
+    'Número de cuota': 'Installment number', 'Emitido': 'Issued', 'Aplicado': 'Applied', 'Certificado': 'Certified', 'Anulado': 'Voided',
+    'Detalle del pago': 'Payment detail', 'Usuario que registra': 'Recorded by', 'Línea': 'Line', 'Clasificación': 'Classification', 'Bien': 'Goods', 'Servicio': 'Service',
+    'Monto Q': 'Amount Q', 'Monto US$': 'Amount US$', 'TOTALES': 'TOTALS', '+ Agregar línea': '+ Add line', 'Elige un tipo…': 'Choose a type…',
+    'Ej.: 1234567-8 o CF': 'E.g.: 1234567-8 or CF', 'Elige un paciente.': 'Choose a patient.',
+    'Agrega al menos una línea al detalle del pago.': 'Add at least one line to the payment detail.',
+    'Agrega al menos una línea al detalle del pago': 'Add at least one line to the payment detail',
+    'Elige el tipo de procedimiento en cada línea del detalle.': 'Choose the procedure type on every detail line.',
+    'El total en quetzales del detalle debe ser mayor que cero.': 'The detail total in quetzales must be greater than zero.',
+    'El total en quetzales del detalle debe ser mayor que cero': 'The detail total in quetzales must be greater than zero',
+    'Para anular un pago usa el botón Anular': 'To void a payment use the Void button', 'El pago no existe o está anulado': 'The payment does not exist or is voided',
+    'Un pago nuevo no puede registrarse como anulado': 'A new payment cannot be registered as voided',
+    'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los cobros con factura.': 'The updated Supabase script (supabase.sql) for invoiced payments still needs to be run.',
     'Ver más preguntas': 'See more questions', 'Más preguntas': 'More questions', 'Aún no hay historias. Pulsa «Nueva historia» para agregar la primera.': 'There are no stories yet. Press “New story” to add the first one.'
   };
   Object.keys(T).forEach(function (k) { if (T[k] && !Object.prototype.hasOwnProperty.call(EN, k)) EN[k] = T[k]; });

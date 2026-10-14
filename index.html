@@ -449,6 +449,19 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 @media (max-width:560px){.hero-foto-caja{height:340px}.hero-asistente{flex-wrap:wrap}.hero-asis-cta{width:100%;text-align:center}}
 @media (prefers-reduced-motion:reduce){.hero-asistente{transition:none}}
 .hero-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:4% center;border-radius:inherit;display:block}
+.pg-sec{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:#005A87;font-weight:800;margin-top:6px}
+.exp-form input.pg-auto{background:#EEF5FA;border-style:dashed;color:#00476B;font-weight:700;cursor:default}
+.pg-detalle td{vertical-align:middle}
+.pg-detalle select,.pg-detalle input{font:inherit;font-size:14px;padding:8px 10px;border:1px solid #C4D4DF;border-radius:10px;background:#FFFFFF;min-height:38px;box-sizing:border-box}
+.pg-detalle select{width:100%;min-width:200px}
+.pg-detalle input{width:120px;text-align:right}
+.pg-detalle tfoot td{font-weight:800;border-top:2px solid #0B2B40;border-bottom:0}
+.pg-linea{font-weight:800;color:#005A87}
+select.pg-estado,select.pg-estado-lista{font-weight:700}
+select.pg-estado[data-estado="emitido"],select.pg-estado-lista[data-estado="emitido"]{background:#DBEAFE;color:#1E40AF}
+select.pg-estado[data-estado="aplicado"],select.pg-estado-lista[data-estado="aplicado"]{background:#FEF3C7;color:#92400E}
+select.pg-estado[data-estado="certificado"],select.pg-estado-lista[data-estado="certificado"]{background:#DCF2EC;color:#08504C}
+select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px solid #C4D4DF;border-radius:999px;min-height:34px}
 .ac-fijo{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:#E8F3FA;color:#005A87;font-size:11.5px;font-weight:700;vertical-align:middle}
 .ac-quien{display:flex;align-items:center;gap:10px;min-width:180px}
 .ac-pct{position:relative;display:block}
@@ -982,17 +995,33 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 
 <form id="pagoForm" class="adm-box">
 <h3 style="margin: 0; font-size: 19px; font-weight: 700">Registrar pago</h3>
+<div class="pg-sec">Documento</div>
 <div class="exp-form">
 <label class="full">Paciente *<select id="pgPaciente" required></select></label>
 <p id="pgSaldo" class="full dlg-msg" hidden></p>
-<label>Monto (Q) *<input id="pgMonto" type="number" min="0.01" step="0.01" required></label>
+<label>NIT (se llena con el del paciente)<input id="pgNit" type="text" maxlength="20" placeholder="Ej.: 1234567-8 o CF" autocomplete="off"></label>
+<label>Tipo de documento *<select id="pgTipoDoc"><option value="factura">Factura</option><option value="recibo">Recibo</option></select></label>
+<label>Serie factura<input id="pgSerie" type="text" maxlength="20" autocomplete="off"></label>
+<label>Número factura<input id="pgNumFactura" type="text" maxlength="30" autocomplete="off"></label>
+<label class="full">Número DTE (autorización FEL)<input id="pgDte" type="text" maxlength="60" autocomplete="off"></label>
+<label>Monto (Q) — total del detalle<input id="pgMonto" type="text" readonly tabindex="-1" class="pg-auto"></label>
+<label>Monto (US$) — total del detalle<input id="pgMontoUsd" type="text" readonly tabindex="-1" class="pg-auto"></label>
 <label>Fecha *<input id="pgFecha" type="date" required></label>
 <label>Método *<select id="pgMetodo"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option><option value="deposito">Depósito</option></select></label>
 <label id="pgRefWrap" hidden>N.º de autorización o boleta<input id="pgReferencia" type="text" maxlength="60"></label>
+<label>Número de cuota<input id="pgCuota" type="number" min="1" max="999" step="1" inputmode="numeric"></label>
+<label>Estado<select id="pgEstado" class="pg-estado"><option value="emitido">Emitido</option><option value="aplicado">Aplicado</option><option value="certificado">Certificado</option></select></label>
+<div class="exp-campo"><span class="pos-lbl">Usuario que registra</span><div id="pgUsuario" class="exp-calc">—</div></div>
 <label>Presupuesto (opcional)<select id="pgPresupuesto"><option value="">Sin presupuesto</option></select></label>
 <label>Concepto<input id="pgConcepto" type="text" maxlength="150" placeholder="Ej.: abono, pago de limpieza"></label>
-<div class="full exp-actions"><button type="submit" class="dlg-submit">Registrar pago</button><p id="pgMsg" class="dlg-msg" role="status"></p></div>
+<label class="full">Observaciones<textarea id="pgObservaciones" rows="2" maxlength="500"></textarea></label>
 </div>
+<div class="pg-sec">Detalle del pago</div>
+<div class="roles-wrap"><table class="pg-detalle"><thead><tr><th>Línea</th><th>Tipo de procedimiento</th><th>Clasificación</th><th class="num">Monto Q</th><th class="num">Monto US$</th><th><span class="sr-only">Quitar</span></th></tr></thead>
+<tbody id="pgDetalle"></tbody>
+<tfoot><tr><td></td><td>TOTALES</td><td></td><td class="num" id="pgTotalQ">Q0.00</td><td class="num" id="pgTotalUsd">US$0.00</td><td></td></tr></tfoot></table></div>
+<div><button type="button" id="pgAgregarLinea" class="adm-btn">+ Agregar línea</button></div>
+<div class="exp-actions"><button type="submit" class="dlg-submit">Registrar pago</button><p id="pgMsg" class="dlg-msg" role="status"></p></div>
 </form>
 
 <div class="adm-pane-head">
@@ -1006,7 +1035,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 <input id="cpBuscar" type="search" class="adm-input" placeholder="Paciente o N.º de recibo" aria-label="Buscar pago">
 </div>
 </div>
-<div class="roles-wrap"><table><thead><tr><th>Recibo</th><th>Fecha</th><th>Paciente</th><th>Concepto</th><th>Método</th><th class="num">Monto</th><th>Acciones</th></tr></thead><tbody id="cpBody"></tbody></table></div>
+<div class="roles-wrap"><table><thead><tr><th>Recibo</th><th>Fecha</th><th>Paciente</th><th>Documento</th><th>Concepto</th><th>Método</th><th class="num">Monto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="cpBody"></tbody></table></div>
 <p id="cpMsg" class="dlg-msg" role="status"></p>
 </div>
 

@@ -8,6 +8,13 @@
   var CLINICA = { nombre: 'Plus Dental', direccion: 'Reforma Montúfar, zona 10, Ciudad de Guatemala', telefono: '+502 3756-5739' };
 
   var saldos = [], saldoDe = {}, pagos = [], ecFiltro = 'saldo', cpPeriodo = 'mes', ecActual = null, movimientos = [];
+  // Documento y detalle del pago
+  var TIPOS_DOC = { factura: 'Factura', recibo: 'Recibo' };
+  var ESTADOS_DOC = { emitido: 'Emitido', aplicado: 'Aplicado', certificado: 'Certificado', anulado: 'Anulado' };
+  var CLASIF = { bien: 'Bien', servicio: 'Servicio' };
+  var tiposProc = [], lineas = [];
+  function usd(n) { return 'US$' + (Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function redondear(n) { return Math.round((Number(n) || 0) * 100) / 100; }
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -46,21 +53,37 @@
     $('impresion').innerHTML = '';
   });
 
-  function htmlRecibo(p) {
+  function documento(p) {
+    var num = [p.serie, p.numero_factura].filter(Boolean).join('-');
+    return (TIPOS_DOC[p.tipo_documento] || 'Recibo') + (num ? ' ' + num : '');
+  }
+  function htmlRecibo(p, detalle) {
     var fila = function (k, v) { return '<tr><td style="padding:8px 0;color:#475B68;width:200px">' + k + '</td><td style="padding:8px 0;font-weight:600">' + v + '</td></tr>'; };
     var s = saldoDe[p.paciente_id];
-    return encabezado('Recibo ' + recibo(p.id)) +
+    var celda = 'padding:7px 6px;border-bottom:1px solid #D9E4EC';
+    var tabla = (detalle || []).length ? '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:14px"><thead><tr>' +
+      ['Línea', 'Tipo de procedimiento', 'Clasificación', 'Monto Q', 'Monto US$'].map(function (h, i) { return '<th style="' + celda + ';text-align:' + (i > 2 ? 'right' : 'left') + '">' + h + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + detalle.map(function (d) {
+        return '<tr><td style="' + celda + '">' + d.linea + '</td><td style="' + celda + '">' + esc(d.tipo ? d.tipo.nombre : '—') + '</td><td style="' + celda + '">' + (CLASIF[d.clasificacion] || '') + '</td>' +
+          '<td style="' + celda + ';text-align:right">' + q(d.monto) + '</td><td style="' + celda + ';text-align:right">' + usd(d.monto_usd) + '</td></tr>';
+      }).join('') + '<tr><td colspan="3" style="' + celda + ';font-weight:800">TOTALES</td><td style="' + celda + ';text-align:right;font-weight:800">' + q(p.monto) + '</td><td style="' + celda + ';text-align:right;font-weight:800">' + usd(p.monto_usd) + '</td></tr></tbody></table>' : '';
+    return encabezado(documento(p) + ' · ' + recibo(p.id)) +
       (p.anulado ? '<div style="border:2px solid #9A3B2E;color:#9A3B2E;font-weight:700;padding:10px 14px;margin-bottom:14px">RECIBO ANULADO — ' + esc(p.anulado_motivo) + '</div>' : '') +
       '<table style="width:100%;border-collapse:collapse;font-size:15px">' +
       fila('Fecha', fechaCorta(p.fecha)) +
       fila('Recibimos de', esc(p.pacientes ? p.pacientes.nombre : '')) +
-      fila('La cantidad de', '<span style="font-size:22px">' + q(p.monto) + '</span>') +
+      (p.nit ? fila('NIT', esc(p.nit)) : '') +
+      (p.numero_dte ? fila('Número DTE', esc(p.numero_dte)) : '') +
+      fila('La cantidad de', '<span style="font-size:22px">' + q(p.monto) + '</span>' + (Number(p.monto_usd) > 0 ? ' · ' + usd(p.monto_usd) : '')) +
+      (p.numero_cuota ? fila('Número de cuota', p.numero_cuota) : '') +
+      fila('Estado', ESTADOS_DOC[p.estado_doc] || '—') +
       fila('Forma de pago', METODOS[p.metodo] + (p.referencia ? ' · ' + esc(p.referencia) : '')) +
       (p.concepto ? fila('Concepto', esc(p.concepto)) : '') +
       (p.presupuesto_id ? fila('Presupuesto', 'N.º ' + p.presupuesto_id) : '') +
       (s && !p.anulado ? fila('Saldo pendiente a la fecha', q(Math.max(s.saldo, 0))) : '') +
       fila('Registrado por', esc(p.registrado_por || '—')) +
-      '</table><div style="margin-top:60px;display:flex;justify-content:flex-end"><div style="border-top:1px solid #0B2B40;width:260px;text-align:center;padding-top:6px;font-size:13px">Firma y sello</div></div></div>';
+      (p.observaciones ? fila('Observaciones', esc(p.observaciones)) : '') +
+      '</table>' + tabla + '<div style="margin-top:60px;display:flex;justify-content:flex-end"><div style="border-top:1px solid #0B2B40;width:260px;text-align:center;padding-top:6px;font-size:13px">Firma y sello</div></div></div>';
   }
 
   // ---------- Saldos ----------
@@ -146,7 +169,7 @@
   // ---------- Cobros ----------
   async function cargarPagos() {
     aviso('cpMsg', '');
-    $('cpBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
+    $('cpBody').innerHTML = '<tr><td colspan="9">Cargando…</td></tr>';
     var consulta = sb.from('pagos').select('*,pacientes(nombre,telefono)').order('id', { ascending: false });
     if (cpPeriodo === 'mes') consulta = consulta.gte('fecha', inicioMes(0));
     if (cpPeriodo === 'anterior') consulta = consulta.gte('fecha', inicioMes(-1)).lt('fecha', inicioMes(0));
@@ -184,7 +207,7 @@
       return !buscar || String(p.id) === String(parseInt(buscar, 10)) || ((p.pacientes && p.pacientes.nombre) || '').toLowerCase().indexOf(buscar) >= 0;
     });
     if (!filas.length) {
-      $('cpBody').innerHTML = '<tr><td colspan="7">' + (buscar ? 'Ningún pago coincide.' : 'No hay pagos en este periodo.') + '</td></tr>';
+      $('cpBody').innerHTML = '<tr><td colspan="9">' + (buscar ? 'Ningún pago coincide.' : 'No hay pagos en este periodo.') + '</td></tr>';
       return;
     }
     $('cpBody').innerHTML = filas.map(function (p) {
@@ -194,12 +217,17 @@
       var acciones = '<button type="button" class="adm-btn" data-recibo="' + p.id + '">Recibo</button>' +
         (wa && !p.anulado ? '<a class="adm-btn" href="https://wa.me/' + wa + '?text=' + encodeURIComponent(texto) + '" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">WhatsApp</a>' : '') +
         (esSuper() && !p.anulado ? '<button type="button" class="adm-btn" data-anular="' + p.id + '">Anular</button>' : '');
-      return '<tr class="' + (p.anulado ? 'anulado' : '') + '" data-pago="' + p.id + '"><td class="fecha"><strong>' + recibo(p.id) + '</strong>' +
-        (p.anulado ? '<br><span class="estado estado-cancelada" title="' + esc(p.anulado_motivo) + '">Anulado</span>' : '') + '</td>' +
-        '<td class="fecha">' + fechaCorta(p.fecha) + '</td><td><strong>' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</strong></td>' +
+      var estado = p.anulado || p.estado_doc === 'anulado'
+        ? '<span class="estado estado-cancelada" title="' + esc(p.anulado_motivo || '') + '">Anulado</span>'
+        : '<select class="pg-estado-lista" data-estado-pago="' + p.id + '" data-estado="' + (p.estado_doc || 'emitido') + '" aria-label="Estado del documento ' + recibo(p.id) + '">' +
+          ['emitido', 'aplicado', 'certificado'].map(function (k) { return '<option value="' + k + '"' + ((p.estado_doc || 'emitido') === k ? ' selected' : '') + '>' + ESTADOS_DOC[k] + '</option>'; }).join('') + '</select>';
+      return '<tr class="' + (p.anulado ? 'anulado' : '') + '" data-pago="' + p.id + '"><td class="fecha"><strong>' + recibo(p.id) + '</strong></td>' +
+        '<td class="fecha">' + fechaCorta(p.fecha) + '</td><td><strong>' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</strong>' + (p.nit ? '<br><span style="color:#5A6D7A;font-size:13px">NIT ' + esc(p.nit) + '</span>' : '') + '</td>' +
+        '<td>' + esc(documento(p)) + (p.numero_dte ? '<br><span style="color:#5A6D7A;font-size:12px">DTE ' + esc(p.numero_dte) + '</span>' : '') + (p.numero_cuota ? '<br><span style="color:#5A6D7A;font-size:12px">Cuota ' + p.numero_cuota + '</span>' : '') + '</td>' +
         '<td>' + esc(p.concepto || (p.presupuesto_id ? 'Presupuesto N.º ' + p.presupuesto_id : '—')) + '</td>' +
         '<td>' + METODOS[p.metodo] + (p.referencia ? '<br><span style="color:#5A6D7A;font-size:13px">' + esc(p.referencia) + '</span>' : '') + '</td>' +
-        '<td class="num"><strong>' + q(p.monto) + '</strong></td><td><div class="acciones">' + acciones + '</div></td></tr>';
+        '<td class="num"><strong>' + q(p.monto) + '</strong>' + (Number(p.monto_usd) > 0 ? '<br><span style="color:#5A6D7A;font-size:13px">' + usd(p.monto_usd) + '</span>' : '') + '</td>' +
+        '<td>' + estado + '</td><td><div class="acciones">' + acciones + '</div></td></tr>';
     }).join('');
   }
 
@@ -224,13 +252,60 @@
           : 'No tiene saldo pendiente. El pago quedará como saldo a favor.';
     }
     $('pgPresupuesto').innerHTML = '<option value="">Sin presupuesto</option>';
+    $('pgNit').value = '';
     if (!pid) return;
+    // NIT del paciente (se puede corregir, p. ej. si la factura sale a nombre de otra persona o CF)
+    sb.from('pacientes').select('nit').eq('id', pid).maybeSingle().then(function (n) {
+      if (!n.error && n.data && $('pgPaciente').value === pid && !$('pgNit').value) $('pgNit').value = n.data.nit || '';
+    });
     var r = await sb.from('presupuestos').select('id,fecha').eq('paciente_id', pid).eq('estado', 'aprobado').order('id', { ascending: false });
     if (r.error || $('pgPaciente').value !== pid) return;
     $('pgPresupuesto').innerHTML += r.data.map(function (p) { return '<option value="' + p.id + '">N.º ' + p.id + ' · ' + fechaCorta(p.fecha) + '</option>'; }).join('');
   }
 
+  // ---------- Detalle del pago ----------
+  // Cada línea: tipo de procedimiento (del catálogo «Tipos de procedimientos»), clasificación, monto Q y US$.
+  // Los montos del pago son los totales del detalle.
+  async function cargarTiposProc() {
+    var r = await sb.from('tipos_procedimiento').select('id,nombre,estado,orden').order('orden').order('codigo');
+    tiposProc = r.error ? [] : r.data.filter(function (t) { return t.estado === 'activo'; });
+    pintarDetalle();
+  }
+  function lineaNueva(monto) { return { tipo_procedimiento_id: '', clasificacion: 'bien', monto: monto || '', monto_usd: '' }; }
+  function pintarDetalle() {
+    if (!lineas.length) lineas.push(lineaNueva());
+    $('pgDetalle').innerHTML = lineas.map(function (l, k) {
+      return '<tr data-linea="' + k + '"><td class="pg-linea">' + (k + 1) + '</td>' +
+        '<td><select data-pl="tipo_procedimiento_id" aria-label="Tipo de procedimiento de la línea ' + (k + 1) + '"><option value="">Elige un tipo…</option>' +
+        tiposProc.map(function (t) { return '<option value="' + t.id + '"' + (String(l.tipo_procedimiento_id) === String(t.id) ? ' selected' : '') + '>' + esc(t.nombre) + '</option>'; }).join('') + '</select></td>' +
+        '<td><select data-pl="clasificacion" aria-label="Clasificación de la línea ' + (k + 1) + '">' +
+        Object.keys(CLASIF).map(function (c) { return '<option value="' + c + '"' + (l.clasificacion === c ? ' selected' : '') + '>' + CLASIF[c] + '</option>'; }).join('') + '</select></td>' +
+        '<td class="num"><input data-pl="monto" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(l.monto) + '" placeholder="0.00" aria-label="Monto en quetzales de la línea ' + (k + 1) + '"></td>' +
+        '<td class="num"><input data-pl="monto_usd" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(l.monto_usd) + '" placeholder="0.00" aria-label="Monto en dólares de la línea ' + (k + 1) + '"></td>' +
+        '<td>' + (lineas.length > 1 ? '<button type="button" class="adm-btn" data-quitar-linea="' + k + '">Quitar</button>' : '') + '</td></tr>';
+    }).join('');
+    pintarTotalesDetalle();
+  }
+  function pintarTotalesDetalle() {
+    var tq = 0, tu = 0;
+    lineas.forEach(function (l) { tq += Math.max(Number(l.monto) || 0, 0); tu += Math.max(Number(l.monto_usd) || 0, 0); });
+    $('pgTotalQ').textContent = q(tq); $('pgTotalUsd').textContent = usd(tu);
+    $('pgMonto').value = q(tq); $('pgMontoUsd').value = usd(tu);
+    return { q: redondear(tq), usd: redondear(tu) };
+  }
+  function pintarEstadoNuevo() { $('pgEstado').dataset.estado = $('pgEstado').value; }
+  function limpiarFormulario() {
+    lineas = [lineaNueva()];
+    ['pgNit', 'pgSerie', 'pgNumFactura', 'pgDte', 'pgReferencia', 'pgCuota', 'pgConcepto', 'pgObservaciones'].forEach(function (id) { $(id).value = ''; });
+    $('pgTipoDoc').value = 'factura'; $('pgMetodo').value = 'efectivo'; $('pgEstado').value = 'emitido'; pintarEstadoNuevo();
+    $('pgFecha').value = hoy(); $('pgRefWrap').hidden = true;
+    $('pgUsuario').textContent = (window.PD_SESION && window.PD_SESION.usuario()) || '—';
+    pintarDetalle();
+  }
+
   async function cargarTodo() {
+    $('pgUsuario').textContent = (window.PD_SESION && window.PD_SESION.usuario()) || '—';
+    if (!tiposProc.length) cargarTiposProc();
     if (await cargarSaldos()) { pintarSaldos(); pintarSelectorPacientes(); }
     cargarResumen();
     cargarPagos();
@@ -259,36 +334,69 @@
     $('tabCobros').click();
     pintarSelectorPacientes(pid);
     $('pagoForm').scrollIntoView({ block: 'start' });
-    $('pgMonto').value = ecActual.saldo > 0.004 ? ecActual.saldo.toFixed(2) : '';
-    $('pgMonto').focus();
+    // el saldo pendiente se propone en la primera línea del detalle
+    lineas = [lineaNueva(ecActual.saldo > 0.004 ? ecActual.saldo.toFixed(2) : '')];
+    pintarDetalle();
+    $('pgDetalle').querySelector('select').focus();
   });
 
   $('pgPaciente').addEventListener('change', alElegirPaciente);
   $('pgMetodo').addEventListener('change', function () { $('pgRefWrap').hidden = this.value === 'efectivo'; });
+  // Detalle: cambios en las líneas, agregar y quitar
+  $('pgDetalle').addEventListener('input', function (e) {
+    var c = e.target.closest('[data-pl]');
+    if (!c) return;
+    lineas[+c.closest('tr').dataset.linea][c.dataset.pl] = c.value;
+    pintarTotalesDetalle();
+  });
+  $('pgDetalle').addEventListener('change', function (e) {
+    var c = e.target.closest('select[data-pl]');
+    if (c) lineas[+c.closest('tr').dataset.linea][c.dataset.pl] = c.value;
+  });
+  $('pgDetalle').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-quitar-linea]');
+    if (b) { lineas.splice(+b.dataset.quitarLinea, 1); pintarDetalle(); }
+  });
+  $('pgAgregarLinea').addEventListener('click', function () {
+    lineas.push(lineaNueva());
+    pintarDetalle();
+    var s = $('pgDetalle').querySelectorAll('select[data-pl="tipo_procedimiento_id"]');
+    s[s.length - 1].focus();
+  });
+  $('pgEstado').addEventListener('change', pintarEstadoNuevo);
+
   $('pagoForm').addEventListener('submit', async function (e) {
     e.preventDefault();
-    var monto = Math.round(Number($('pgMonto').value) * 100) / 100;
-    if (!(monto > 0)) { aviso('pgMsg', 'Escribe un monto mayor que cero.', true); return; }
+    if (!$('pgPaciente').value) { aviso('pgMsg', 'Elige un paciente.', true); $('pgPaciente').focus(); return; }
+    var usadas = lineas.filter(function (l) { return Number(l.monto) > 0 || Number(l.monto_usd) > 0 || l.tipo_procedimiento_id; });
+    if (!usadas.length) { aviso('pgMsg', 'Agrega al menos una línea al detalle del pago.', true); return; }
+    if (usadas.some(function (l) { return !l.tipo_procedimiento_id; })) { aviso('pgMsg', 'Elige el tipo de procedimiento en cada línea del detalle.', true); return; }
+    var tot = pintarTotalesDetalle();
+    if (!(tot.q > 0)) { aviso('pgMsg', 'El total en quetzales del detalle debe ser mayor que cero.', true); return; }
     var datos = {
       paciente_id: +$('pgPaciente').value,
       presupuesto_id: $('pgPresupuesto').value ? +$('pgPresupuesto').value : null,
       fecha: $('pgFecha').value || hoy(),
-      monto: monto,
       metodo: $('pgMetodo').value,
       referencia: $('pgMetodo').value === 'efectivo' ? null : ($('pgReferencia').value.trim() || null),
-      concepto: $('pgConcepto').value.trim() || null
+      concepto: $('pgConcepto').value.trim() || null,
+      nit: $('pgNit').value.trim(), tipo_documento: $('pgTipoDoc').value, serie: $('pgSerie').value.trim(),
+      numero_factura: $('pgNumFactura').value.trim(), numero_dte: $('pgDte').value.trim(),
+      numero_cuota: $('pgCuota').value ? +$('pgCuota').value : null, estado_doc: $('pgEstado').value,
+      observaciones: $('pgObservaciones').value.trim()
     };
+    var detalle = usadas.map(function (l) {
+      return { tipo_procedimiento_id: +l.tipo_procedimiento_id, clasificacion: l.clasificacion, monto: redondear(l.monto), monto_usd: redondear(l.monto_usd) };
+    });
     var boton = this.querySelector('[type=submit]');
     boton.disabled = true;
     aviso('pgMsg', 'Registrando…');
-    var r = await sb.from('pagos').insert(datos).select('*,pacientes(nombre,telefono)').single();
+    var r = await sb.rpc('registrar_pago', { p_datos: datos, p_lineas: detalle });
     boton.disabled = false;
-    if (r.error) { aviso('pgMsg', traducir(r.error), true); return; }
+    if (r.error) { aviso('pgMsg', /registrar_pago|could not find the function/i.test(r.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los cobros con factura.' : traducir(r.error), true); return; }
     var pid = datos.paciente_id;
-    this.reset();
-    $('pgFecha').value = hoy();
-    $('pgRefWrap').hidden = true;
-    aviso('pgMsg', 'Pago registrado con el recibo ' + recibo(r.data.id) + '. Puedes imprimirlo o enviarlo desde la lista.');
+    limpiarFormulario();
+    aviso('pgMsg', 'Pago registrado con el recibo ' + recibo(r.data) + '. Puedes imprimirlo o enviarlo desde la lista.');
     cpPeriodo = 'mes';
     await cargarTodo();
     pintarSelectorPacientes(pid);
@@ -299,11 +407,26 @@
     if (b) { cpPeriodo = b.dataset.cpperiodo; cargarPagos(); }
   });
   $('cpBuscar').addEventListener('input', pintarPagos);
+  // Cambiar el estado del documento desde la lista (Emitido, Aplicado, Certificado)
+  $('cpBody').addEventListener('change', async function (e) {
+    var s = e.target.closest('[data-estado-pago]');
+    if (!s) return;
+    var antes = s.dataset.estado;
+    s.disabled = true;
+    var r = await sb.rpc('cambiar_estado_pago', { p_id: +s.dataset.estadoPago, p_estado: s.value });
+    s.disabled = false;
+    if (r.error) { s.value = antes; aviso('cpMsg', traducir(r.error), true); return; }
+    s.dataset.estado = s.value;
+    pagos.forEach(function (p) { if (String(p.id) === s.dataset.estadoPago) p.estado_doc = s.value; });
+    aviso('cpMsg', 'Recibo ' + recibo(s.dataset.estadoPago) + ': estado cambiado a ' + ESTADOS_DOC[s.value] + '.');
+  });
   $('cpBody').addEventListener('click', async function (e) {
     var rb = e.target.closest('[data-recibo]');
     if (rb) {
       var p = pagos.filter(function (x) { return String(x.id) === rb.dataset.recibo; })[0];
-      if (p) imprimir(htmlRecibo(p));
+      if (!p) return;
+      var det = await sb.from('pago_detalle').select('linea,clasificacion,monto,monto_usd,tipo:tipos_procedimiento(nombre)').eq('pago_id', p.id).order('linea');
+      imprimir(htmlRecibo(p, det.error ? [] : det.data));
       return;
     }
     // Anular: pide el motivo en una fila debajo del pago
@@ -312,7 +435,7 @@
       var viejo = $('cpBody').querySelector('.anular-row');
       if (viejo) viejo.remove();
       var tr = an.closest('tr');
-      tr.insertAdjacentHTML('afterend', '<tr class="anular-row"><td colspan="7"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">' +
+      tr.insertAdjacentHTML('afterend', '<tr class="anular-row"><td colspan="9"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">' +
         '<label class="adm-field" style="flex:1 1 260px">Motivo de la anulación del recibo ' + recibo(an.dataset.anular) +
         '<input id="anMotivo" class="adm-input" maxlength="200" style="width:100%" placeholder="Ej.: monto equivocado"></label>' +
         '<button type="button" class="adm-btn" data-confirmar-anular="' + an.dataset.anular + '" style="border-color:#9A3B2E;color:#9A3B2E">Anular recibo</button>' +
@@ -340,11 +463,14 @@
 
   $('pgFecha').value = hoy();
   $('pgFecha').max = hoy();
+  pintarEstadoNuevo();
+  pintarDetalle();
 
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { if ($('ecDetalle').hidden) cargarTodo(); },
     limpiar: function () {
       saldos = []; saldoDe = {}; pagos = []; ecActual = null; movimientos = [];
+      tiposProc = []; limpiarFormulario();
       ['ecBody', 'ecMovs', 'cpBody', 'pgPaciente', 'cpMetodos'].forEach(function (id) { $(id).innerHTML = ''; });
       $('ecDetalle').hidden = true; $('ecLista').hidden = false;
     }

@@ -1928,6 +1928,124 @@ select v.nombre, v.descripcion, v.sugeridos, v.orden
 -- Número de identificación tributaria (texto; p. ej. «1234567-8» o «CF» para consumidor final).
 alter table public.pacientes add column if not exists nit text check (char_length(nit) <= 20);
 
+-- ===== Cobros con documento (factura o recibo) y detalle =====
+-- Cada pago guarda los datos del documento: NIT, tipo (factura o recibo), serie, número de factura, número DTE (FEL),
+-- monto en dólares, número de cuota, estado (Emitido, Aplicado, Certificado, Anulado) y observaciones.
+-- El detalle tiene líneas numeradas (tipo de procedimiento, clasificación Bien o Servicio, monto Q y US$).
+-- El monto del pago (Q y US$) es la suma de su detalle. Se registra todo junto con registrar_pago().
+
+alter table public.pagos add column if not exists nit text check (char_length(nit) <= 20);
+alter table public.pagos add column if not exists tipo_documento text not null default 'recibo' check (tipo_documento in ('factura', 'recibo'));
+alter table public.pagos add column if not exists serie text check (char_length(serie) <= 20);
+alter table public.pagos add column if not exists numero_factura text check (char_length(numero_factura) <= 30);
+alter table public.pagos add column if not exists numero_dte text check (char_length(numero_dte) <= 60);
+alter table public.pagos add column if not exists monto_usd numeric(10,2) check (monto_usd >= 0);
+alter table public.pagos add column if not exists numero_cuota int check (numero_cuota between 1 and 999);
+alter table public.pagos add column if not exists estado_doc text not null default 'emitido' check (estado_doc in ('emitido', 'aplicado', 'certificado', 'anulado'));
+alter table public.pagos add column if not exists observaciones text check (char_length(observaciones) <= 500);
+
+-- Pagos anulados antes de existir el estado: quedan «Anulado»
+update public.pagos set estado_doc = 'anulado' where anulado and estado_doc <> 'anulado';
+
+-- Al anular un pago (función anular_pago), su estado pasa a «Anulado»
+create or replace function public.pago_estado_anulado()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.anulado and not old.anulado then
+    new.estado_doc := 'anulado';
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'pagos_estado_anulado' and tgrelid = 'public.pagos'::regclass) then
+    create trigger pagos_estado_anulado before update on public.pagos
+      for each row execute function public.pago_estado_anulado();
+  end if;
+end $$;
+
+create table if not exists public.pago_detalle (
+  id                    bigint generated always as identity primary key,
+  pago_id               bigint not null references public.pagos (id) on delete cascade,
+  linea                 int not null check (linea >= 1),
+  tipo_procedimiento_id bigint references public.tipos_procedimiento (id) on delete set null,
+  clasificacion         text not null default 'bien' check (clasificacion in ('bien', 'servicio')),
+  monto                 numeric(10,2) not null default 0 check (monto >= 0),
+  monto_usd             numeric(10,2) not null default 0 check (monto_usd >= 0)
+);
+create unique index if not exists pago_detalle_linea on public.pago_detalle (pago_id, linea);
+alter table public.pago_detalle enable row level security;
+drop policy if exists "personal ve detalle de pagos" on public.pago_detalle;
+create policy "personal ve detalle de pagos" on public.pago_detalle for select using (public.es_personal());
+grant select on public.pago_detalle to authenticated;
+
+-- Registra el pago y su detalle en un solo paso. Los montos del pago son la suma de las líneas.
+create or replace function public.registrar_pago(p_datos jsonb, p_lineas jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint;
+  v_q numeric := 0;
+  v_usd numeric := 0;
+  v_estado text := coalesce(nullif(p_datos ->> 'estado_doc', ''), 'emitido');
+  e jsonb;
+  n int := 0;
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if jsonb_array_length(coalesce(p_lineas, '[]'::jsonb)) = 0 then
+    raise exception 'Agrega al menos una línea al detalle del pago';
+  end if;
+  if v_estado not in ('emitido', 'aplicado', 'certificado') then
+    raise exception 'Un pago nuevo no puede registrarse como anulado';
+  end if;
+  select coalesce(sum(greatest(coalesce((l ->> 'monto')::numeric, 0), 0)), 0),
+         coalesce(sum(greatest(coalesce((l ->> 'monto_usd')::numeric, 0), 0)), 0)
+    into v_q, v_usd
+    from jsonb_array_elements(p_lineas) l;
+  if v_q <= 0 then
+    raise exception 'El total en quetzales del detalle debe ser mayor que cero';
+  end if;
+  insert into public.pagos (paciente_id, presupuesto_id, fecha, monto, monto_usd, metodo, referencia, concepto,
+                            nit, tipo_documento, serie, numero_factura, numero_dte, numero_cuota, estado_doc, observaciones)
+  values ((p_datos ->> 'paciente_id')::bigint, nullif(p_datos ->> 'presupuesto_id', '')::bigint,
+          coalesce(nullif(p_datos ->> 'fecha', '')::date, current_date), round(v_q, 2), round(v_usd, 2),
+          (p_datos ->> 'metodo')::public.metodo_pago, nullif(trim(p_datos ->> 'referencia'), ''), nullif(trim(p_datos ->> 'concepto'), ''),
+          nullif(trim(p_datos ->> 'nit'), ''), coalesce(nullif(p_datos ->> 'tipo_documento', ''), 'recibo'), nullif(trim(p_datos ->> 'serie'), ''),
+          nullif(trim(p_datos ->> 'numero_factura'), ''), nullif(trim(p_datos ->> 'numero_dte'), ''),
+          nullif(p_datos ->> 'numero_cuota', '')::int, v_estado, nullif(trim(p_datos ->> 'observaciones'), ''))
+  returning id into v_id;
+  for e in select * from jsonb_array_elements(p_lineas) loop
+    n := n + 1;
+    insert into public.pago_detalle (pago_id, linea, tipo_procedimiento_id, clasificacion, monto, monto_usd)
+    values (v_id, n, nullif(e ->> 'tipo_procedimiento_id', '')::bigint, coalesce(nullif(e ->> 'clasificacion', ''), 'bien'),
+            round(greatest(coalesce((e ->> 'monto')::numeric, 0), 0), 2), round(greatest(coalesce((e ->> 'monto_usd')::numeric, 0), 0), 2));
+  end loop;
+  return v_id;
+end;
+$$;
+revoke execute on function public.registrar_pago(jsonb, jsonb) from public, anon;
+grant execute on function public.registrar_pago(jsonb, jsonb) to authenticated;
+
+-- Cambiar el estado del documento (Emitido, Aplicado, Certificado). «Anulado» solo con anular_pago.
+create or replace function public.cambiar_estado_pago(p_id bigint, p_estado text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if p_estado not in ('emitido', 'aplicado', 'certificado') then
+    raise exception 'Para anular un pago usa el botón Anular';
+  end if;
+  update public.pagos set estado_doc = p_estado where id = p_id and not anulado;
+  if not found then
+    raise exception 'El pago no existe o está anulado';
+  end if;
+end;
+$$;
+revoke execute on function public.cambiar_estado_pago(bigint, text) from public, anon;
+grant execute on function public.cambiar_estado_pago(bigint, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
