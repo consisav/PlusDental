@@ -116,6 +116,11 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .cuo-res small{display:block;font-size:10.5px;color:#9CC3DA;letter-spacing:.08em;font-weight:700}
 .cuo-res b{font-size:17px}
 .cuo-bloqueada .cuo-fila{cursor:default}
+.cuo-bloqueada .cuo-modo button{cursor:default}
+.cuo-modo{display:inline-flex;border:1px solid #C4D4DF;border-radius:999px;padding:3px;background:#FFFFFF;align-self:flex-start;flex-wrap:wrap}
+.cuo-modo button{font:inherit;font-size:13px;font-weight:700;border:0;background:transparent;color:#475B68;padding:7px 14px;border-radius:999px;cursor:pointer}
+.cuo-modo button[aria-pressed="true"]{background:#0B2B40;color:#FFFFFF}
+.cuo-res>div.cuo-cero{background:#DCF2EC;color:#08504C}.cuo-res>div.cuo-cero small{color:#08504C}
 .pre-cuotas{display:flex;flex-direction:column;gap:8px;max-width:760px}
 .pre-cuotas-tit{font-size:14px;font-weight:600}
 .pre-pago{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;max-width:760px}
@@ -1104,7 +1109,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 <div class="pre-pago">
 <label>Forma de pago<select id="preForma" class="adm-input"><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta de crédito</option><option value="otro">Otro</option></select></label>
-<input type="hidden" id="preCuotas" value="1">
+<input type="hidden" id="preCuotas" value="1"><input type="hidden" id="preSinRecargo" value="">
 <label>Cantidad de citas<input id="preCitas" type="number" min="1" max="99" step="1" inputmode="numeric" class="adm-input" placeholder="Ej.: 3"></label>
 </div>
 <div id="preCuotasWrap" class="pre-cuotas" hidden><span class="pre-cuotas-tit">Plan de pago con tarjeta</span><div id="preCuotasTabla"></div></div>

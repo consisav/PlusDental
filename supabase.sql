@@ -2393,6 +2393,95 @@ $$;
 revoke execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb, text, text, int, int) from public, anon;
 grant execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb, text, text, int, int) to authenticated;
 
+-- ===== Plan de cuotas sin recargo =====
+-- Con tarjeta se puede elegir el plan de cuotas con recargo (según «Recargos de tarjeta») o sin recargo (tasa cero).
+-- Esta versión de guardar_presupuesto reemplaza a las anteriores.
+alter table public.presupuestos add column if not exists sin_recargo boolean not null default false;
+drop function if exists public.guardar_presupuesto(bigint, numeric, text, jsonb, text, text, int, int);
+create or replace function public.guardar_presupuesto(p_id bigint, p_descuento numeric, p_notas text, p_items jsonb,
+  p_tipo text default 'directo', p_forma_pago text default null, p_cuotas int default null, p_citas int default null,
+  p_sin_recargo boolean default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_p public.presupuestos;
+  v_tipo text := coalesce(p_tipo, 'directo');
+  v_forma text;
+  v_cuotas int;
+  v_citas int;
+  v_recargo numeric := 0;
+  v_sin boolean;
+  v_max numeric;
+  v_antes text;
+  v_despues text;
+  v_tenia boolean;
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if v_tipo not in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial') then
+    raise exception 'Tipo de precio no válido';
+  end if;
+  select * into v_p from public.presupuestos where id = p_id for update;
+  if v_p.id is null then
+    raise exception 'Presupuesto no encontrado';
+  end if;
+  if v_p.estado in ('aprobado', 'rechazado') then
+    raise exception 'Un presupuesto aprobado o no aprobado ya no se puede modificar';
+  end if;
+  v_forma := coalesce(nullif(p_forma_pago, ''), v_p.forma_pago);
+  if v_forma not in ('efectivo', 'transferencia', 'tarjeta', 'otro') then
+    raise exception 'Forma de pago no válida';
+  end if;
+  v_cuotas := case when p_forma_pago is null then v_p.cuotas when v_forma = 'tarjeta' then coalesce(p_cuotas, 1) else null end;
+  if v_cuotas is not null and v_cuotas not in (1, 2, 3, 6, 10, 12, 18, 24) then
+    raise exception 'El plan de pago debe ser de 1, 2, 3, 6, 10, 12, 18 o 24 cuotas';
+  end if;
+  v_citas := case when p_forma_pago is null then v_p.citas else p_citas end;
+  if v_citas is not null and (v_citas < 1 or v_citas > 99) then
+    raise exception 'La cantidad de citas debe estar entre 1 y 99';
+  end if;
+  v_sin := v_forma = 'tarjeta' and (case when p_forma_pago is null then v_p.sin_recargo else coalesce(p_sin_recargo, false) end);
+  if v_forma = 'tarjeta' and v_cuotas is not null and not v_sin then
+    v_recargo := case when p_forma_pago is null then v_p.recargo_pct
+                      else coalesce((select porcentaje from public.recargos_cuotas where cuotas = v_cuotas), 0) end;
+  end if;
+
+  select min(pr.descuento_max) into v_max
+    from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) e
+    join public.tratamientos t on lower(t.nombre) = lower(trim(e ->> 'tratamiento'))
+    join public.precios pr on pr.tratamiento_id = t.id and pr.tipo = v_tipo and pr.estado = 'activo';
+  if v_max is not null and coalesce(p_descuento, 0) > v_max then
+    raise exception 'El descuento máximo permitido con este tipo de precio es % %%', trim(trailing '.' from trim(trailing '0' from v_max::text));
+  end if;
+
+  select exists (select 1 from public.presupuesto_items where presupuesto_id = p_id) into v_tenia;
+  select coalesce(string_agg(tratamiento || '|' || coalesce(pieza, '') || '|' || cantidad || '|' || precio::numeric(10,2), ';' order by orden, id), '')
+    into v_antes from public.presupuesto_items where presupuesto_id = p_id;
+  v_antes := v_antes || '#' || v_p.descuento_pct::numeric(5,2) || '#' || coalesce(v_p.notas, '') || '#' || v_p.tipo_precio || '#' ||
+             v_p.forma_pago || '#' || coalesce(v_p.cuotas::text, '') || '#' || coalesce(v_p.citas::text, '') || '#' || v_p.recargo_pct::numeric(5,2) || '#' || v_p.sin_recargo;
+
+  delete from public.presupuesto_items where presupuesto_id = p_id;
+  insert into public.presupuesto_items (presupuesto_id, orden, tratamiento, pieza, cantidad, precio)
+  select p_id, t.ord, trim(t.i ->> 'tratamiento'), nullif(trim(t.i ->> 'pieza'), ''),
+         greatest(coalesce((t.i ->> 'cantidad')::int, 1), 1), greatest(coalesce((t.i ->> 'precio')::numeric, 0), 0)
+  from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) with ordinality as t(i, ord)
+  where coalesce(trim(t.i ->> 'tratamiento'), '') <> '';
+
+  select coalesce(string_agg(tratamiento || '|' || coalesce(pieza, '') || '|' || cantidad || '|' || precio::numeric(10,2), ';' order by orden, id), '')
+    into v_despues from public.presupuesto_items where presupuesto_id = p_id;
+  v_despues := v_despues || '#' || coalesce(p_descuento, 0)::numeric(5,2) || '#' || coalesce(nullif(trim(p_notas), ''), '') || '#' || v_tipo || '#' ||
+               v_forma || '#' || coalesce(v_cuotas::text, '') || '#' || coalesce(v_citas::text, '') || '#' || v_recargo::numeric(5,2) || '#' || v_sin;
+
+  update public.presupuestos
+     set descuento_pct = coalesce(p_descuento, 0), notas = nullif(trim(p_notas), ''), tipo_precio = v_tipo,
+         forma_pago = v_forma, cuotas = v_cuotas, citas = v_citas, recargo_pct = v_recargo, sin_recargo = v_sin,
+         version = case when v_tenia and v_antes <> v_despues then version + 1 else version end
+   where id = p_id;
+end;
+$$;
+revoke execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb, text, text, int, int, boolean) from public, anon;
+grant execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb, text, text, int, int, boolean) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

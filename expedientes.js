@@ -338,7 +338,7 @@
       var r = await sb.from('presupuestos').insert({ paciente_id: actual.id }).select('id').single();
       if (r.error) throw new Error(traducir(r.error));
       var g = await sb.rpc('guardar_presupuesto', { p_id: r.data.id, p_descuento: 0, p_notas: '', p_items: d.items, p_tipo: d.tipo,
-        p_forma_pago: d.forma_pago || 'efectivo', p_cuotas: d.cuotas, p_citas: d.citas });
+        p_forma_pago: d.forma_pago || 'efectivo', p_cuotas: d.cuotas, p_citas: d.citas, p_sin_recargo: !!d.sin_recargo });
       if (g.error) {
         var falta = /guardar_presupuesto|could not find the function/i.test(g.error.message || '');
         throw new Error('Se creó el presupuesto N.º ' + r.data.id + ', pero no se pudieron agregar los tratamientos: ' +

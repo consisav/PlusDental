@@ -169,6 +169,11 @@
       '.odg-det tr.odg-edit td:nth-child(1) input{width:70px}.odg-det tr.odg-edit td:nth-child(2) input{width:100%;min-width:130px}',
       '.odg-man{color:#B45309;font-size:12px}',
       '.odg-res .odg-pre-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}',
+      '.odg-res .odg-pre .odg-pre-pie{display:flex;justify-content:space-between;align-items:center;gap:10px 14px;flex-wrap:wrap;border-top:1px solid #D9E4EC;padding-top:12px}',
+      '.odg-pre-pie>span{font-size:12.5px;color:#5A6D7A}',
+      '.odg-res .odg-pre .cuo-res>div{background:#0B2B40;color:#FFFFFF;border-radius:12px;padding:8px 14px}',
+      '.odg-res .odg-pre .cuo-res>div.cuo-cero{background:#DCF2EC;color:#08504C}',
+      '.odg-res .odg-pre .cuo-modo{display:inline-flex;border:1px solid #C4D4DF;border-radius:999px;padding:3px;background:#FFFFFF;align-self:flex-start}',
       '.odg-res .odg-pre-ed{background:#FFFBF0;border-radius:12px;padding:14px;margin-top:14px;border-top:0}',
       '.odg-res .odg-pre select:disabled,.odg-res .odg-pre input:disabled,.odg-res select[data-tipo-precio]:disabled{background:#F1F5F9;color:#0B2B40;-webkit-text-fill-color:#0B2B40;opacity:1;cursor:not-allowed}',
       '.odg-est:disabled[aria-pressed="true"]{opacity:1}',
@@ -404,22 +409,25 @@
     var FORMAS = [['efectivo', 'Efectivo'], ['transferencia', 'Transferencia'], ['tarjeta', 'Tarjeta de crédito'], ['otro', 'Otro']];
     var CUOTAS = [1, 2, 3, 6, 10, 12, 18, 24];
     var ESTADOS_PRE = [['activo', 'Activo'], ['aprobado', 'Aprobado'], ['proceso', 'Proceso'], ['finalizado', 'Finalizado'], ['no_aprobado', 'No aprobado']];
-    var datosPre = { forma: 'efectivo', cuotas: 1, citas: '', estado: 'activo' }, codigoPre = '';
+    var datosPre = { forma: 'efectivo', cuotas: 1, sinRecargo: false, citas: '', estado: 'activo' }, codigoPre = '';
     function bloquePresupuesto(total) {
       var tarjeta = datosPre.forma === 'tarjeta', ed = editandoDatos && esSuper(), dis = ed ? '' : ' disabled';
-      var botones = !esSuper() ? '' : ed
-        ? '<button type="button" class="odg-crear" data-datos-guardar>Guardar</button><button type="button" class="odg-imp" data-datos-cancelar>Cancelar</button>'
-        : '<button type="button" class="odg-imp" data-datos-mod>Modificar información del presupuesto</button>';
-      return '<div class="odg-pre' + (ed ? ' odg-pre-ed' : '') + '"><div class="odg-pre-cab"><div class="odg-pre-tit">Datos del presupuesto</div><div class="odg-fila-acc">' + botones + '</div></div><div class="odg-pre-g">' +
+      // Barra final: guardar lo definido y confirmar (crear) el presupuesto
+      var pie = !esSuper() ? '' : '<div class="odg-pre-pie">' + (ed
+        ? '<span>Revisa los datos y guárdalos; luego confirma para crear el presupuesto.</span><div class="odg-fila-acc"><button type="button" class="odg-imp" data-datos-cancelar>Cancelar</button><button type="button" class="odg-imp" data-datos-guardar>Guardar</button>' +
+          (opciones.crearPresupuesto ? '<button type="button" class="odg-crear" data-datos-confirmar>Guardar y confirmar presupuesto</button>' : '') + '</div>'
+        : '<span>Todo lo definido arriba se guarda en el presupuesto al confirmarlo.</span><div class="odg-fila-acc"><button type="button" class="odg-imp" data-datos-mod>Modificar información del presupuesto</button>' +
+          (opciones.crearPresupuesto ? '<button type="button" class="odg-crear" data-crear-presupuesto>Confirmar presupuesto</button>' : '') + '</div>') + '</div>';
+      return '<div class="odg-pre' + (ed ? ' odg-pre-ed' : '') + '"><div class="odg-pre-cab"><div class="odg-pre-tit">Datos del presupuesto</div></div><div class="odg-pre-g">' +
         '<div class="odg-pre-campo"><span>Código del presupuesto</span><div class="odg-cod"><small>SE ASIGNA AL CREAR</small>' + esc(codigoPre || '—') + '</div></div>' +
         '<label class="odg-pre-campo"><span>Forma de pago</span><select data-pre-campo="forma"' + dis + '>' + FORMAS.map(function (x) {
           return '<option value="' + x[0] + '"' + (x[0] === datosPre.forma ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label>' +
         '<label class="odg-pre-campo"><span>Cantidad de citas</span><input type="number" min="1" max="99" step="1" inputmode="numeric" data-pre-campo="citas" value="' + esc(datosPre.citas) + '" placeholder="Ej.: 3"' + dis + '></label>' +
-        '</div>' + (tarjeta && window.PD_CUOTAS ? '<div class="odg-pre-campo' + (ed ? '' : ' cuo-bloqueada') + '"><span>Plan de pago con tarjeta</span>' + window.PD_CUOTAS.tabla(total, datosPre.cuotas, 'pre-cuota') + '</div>' : '') +
+        '</div>' + (tarjeta && window.PD_CUOTAS ? '<div class="odg-pre-campo' + (ed ? '' : ' cuo-bloqueada') + '"><span>Plan de pago con tarjeta</span>' + window.PD_CUOTAS.tabla(total, datosPre.cuotas, 'pre-cuota', null, datosPre.sinRecargo) + '</div>' : '') +
         '<div class="odg-pre-campo"><span>Estado</span><div class="odg-pre-est" role="group" aria-label="Estado del presupuesto">' + ESTADOS_PRE.map(function (x) {
           var auto = x[0] === 'proceso' || x[0] === 'finalizado';
           return '<button type="button" class="odg-est odg-est-' + x[0] + '" data-pre-estado="' + x[0] + '" aria-pressed="' + (datosPre.estado === x[0]) + '"' +
-            (auto ? ' disabled title="Se pone solo al marcar tratamientos realizados en Presupuesto"' : ed ? '' : ' disabled') + '>' + x[1] + '</button>'; }).join('') + '</div></div></div>';
+            (auto ? ' disabled title="Se pone solo al marcar tratamientos realizados en Presupuesto"' : ed ? '' : ' disabled') + '>' + x[1] + '</button>'; }).join('') + '</div></div>' + pie + '</div>';
     }
     function resumen() {
       var f = filasDetalle(), sup = esSuper();
@@ -595,8 +603,8 @@
       var html = '<form method="dialog"><h4>Crear presupuesto</h4>' +
         '<p>Nuevo presupuesto' + (nombre ? ' · <b>' + esc(nombre) + '</b>' : '') + '</p>' +
         '<p>Tipo de precio: <b>' + (tp ? tp[1] : '') + '</b></p>' +
-        '<p>Forma de pago: <b>' + FORMAS.filter(function (x) { return x[0] === datosPre.forma; })[0][1] + (datosPre.forma === 'tarjeta' ? ' · ' + (datosPre.cuotas === 1 ? '1 pago' : datosPre.cuotas + ' cuotas') : '') + '</b>' +
-        (datosPre.forma === 'tarjeta' && window.PD_CUOTAS ? ' · Total a pagar: <b>' + q(window.PD_CUOTAS.calcular(d.lineas.reduce(function (s, l) { return s + l.precio * l.cantidad; }, 0), datosPre.cuotas).total) + '</b>' : '') +
+        '<p>Forma de pago: <b>' + FORMAS.filter(function (x) { return x[0] === datosPre.forma; })[0][1] + (datosPre.forma === 'tarjeta' ? ' · ' + (datosPre.cuotas === 1 ? '1 pago' : datosPre.cuotas + ' cuotas') + (datosPre.sinRecargo ? ' sin recargo' : '') : '') + '</b>' +
+        (datosPre.forma === 'tarjeta' && window.PD_CUOTAS ? ' · Total a pagar: <b>' + q(window.PD_CUOTAS.calcular(d.lineas.reduce(function (s, l) { return s + l.precio * l.cantidad; }, 0), datosPre.cuotas, datosPre.sinRecargo ? 0 : null).total) + '</b>' : '') +
         (datosPre.citas ? ' · Citas: <b>' + esc(datosPre.citas) + '</b>' : '') + ' · Estado: <b>' + ESTADOS_PRE.filter(function (x) { return x[0] === datosPre.estado; })[0][1] + '</b></p>';
       if (!d.lineas.length) {
         html += '<div class="alerta">Ningún hallazgo «Requerido» tiene procedimiento. Elige el procedimiento en la tabla del detalle y vuelve a intentarlo.</div>' +
@@ -634,7 +642,7 @@
       try {
         var r = await opciones.crearPresupuesto({
           tipo: tipoPrecio,
-          forma_pago: datosPre.forma, cuotas: datosPre.forma === 'tarjeta' ? datosPre.cuotas : null,
+          forma_pago: datosPre.forma, cuotas: datosPre.forma === 'tarjeta' ? datosPre.cuotas : null, sin_recargo: datosPre.forma === 'tarjeta' && datosPre.sinRecargo,
           citas: datosPre.citas ? +datosPre.citas : null, estado: datosPre.estado,
           items: d.lineas.map(function (l) { return { tratamiento: l.tratamiento, pieza: l.pieza, cantidad: l.cantidad, precio: l.precio }; })
         });
@@ -686,6 +694,9 @@
       if (e.target.closest('[data-fila-cancelar]')) { editandoFila = null; pintar(); return; }
       if (e.target.closest('[data-datos-mod]') && esSuper()) { editandoDatos = true; copiaDatos = { d: JSON.parse(JSON.stringify(datosPre)), t: tipoPrecio }; pintar(); return; }
       if (e.target.closest('[data-datos-guardar]')) { editandoDatos = false; copiaDatos = null; pintar(); return; }
+      if (e.target.closest('[data-datos-confirmar]')) { editandoDatos = false; copiaDatos = null; pintar(); abrirPresupuesto(); return; }
+      var modo = e.target.closest('[data-pre-cuota-modo]');
+      if (modo) { if (editandoDatos && esSuper()) { datosPre.sinRecargo = modo.dataset.preCuotaModo === 'sin'; pintar(); } return; }
       if (e.target.closest('[data-datos-cancelar]')) { if (copiaDatos) { datosPre = copiaDatos.d; tipoPrecio = copiaDatos.t; } editandoDatos = false; copiaDatos = null; pintar(); return; }
       var cuo = e.target.closest('[data-pre-cuota]');
       if (cuo && !(editandoDatos && esSuper())) return;

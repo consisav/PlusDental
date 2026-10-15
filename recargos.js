@@ -36,19 +36,24 @@
     return { cuotas: n, pct: pct, recargo: recargo, total: pagar, cuota: r2(pagar / n) };
   }
   // Tabla para elegir el plan: cada fila lleva data-<atributo>="n"
-  function tabla(total, sel, atributo, pctFijo) {
+  // sinRecargo: plan de cuotas sin recargo (tasa cero); el selector se elige con data-<atributo>-modo="con|sin"
+  function tabla(total, sel, atributo, pctFijo, sinRecargo) {
     sel = +sel || 1;
+    if (sinRecargo) pctFijo = 0;
     var filasHtml = PLANES.map(function (n) {
-      var c = calcular(total, n, n === sel ? pctFijo : null), activo = n === sel;
+      var c = calcular(total, n, sinRecargo ? 0 : n === sel ? pctFijo : null), activo = n === sel;
       return '<tr class="cuo-fila' + (activo ? ' cuo-sel' : '') + '" data-' + atributo + '="' + n + '" tabindex="0" role="radio" aria-checked="' + activo + '">' +
         '<td><span class="cuo-radio" aria-hidden="true"></span></td><td>' + (n === 1 ? '1 pago' : n + ' cuotas') + '</td>' +
         '<td class="num">' + pctTxt(c.pct) + '</td><td class="num">' + q(c.recargo) + '</td><td class="num">' + q(c.cuota) + '</td><td class="num"><strong>' + q(c.total) + '</strong></td></tr>';
     }).join('');
     var e = calcular(total, sel, pctFijo);
-    return '<div class="cuo"><div class="roles-wrap" data-sin-tarjetas><table class="cuo-tabla" role="radiogroup" aria-label="Plan de pago"><thead><tr><th><span class="sr-only">Elegir</span></th><th>Plan</th><th class="num">% recargo</th><th class="num">Recargo</th><th class="num">Valor cuota</th><th class="num">Total a pagar</th></tr></thead>' +
+    var modo = '<div class="cuo-modo" role="group" aria-label="Recargo del plan de cuotas">' +
+      '<button type="button" data-' + atributo + '-modo="con" aria-pressed="' + !sinRecargo + '">Con recargo</button>' +
+      '<button type="button" data-' + atributo + '-modo="sin" aria-pressed="' + !!sinRecargo + '">Sin recargo (tasa cero)</button></div>';
+    return '<div class="cuo">' + modo + '<div class="roles-wrap" data-sin-tarjetas><table class="cuo-tabla" role="radiogroup" aria-label="Plan de pago"><thead><tr><th><span class="sr-only">Elegir</span></th><th>Plan</th><th class="num">% recargo</th><th class="num">Recargo</th><th class="num">Valor cuota</th><th class="num">Total a pagar</th></tr></thead>' +
       '<tbody>' + filasHtml + '</tbody></table></div>' +
       '<div class="cuo-res"><div><small>PLAN ELEGIDO</small><b>' + (sel === 1 ? '1 pago de ' : sel + ' cuotas de ') + q(e.cuota) + '</b></div>' +
-      '<div><small>TOTAL A PAGAR</small><b>' + q(e.total) + '</b></div></div></div>';
+      '<div><small>TOTAL A PAGAR</small><b>' + q(e.total) + '</b></div>' + (sinRecargo ? '<div class="cuo-cero"><small>RECARGO</small><b>Sin recargo</b></div>' : '') + '</div></div>';
   }
 
   window.PD_CUOTAS = { PLANES: PLANES, cargar: cargar, calcular: calcular, tabla: tabla, porcentaje: function (n) { return porc[n] || 0; } };

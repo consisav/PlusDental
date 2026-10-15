@@ -229,6 +229,7 @@
     $('preNotas').value = actual.notas || '';
     $('preForma').value = actual.forma_pago || 'efectivo';
     $('preCuotas').value = String(actual.cuotas || 1);
+    $('preSinRecargo').value = actual.sin_recargo ? '1' : '';
     if (window.PD_CUOTAS) window.PD_CUOTAS.cargar().then(function () { if (actual) pintarCuotas(); });
     $('preCitas').value = actual.citas || '';
     if (editable() && !items.length) items.push({ tratamiento: '', pieza: '', cantidad: 1, precio: 0 });
@@ -283,7 +284,7 @@
     var total = totales(items, $('preDescuento').value).total, sel = +($('preCuotas').value || 1);
     // presupuesto ya aprobado o no aprobado: se usa el % guardado; si se puede editar, el vigente
     var fijo = !editable() && sel === actual.cuotas ? actual.recargo_pct : null;
-    $('preCuotasTabla').innerHTML = window.PD_CUOTAS.tabla(total, sel, 'pre-cuota', fijo);
+    $('preCuotasTabla').innerHTML = window.PD_CUOTAS.tabla(total, sel, 'pre-cuota', fijo, $('preSinRecargo').value === '1');
     $('preCuotasTabla').classList.toggle('cuo-bloqueada', !editable());
   }
 
@@ -310,7 +311,7 @@
       (t.descuento ? 'Subtotal: ' + q(t.subtotal) + '\nDescuento (' + Number($('preDescuento').value) + '%): -' + q(t.descuento) + '\n' : '') +
       'Total: ' + q(t.total) + ' (IVA incluido)' +
       '\nForma de pago: ' + FORMAS[$('preForma').value || 'efectivo'] + ($('preForma').value === 'tarjeta' ? ' · ' + ($('preCuotas').value === '1' ? '1 pago' : $('preCuotas').value + ' cuotas') : '') +
-      ($('preForma').value === 'tarjeta' && window.PD_CUOTAS ? (function () { var c = window.PD_CUOTAS.calcular(t.total, +($('preCuotas').value || 1), !editable() ? actual.recargo_pct : null); return '\nValor de cada cuota: ' + q(c.cuota) + ' (recargo ' + c.pct + '%)\nTotal a pagar con tarjeta: ' + q(c.total); })() : '') +
+      ($('preForma').value === 'tarjeta' && window.PD_CUOTAS ? (function () { var sinR = $('preSinRecargo').value === '1', c = window.PD_CUOTAS.calcular(t.total, +($('preCuotas').value || 1), sinR ? 0 : !editable() ? actual.recargo_pct : null); return '\nValor de cada cuota: ' + q(c.cuota) + (sinR ? ' (sin recargo)' : ' (recargo ' + c.pct + '%)') + '\nTotal a pagar con tarjeta: ' + q(c.total); })() : '') +
       ($('preCitas').value ? '\nCitas estimadas: ' + $('preCitas').value : '') +
       ($('preNotas').value.trim() ? '\n\n' + $('preNotas').value.trim() : '') +
       '\n\nQuedamos a la orden para cualquier duda.';
@@ -356,7 +357,8 @@
       p_tipo: tipoActual(),
       p_forma_pago: $('preForma').value || 'efectivo',
       p_cuotas: $('preForma').value === 'tarjeta' ? +($('preCuotas').value || 1) : null,
-      p_citas: $('preCitas').value ? Math.min(Math.max(parseInt($('preCitas').value, 10) || 1, 1), 99) : null
+      p_citas: $('preCitas').value ? Math.min(Math.max(parseInt($('preCitas').value, 10) || 1, 1), 99) : null,
+      p_sin_recargo: $('preForma').value === 'tarjeta' && $('preSinRecargo').value === '1'
     });
     if (r.error) { aviso('preEdMsg', traducir(r.error), true); return false; }
     cambios = false;
@@ -494,6 +496,8 @@
   });
   // Plan de pago: se elige tocando la fila de la tabla
   $('preCuotasTabla').addEventListener('click', function (e) {
+    var m = e.target.closest('[data-pre-cuota-modo]');
+    if (m && editable()) { $('preSinRecargo').value = m.dataset.preCuotaModo === 'sin' ? '1' : ''; cambios = true; pintarCuotas(); var a2 = $('preWa'); if (a2) a2.href = mensajeWhatsApp(); return; }
     var f = e.target.closest('[data-pre-cuota]');
     if (!f || !editable()) return;
     $('preCuotas').value = f.dataset.preCuota;
