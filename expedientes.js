@@ -437,7 +437,7 @@
   async function cargarPresupuestoActual() {
     if (!actual) return;
     var pid = actual.id;
-    var r = await sb.from('presupuestos').select('*,presupuesto_items(id,orden,tratamiento,pieza,cantidad,precio,realizado)')
+    var r = await sb.from('presupuestos').select('*,presupuesto_items(*)')
       .eq('paciente_id', pid).eq('origen', 'odontograma').order('id', { ascending: false }).limit(1);
     if (!actual || actual.id !== pid) return;
     odg.presupuestoActual(!r.error && r.data && r.data.length ? r.data[0] : null);

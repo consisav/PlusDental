@@ -161,12 +161,25 @@
       '.odg-res .odg-vacio{margin:4px 0 0;color:#5A6D7A}',
       '.odg-fila-acc{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}',
       '.odg-res .odg-det-wrap{overflow-x:auto;background:none;border:0;padding:0;border-radius:10px}',
-      '.odg-det td:nth-child(2){min-width:120px}.odg-det td.proc{min-width:170px}',
+      '.odg-det-c{table-layout:fixed;width:100%}',
+      '.odg-det-c th,.odg-det-c td{overflow-wrap:anywhere;word-break:normal}',
+      '.odg-det-c .odg-c-pz{width:18%}.odg-det-c .odg-c-val{width:14%}.odg-det-c .odg-c-est{width:19%}.odg-det-c .odg-c-acc{width:108px;text-align:right}',
+      '.odg-det-c td small{display:block;font-size:12px;color:#5A6D7A;font-weight:500;margin-top:2px}',
+      '.odg-det-c td.odg-c-pz strong{font-size:15px}',
+      '.odg-det-c tfoot td small{font-weight:600}',
+      '.odg-det-c select.odg-ie{width:100%;max-width:150px}',
+      '.odg-det .odg-mod{font:inherit;font-size:12.5px;font-weight:700;border:1px solid #C4D4DF;border-radius:999px;padding:5px 10px;min-height:32px;background:#FFFFFF;color:#0B2B40;cursor:pointer;white-space:nowrap}',
+      '.odg-det .odg-mod:hover{border-color:#0B2B40}',
+      '.odg-res .odg-edit-g{display:grid;grid-template-columns:90px minmax(0,1.2fr) minmax(0,2fr) 90px 120px;gap:10px;align-items:end;background:none;border:0;padding:4px 0;border-radius:0}',
+      '.odg-edit-g label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:#5A6D7A;min-width:0}',
+      '.odg-det tr.odg-edit .odg-edit-g input,.odg-det tr.odg-edit .odg-edit-g select{width:100%}',
+      '.odg-res .odg-edit-g .odg-edit-acc{grid-column:1/-1;justify-content:flex-end;background:none;border:0;padding:0}',
+      '@media (max-width:900px){.odg-res .odg-edit-g{grid-template-columns:repeat(2,minmax(0,1fr))}.odg-edit-g .odg-edit-proc{grid-column:1/-1}.odg-det-c .odg-c-acc{width:96px}}',
       '.odg-res .odg-pre .odg-fila-acc{display:flex}',
       '.odg-det .odg-mod{padding:5px 12px;min-height:32px;font-size:12.5px}',
       '.odg-det tr.odg-edit td{background:#FFF8E6}',
       '.odg-det tr.odg-edit input,.odg-det tr.odg-edit select{font:inherit;font-size:13.5px;border:1px solid #C4D4DF;border-radius:8px;padding:6px 8px;min-height:34px;box-sizing:border-box;max-width:100%;background:#FFFFFF}',
-      '.odg-det tr.odg-edit td:nth-child(1) input{width:70px}.odg-det tr.odg-edit td:nth-child(2) input{width:100%;min-width:130px}',
+
       '.odg-man{color:#B45309;font-size:12px}',
       '.odg-res .odg-pre-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}',
       '.odg-res .odg-pre .odg-pre-pie{display:flex;justify-content:space-between;align-items:center;gap:10px 14px;flex-wrap:wrap;border-top:1px solid #D9E4EC;padding-top:12px}',
@@ -388,34 +401,37 @@
       return texto ? '<div class="odg-aviso-est"><span>' + esc(texto) + '</span>' + boton + '</div>' : '';
     }
     function tablaDetalle(filas, conTotal) {
-      var total = 0, sinProc = 0, sinPrecio = 0, sup = esSuper(), conEstado = conTotal;
+      var total = 0, sinProc = 0, sinPrecio = 0, sup = esSuper(), conEstado = conTotal, columnas = conEstado ? 5 : 4;
       var cuerpo = filas.map(function (f) {
         var v = valorFila(f), clave = f.n + '|' + f.clave, it = conEstado ? itemDe(f) : null;
         var eliminado = it && it.estado === 'eliminado';
         if (f.h !== 'ausente' && !eliminado) { if (!f.proc) sinProc++; else if (v.total == null) sinPrecio++; else total += v.total; }
-        var colsEstado = conEstado ? '<td>' + (f.proc ? celdaEstado(f, it) : '—') + '</td><td class="fecha">' + (it && it.estado_fecha ? fechaHora(it.estado_fecha) + (it.estado_por ? '<br><span class="odg-por">' + esc(it.estado_por) + '</span>' : '') : '—') + '</td>' : '';
+        // Modificar: formulario a lo ancho de la tabla
         if (sup && editandoFila === clave && f.h !== 'ausente') {
           var item = buscarEnCatalogo(f.proc), base = item ? precioDe(item) : null;
-          return '<tr class="odg-edit" data-fila="' + clave + '"><td><input data-ed="pieza" value="' + esc(piezaDe(f)) + '" maxlength="20" aria-label="Pieza"></td>' +
-            '<td><input data-ed="hallazgo" value="' + esc(textoDe(f)) + '" maxlength="80" aria-label="Hallazgo"></td>' +
-            '<td class="proc"><select data-ed="proc" aria-label="Procedimiento">' + opcionesProc(f.h, f.proc) + '</select></td>' +
-            '<td class="num"><input data-ed="cant" type="number" min="1" max="32" step="1" value="' + v.cant + '" aria-label="Cantidad" style="width:64px"></td>' +
-            '<td class="num"><input data-ed="precio" type="number" min="0" step="0.01" value="' + (v.unit != null ? v.unit.toFixed(2) : '') + '" placeholder="' + (base != null ? base.toFixed(2) : '0.00') + '" aria-label="Precio" style="width:104px"></td>' +
-            '<td class="num">—</td>' + colsEstado + '<td><div class="odg-fila-acc"><button type="button" class="odg-imp" data-fila-guardar>Guardar</button><button type="button" class="odg-imp" data-fila-cancelar>Cancelar</button></div></td></tr>';
+          return '<tr class="odg-edit" data-fila="' + clave + '"><td colspan="' + columnas + '"><div class="odg-edit-g">' +
+            '<label><span>Pieza</span><input data-ed="pieza" value="' + esc(piezaDe(f)) + '" maxlength="20"></label>' +
+            '<label><span>Hallazgo</span><input data-ed="hallazgo" value="' + esc(textoDe(f)) + '" maxlength="80"></label>' +
+            '<label class="odg-edit-proc"><span>Procedimiento</span><select data-ed="proc">' + opcionesProc(f.h, f.proc) + '</select></label>' +
+            '<label><span>Cantidad</span><input data-ed="cant" type="number" min="1" max="32" step="1" value="' + v.cant + '"></label>' +
+            '<label><span>Precio (Q)</span><input data-ed="precio" type="number" min="0" step="0.01" value="' + (v.unit != null ? v.unit.toFixed(2) : '') + '" placeholder="' + (base != null ? base.toFixed(2) : '0.00') + '"></label>' +
+            '<div class="odg-fila-acc odg-edit-acc"><button type="button" class="odg-imp" data-fila-cancelar>Cancelar</button><button type="button" class="odg-crear" data-fila-guardar>Guardar</button></div>' +
+            '</div></td></tr>';
         }
         var proc = f.h === 'ausente' ? '—' : f.proc ? esc(f.proc.n) : '<span class="sinp">Sin procedimiento</span>';
-        return '<tr' + (eliminado ? ' class="odg-elim"' : '') + '><td><strong>' + esc(piezaDe(f)) + '</strong></td><td>' + esc(textoDe(f)) + '</td><td class="proc">' + proc + '</td>' +
-          '<td class="num">' + (f.proc ? v.cant : '—') + '</td>' +
-          '<td class="num">' + (v.unit != null ? q(v.unit) + (v.manual ? ' <span class="odg-man" title="Precio modificado a mano">✎</span>' : '') : f.proc ? '<span class="sinp">Sin precio</span>' : '—') + '</td>' +
-          '<td class="num">' + (v.total != null ? '<strong>' + q(v.total) + '</strong>' : '—') + '</td>' + colsEstado +
-          '<td>' + (sup && f.h !== 'ausente' && !editandoFila ? '<button type="button" class="odg-imp odg-mod" data-fila-mod="' + clave + '">Modificar</button>' : '') + '</td></tr>';
+        var valor = v.total != null ? '<strong>' + q(v.total) + '</strong><small>' + v.cant + ' × ' + q(v.unit) + (v.manual ? ' <span class="odg-man" title="Precio modificado a mano">✎</span>' : '') + '</small>'
+          : f.proc ? '<span class="sinp">Sin precio</span>' : '—';
+        var estado = conEstado ? '<td class="odg-c-est">' + (f.proc ? celdaEstado(f, it) : '—') +
+          (it && it.estado_fecha ? '<small>' + fechaHora(it.estado_fecha) + (it.estado_por ? ' · ' + esc(it.estado_por) : '') + '</small>' : '') + '</td>' : '';
+        var mod = sup && f.h !== 'ausente' && !editandoFila ? '<button type="button" class="odg-mod" data-fila-mod="' + clave + '" title="Modificar" aria-label="Modificar pieza ' + esc(piezaDe(f)) + '">✎ Modificar</button>' : '';
+        return '<tr' + (eliminado ? ' class="odg-elim"' : '') + '><td class="odg-c-pz"><strong>' + esc(piezaDe(f)) + '</strong><small>' + esc(textoDe(f)) + '</small></td>' +
+          '<td class="proc">' + proc + '</td><td class="num odg-c-val">' + valor + '</td>' + estado + '<td class="odg-c-acc">' + mod + '</td></tr>';
       }).join('');
-      var vacias = conEstado ? '<td></td><td></td>' : '';
-      var pie = conTotal && filas.length ? '<tfoot><tr><td></td><td>TOTAL ESTIMADO</td><td>' +
-        [sinProc ? sinProc + ' sin procedimiento' : '', sinPrecio ? sinPrecio + ' sin precio' : ''].filter(Boolean).join(' · ') +
-        '</td><td></td><td></td><td class="num">' + q(total) + '</td>' + vacias + '<td></td></tr></tfoot>' : '';
-      return (conEstado ? avisoEstado() : '') + '<div class="odg-det-wrap"><table class="odg-det"><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Procedimiento</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Total</th>' +
-        (conEstado ? '<th>Estado</th><th>Fecha estado</th>' : '') + '<th><span class="sr-only">Acciones</span></th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table></div>';
+      var pie = conTotal && filas.length ? '<tfoot><tr><td colspan="2">TOTAL ESTIMADO' +
+        ([sinProc ? sinProc + ' sin procedimiento' : '', sinPrecio ? sinPrecio + ' sin precio' : ''].filter(Boolean).length ? '<small>' + [sinProc ? sinProc + ' sin procedimiento' : '', sinPrecio ? sinPrecio + ' sin precio' : ''].filter(Boolean).join(' · ') + '</small>' : '') +
+        '</td><td class="num">' + q(total) + '</td>' + (conEstado ? '<td></td>' : '') + '<td></td></tr></tfoot>' : '';
+      return (conEstado ? avisoEstado() : '') + '<div class="odg-det-wrap"><table class="odg-det odg-det-c"><thead><tr><th class="odg-c-pz">Pieza · hallazgo</th><th>Procedimiento</th><th class="num odg-c-val">Valor</th>' +
+        (conEstado ? '<th class="odg-c-est">Estado · fecha</th>' : '') + '<th class="odg-c-acc"><span class="sr-only">Acciones</span></th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table></div>';
     }
     function guardarFila(tr) {
       var partes = tr.dataset.fila.split('|'), n = +partes[0], clave = partes[1], p = datos.piezas[n];
