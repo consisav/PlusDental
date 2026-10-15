@@ -327,7 +327,21 @@
   // base = lo último guardado; los cambios pendientes salen de comparar contra ella.
   // meta guarda, por pieza, la fecha del cambio y las observaciones escritas antes de guardar.
   var base = null, meta = {}, pendientes = [], historial = [];
-  var odg = window.Odontograma.crear($('odoComp'), { onCambio: function () { revisarCambios(); } });
+  var odg = window.Odontograma.crear($('odoComp'), {
+    onCambio: function () { revisarCambios(); },
+    paciente: function () { return actual ? actual.nombre : ''; },
+    // Presupuesto en borrador con los tratamientos requeridos (d.items) y el tipo de precio elegido (d.tipo)
+    crearPresupuesto: async function (d) {
+      if (!actual) throw new Error('Primero guarda el expediente del paciente.');
+      var r = await sb.from('presupuestos').insert({ paciente_id: actual.id }).select('id').single();
+      if (r.error) throw new Error(traducir(r.error));
+      var g = await sb.rpc('guardar_presupuesto', { p_id: r.data.id, p_descuento: 0, p_notas: '', p_items: d.items, p_tipo: d.tipo });
+      if (g.error) throw new Error('Se creó el presupuesto N.º ' + r.data.id + ', pero no se pudieron agregar los tratamientos: ' + traducir(g.error));
+      return { id: r.data.id };
+    },
+    puedeAbrirPresupuesto: function () { return !!($('tabPresupuestos') && window.PD_PRESUPUESTOS); },
+    abrirPresupuesto: function (id) { $('tabPresupuestos').click(); window.PD_PRESUPUESTOS.abrir(id); }
+  });
 
   // Procedimientos y precios para el odontograma: catálogo de tratamientos (con sus precios por tipo)
   // y los procedimientos sugeridos de «Tipos de procedimientos» que aún no están en el catálogo.

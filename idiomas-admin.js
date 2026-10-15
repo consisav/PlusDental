@@ -407,7 +407,15 @@
     'Para anular un pago usa el botón Anular': 'To void a payment use the Void button', 'El pago no existe o está anulado': 'The payment does not exist or is voided',
     'Un pago nuevo no puede registrarse como anulado': 'A new payment cannot be registered as voided',
     'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los cobros con factura.': 'The updated Supabase script (supabase.sql) for invoiced payments still needs to be run.',
-    'Ver más preguntas': 'See more questions', 'Más preguntas': 'More questions', 'Aún no hay historias. Pulsa «Nueva historia» para agregar la primera.': 'There are no stories yet. Press “New story” to add the first one.'
+    'Ver más preguntas': 'See more questions', 'Más preguntas': 'More questions', 'Aún no hay historias. Pulsa «Nueva historia» para agregar la primera.': 'There are no stories yet. Press “New story” to add the first one.',
+    // ---- Odontograma → crear presupuesto ----
+    'Crear presupuesto': 'Create quote', 'Nuevo presupuesto en borrador ·': 'New draft quote ·', 'Nuevo presupuesto en borrador': 'New draft quote', 'Tipo de precio:': 'Price type:',
+    'Sin precio con este tipo:': 'No price for this type:', 'se agregan en Q0.00 para que escribas el precio en el presupuesto.': 'they are added at Q0.00 so you can type the price in the quote.',
+    'Sin procedimiento:': 'No procedure:', 'estos hallazgos no se incluyen.': 'these findings are not included.',
+    'Ningún hallazgo «Requerido» tiene procedimiento. Elige el procedimiento en la tabla del detalle y vuelve a intentarlo.': 'No “Required” finding has a procedure. Choose the procedure in the detail table and try again.',
+    'Crear borrador': 'Create draft', 'Creando…': 'Creating…', 'creado': 'created', 'Puedes revisarlo, aplicar descuento y enviarlo desde Presupuesto.': 'You can review it, apply a discount and send it from Quotes.',
+    'Seguir en el odontograma': 'Stay on the odontogram', 'Abrir en Presupuesto': 'Open in Quotes', 'No se pudo crear el presupuesto.': 'The quote could not be created.',
+    'Primero guarda el expediente del paciente.': 'Save the patient record first.'
   };
   Object.keys(T).forEach(function (k) { if (T[k] && !Object.prototype.hasOwnProperty.call(EN, k)) EN[k] = T[k]; });
 })();

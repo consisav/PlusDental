@@ -161,6 +161,16 @@
       '.odg-dlg .pie{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}',
       '.odg-dlg .pie button{font:inherit;font-weight:700;font-size:14px;border:1px solid #C4D4DF;border-radius:999px;padding:9px 16px;background:#FFFFFF;color:#0B2B40;cursor:pointer}',
       '.odg-dlg .pie a{font-size:13px;font-weight:700;color:#005A87;cursor:pointer}',
+      '.odg-res .odg-acc{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;background:none;border:0;padding:0;border-radius:0}',
+      '.odg-crear{font:inherit;font-size:13.5px;font-weight:700;border:0;border-radius:999px;padding:8px 16px;min-height:36px;background:#0B2B40;color:#FFFFFF;cursor:pointer}',
+      '.odg-crear:hover{background:#005A87}.odg-crear:focus-visible{outline:2px solid #005A87;outline-offset:2px}',
+      '.odg-dlg .odg-det{font-size:13.5px}.odg-dlg .odg-det td{padding:6px 8px}.odg-dlg .tabla{overflow:auto;min-height:0}',
+      '.odg-dlg .alerta{background:#FFF7E6;border:1px solid #F2D29B;color:#7A4B00;border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.5}',
+      '.odg-dlg .alerta ul{margin:4px 0 0;padding-left:18px}',
+      '.odg-dlg .error{color:#9A3B2E;font-size:13.5px;font-weight:600}',
+      '.odg-dlg .ok{display:flex;align-items:center;gap:10px}.odg-dlg .ok svg{flex:0 0 auto}',
+      '.odg-dlg .pie.der{justify-content:flex-end}',
+      '.odg-dlg .pie .pri{background:#0B2B40;border-color:#0B2B40;color:#FFFFFF}.odg-dlg .pie .pri:disabled{opacity:.6;cursor:default}',
       '@media (prefers-reduced-motion:reduce){.odg-pz path,.odg-pz .cen{transition:none}}'
     ].join('\n');
     var st = document.createElement('style');
@@ -295,7 +305,9 @@
       var selTipo = '<label class="odg-tp">Tipo de precio <select data-tipo-precio>' + TIPOS_PRECIO.map(function (t) {
         return '<option value="' + t[0] + '"' + (t[0] === tipoPrecio ? ' selected' : '') + '>' + t[1] + '</option>';
       }).join('') + '</select></label>';
-      return '<div><div class="odg-cab"><h4 style="color:' + ROJO + '">Requerido (' + f.req.length + ')</h4>' + (f.req.length && catalogo.length ? selTipo : '') + '</div>' +
+      var crearPre = opciones.crearPresupuesto ? '<button type="button" class="odg-crear" data-crear-presupuesto>Crear presupuesto</button>' : '';
+      return '<div><div class="odg-cab"><h4 style="color:' + ROJO + '">Requerido (' + f.req.length + ')</h4>' +
+        (f.req.length && catalogo.length ? '<div class="odg-acc">' + selTipo + crearPre + '</div>' : '') + '</div>' +
         (f.req.length ? tablaDetalle(f.req, true) : 'Sin tratamientos pendientes.') + '</div>' +
         '<div><div class="odg-cab"><h4 style="color:' + AZUL + '">Realizado / existente (' + f.hecho.length + ')</h4></div>' +
         (f.hecho.length ? tablaDetalle(f.hecho, false) : 'Sin registros.') + '</div>';
@@ -418,6 +430,95 @@
       if (primero) primero.focus();
     }
 
+    // Crear presupuesto con los hallazgos «Requerido» que ya tienen procedimiento (precio del tipo elegido)
+    var dlgPre = null;
+    function lineasPresupuesto() {
+      var lineas = [], sinProc = [];
+      filasDetalle().req.forEach(function (f) {
+        if (f.h === 'ausente') return;
+        if (!f.proc) { sinProc.push(f); return; }
+        var item = buscarEnCatalogo(f.proc), precio = precioDe(item);
+        lineas.push({ tratamiento: item ? item.nombre : f.proc.n, pieza: String(f.n), cantidad: 1, precio: precio == null ? 0 : precio, sinPrecio: precio == null });
+      });
+      return { lineas: lineas, sinProc: sinProc };
+    }
+    function pieVentana(botones) { return '<div class="pie der">' + botones + '</div>'; }
+    function abrirPresupuesto() {
+      if (typeof HTMLDialogElement === 'undefined') return;
+      if (!dlgPre) {
+        dlgPre = document.createElement('dialog');
+        dlgPre.className = 'odg-dlg';
+        document.body.appendChild(dlgPre);
+        dlgPre.addEventListener('click', function (e) {
+          if (e.target === dlgPre && !dlgPre._ocupado) { dlgPre.close(); return; }
+          if (e.target.closest('[data-pre-crear]')) { e.preventDefault(); confirmarPresupuesto(); return; }
+          var ab = e.target.closest('[data-pre-abrir]');
+          if (ab) { e.preventDefault(); dlgPre.close(); opciones.abrirPresupuesto(+ab.dataset.preAbrir); }
+        });
+        dlgPre.addEventListener('cancel', function (e) { if (dlgPre._ocupado) e.preventDefault(); });
+      }
+      var d = lineasPresupuesto(), tp = TIPOS_PRECIO.filter(function (t) { return t[0] === tipoPrecio; })[0];
+      var nombre = opciones.paciente ? opciones.paciente() : '';
+      dlgPre._datos = d;
+      var html = '<form method="dialog"><h4>Crear presupuesto</h4>' +
+        '<p>Nuevo presupuesto en borrador' + (nombre ? ' · <b>' + esc(nombre) + '</b>' : '') + '</p>' +
+        '<p>Tipo de precio: <b>' + (tp ? tp[1] : '') + '</b></p>';
+      if (!d.lineas.length) {
+        html += '<div class="alerta">Ningún hallazgo «Requerido» tiene procedimiento. Elige el procedimiento en la tabla del detalle y vuelve a intentarlo.</div>' +
+          pieVentana('<button value="cerrar">Cerrar</button>');
+      } else {
+        var total = d.lineas.reduce(function (s, l) { return s + l.precio; }, 0);
+        var sinPrecio = d.lineas.filter(function (l) { return l.sinPrecio; });
+        html += '<div class="tabla"><table class="odg-det"><thead><tr><th>Pieza</th><th>Tratamiento</th><th class="num">Precio</th></tr></thead><tbody>' +
+          d.lineas.map(function (l) {
+            return '<tr><td><strong>' + l.pieza + '</strong></td><td>' + esc(l.tratamiento) + '</td><td class="num">' + (l.sinPrecio ? '<span class="sinp">' + q(0) + '</span>' : q(l.precio)) + '</td></tr>';
+          }).join('') + '</tbody><tfoot><tr><td></td><td>TOTAL</td><td class="num">' + q(total) + '</td></tr></tfoot></table></div>';
+        if (sinPrecio.length) {
+          html += '<div class="alerta"><b>Sin precio con este tipo:</b> se agregan en Q0.00 para que escribas el precio en el presupuesto.<ul>' +
+            sinPrecio.map(function (l) { return '<li><b>' + l.pieza + '</b> ' + esc(l.tratamiento) + '</li>'; }).join('') + '</ul></div>';
+        }
+        if (d.sinProc.length) {
+          html += '<div class="alerta"><b>Sin procedimiento:</b> estos hallazgos no se incluyen.<ul>' +
+            d.sinProc.map(function (f) { return '<li><b>' + f.n + '</b> ' + esc(f.texto) + '</li>'; }).join('') + '</ul></div>';
+        }
+        html += '<p class="error" role="alert"></p>' +
+          pieVentana('<button value="cancelar">Cancelar</button><button type="button" class="pri" data-pre-crear>Crear borrador</button>');
+      }
+      dlgPre.innerHTML = html + '</form>';
+      dlgPre._ocupado = false;
+      dlgPre.showModal();
+      var foco = dlgPre.querySelector('[data-pre-crear]') || dlgPre.querySelector('button');
+      if (foco) foco.focus();
+    }
+    async function confirmarPresupuesto() {
+      var b = dlgPre.querySelector('[data-pre-crear]'), d = dlgPre._datos;
+      if (!b || dlgPre._ocupado) return;
+      dlgPre._ocupado = true;
+      b.disabled = true; b.textContent = 'Creando…';
+      dlgPre.querySelector('.error').textContent = '';
+      try {
+        var r = await opciones.crearPresupuesto({
+          tipo: tipoPrecio,
+          items: d.lineas.map(function (l) { return { tratamiento: l.tratamiento, pieza: l.pieza, cantidad: l.cantidad, precio: l.precio }; })
+        });
+        var total = d.lineas.reduce(function (s, l) { return s + l.precio; }, 0);
+        var puedeAbrir = opciones.abrirPresupuesto && (!opciones.puedeAbrirPresupuesto || opciones.puedeAbrirPresupuesto());
+        dlgPre.innerHTML = '<form method="dialog"><div class="ok"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1B7F4B"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '<h4><span>Presupuesto N.º ' + r.id + '</span> <span>creado</span></h4></div>' +
+          '<p>Borrador · ' + d.lineas.length + (d.lineas.length === 1 ? ' tratamiento' : ' tratamientos') + ' · ' + q(total) + '</p>' +
+          '<p>Puedes revisarlo, aplicar descuento y enviarlo desde Presupuesto.</p>' +
+          pieVentana('<button value="cerrar">Seguir en el odontograma</button>' + (puedeAbrir ? '<button type="button" class="pri" data-pre-abrir="' + r.id + '">Abrir en Presupuesto</button>' : '')) +
+          '</form>';
+        dlgPre._ocupado = false;
+        var ab = dlgPre.querySelector('[data-pre-abrir]') || dlgPre.querySelector('button');
+        if (ab) ab.focus();
+      } catch (err) {
+        dlgPre._ocupado = false;
+        b.disabled = false; b.textContent = 'Crear borrador';
+        dlgPre.querySelector('.error').textContent = (err && err.message) || 'No se pudo crear el presupuesto.';
+      }
+    }
+
     raiz.addEventListener('change', function (e) {
       var t = e.target;
       if (t.matches('[data-tipo-precio]')) { tipoPrecio = t.value; pintar(); return; }
@@ -429,6 +530,7 @@
     });
     raiz.addEventListener('click', function (e) {
       if (e.target.closest('select')) return;
+      if (e.target.closest('[data-crear-presupuesto]')) { abrirPresupuesto(); return; }
       var b = e.target.closest('[data-denticion],[data-modo],[data-herr]');
       if (b) {
         if (b.dataset.denticion) { datos.denticion = b.dataset.denticion; avisar(); }

@@ -520,6 +520,14 @@
     cargarCatalogo();
   });
 
+  // Para abrir un presupuesto desde otra sección (p. ej. el odontograma del expediente)
+  window.PD_PRESUPUESTOS = {
+    abrir: async function (id) {
+      if (!catalogo.length) await cargarCatalogo();
+      await abrir(id);
+    }
+  };
+
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { if (!$('preLista').hidden) cargar(); },
     limpiar: function () {
