@@ -93,6 +93,16 @@
     $('trPie').innerHTML = '<tr><td></td><td>' + etq + '</td><td></td><td class="num">' + cant + '</td><td></td><td></td><td class="num">' + q(suma) + '</td><td></td></tr>';
   }
 
+  // Odontograma tal como está al momento de imprimir (el de pantalla, o el guardado del paciente)
+  function imagenOdontograma() {
+    if (!window.Odontograma || !window.Odontograma.imagen) return '';
+    var valor = window.PD_ODONTOGRAMA_ACTUAL ? window.PD_ODONTOGRAMA_ACTUAL() : null;
+    if (!valor || !valor.piezas) valor = paciente.odontograma;
+    var edad = paciente.fecha_nacimiento ? Math.floor((Date.now() - new Date(paciente.fecha_nacimiento + 'T12:00:00')) / 31557600000) : null;
+    var img = window.Odontograma.imagen(valor, edad);
+    return img ? '<div style="break-inside:avoid;page-break-inside:avoid;margin-top:28px"><div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#005A87;font-weight:800;margin-bottom:8px;border-bottom:1px solid #D9E4EC;padding-bottom:4px">Odontograma al ' + fechaHora(new Date().toISOString()) + '</div>' + img + '</div>' : '';
+  }
+
   // Reporte: paciente, código de cliente, médico, presupuesto y forma de pago en el encabezado.
   // Si los procedimientos son de varios presupuestos, se agrupan por presupuesto (cada grupo con su encabezado).
   function imprimirLista() {
@@ -144,7 +154,8 @@
       '<tr><td colspan="6" style="' + celda + ';font-weight:800;background:#EEF5FA">TOTAL</td><td style="' + celda + ';text-align:right;font-weight:800;background:#EEF5FA">' + q(suma) + '</td></tr></tbody></table>' +
       '<div style="margin-top:18px;font-size:13px;color:#475B68">Finalizado: <b>' + $('trRealizado').textContent + '</b> · Pagado: <b>' + $('trPagado').textContent + '</b> · Saldo: <b>' + $('trSaldo').textContent + '</b></div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:46px;font-size:12px;text-align:center;color:#475B68">' +
-      '<div style="border-top:1px solid #0B2B40;padding-top:6px">' + esc(medico) + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div></div>';
+      '<div style="border-top:1px solid #0B2B40;padding-top:6px">' + esc(medico) + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div>' +
+      imagenOdontograma() + '</div>';
     imp.imprimir(html);
   }
 

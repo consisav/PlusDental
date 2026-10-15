@@ -192,6 +192,7 @@
       '.odg-ie-pendiente{background:#EBF0F4;color:#475B68}.odg-ie-proceso{background:#FEF3C7;color:#92400E}.odg-ie-finalizado{background:#DCF2EC;color:#08504C}.odg-ie-eliminado{background:#FDE2E4;color:#9F1239}',
       '.odg-det tr.odg-elim td:not(:nth-last-child(-n+3)){text-decoration:line-through;color:#8A9DA9}',
       '.odg-por{font-size:11.5px;color:#5A6D7A}',
+      '.odg-imagen{gap:8px}.odg-imagen .odg-lienzo{overflow:visible;padding:10px 6px 4px;border-radius:12px}.odg-imagen .odg-mapa{min-width:0}.odg-imagen .odg-pz path,.odg-imagen .odg-pz .cen{cursor:default}',
       '.odg-res .odg-aviso-est{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#FFF8E6;border:1px solid #F3D9A4;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13px;color:#7A4B00}',
       '.odg-res .odg-pre .odg-pre-cab .odg-est{cursor:default}',
       '.odg-dlg .op[aria-pressed="true"]{border-color:#005A87;box-shadow:inset 0 0 0 1.5px #005A87;background:#EEF5FA}',
@@ -1025,5 +1026,15 @@
     return out;
   }
 
-  window.Odontograma = { crear: crear, diferencias: diferencias };
+  // Imagen del odontograma (solo el dibujo y la leyenda) para los reportes impresos
+  function imagen(valor, edad) {
+    var div = document.createElement('div');
+    crear(div, {}).cargar(valor, edad);
+    var mapa = div.querySelector('.odg-lienzo'), ley = div.querySelector('.odg-ley');
+    if (!mapa) return '';
+    mapa.querySelectorAll('[tabindex]').forEach(function (e) { e.removeAttribute('tabindex'); e.removeAttribute('role'); });
+    return '<div class="odg odg-imagen">' + mapa.outerHTML + (ley ? ley.outerHTML : '') + '</div>';
+  }
+
+  window.Odontograma = { crear: crear, diferencias: diferencias, imagen: imagen };
 })();
