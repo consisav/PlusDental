@@ -106,7 +106,7 @@
       $(b.dataset.ficha).hidden = b.dataset.ficha !== id;
     });
     if (id === 'fNotas') cargarNotas();
-    if (id === 'fOdonto') { cargarHistorial(); cargarCatalogoOdg(); cargarCodigoPresupuesto(); }
+    if (id === 'fOdonto') { cargarHistorial(); cargarCatalogoOdg(); cargarCodigoPresupuesto(); if (window.PD_CUOTAS) window.PD_CUOTAS.cargar(); }
     if (id === 'fRx') cargarArchivos();
     if (id === 'fTrat' && window.PD_TRATAMIENTOS) window.PD_TRATAMIENTOS.cargar(actual);
   }
@@ -390,6 +390,7 @@
     var sig = (r.data.length ? Number(r.data[0].correlativo) || 0 : 0) + 1;
     odg.codigoPresupuesto(String(pid).padStart(4, '0') + '-' + anio + '-' + String(sig).padStart(3, '0') + '-V01');
   }
+  document.addEventListener('pd-recargos', function () { odg.recargos(); });
   var catalogoOdgCargado = 0;
   async function cargarCatalogoOdg() {
     if (Date.now() - catalogoOdgCargado < 120000) return;

@@ -228,8 +228,8 @@
     $('preTipo').value = actual.tipo_precio || 'directo';
     $('preNotas').value = actual.notas || '';
     $('preForma').value = actual.forma_pago || 'efectivo';
-    var cu = String(actual.cuotas || 1);
-    $('preCuotas').innerHTML = '<option value="' + cu + '">' + cu + '</option>'; $('preCuotas').value = cu;
+    $('preCuotas').value = String(actual.cuotas || 1);
+    if (window.PD_CUOTAS) window.PD_CUOTAS.cargar().then(function () { if (actual) pintarCuotas(); });
     $('preCitas').value = actual.citas || '';
     if (editable() && !items.length) items.push({ tratamiento: '', pieza: '', cantidad: 1, precio: 0 });
     pintarEditor();
@@ -279,11 +279,12 @@
   function pintarCuotas() {
     var tarjeta = $('preForma').value === 'tarjeta';
     $('preCuotasWrap').hidden = !tarjeta;
-    if (!tarjeta || document.activeElement === $('preCuotas')) return;
-    var total = totales(items, $('preDescuento').value).total, sel = $('preCuotas').value || '1';
-    $('preCuotas').innerHTML = [1, 2, 3, 6, 10, 12, 18, 24].map(function (n) {
-      return '<option value="' + n + '"' + (String(n) === sel ? ' selected' : '') + '>' + (n === 1 ? '1 pago' : n + ' cuotas') + (total > 0 ? ' de ' + q(total / n) : '') + '</option>';
-    }).join('');
+    if (!tarjeta || !window.PD_CUOTAS) { $('preCuotasTabla').innerHTML = ''; return; }
+    var total = totales(items, $('preDescuento').value).total, sel = +($('preCuotas').value || 1);
+    // presupuesto ya aprobado o no aprobado: se usa el % guardado; si se puede editar, el vigente
+    var fijo = !editable() && sel === actual.cuotas ? actual.recargo_pct : null;
+    $('preCuotasTabla').innerHTML = window.PD_CUOTAS.tabla(total, sel, 'pre-cuota', fijo);
+    $('preCuotasTabla').classList.toggle('cuo-bloqueada', !editable());
   }
 
   function pintarTotales() {
@@ -309,6 +310,7 @@
       (t.descuento ? 'Subtotal: ' + q(t.subtotal) + '\nDescuento (' + Number($('preDescuento').value) + '%): -' + q(t.descuento) + '\n' : '') +
       'Total: ' + q(t.total) + ' (IVA incluido)' +
       '\nForma de pago: ' + FORMAS[$('preForma').value || 'efectivo'] + ($('preForma').value === 'tarjeta' ? ' · ' + ($('preCuotas').value === '1' ? '1 pago' : $('preCuotas').value + ' cuotas') : '') +
+      ($('preForma').value === 'tarjeta' && window.PD_CUOTAS ? (function () { var c = window.PD_CUOTAS.calcular(t.total, +($('preCuotas').value || 1), !editable() ? actual.recargo_pct : null); return '\nValor de cada cuota: ' + q(c.cuota) + ' (recargo ' + c.pct + '%)\nTotal a pagar con tarjeta: ' + q(c.total); })() : '') +
       ($('preCitas').value ? '\nCitas estimadas: ' + $('preCitas').value : '') +
       ($('preNotas').value.trim() ? '\n\n' + $('preNotas').value.trim() : '') +
       '\n\nQuedamos a la orden para cualquier duda.';
@@ -490,8 +492,22 @@
     aviso('preEdMsg', n ? 'Se aplicaron los precios «' + TIPOS[tipoActual()] + '» a ' + n + (n === 1 ? ' tratamiento' : ' tratamientos') + '. Pulsa «Guardar».' : 'Tipo de precio cambiado. Pulsa «Guardar».');
     var a = $('preWa'); if (a) a.href = mensajeWhatsApp();
   });
-  ['preDescuento', 'preNotas', 'preForma', 'preCuotas', 'preCitas'].forEach(function (id) {
-    $(id).addEventListener(id === 'preForma' || id === 'preCuotas' ? 'change' : 'input', function () {
+  // Plan de pago: se elige tocando la fila de la tabla
+  $('preCuotasTabla').addEventListener('click', function (e) {
+    var f = e.target.closest('[data-pre-cuota]');
+    if (!f || !editable()) return;
+    $('preCuotas').value = f.dataset.preCuota;
+    cambios = true;
+    pintarCuotas();
+    var g = $('preCuotasTabla').querySelector('[data-pre-cuota="' + f.dataset.preCuota + '"]'); if (g) g.focus({ preventScroll: true });
+    var a = $('preWa'); if (a) a.href = mensajeWhatsApp();
+  });
+  $('preCuotasTabla').addEventListener('keydown', function (e) {
+    var f = e.target.closest('[data-pre-cuota]');
+    if (f && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); f.click(); }
+  });
+  ['preDescuento', 'preNotas', 'preForma', 'preCitas'].forEach(function (id) {
+    $(id).addEventListener(id === 'preForma' ? 'change' : 'input', function () {
       cambios = true;
       pintarTotales();
       var a = $('preWa'); if (a) a.href = mensajeWhatsApp();

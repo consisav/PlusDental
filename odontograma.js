@@ -347,10 +347,9 @@
         '<div class="odg-pre-campo"><span>Código del presupuesto</span><div class="odg-cod"><small>SE ASIGNA AL CREAR</small>' + esc(codigoPre || '—') + '</div></div>' +
         '<label class="odg-pre-campo"><span>Forma de pago</span><select data-pre-campo="forma">' + FORMAS.map(function (x) {
           return '<option value="' + x[0] + '"' + (x[0] === datosPre.forma ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label>' +
-        (tarjeta ? '<label class="odg-pre-campo"><span>Plan de pago</span><select data-pre-campo="cuotas">' + CUOTAS.map(function (n) {
-          return '<option value="' + n + '"' + (n === datosPre.cuotas ? ' selected' : '') + '>' + (n === 1 ? '1 pago' : n + ' cuotas') + (total > 0 ? ' de ' + q(total / n) : '') + '</option>'; }).join('') + '</select></label>' : '') +
         '<label class="odg-pre-campo"><span>Cantidad de citas</span><input type="number" min="1" max="99" step="1" inputmode="numeric" data-pre-campo="citas" value="' + esc(datosPre.citas) + '" placeholder="Ej.: 3"></label>' +
-        '</div><div class="odg-pre-campo"><span>Estado</span><div class="odg-pre-est" role="group" aria-label="Estado del presupuesto">' + ESTADOS_PRE.map(function (x) {
+        '</div>' + (tarjeta && window.PD_CUOTAS ? '<div class="odg-pre-campo"><span>Plan de pago con tarjeta</span>' + window.PD_CUOTAS.tabla(total, datosPre.cuotas, 'pre-cuota') + '</div>' : '') +
+        '<div class="odg-pre-campo"><span>Estado</span><div class="odg-pre-est" role="group" aria-label="Estado del presupuesto">' + ESTADOS_PRE.map(function (x) {
           var auto = x[0] === 'proceso' || x[0] === 'finalizado';
           return '<button type="button" class="odg-est odg-est-' + x[0] + '" data-pre-estado="' + x[0] + '" aria-pressed="' + (datosPre.estado === x[0]) + '"' +
             (auto ? ' disabled title="Se pone solo al marcar tratamientos realizados en Presupuesto"' : '') + '>' + x[1] + '</button>'; }).join('') + '</div></div></div>';
@@ -528,6 +527,7 @@
         '<p>Nuevo presupuesto' + (nombre ? ' · <b>' + esc(nombre) + '</b>' : '') + '</p>' +
         '<p>Tipo de precio: <b>' + (tp ? tp[1] : '') + '</b></p>' +
         '<p>Forma de pago: <b>' + FORMAS.filter(function (x) { return x[0] === datosPre.forma; })[0][1] + (datosPre.forma === 'tarjeta' ? ' · ' + (datosPre.cuotas === 1 ? '1 pago' : datosPre.cuotas + ' cuotas') : '') + '</b>' +
+        (datosPre.forma === 'tarjeta' && window.PD_CUOTAS ? ' · Total a pagar: <b>' + q(window.PD_CUOTAS.calcular(d.lineas.reduce(function (s, l) { return s + l.precio; }, 0), datosPre.cuotas).total) + '</b>' : '') +
         (datosPre.citas ? ' · Citas: <b>' + esc(datosPre.citas) + '</b>' : '') + ' · Estado: <b>' + ESTADOS_PRE.filter(function (x) { return x[0] === datosPre.estado; })[0][1] + '</b></p>';
       if (!d.lineas.length) {
         html += '<div class="alerta">Ningún hallazgo «Requerido» tiene procedimiento. Elige el procedimiento en la tabla del detalle y vuelve a intentarlo.</div>' +
@@ -592,7 +592,7 @@
       if (t.matches('[data-tipo-precio]')) { tipoPrecio = t.value; pintar(); return; }
       if (t.matches('[data-pre-campo]')) {
         var c = t.dataset.preCampo;
-        if (c === 'forma') { datosPre.forma = t.value; pintar(); }
+        if (c === 'forma') { datosPre.forma = t.value; if (t.value === 'tarjeta' && window.PD_CUOTAS) window.PD_CUOTAS.cargar(); pintar(); }
         else if (c === 'cuotas') datosPre.cuotas = +t.value;
         else if (c === 'citas') datosPre.citas = t.value ? String(Math.min(Math.max(parseInt(t.value, 10) || 1, 1), 99)) : '';
         return;
@@ -606,6 +606,8 @@
     raiz.addEventListener('click', function (e) {
       if (e.target.closest('select')) return;
       if (e.target.closest('[data-ver-sin]')) { verSinProc = !verSinProc; pintar(); return; }
+      var cuo = e.target.closest('[data-pre-cuota]');
+      if (cuo) { datosPre.cuotas = +cuo.dataset.preCuota; pintar(); var f2 = raiz.querySelector('[data-pre-cuota="' + datosPre.cuotas + '"]'); if (f2) f2.focus({ preventScroll: true }); return; }
       var est = e.target.closest('[data-pre-estado]');
       if (est) { if (!est.disabled) { datosPre.estado = est.dataset.preEstado; pintar(); } return; }
       if (e.target.closest('[data-crear-presupuesto]')) { abrirPresupuesto(); return; }
@@ -632,6 +634,8 @@
     // Teclado: Enter o espacio aplica la herramienta (por cara, sobre la cara oclusal/incisal)
     raiz.addEventListener('keydown', function (e) {
       if (e.key !== 'Enter' && e.key !== ' ') return;
+      var fc = e.target.closest('[data-pre-cuota]');
+      if (fc) { e.preventDefault(); fc.click(); return; }
       var pz = e.target.closest('[data-pieza]');
       if (!pz) return;
       e.preventDefault();
@@ -652,6 +656,8 @@
       hallazgos: function () { return Object.keys(datos.piezas).length; },
       // lista: [{ id, nombre, tipo, base, precios: { directo: 350, vip: 300 } }] (id null = sugerido sin catálogo)
       codigoPresupuesto: function (texto) { codigoPre = texto || ''; pintar(); },
+      // al cargar los % de recargo se vuelve a dibujar la tabla de cuotas
+      recargos: function () { if (datosPre.forma === 'tarjeta') pintar(); },
       catalogo: function (lista) {
         catalogo = (lista || []).map(function (c, i) { return Object.assign({ k: c.id ? 'id' + c.id : 'n' + i }, c); });
         pintar();

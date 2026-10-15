@@ -334,6 +334,8 @@
     [/^Cuota (\d+)$/, 'Installment $1'],
     [/^(\d+) cuotas( de (Q[\d,.]+))?$/, function (m, n, x, v) { return n + ' installments' + (v ? ' of ' + v : ''); }],
     [/^1 pago de (Q[\d,.]+)$/, '1 payment of $1'],
+    [/^(\d+) cuotas$/, '$1 installments'],
+    [/^1 pago$/, '1 payment'],
     [/^Presupuesto (\d{4,}-\d{4}-\d{3,}-V\d{2,})$/, 'Quote $1'],
     [/^Elegir procedimiento para (\d+) hallazgos? sin procedimiento$/, function (m, n) { return 'Choose a procedure for ' + n + (n === '1' ? ' finding' : ' findings') + ' without one'; }],
     [/^Impreso el (\d{1,2}) (\S+?)\.? (\d{4})(, \d{1,2}:\d{2})?$/, function (m, d, mes, a, h) {

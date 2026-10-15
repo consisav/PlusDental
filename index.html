@@ -102,6 +102,22 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .pre-totales .total{border-top:1px solid #C4D4DF;padding-top:10px;font-size:18px}.pre-totales .total b{font-size:22px}
 .pre-totales .cargado{font-size:14px}.pre-totales .cargado b{color:#005A87}
 .estado-activo{background:#DBEAFE;color:#1E40AF}.estado-proceso{background:#FEF3C7;color:#92400E}.estado-finalizado{background:#E5E7EB;color:#374151}.estado-no_aprobado{background:#FDE2E4;color:#9F1239}
+.cuo{display:flex;flex-direction:column;gap:10px}
+.cuo-tabla{width:100%;border-collapse:collapse;font-size:14px;background:#FFFFFF}
+.cuo-tabla th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#5A6D7A;padding:8px 10px;border-bottom:1px solid #D9E4EC;font-weight:700}
+.cuo-tabla td{padding:8px 10px;border-bottom:1px solid #EEF3F7;font-weight:500}
+.cuo-tabla .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cuo-fila{cursor:pointer}.cuo-fila:hover td{background:#F5F9FC}.cuo-fila:focus-visible{outline:2px solid #005A87;outline-offset:-2px}
+.cuo-sel td{background:#EEF5FA !important;font-weight:700}
+.cuo-radio{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid #8A9DA9;vertical-align:-2px;box-sizing:border-box}
+.cuo-sel .cuo-radio{border-color:#005A87;background:radial-gradient(#005A87 40%,#FFFFFF 46%)}
+.cuo-res{display:flex;gap:10px;flex-wrap:wrap}
+.cuo-res>div{background:#0B2B40;color:#FFFFFF;border-radius:12px;padding:8px 14px}
+.cuo-res small{display:block;font-size:10.5px;color:#9CC3DA;letter-spacing:.08em;font-weight:700}
+.cuo-res b{font-size:17px}
+.cuo-bloqueada .cuo-fila{cursor:default}
+.pre-cuotas{display:flex;flex-direction:column;gap:8px;max-width:760px}
+.pre-cuotas-tit{font-size:14px;font-weight:600}
 .pre-pago{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;max-width:760px}
 .pre-pago label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
 .pre-pago .adm-input{width:100%;box-sizing:border-box;border-radius:12px}
@@ -753,6 +769,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" role="tab" id="tabTipos" data-tab="admTipos" aria-selected="false" aria-controls="admTipos">Tipos de procedimientos</button>
 <button type="button" role="tab" id="tabPrecios" data-tab="admPrecios" aria-selected="false" aria-controls="admPrecios">Precios</button>
 <button type="button" role="tab" id="tabPaquetes" data-tab="admPaquetes" aria-selected="false" aria-controls="admPaquetes">Paquetes</button>
+<button type="button" role="tab" id="tabRecargos" data-tab="admRecargos" aria-selected="false" aria-controls="admRecargos">Recargos de tarjeta</button>
 </div>
 </div>
 <div class="adm-g">
@@ -1087,9 +1104,10 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 <div class="pre-pago">
 <label>Forma de pago<select id="preForma" class="adm-input"><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta de crédito</option><option value="otro">Otro</option></select></label>
-<label id="preCuotasWrap" hidden>Plan de pago<select id="preCuotas" class="adm-input"><option value="1">1 pago</option></select></label>
+<input type="hidden" id="preCuotas" value="1">
 <label>Cantidad de citas<input id="preCitas" type="number" min="1" max="99" step="1" inputmode="numeric" class="adm-input" placeholder="Ej.: 3"></label>
 </div>
+<div id="preCuotasWrap" class="pre-cuotas" hidden><span class="pre-cuotas-tit">Plan de pago con tarjeta</span><div id="preCuotasTabla"></div></div>
 <div class="pre-bottom">
 <label class="adm-field" style="flex: 1 1 300px">Notas para el paciente<textarea id="preNotas" rows="4" maxlength="2000" class="pre-notas" placeholder="Ej.: cuidados e indicaciones"></textarea></label>
 <div class="pre-totales">
@@ -1344,6 +1362,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <!-- Precios -->
 <div id="admPrecios" role="tabpanel" aria-labelledby="tabPrecios" hidden class="adm-pane"></div>
 <div id="admPaquetes" role="tabpanel" aria-labelledby="tabPaquetes" hidden class="adm-pane"></div>
+<div id="admRecargos" role="tabpanel" aria-labelledby="tabRecargos" hidden class="adm-pane"></div>
 
 <!-- Reportes -->
 <div id="admRepPacientes" role="tabpanel" aria-labelledby="tabRepPacientes" hidden class="adm-pane"></div>
@@ -1998,6 +2017,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="tipos.js"></script>
 <script src="precios.js"></script>
 <script src="paquetes.js"></script>
+<script src="recargos.js"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="idiomas-admin.js"></script>
