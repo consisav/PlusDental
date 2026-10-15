@@ -162,8 +162,85 @@
         '<span class="quien">' + esc(o.dentista ? o.dentista.nombre : 'Dentista por asignar') + '<br>' + esc(o.sala ? o.sala.codigo + ' · ' + o.sala.nombre : 'Sin sala asignada') + '</span>' +
         '<div class="barra-puntos" title="Qué tan adecuada es"><i style="width:' + pct + '%"></i></div>' +
         (o.razones.length ? '<div class="ag-razones">' + o.razones.map(function (r) { return '<span>' + esc(r) + '</span>'; }).join('') + '</div>' : '') +
-        '<button type="button" class="adm-btn adm-primary" data-agendar="' + i + '">Agendar aquí</button></div>';
+        (cantidadCitas() > 1 ? '<button type="button" class="adm-btn adm-primary" data-serie="' + i + '">Programar serie de ' + cantidadCitas() + ' citas desde aquí</button>'
+          : '<button type="button" class="adm-btn adm-primary" data-agendar="' + i + '">Agendar aquí</button>') + '</div>';
     }).join('');
+  }
+
+  // ---------- Serie de citas (una o más) ----------
+  function cantidadCitas() { return Math.min(Math.max(parseInt($('agCantidad').value, 10) || 1, 1), 24); }
+  function siguienteFecha(f, k) {
+    var c = $('agCada').value;
+    if (c.charAt(0) === 'm') { var d = fecha(f); var dia = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + k * +c.slice(1)); var ult = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(dia, ult)); return iso(d); }
+    return sumar(f, k * +c);
+  }
+  function textoCada() { var o = $('agCada').selectedOptions[0]; return o ? o.text : ''; }
+  var serie = null;
+  // Propone las citas: la primera es la elegida; las siguientes, cerca de la fecha que toca (misma hora y médico si se puede)
+  function planificarSerie(primera) {
+    var n = cantidadCitas(), plan = [primera], copia = citas.slice();
+    var medicoAntes = $('agMedico').value, desdeAntes = $('agDesde').value, fijoAntes = fijo;
+    function ocupar(o) { citas.push({ id: 'plan' + plan.length, fecha: o.fecha, hora: o.hora, dentista_id: o.dentista ? o.dentista.id : null, posicion_id: o.sala ? o.sala.id : null, estado: 'pendiente', nombre: '' }); }
+    ocupar(primera);
+    fijo = null;
+    if (primera.dentista) $('agMedico').value = String(primera.dentista.id);
+    for (var k = 1; k < n; k++) {
+      var objetivo = siguienteFecha(primera.fecha, k);
+      $('agDesde').value = objetivo;
+      var ops = sugerir().opciones.filter(function (o) { return o.fecha <= sumar(objetivo, 6); });
+      var elegida = ops.filter(function (o) { return o.fecha === objetivo && o.hora === primera.hora; })[0]
+        || ops.filter(function (o) { return o.hora === primera.hora; })[0] || ops[0] || null;
+      if (elegida) { plan.push(elegida); ocupar(elegida); }
+      else plan.push({ falta: true, fecha: objetivo });
+    }
+    citas = copia; fijo = fijoAntes; $('agMedico').value = medicoAntes; $('agDesde').value = desdeAntes;
+    return plan;
+  }
+  function pintarSerie() {
+    var ok = serie.filter(function (o) { return !o.falta; }).length;
+    $('agSugerencias').innerHTML = '<div class="ag-serie"><b>Serie de ' + serie.length + ' citas · cada ' + esc(textoCada()) + '</b>' +
+      '<p class="dlg-msg" style="margin:0">Revisa las fechas propuestas. Se buscó la misma hora y el mismo médico; si no había espacio, el horario más cercano.</p>' +
+      '<table><thead><tr><th>#</th><th>Fecha y hora</th><th>Dentista</th><th>Sala</th></tr></thead><tbody>' +
+      serie.map(function (o, i) {
+        return o.falta ? '<tr><td>' + (i + 1) + '</td><td class="falta" colspan="3">' + textoFecha(o.fecha) + ': sin horario disponible cerca de esa fecha (no se agendará)</td></tr>'
+          : '<tr><td>' + (i + 1) + '</td><td><b>' + textoFecha(o.fecha) + ' · ' + o.hora + '</b></td><td>' + esc(o.dentista ? o.dentista.nombre : 'Por asignar') + '</td><td>' + esc(o.sala ? o.sala.codigo + ' · ' + o.sala.nombre : 'Sin sala') + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<div class="ag-serie-acc"><button type="button" class="adm-btn" data-serie-cancelar>Volver a los horarios</button>' +
+      (ok ? '<button type="button" class="adm-btn adm-primary" data-serie-ok>Agendar ' + ok + (ok === 1 ? ' cita' : ' citas') + '</button>' : '') + '</div></div>';
+  }
+  async function agendarSerie(boton) {
+    var p = pacienteElegido(), nuevo = $('agPaciente').value === 'nuevo';
+    if (!p && !nuevo) { aviso('agFormMsg', 'Elige el paciente.', true); return; }
+    if (nuevo && (!$('agNombre').value.trim() || !$('agTelefono').value.trim())) { aviso('agFormMsg', 'Escribe el nombre y el teléfono del paciente nuevo.', true); return; }
+    boton.disabled = true;
+    var hechas = [], fallo = null, lista = serie.filter(function (o) { return !o.falta; });
+    for (var i = 0; i < lista.length; i++) {
+      var o = lista[i];
+      aviso('agFormMsg', 'Agendando cita ' + (i + 1) + ' de ' + lista.length + '…');
+      var r = await sb.rpc('agendar_cita', {
+        p_fecha: o.fecha, p_hora: o.hora, p_paciente_id: p ? p.id : null,
+        p_nombre: nuevo ? $('agNombre').value.trim() : null, p_telefono: nuevo ? $('agTelefono').value.trim() : null,
+        p_servicio: $('agTratamiento').value.trim(), p_dentista_id: o.dentista ? o.dentista.id : null, p_posicion_id: o.sala ? o.sala.id : null,
+        p_prioridad: $('agPrioridad').value, p_notas: [$('agNotas').value.trim(), lista.length > 1 ? '(cita ' + (i + 1) + ' de ' + lista.length + ')' : ''].filter(Boolean).join(' '),
+        p_estado: $('agConfirmada').checked ? 'confirmada' : 'pendiente'
+      });
+      if (r.error) { fallo = textoFecha(o.fecha) + ' · ' + o.hora + ': ' + traducir(r.error); break; }
+      hechas.push(o);
+    }
+    boton.disabled = false;
+    var nombre = p ? p.nombre : $('agNombre').value.trim(), tel = telWa(p ? p.telefono : $('agTelefono').value.trim());
+    var fechasTxt = hechas.map(function (o, i) { return (i + 1) + '. ' + textoFecha(o.fecha) + ' a las ' + o.hora + (o.dentista ? ' con ' + o.dentista.nombre : ''); }).join('\n');
+    var msg = 'Hola ' + nombre + ', le confirmamos sus citas en Plus Dental para ' + $('agTratamiento').value.trim() + ':\n' + fechasTxt + '\nDirección: ' + CLINICA + '. Si necesita cambiar alguna, responda a este mensaje.';
+    $('agSugerencias').innerHTML = '<div class="ag-fijo" style="background:' + (fallo ? '#FFF8E6;border-color:#F3D9A4;color:#7A4B00' : '#DCF2EC;border-color:#BFE6D8;color:#08504C') + ';flex-direction:column;align-items:flex-start">' +
+      '<span><b>' + hechas.length + (hechas.length === 1 ? ' cita agendada' : ' citas agendadas') + '</b> para ' + esc(nombre) + ':</span>' +
+      '<span>' + hechas.map(function (o) { return textoFecha(o.fecha) + ' · ' + o.hora; }).join('<br>') + '</span>' +
+      (fallo ? '<span>No se pudo agendar: ' + esc(fallo) + '</span>' : '') +
+      (hechas.length && tel ? '<div class="ag-aviso-btns"><a class="adm-btn" href="https://wa.me/' + tel + '?text=' + encodeURIComponent(msg) + '" target="_blank" rel="noopener">WhatsApp al paciente con todas las fechas</a></div>' : '') + '</div>';
+    aviso('agFormMsg', '');
+    serie = null; fijo = null; pintarFijo();
+    $('agNotas').value = '';
+    if (hechas.length) $('agDia').value = hechas[0].fecha;
+    await cargarCitas();
   }
 
   // ---------- Formulario ----------
@@ -180,9 +257,16 @@
     $('agPacInfo').textContent = p ? [p.telefono ? 'WhatsApp ' + p.telefono : 'Sin teléfono en el expediente', p.correo ? 'Correo ' + p.correo : 'Sin correo', p.dentista_id ? 'Médico asignado: ' + nombreDentista(p.dentista_id) : 'Sin médico asignado'].join(' · ') : '';
     $('agCorreoWrap').hidden = !(nuevo || (p && !p.correo));
     $('agCorreo').value = '';
-    if (p && p.dentista_id && !$('agMedico').value) {
-      // No se fija el médico: el asistente ya le da preferencia al médico asignado
+    if (!medicoElegidoAMano) {
+      var porDefecto = p && p.dentista_id && dentistas.some(function (d) { return d.id === p.dentista_id; }) ? p.dentista_id : medicoPrincipal();
+      $('agMedico').value = porDefecto ? String(porDefecto) : '';
     }
+  }
+  // Dentista principal de la clínica: el primero activo con rol «principal» (si no hay, el primero activo)
+  var medicoElegidoAMano = false;
+  function medicoPrincipal() {
+    var d = dentistas.filter(function (x) { return x.rol_sala === 'principal'; })[0] || dentistas[0];
+    return d ? d.id : null;
   }
   function alCambiarTratamiento() {
     var esp = especialidadRequerida();
@@ -539,6 +623,8 @@
 
   // ---------- Eventos ----------
   $('agPaciente').addEventListener('change', alCambiarPaciente);
+  $('agMedico').addEventListener('change', function () { medicoElegidoAMano = true; });
+  $('agCantidad').addEventListener('input', function () { $('agCadaWrap').hidden = cantidadCitas() < 2; if (sugerencias.length && !serie) pintarSugerencias({ opciones: sugerencias }); });
   $('agTratamiento').addEventListener('input', alCambiarTratamiento);
   $('agEspecialidad').addEventListener('change', alCambiarTratamiento);
   $('agForm').addEventListener('submit', function (e) {
@@ -549,6 +635,11 @@
     pintarSugerencias(sugerir());
   });
   $('agSugerencias').addEventListener('click', function (e) {
+    var sb2 = e.target.closest('[data-serie]');
+    if (sb2) { serie = planificarSerie(sugerencias[+sb2.dataset.serie]); pintarSerie(); return; }
+    if (e.target.closest('[data-serie-cancelar]')) { serie = null; pintarSugerencias({ opciones: sugerencias }); return; }
+    var so = e.target.closest('[data-serie-ok]');
+    if (so && serie) { agendarSerie(so); return; }
     var b = e.target.closest('[data-agendar]');
     if (b) agendar(sugerencias[+b.dataset.agendar], b);
   });

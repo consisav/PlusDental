@@ -135,6 +135,12 @@ select.pre-ie{font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;
 .cita-buscar-acc{display:flex;gap:6px}
 @media (max-width:1100px){.cita-buscar{grid-template-columns:repeat(2,minmax(0,1fr))}.cita-buscar-acc{grid-column:1/-1}}
 @media (max-width:520px){.cita-buscar{grid-template-columns:1fr}}
+.ag-serie{display:flex;flex-direction:column;gap:10px;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:14px}
+.ag-serie table{width:100%;border-collapse:collapse;font-size:14px;background:#FFFFFF;border-radius:10px;overflow:hidden}
+.ag-serie th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#5A6D7A;padding:8px 10px;border-bottom:1px solid #D9E4EC}
+.ag-serie td{padding:8px 10px;border-bottom:1px solid #EEF3F7}
+.ag-serie .falta{color:#9F1239;font-weight:700}
+.ag-serie-acc{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .pre-pago{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;max-width:760px}
 .pre-pago label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
 .pre-pago .adm-input{width:100%;box-sizing:border-box;border-radius:12px}
@@ -1055,6 +1061,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>Buscar desde<input id="agDesde" type="date" required></label>
 <label>Preferencia de horario<select id="agFranja"><option value="">Cualquier hora</option><option value="manana">Mañana (antes de las 12:00)</option><option value="tarde">Tarde (desde las 12:00)</option></select></label>
 <label>Prioridad<select id="agPrioridad"><option value="normal">Normal</option><option value="urgente">Urgente (lo antes posible)</option></select></label>
+<label>Cantidad de citas<input id="agCantidad" type="number" min="1" max="24" step="1" value="1" inputmode="numeric"></label>
+<label id="agCadaWrap" hidden>Cada<select id="agCada"><option value="7">1 semana</option><option value="14">2 semanas</option><option value="21">3 semanas</option><option value="m1" selected>1 mes</option><option value="m2">2 meses</option><option value="m3">3 meses</option><option value="m6">6 meses</option></select></label>
 <label class="full">Motivo u observaciones<textarea id="agNotas" rows="2" maxlength="500" placeholder="Ej.: dolor en pieza 36 desde hace 3 días"></textarea></label>
 <label class="full pos-activa" style="flex-direction: row"><input id="agConfirmada" type="checkbox" checked> Registrar como cita confirmada</label>
 <fieldset class="full pos-sec"><legend>Avisos</legend>
