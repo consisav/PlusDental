@@ -636,6 +636,36 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 .estado-reprogramada{background:#EDE9FE;color:#5B21B6}
 .estado-atendida{background:#DBEAFE;color:#1E40AF}
 .cita-grab{display:block;font-size:12px;color:#5A6D7A;margin-top:3px;line-height:1.4}
+.roles-wrap:has(> table.citas-tabla){overflow:visible}
+table.citas-tabla{table-layout:fixed}
+.roles-wrap:has(> table.citas-tabla){container:citas / inline-size}
+table.citas-tabla col.c-fecha{width:15%}table.citas-tabla col.c-asig{width:25%}table.citas-tabla col.c-estado{width:14%}table.citas-tabla col.c-acc{width:150px}
+@media (min-width:641px){
+@container citas (max-width: 780px){
+table.citas-tabla>colgroup,table.citas-tabla>thead{display:none}
+table.citas-tabla,table.citas-tabla>tbody{display:block}
+table.citas-tabla>tbody>tr{display:grid;grid-template-columns:118px minmax(0,1fr) auto;grid-template-areas:"f p e" "f a c";gap:10px 14px;padding:14px;border-bottom:1px solid #D9E4EC}
+table.citas-tabla>tbody>tr:last-child{border-bottom:0}
+table.citas-tabla>tbody>tr>td{padding:0;border:0}
+table.citas-tabla td:nth-child(1){grid-area:f}table.citas-tabla td:nth-child(2){grid-area:p}table.citas-tabla td:nth-child(3){grid-area:a}table.citas-tabla td:nth-child(4){grid-area:e;text-align:right}table.citas-tabla td:nth-child(5){grid-area:c;align-self:end}
+table.citas-tabla td:only-child{grid-column:1 / -1;grid-row:auto}
+table.citas-tabla .ct-asig{grid-template-columns:1fr 1fr}
+}
+}
+.ct-mas>summary.adm-btn{font-size:20px;padding:0 12px;height:36px;min-height:36px;display:inline-flex;align-items:center}
+table.citas-tabla td{vertical-align:top;padding:12px}
+table.citas-tabla tbody tr:hover{background:#F7FAFC}
+table.citas-tabla th.c-acc-th{text-align:right}
+.ct-fecha b{display:block;color:#0B2B40;font-size:14.5px}.ct-fecha .ct-hora{font-size:14px;color:#0B2B40;font-variant-numeric:tabular-nums}
+.ct-pac{display:block;font-weight:700;color:#0B2B40;overflow-wrap:anywhere}.ct-sub{display:block;font-size:13px;color:#5A6D7A;margin-top:2px;overflow-wrap:anywhere}
+.ct-asig{display:grid;gap:6px}.ct-asig select{width:100%;min-height:34px !important;padding:5px 8px !important;font-size:13px !important;border-radius:9px !important}
+.ct-acc{display:flex;gap:6px;justify-content:flex-end;align-items:flex-start}.ct-acc .adm-btn{min-height:36px;padding:6px 14px;font-size:13.5px}
+.ct-mas{position:relative}.ct-mas>summary{list-style:none;cursor:pointer;min-width:38px;justify-content:center;font-size:18px;line-height:1;letter-spacing:1px}.ct-mas>summary::-webkit-details-marker{display:none}
+.ct-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:210px;background:#FFFFFF;border:1px solid #D9E4EC;border-radius:12px;box-shadow:0 14px 34px rgba(11,43,64,.16);padding:6px;display:grid}
+.ct-menu button,.ct-menu a{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;font-size:14px;color:#0B2B40;cursor:pointer}
+.ct-menu button:hover,.ct-menu a:hover,.ct-menu button:focus-visible,.ct-menu a:focus-visible{background:#EEF5FA}
+.ct-menu .ct-peligro{color:#9F1239}.ct-menu hr{border:0;border-top:1px solid #EEF3F7;margin:4px 0}
+.ct-menu .ct-info{font-size:12px;color:#5A6D7A;padding:6px 12px 4px;line-height:1.45}
 #reproDlg{border:0;border-radius:24px;padding:0;width:min(460px,calc(100% - 32px));box-shadow:0 30px 80px rgba(11,43,64,.25);color:#0B2B40}
 #reproDlg::backdrop{background:rgba(11,43,64,.55)}
 .acciones{display:flex;gap:8px;flex-wrap:wrap}
@@ -1034,7 +1064,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="cita-buscar-acc"><button type="button" id="cbBuscar" class="adm-btn adm-primary">Buscar</button><button type="button" id="cbLimpiar" class="adm-btn">Limpiar</button></div>
 </div>
 <p id="cbResumen" class="dlg-msg" hidden></p>
-<div class="roles-wrap"><table><thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Servicio</th><th>Dentista</th><th>Posición</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="citasBody"></tbody></table></div>
+<div class="roles-wrap"><table class="citas-tabla"><colgroup><col class="c-fecha"><col><col class="c-asig"><col class="c-estado"><col class="c-acc"></colgroup><thead><tr><th>Fecha y hora</th><th>Paciente · servicio</th><th>Dentista · posición</th><th>Estado</th><th class="c-acc-th">Acciones</th></tr></thead><tbody id="citasBody"></tbody></table></div>
 <p id="citasMsg" class="dlg-msg" role="status"></p>
 
 <div class="adm-box">

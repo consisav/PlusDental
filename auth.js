@@ -135,7 +135,7 @@
 
   async function cargarCitas() {
     aviso('citasMsg', '');
-    $('citasBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
+    $('citasBody').innerHTML = '<tr><td colspan="5">Cargando…</td></tr>';
     var desde = $('cbDesde').value, hasta = $('cbHasta').value;
     function consulta(campos) {
       var q = sb.from('citas').select(campos);
@@ -220,44 +220,46 @@
     $('cbResumen').hidden = !buscando;
     if (buscando) $('cbResumen').textContent = lista.length + (lista.length === 1 ? ' cita encontrada' : ' citas encontradas') +
       (rango ? ' del ' + ($('cbDesde').value ? fechaLarga($('cbDesde').value) : 'inicio') + ' al ' + ($('cbHasta').value ? fechaLarga($('cbHasta').value) : 'último registro') : '') + '.';
-    if (!lista.length && buscando) { $('citasBody').innerHTML = '<tr><td colspan="7">Ninguna cita coincide con la búsqueda.</td></tr>'; return; }
+    if (!lista.length && buscando) { $('citasBody').innerHTML = '<tr><td colspan="5">Ninguna cita coincide con la búsqueda.</td></tr>'; return; }
     if (!lista.length) {
       var cuando = periodo === 'proximas' ? 'próximas' : 'anteriores';
       var vacio = { pendiente: 'No hay citas programadas ' + cuando + '.', confirmada: 'No hay citas confirmadas ' + cuando + '.', reprogramada: 'No hay citas reprogramadas ' + cuando + '.', atendida: 'No hay citas atendidas ' + cuando + '.', cancelada: 'No hay citas canceladas ' + cuando + '.', todas: 'No hay citas ' + cuando + '.' };
-      $('citasBody').innerHTML = '<tr><td colspan="7">' + vacio[filtro] + '</td></tr>';
+      $('citasBody').innerHTML = '<tr><td colspan="5">' + vacio[filtro] + '</td></tr>';
       return;
     }
     $('citasBody').innerHTML = lista.map(function (c) {
-      var acciones = '';
-      if (c.estado === 'pendiente' || c.estado === 'reprogramada') acciones += '<button type="button" class="adm-btn adm-primary" data-cita="' + c.id + '" data-estado="confirmada">Confirmar</button>';
-      if (c.estado !== 'cancelada' && c.estado !== 'atendida') acciones += '<button type="button" class="adm-btn" data-cita="' + c.id + '" data-estado="atendida">Atendido</button>';
-      if (c.estado !== 'cancelada' && c.estado !== 'atendida' && window.PD_AGENDA) acciones += '<button type="button" class="adm-btn" data-repro="' + c.id + '">Reprogramar</button>';
-      if (c.estado !== 'cancelada') acciones += '<button type="button" class="adm-btn" data-cita="' + c.id + '" data-estado="cancelada">Cancelar</button>';
-      acciones += '<a class="adm-btn" style="text-decoration:none;display:inline-flex;align-items:center" href="' + esc(waPaciente(c)) + '" target="_blank" rel="noopener">WhatsApp</a>';
-      return '<tr><td class="fecha"><strong style="color:#0B2B40">' + fechaLarga(c.fecha) + '</strong><br>' + hhmm(c.hora) +
-        (c.reprogramada_de ? '<span class="cita-grab">Reprogramada de ' + esc(fechaLarga(c.reprogramada_de.slice(0, 10)) + ' · ' + c.reprogramada_de.slice(11, 16)) + '</span>' : '') +
-        '<span class="cita-grab">Grabada: ' + fechaHoraGrab(c.creada) + ' · ' + esc(c.creada_por || 'Sin usuario') + '</span></td>' +
-        '<td><strong>' + esc(c.nombre) + '</strong><br><span style="color:#5A6D7A">' + esc(c.telefono) + '</span></td>' +
-        '<td>' + esc(c.servicio) + '</td>' +
-        '<td>' + selectorDentista(c) + '</td>' +
-        '<td>' + selectorPosicion(c) + '</td>' +
+      // Una acción principal visible; las demás en el menú «⋯»
+      var activa = c.estado !== 'cancelada' && c.estado !== 'atendida';
+      var principal = c.estado === 'pendiente' || c.estado === 'reprogramada'
+        ? '<button type="button" class="adm-btn adm-primary" data-cita="' + c.id + '" data-estado="confirmada">Confirmar</button>'
+        : c.estado === 'confirmada' ? '<button type="button" class="adm-btn adm-primary" data-cita="' + c.id + '" data-estado="atendida">Atendido</button>' : '';
+      var menu = '<div class="ct-info">Grabada: ' + fechaHoraGrab(c.creada) + '<br>Usuario: ' + esc(c.creada_por || 'Sin usuario') + '</div><hr>';
+      if (activa && c.estado !== 'confirmada') menu += '<button type="button" data-cita="' + c.id + '" data-estado="atendida">Marcar atendido</button>';
+      if (activa && window.PD_AGENDA) menu += '<button type="button" data-repro="' + c.id + '">Reprogramar…</button>';
+      menu += '<a href="' + esc(waPaciente(c)) + '" target="_blank" rel="noopener">WhatsApp al paciente</a>';
+      if (c.paciente_id && window.PD_EXPEDIENTE) menu += '<button type="button" data-ir-exp="' + c.paciente_id + '">Ver expediente</button>';
+      if (c.estado !== 'cancelada') menu += '<hr><button type="button" class="ct-peligro" data-cita="' + c.id + '" data-estado="cancelada">Cancelar cita</button>';
+      return '<tr><td class="ct-fecha"><b>' + fechaLarga(c.fecha) + '</b><span class="ct-hora">' + hhmm(c.hora) + '</span>' +
+        (c.reprogramada_de ? '<span class="cita-grab">Antes: ' + esc(fechaLarga(c.reprogramada_de.slice(0, 10)) + ' · ' + c.reprogramada_de.slice(11, 16)) + '</span>' : '') + '</td>' +
+        '<td><span class="ct-pac">' + esc(c.nombre) + '</span><span class="ct-sub">' + esc(c.servicio || '') + (c.telefono ? ' · ' + esc(c.telefono) : '') + '</span></td>' +
+        '<td><div class="ct-asig">' + selectorDentista(c) + selectorPosicion(c) + '</div></td>' +
         '<td><span class="estado estado-' + c.estado + '">' + ESTADOS[c.estado] + '</span></td>' +
-        '<td><div class="acciones">' + acciones + '</div></td></tr>';
+        '<td><div class="ct-acc">' + principal + '<details class="ct-mas"><summary class="adm-btn" aria-label="Más acciones" title="Más acciones">⋯</summary><div class="ct-menu">' + menu + '</div></details></div></td></tr>';
     }).join('');
   }
 
   function selectorPosicion(c) {
     if (!posicionesCita.length || !('posicion_id' in c)) return '<span style="color:#94A6B2">—</span>';
-    return '<select class="adm-input" data-pos-cita="' + c.id + '" aria-label="Posición de la cita de ' + esc(c.nombre) + '" style="border-radius:10px;min-height:38px;padding:6px 8px;max-width:190px"' +
-      (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Sin asignar</option>' +
+    return '<select class="adm-input" data-pos-cita="' + c.id + '" aria-label="Posición de la cita de ' + esc(c.nombre) + '" title="Posición"' +
+      (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Posición: sin asignar</option>' +
       posicionesCita.map(function (p) { return '<option value="' + p.id + '"' + (p.id === c.posicion_id ? ' selected' : '') + '>' + esc(p.codigo + ' · ' + p.nombre) + '</option>'; }).join('') +
       '</select>';
   }
 
   function selectorDentista(c) {
     if (!dentistasCita.length || !('dentista_id' in c)) return '<span style="color:#94A6B2">—</span>';
-    return '<select class="adm-input" data-den-cita="' + c.id + '" aria-label="Dentista de la cita de ' + esc(c.nombre) + '" style="border-radius:10px;min-height:38px;padding:6px 8px;max-width:190px"' +
-      (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Sin asignar</option>' +
+    return '<select class="adm-input" data-den-cita="' + c.id + '" aria-label="Dentista de la cita de ' + esc(c.nombre) + '" title="Dentista"' +
+      (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Dentista: sin asignar</option>' +
       dentistasCita.map(function (d) { return '<option value="' + d.id + '"' + (d.id === c.dentista_id ? ' selected' : '') + '>' + esc(d.nombre) + '</option>'; }).join('') +
       '</select>';
   }
@@ -489,6 +491,11 @@
     if (den) asignarDentista(den);
   });
   $('citasBody').addEventListener('click', function (e) {
+    var mas = e.target.closest('details.ct-mas');
+    if (e.target.closest('.ct-mas > summary')) { document.querySelectorAll('#citasBody details.ct-mas[open]').forEach(function (d) { if (d !== mas) d.open = false; }); return; }
+    if (mas && e.target.closest('.ct-menu button, .ct-menu a')) mas.open = false;
+    var ex = e.target.closest('button[data-ir-exp]');
+    if (ex && window.PD_EXPEDIENTE) { window.PD_EXPEDIENTE.abrir(+ex.dataset.irExp); return; }
     var rp = e.target.closest('button[data-repro]');
     if (rp && window.PD_AGENDA) {
       var c = citas.filter(function (x) { return String(x.id) === rp.dataset.repro; })[0];
@@ -497,6 +504,14 @@
     }
     var b = e.target.closest('button[data-cita]');
     if (b) cambiarEstado(b.dataset.cita, b.dataset.estado, b);
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('#citasBody details.ct-mas')) return;
+    document.querySelectorAll('#citasBody details.ct-mas[open]').forEach(function (d) { d.open = false; });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') document.querySelectorAll('#citasBody details.ct-mas[open]').forEach(function (d) { d.open = false; });
   });
 
   $('bloqFecha').min = hoyISO();
