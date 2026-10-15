@@ -171,13 +171,13 @@
   }
 
   // ---------- Serie de citas (una o más) ----------
-  function cantidadCitas() { return Math.min(Math.max(parseInt($('agCantidad').value, 10) || 1, 1), 24); }
+  function cantidadCitas() { return $('agCantidad') ? Math.min(Math.max(parseInt($('agCantidad').value, 10) || 1, 1), 24) : 1; }
   function siguienteFecha(f, k) {
-    var c = $('agCada').value;
+    var c = $('agCada') ? $('agCada').value : 'm1';
     if (c.charAt(0) === 'm') { var d = fecha(f); var dia = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + k * +c.slice(1)); var ult = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(dia, ult)); return iso(d); }
     return sumar(f, k * +c);
   }
-  function textoCada() { var o = $('agCada').selectedOptions[0]; return o ? o.text : ''; }
+  function textoCada() { var o = $('agCada') && $('agCada').selectedOptions[0]; return o ? o.text : ''; }
   var serie = null;
   // Propone las citas: la primera es la elegida; las siguientes, cerca de la fecha que toca (misma hora y médico si se puede)
   function planificarSerie(primera) {
@@ -276,6 +276,7 @@
     $('agEspDetectada').textContent = $('agEspecialidad').value ? '' : esp ? 'Especialidad detectada: ' + esp + '.' : 'No se detectó una especialidad: se buscará entre todos los dentistas.';
   }
   function pintarFijo() {
+    if (fijo) modoHorario('buscar');
     $('agFijo').hidden = !fijo;
     if (fijo) $('agFijo').innerHTML = '<div class="ag-fijo">Horario elegido en la agenda: <b>' + textoFecha(fijo.fecha) + ' · ' + fijo.hora + (fijo.sala ? ' · ' + esc(nombreSala(fijo.sala)) : '') + '</b><button type="button" class="adm-btn" id="agQuitarFijo" style="min-height:34px;padding:5px 12px">Quitar</button></div>';
   }
@@ -721,10 +722,40 @@
     return false;
   }
 
+  // Paso 3: buscar los mejores horarios o guardar en una fecha y hora ya acordadas
+  function modoHorario(m) {
+    var fija = m === 'fija';
+    document.querySelectorAll('#agForm [data-ag-modo]').forEach(function (b) { b.setAttribute('aria-checked', b.dataset.agModo === m); });
+    $('agModoBuscar').hidden = fija; $('agModoFija').hidden = !fija;
+    $('agBuscarBtn').hidden = fija; $('agGuardarM').hidden = !fija;
+    $('agFormMsg').hidden = fija; $('agMsgM').hidden = !fija;
+    if (fija) { if (fijo) { fijo = null; $('agFijo').hidden = true; } opcionesHorario(); }
+  }
+  // Limpia el registro actual y deja el formulario listo para una cita nueva
+  function nuevaCita() {
+    var man = sumar(hoy(), 1);
+    $('agPaciente').value = ''; $('agNombre').value = ''; $('agTelefono').value = ''; $('agCorreo').value = '';
+    $('agTratamiento').value = ''; $('agEspecialidad').value = '';
+    medicoElegidoAMano = false;
+    $('agDesde').value = man; $('agFranja').value = '';
+    $('agFechaM').value = man; $('agSalaM').value = '';
+    $('agEstado').value = 'pendiente'; $('agPrioridad').value = 'normal'; $('agNotas').value = '';
+    ['agAvPac', 'agAvMed', 'agAvMail'].forEach(function (id) { $(id).checked = true; });
+    fijo = null; serie = null; sugerencias = [];
+    $('agSugerencias').innerHTML = '';
+    aviso('agFormMsg', ''); aviso('agMsgM', '');
+    alCambiarPaciente(); alCambiarTratamiento(); $('agEspDetectada').textContent = '';
+    modoHorario('buscar'); pintarFijo();
+    $('agUsuarioGraba').textContent = usuarioSesion();
+    $('agForm').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    $('agPaciente').focus({ preventScroll: true });
+  }
+  $('agNuevaCita').addEventListener('click', nuevaCita);
+  document.querySelectorAll('#agForm [data-ag-modo]').forEach(function (b) { b.addEventListener('click', function () { modoHorario(b.dataset.agModo); }); });
+
   // ---------- Eventos ----------
   $('agPaciente').addEventListener('change', alCambiarPaciente);
   $('agMedico').addEventListener('change', function () { medicoElegidoAMano = true; });
-  $('agCantidad').addEventListener('input', function () { $('agCadaWrap').hidden = cantidadCitas() < 2; if (sugerencias.length && !serie) pintarSugerencias({ opciones: sugerencias }); });
   $('agTratamiento').addEventListener('input', alCambiarTratamiento);
   $('agEspecialidad').addEventListener('change', alCambiarTratamiento);
   $('agForm').addEventListener('submit', function (e) {

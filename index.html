@@ -329,6 +329,28 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-mini.libre{border-style:dashed;color:#005A87;font-weight:600;background:#F5F9FC}
 .ag-mini.cerrado{cursor:default;color:#94A6B2;background:transparent;border-color:transparent}
 .ag-avisos{display:flex;flex-wrap:wrap;gap:10px 28px}
+.ag-form{display:flex;flex-direction:column;gap:0;padding:0 !important;overflow:hidden}
+.ag-form-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px 24px;flex-wrap:wrap;padding:22px 24px 18px;border-bottom:1px solid #D9E4EC;background:#F5F9FC}
+.ag-form-tit{flex:1 1 360px;min-width:0}.ag-form-tit h3{margin:0 0 4px;font-size:20px;font-weight:700;color:#0B2B40}
+.ag-form-der{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.ag-grab{font-size:12.5px;color:#5A6D7A}.ag-grab b{color:#0B2B40}
+.ag-paso{padding:20px 24px;border-bottom:1px solid #EEF3F7;display:flex;flex-direction:column;gap:14px}
+.ag-paso h4{margin:0;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;color:#0B2B40}
+.ag-num{width:28px;height:28px;border-radius:50%;background:#005A87;color:#FFFFFF;font-size:14px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.ag-g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ag-pac-info{margin:-4px 0 0;font-size:13.5px;color:#475B68}.ag-pac-info:empty{display:none}#agEspDetectada:empty{display:none}
+.ag-modo{display:inline-flex;align-self:flex-start;max-width:100%;background:#EEF5FA;border:1px solid #D9E4EC;border-radius:999px;padding:4px;gap:4px}
+.ag-modo button{font:inherit;font-size:14px;font-weight:700;border:0;background:transparent;color:#475B68;border-radius:999px;padding:9px 18px;cursor:pointer;min-height:40px}
+.ag-modo button[aria-checked="true"]{background:#005A87;color:#FFFFFF;box-shadow:0 2px 8px rgba(0,90,135,.25)}
+.ag-sub{display:block;font-size:14px;font-weight:600;margin-bottom:8px}
+.ag-chips{gap:8px}.ag-chips label{display:inline-flex !important;flex-direction:row !important;align-items:center;gap:8px !important;font-weight:600;font-size:13.5px;border:1px solid #C4D4DF;border-radius:999px;padding:7px 14px;cursor:pointer;background:#FFFFFF}
+.ag-chips label:has(input:checked){background:#E2EEF6;border-color:#9CC3DA;color:#00476B}
+.ag-chips input{width:16px !important;height:16px;min-height:0 !important;padding:0 !important;margin:0;accent-color:#005A87}
+.ag-form-pie{display:flex;justify-content:flex-end;align-items:center;gap:12px 16px;flex-wrap:wrap;padding:18px 24px;background:#F5F9FC}
+.ag-form-pie .dlg-msg{flex:1 1 260px;margin:0}.ag-form-pie .dlg-submit{width:auto;min-width:240px;margin:0}
+.ag-form .ag-sugerencias:not(:empty){padding:18px 24px;border-top:1px solid #D9E4EC}
+@media (max-width:900px){.ag-g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.ag-g3{grid-template-columns:minmax(0,1fr)}.ag-form-head,.ag-paso,.ag-form-pie{padding-left:16px;padding-right:16px}.ag-form-der{align-items:flex-start}.ag-modo{display:flex;width:100%}.ag-modo button{flex:1;padding:9px 8px;font-size:13px}.ag-form-pie .dlg-submit{width:100%;min-width:0}}
 .ag-avisos label{flex-direction:row}
 .ag-aviso-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .ag-aviso-btns a{text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:38px}
@@ -1087,51 +1109,82 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="admAgenda" role="tabpanel" aria-labelledby="tabAgenda" hidden class="adm-pane">
 <div class="adm-pane-head"><h3 class="adm-h">Administrar citas</h3><span class="pronto-pill" style="background: #E2EEF6; color: #00476B">Asistente inteligente</span></div>
 
-<form id="agForm" class="adm-box">
-<div style="display: flex; flex-direction: column; gap: 4px">
-<h3 style="margin: 0; font-size: 19px; font-weight: 700">Nueva cita</h3>
-<p class="dlg-msg">Indica el paciente y el tratamiento. El asistente busca los mejores horarios según la especialidad requerida, el médico del paciente, la disponibilidad de cada dentista y sala, y la prioridad.</p>
+<form id="agForm" class="adm-box ag-form">
+<div class="ag-form-head">
+<div class="ag-form-tit">
+<h3>Nueva cita</h3>
+<p class="dlg-msg">Completa los pasos. El asistente propone los mejores horarios según la especialidad, el médico del paciente, la disponibilidad de dentistas y salas, y la prioridad.</p>
 </div>
+<div class="ag-form-der">
+<button type="button" id="agNuevaCita" class="adm-btn">+ Nueva cita</button>
+<span class="ag-grab">Graba: <b id="agUsuarioGraba">Sin usuario</b> · fecha y hora al guardar</span>
+</div>
+</div>
+
+<section class="ag-paso">
+<h4><span class="ag-num">1</span>Paciente</h4>
 <div class="exp-form">
 <label class="full">Paciente *<select id="agPaciente"><option value="">Cargando pacientes…</option></select></label>
 <label id="agNombreWrap" hidden>Nombre del paciente nuevo *<input id="agNombre" type="text" maxlength="120"></label>
 <label id="agTelWrap" hidden>Teléfono / WhatsApp *<input id="agTelefono" type="tel" maxlength="40"></label>
-<p id="agPacInfo" class="full dlg-msg"></p>
-<label>Tratamiento *<input id="agTratamiento" type="text" list="agTratamientos" maxlength="60" placeholder="Ej.: Limpieza, Ortodoncia, Extracción de cordal" required></label>
+<p id="agPacInfo" class="full ag-pac-info"></p>
+</div>
+</section>
+
+<section class="ag-paso">
+<h4><span class="ag-num">2</span>Tratamiento y médico</h4>
+<div class="exp-form ag-g3">
+<label>Tratamiento *<input id="agTratamiento" type="text" list="agTratamientos" maxlength="60" placeholder="Ej.: Limpieza, Ortodoncia" required></label>
 <datalist id="agTratamientos"></datalist>
 <label>Especialidad requerida<select id="agEspecialidad"><option value="">Detectar automáticamente</option></select></label>
-<p id="agEspDetectada" class="full dlg-msg"></p>
 <label>Médico<select id="agMedico"><option value="">El más adecuado (recomendado)</option></select></label>
+<p id="agEspDetectada" class="full dlg-msg"></p>
+</div>
+</section>
+
+<section class="ag-paso">
+<h4><span class="ag-num">3</span>¿Cuándo?</h4>
+<div class="ag-modo" role="radiogroup" aria-label="Cómo elegir el horario">
+<button type="button" role="radio" data-ag-modo="buscar" aria-checked="true">Buscar los mejores horarios</button>
+<button type="button" role="radio" data-ag-modo="fija" aria-checked="false">Ya tengo fecha y hora</button>
+</div>
+<div id="agModoBuscar" class="exp-form">
 <label>Buscar desde<input id="agDesde" type="date" required></label>
 <label>Preferencia de horario<select id="agFranja"><option value="">Cualquier hora</option><option value="manana">Mañana (antes de las 12:00)</option><option value="tarde">Tarde (desde las 12:00)</option></select></label>
-<label>Prioridad<select id="agPrioridad"><option value="normal">Normal</option><option value="urgente">Urgente (lo antes posible)</option></select></label>
-<label>Cantidad de citas<input id="agCantidad" type="number" min="1" max="24" step="1" value="1" inputmode="numeric"></label>
-<label id="agCadaWrap" hidden>Cada<select id="agCada"><option value="7">1 semana</option><option value="14">2 semanas</option><option value="21">3 semanas</option><option value="m1" selected>1 mes</option><option value="m2">2 meses</option><option value="m3">3 meses</option><option value="m6">6 meses</option></select></label>
-<label class="full">Motivo u observaciones<textarea id="agNotas" rows="2" maxlength="500" placeholder="Ej.: dolor en pieza 36 desde hace 3 días"></textarea></label>
-<label>Estado de la cita<select id="agEstado"><option value="pendiente" selected>Programado</option><option value="confirmada">Confirmado</option><option value="atendida">Atendido</option></select></label>
-<div class="exp-campo"><span class="pos-lbl">Fecha y hora de grabación</span><div class="exp-calc">Se registra al grabar</div></div>
-<div class="exp-campo"><span class="pos-lbl">Usuario que graba</span><div id="agUsuarioGraba" class="exp-calc">Sin usuario</div></div>
-<fieldset class="full pos-sec"><legend>Avisos</legend>
-<div class="ag-avisos">
-<label class="pos-activa"><input id="agAvPac" type="checkbox" checked> WhatsApp al paciente</label>
-<label class="pos-activa"><input id="agAvMed" type="checkbox" checked> WhatsApp al médico</label>
-<label class="pos-activa"><input id="agAvMail" type="checkbox" checked> Recordatorio por correo al paciente</label>
-</div>
-<label id="agCorreoWrap" class="adm-field" hidden>Correo del paciente<input id="agCorreo" type="email" maxlength="120" placeholder="paciente@correo.com" class="adm-input" style="width: 100%; max-width: 420px"></label>
-<p class="dlg-msg">Al agendar, cada aviso se abre ya escrito en WhatsApp o en tu programa de correo: solo pulsa «Enviar».</p>
-</fieldset>
 <div id="agFijo" class="full" hidden></div>
-<div class="full exp-actions"><button type="submit" class="dlg-submit">Buscar los mejores horarios</button><p id="agFormMsg" class="dlg-msg" role="status"></p></div>
-<fieldset class="full pos-sec"><legend>O guarda la cita en un horario específico</legend>
-<p class="dlg-msg">Úsalo si ya acordaste el día y la hora con el paciente. Se asigna el médico elegido arriba (o el más adecuado para ese horario).</p>
-<div class="exp-form">
+</div>
+<div id="agModoFija" class="exp-form ag-g3" hidden>
 <label>Fecha<input id="agFechaM" type="date"></label>
 <label>Hora<select id="agHoraM"></select></label>
 <label>Sala<select id="agSalaM"><option value="">La del médico</option></select></label>
-<div class="exp-actions" style="align-self: end"><button type="button" id="agGuardarM" class="dlg-submit">Guardar cita</button></div>
+<p class="full dlg-msg">Solo aparecen horas libres. Se asigna el médico elegido en el paso 2 (o el más adecuado para ese horario).</p>
 </div>
-<p id="agMsgM" class="dlg-msg" role="status"></p>
-</fieldset>
+</section>
+
+<section class="ag-paso">
+<h4><span class="ag-num">4</span>Estado, notas y avisos</h4>
+<div class="exp-form">
+<label>Estado de la cita<select id="agEstado"><option value="pendiente" selected>Programado</option><option value="confirmada">Confirmado</option><option value="atendida">Atendido</option></select></label>
+<label>Prioridad<select id="agPrioridad"><option value="normal">Normal</option><option value="urgente">Urgente (lo antes posible)</option></select></label>
+<label class="full">Motivo u observaciones<textarea id="agNotas" rows="2" maxlength="500" placeholder="Ej.: dolor en pieza 36 desde hace 3 días"></textarea></label>
+<div class="full">
+<span class="ag-sub">Avisos al agendar</span>
+<div class="ag-avisos ag-chips">
+<label><input id="agAvPac" type="checkbox" checked> WhatsApp al paciente</label>
+<label><input id="agAvMed" type="checkbox" checked> WhatsApp al médico</label>
+<label><input id="agAvMail" type="checkbox" checked> Correo al paciente</label>
+</div>
+</div>
+<label id="agCorreoWrap" hidden>Correo del paciente<input id="agCorreo" type="email" maxlength="120" placeholder="paciente@correo.com"></label>
+<p class="full dlg-msg">Cada aviso se abre ya escrito en WhatsApp o en tu correo: solo pulsa «Enviar».</p>
+</div>
+</section>
+
+<div class="ag-form-pie">
+<p id="agFormMsg" class="dlg-msg" role="status"></p>
+<p id="agMsgM" class="dlg-msg" role="status" hidden></p>
+<button type="submit" id="agBuscarBtn" class="dlg-submit">Buscar los mejores horarios</button>
+<button type="button" id="agGuardarM" class="dlg-submit" hidden>Guardar cita</button>
 </div>
 <div id="agSugerencias" class="ag-sugerencias"></div>
 </form>
