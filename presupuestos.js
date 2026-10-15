@@ -102,14 +102,16 @@
     if (!p.error) p.data.forEach(function (x) { (preciosAct[x.tratamiento_id] = preciosAct[x.tratamiento_id] || {})[x.tipo] = { valor: Number(x.valor), max: Number(x.descuento_max) }; });
     // Sugerencias al escribir: el catálogo activo y los procedimientos sugeridos de cada tipo
     var nombres = {};
-    $('preCatalogoLista').innerHTML = catalogo.filter(function (t) { return t.activo; })
-      .map(function (t) { nombres[t.nombre.toLowerCase()] = 1; return '<option value="' + esc(t.nombre) + '">' + q(t.precio) + '</option>'; }).join('') +
-      tiposCat.filter(function (x) { return x.estado === 'activo'; }).map(function (x) {
-        return (x.sugeridos || []).filter(function (n) { return !nombres[n.toLowerCase()]; })
-          .map(function (n) { nombres[n.toLowerCase()] = 1; return '<option value="' + esc(n) + '">' + esc(x.nombre) + '</option>'; }).join('');
-      }).join('');
+    pintarSugerencias();
     pintarTiposProc();
     pintarCatalogo();
+  }
+
+  // Solo se ofrecen procedimientos con precio: un precio activo del tipo elegido o el precio del catálogo
+  function conPrecio(t) { return !!(t && t.activo && ((preciosAct[t.id] && preciosAct[t.id][tipoActual()]) || Number(t.precio) > 0)); }
+  function pintarSugerencias() {
+    $('preCatalogoLista').innerHTML = catalogo.filter(conPrecio)
+      .map(function (t) { return '<option value="' + esc(t.nombre) + '">' + q(precioDe(t)) + '</option>'; }).join('');
   }
 
   function pintarCatalogo() {
@@ -162,12 +164,13 @@
       var sinTipo = catalogo.filter(function (t) { return t.activo && !tiposActivos().some(function (x) { return x.id === t.tipo_id; }) && !grupos.some(function (g) { return g.lista.some(function (p) { return p.t === t; }); }); });
       if (sinTipo.length) grupos.push({ titulo: tiposActivos().length ? 'Sin tipo' : 'Catálogo', lista: sinTipo.map(function (t) { return { nombre: t.nombre, t: t }; }) });
     }
+    grupos.forEach(function (g) { g.lista = g.lista.filter(function (p) { return conPrecio(p.t); }); });
     grupos = grupos.filter(function (g) { return g.lista.length; });
     $('preProc').innerHTML = grupos.length ? '<option value="">Elige un procedimiento…</option>' + grupos.map(function (g) {
       return '<optgroup label="' + esc(g.titulo) + '">' + g.lista.map(function (p) {
-        return '<option value="' + esc(p.nombre) + '">' + esc(p.nombre) + ' · ' + (p.t ? q(precioDe(p.t)) : 'sin precio') + '</option>';
+        return '<option value="' + esc(p.nombre) + '">' + esc(p.nombre) + ' · ' + q(precioDe(p.t)) + '</option>';
       }).join('') + '</optgroup>';
-    }).join('') : '<option value="">No hay procedimientos: créalos en Precios y paquetes</option>';
+    }).join('') : '<option value="">No hay procedimientos con precio: defínelos en Precios y paquetes</option>';
     $('preProc').value = [].some.call($('preProc').options, function (o) { return o.value === antes; }) ? antes : '';
   }
 
@@ -438,6 +441,7 @@
   });
   // Al cambiar el tipo de precio se actualizan los precios de los tratamientos del catálogo
   $('preTipo').addEventListener('change', function () {
+    pintarProcedimientos(); pintarSugerencias();
     var n = 0;
     items.forEach(function (it) {
       var t = tratamientoDe(it.tratamiento);

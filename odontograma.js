@@ -29,7 +29,11 @@
   function norm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
   function relacionados(h) {
     var cl = CLAVES[h] || [];
-    return catalogo.filter(function (c) { var n = norm(c.nombre); return cl.some(function (k) { return n.indexOf(k) >= 0; }); });
+    return disponibles().filter(function (c) { var n = norm(c.nombre); return cl.some(function (k) { return n.indexOf(k) >= 0; }); });
+  }
+  // Solo se ofrecen los procedimientos que tienen precio (en el tipo de precio elegido)
+  function conPrecio(c) { return precioDe(c) != null; }
+  function disponibles() { return catalogo.filter(conPrecio);
   }
   function buscarEnCatalogo(proc) {
     if (!proc) return null;
@@ -259,7 +263,7 @@
 
     // Detalle: cada hallazgo con su procedimiento del catálogo y su precio
     function opcionesProc(h, actual) {
-      var rel = relacionados(h), resto = catalogo.filter(function (c) { return rel.indexOf(c) < 0; });
+      var rel = relacionados(h), resto = disponibles().filter(function (c) { return rel.indexOf(c) < 0; });
       var sel = buscarEnCatalogo(actual);
       function op(c) { return '<option value="' + c.k + '"' + (sel === c ? ' selected' : '') + '>' + esc(c.nombre) + '</option>'; }
       var html = !actual ? '<option value="" selected>Elegir procedimiento…</option>'
@@ -386,9 +390,10 @@
     function llenarVentana() {
       var inf = dlg._info, bus = norm(dlg.querySelector('input').value.trim());
       var rel = relacionados(inf.h);
-      var lista = bus ? catalogo.filter(function (c) { return norm(c.nombre + ' ' + c.tipo).indexOf(bus) >= 0; })
-        : dlg._todos || !rel.length ? catalogo : rel;
-      dlg.querySelector('[data-todos]').hidden = !!(bus || lista === catalogo);
+      var todos = disponibles();
+      var lista = bus ? todos.filter(function (c) { return norm(c.nombre + ' ' + c.tipo).indexOf(bus) >= 0; })
+        : dlg._todos || !rel.length ? todos : rel;
+      dlg.querySelector('[data-todos]').hidden = !!(bus || lista === todos);
       dlg.querySelector('.lista').innerHTML = lista.length ? lista.map(function (c) {
         var pr = precioDe(c);
         return '<button type="button" class="op" data-k="' + c.k + '"><span>' + esc(c.nombre) + (c.tipo ? '<small>' + esc(c.tipo) + '</small>' : '') + '</span>' +
@@ -396,7 +401,7 @@
       }).join('') : '<p>No hay procedimientos con ese nombre.</p>';
     }
     function abrirVentana(info) {
-      if (!catalogo.length || typeof HTMLDialogElement === 'undefined') return;
+      if (!disponibles().length || typeof HTMLDialogElement === 'undefined') return;
       if (!dlg) {
         dlg = document.createElement('dialog');
         dlg.className = 'odg-dlg';
