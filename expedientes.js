@@ -106,7 +106,7 @@
       $(b.dataset.ficha).hidden = b.dataset.ficha !== id;
     });
     if (id === 'fNotas') cargarNotas();
-    if (id === 'fOdonto') { cargarHistorial(); cargarCatalogoOdg(); }
+    if (id === 'fOdonto') { cargarHistorial(); cargarCatalogoOdg(); cargarCodigoPresupuesto(); }
     if (id === 'fRx') cargarArchivos();
     if (id === 'fTrat' && window.PD_TRATAMIENTOS) window.PD_TRATAMIENTOS.cargar(actual);
   }
@@ -335,9 +335,19 @@
       if (!actual) throw new Error('Primero guarda el expediente del paciente.');
       var r = await sb.from('presupuestos').insert({ paciente_id: actual.id }).select('id').single();
       if (r.error) throw new Error(traducir(r.error));
-      var g = await sb.rpc('guardar_presupuesto', { p_id: r.data.id, p_descuento: 0, p_notas: '', p_items: d.items, p_tipo: d.tipo });
-      if (g.error) throw new Error('Se creó el presupuesto N.º ' + r.data.id + ', pero no se pudieron agregar los tratamientos: ' + traducir(g.error));
-      return { id: r.data.id };
+      var g = await sb.rpc('guardar_presupuesto', { p_id: r.data.id, p_descuento: 0, p_notas: '', p_items: d.items, p_tipo: d.tipo,
+        p_forma_pago: d.forma_pago || 'efectivo', p_cuotas: d.cuotas, p_citas: d.citas });
+      if (g.error) {
+        var falta = /guardar_presupuesto|could not find the function/i.test(g.error.message || '');
+        throw new Error('Se creó el presupuesto N.º ' + r.data.id + ', pero no se pudieron agregar los tratamientos: ' +
+          (falta ? 'falta ejecutar en Supabase el script actualizado (supabase.sql).' : traducir(g.error)));
+      }
+      // Estado elegido: Activo queda en borrador; Aprobado y No aprobado se aplican al crear
+      var estadoBd = { aprobado: 'aprobado', no_aprobado: 'rechazado' }[d.estado];
+      if (estadoBd) await sb.from('presupuestos').update({ estado: estadoBd }).eq('id', r.data.id);
+      var c = await sb.from('presupuestos').select('codigo').eq('id', r.data.id).maybeSingle();
+      cargarCodigoPresupuesto();
+      return { id: r.data.id, codigo: !c.error && c.data ? c.data.codigo : null };
     },
     // Reporte impreso con el logo: paciente, médico asignado y los procedimientos requeridos con su valor
     imprimir: function (d) {
@@ -370,6 +380,16 @@
 
   // Procedimientos y precios para el odontograma: catálogo de tratamientos (con sus precios por tipo)
   // y los procedimientos sugeridos de «Tipos de procedimientos» que aún no están en el catálogo.
+  // Código que tendrá el próximo presupuesto del paciente: PACIENTE-AÑO-CORRELATIVO-V01 (lo asigna la base de datos)
+  async function cargarCodigoPresupuesto() {
+    if (!actual) return;
+    var pid = actual.id, anio = new Date().getFullYear();
+    var r = await sb.from('presupuestos').select('correlativo').eq('paciente_id', pid).eq('anio', anio).order('correlativo', { ascending: false }).limit(1);
+    if (!actual || actual.id !== pid) return;
+    if (r.error) { odg.codigoPresupuesto(''); return; }
+    var sig = (r.data.length ? Number(r.data[0].correlativo) || 0 : 0) + 1;
+    odg.codigoPresupuesto(String(pid).padStart(4, '0') + '-' + anio + '-' + String(sig).padStart(3, '0') + '-V01');
+  }
   var catalogoOdgCargado = 0;
   async function cargarCatalogoOdg() {
     if (Date.now() - catalogoOdgCargado < 120000) return;

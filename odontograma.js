@@ -154,6 +154,20 @@
       '.odg-det .sinp{color:#9A3B2E;font-size:12.5px;font-weight:700}',
       '.odg-res button.odg-ver-sin{font:inherit;font-size:13px;font-weight:700;color:#005A87;background:none;border:0;padding:10px 2px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}',
       '.odg-res .odg-vacio{margin:4px 0 0;color:#5A6D7A}',
+      '.odg-res .odg-pre{background:none;border:0;border-top:1px solid #D9E4EC;border-radius:0;padding:14px 0 0;margin-top:14px;display:flex;flex-direction:column;gap:12px}',
+      '.odg-res .odg-pre div{background:none;border:0;padding:0;border-radius:0}',
+      '.odg-pre-tit{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#005A87;font-weight:800}',
+      '.odg-pre-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}',
+      '.odg-pre-campo{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}',
+      '.odg-res .odg-pre-campo input{font:inherit;font-size:14px;border:1px solid #C4D4DF;border-radius:10px;padding:8px 10px;min-height:38px;box-sizing:border-box;background:#FFFFFF}',
+      '.odg-res .odg-pre-campo select{min-height:38px}',
+      '.odg-res .odg-pre .odg-cod{background:#0B2B40;color:#FFFFFF;border-radius:10px;padding:6px 12px;font-weight:800;font-size:15px;letter-spacing:.03em;min-height:38px;box-sizing:border-box}',
+      '.odg-cod small{display:block;font-size:9.5px;letter-spacing:.12em;color:#9CC3DA;font-weight:700}',
+      '.odg-pre-est{display:flex;gap:6px;flex-wrap:wrap}',
+      '.odg-est{font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;padding:6px 12px;border:2px solid transparent;cursor:pointer}',
+      '.odg-est[aria-pressed="true"]{border-color:#0B2B40}.odg-est:disabled{cursor:not-allowed;opacity:.55}',
+      '.odg-est-activo{background:#DBEAFE;color:#1E40AF}.odg-est-aprobado{background:#DCF2EC;color:#08504C}.odg-est-proceso{background:#FEF3C7;color:#92400E}',
+      '.odg-est-finalizado{background:#E5E7EB;color:#374151}.odg-est-no_aprobado{background:#FDE2E4;color:#9F1239}',
       'dialog.odg-dlg{border:0;border-radius:18px;padding:0;width:min(480px,calc(100vw - 32px));max-height:min(640px,calc(100vh - 40px));box-shadow:0 20px 50px rgba(0,0,0,.25);color:#0B2B40;font-family:Manrope,system-ui,sans-serif}',
       'dialog.odg-dlg::backdrop{background:rgba(11,43,64,.4)}',
       '.odg-dlg form{display:flex;flex-direction:column;gap:10px;padding:20px;max-height:inherit;box-sizing:border-box}',
@@ -322,6 +336,25 @@
       opciones.imprimir({ tipo: tp ? tp[1] : '', lineas: lineas, total: lineas.reduce(function (s, l) { return s + l.precio; }, 0) });
     }
     var verSinProc = false;
+    // Datos del presupuesto que se creará desde el odontograma
+    var FORMAS = [['efectivo', 'Efectivo'], ['transferencia', 'Transferencia'], ['tarjeta', 'Tarjeta de crédito'], ['otro', 'Otro']];
+    var CUOTAS = [1, 2, 3, 6, 10, 12, 18, 24];
+    var ESTADOS_PRE = [['activo', 'Activo'], ['aprobado', 'Aprobado'], ['proceso', 'Proceso'], ['finalizado', 'Finalizado'], ['no_aprobado', 'No aprobado']];
+    var datosPre = { forma: 'efectivo', cuotas: 1, citas: '', estado: 'activo' }, codigoPre = '';
+    function bloquePresupuesto(total) {
+      var tarjeta = datosPre.forma === 'tarjeta';
+      return '<div class="odg-pre"><div class="odg-pre-tit">Datos del presupuesto</div><div class="odg-pre-g">' +
+        '<div class="odg-pre-campo"><span>Código del presupuesto</span><div class="odg-cod"><small>SE ASIGNA AL CREAR</small>' + esc(codigoPre || '—') + '</div></div>' +
+        '<label class="odg-pre-campo"><span>Forma de pago</span><select data-pre-campo="forma">' + FORMAS.map(function (x) {
+          return '<option value="' + x[0] + '"' + (x[0] === datosPre.forma ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label>' +
+        (tarjeta ? '<label class="odg-pre-campo"><span>Plan de pago</span><select data-pre-campo="cuotas">' + CUOTAS.map(function (n) {
+          return '<option value="' + n + '"' + (n === datosPre.cuotas ? ' selected' : '') + '>' + (n === 1 ? '1 pago' : n + ' cuotas') + (total > 0 ? ' de ' + q(total / n) : '') + '</option>'; }).join('') + '</select></label>' : '') +
+        '<label class="odg-pre-campo"><span>Cantidad de citas</span><input type="number" min="1" max="99" step="1" inputmode="numeric" data-pre-campo="citas" value="' + esc(datosPre.citas) + '" placeholder="Ej.: 3"></label>' +
+        '</div><div class="odg-pre-campo"><span>Estado</span><div class="odg-pre-est" role="group" aria-label="Estado del presupuesto">' + ESTADOS_PRE.map(function (x) {
+          var auto = x[0] === 'proceso' || x[0] === 'finalizado';
+          return '<button type="button" class="odg-est odg-est-' + x[0] + '" data-pre-estado="' + x[0] + '" aria-pressed="' + (datosPre.estado === x[0]) + '"' +
+            (auto ? ' disabled title="Se pone solo al marcar tratamientos realizados en Presupuesto"' : '') + '>' + x[1] + '</button>'; }).join('') + '</div></div></div>';
+    }
     function resumen() {
       var f = filasDetalle();
       var selTipo = '<label class="odg-tp">Tipo de precio <select data-tipo-precio>' + TIPOS_PRECIO.map(function (t) {
@@ -337,7 +370,8 @@
         : 'Elegir procedimiento para ' + sinN + (sinN === 1 ? ' hallazgo' : ' hallazgos') + ' sin procedimiento') + '</button>' : '';
       return '<div><div class="odg-cab"><h4 style="color:' + ROJO + '">Requerido (' + visibles.length + ')</h4>' +
         (f.req.length && catalogo.length ? '<div class="odg-acc">' + selTipo + crearPre + '</div>' : '') + '</div>' +
-        (visibles.length ? tablaDetalle(visibles, true) : f.req.length ? '<p class="odg-vacio">Aún no hay hallazgos con procedimiento elegido.</p>' : 'Sin tratamientos pendientes.') + enlace + '</div>' +
+        (visibles.length ? tablaDetalle(visibles, true) : f.req.length ? '<p class="odg-vacio">Aún no hay hallazgos con procedimiento elegido.</p>' : 'Sin tratamientos pendientes.') + enlace +
+        (opciones.crearPresupuesto && conProc.length ? bloquePresupuesto(conProc.reduce(function (t, x) { var p = precioDe(buscarEnCatalogo(x.proc)); return t + (p || 0); }, 0)) : '') + '</div>' +
         '<div><div class="odg-cab"><h4 style="color:' + AZUL + '">Realizado / existente (' + f.hecho.length + ')</h4></div>' +
         (f.hecho.length ? tablaDetalle(f.hecho, false) : 'Sin registros.') + '</div>';
     }
@@ -491,8 +525,10 @@
       var nombre = opciones.paciente ? opciones.paciente() : '';
       dlgPre._datos = d;
       var html = '<form method="dialog"><h4>Crear presupuesto</h4>' +
-        '<p>Nuevo presupuesto en borrador' + (nombre ? ' · <b>' + esc(nombre) + '</b>' : '') + '</p>' +
-        '<p>Tipo de precio: <b>' + (tp ? tp[1] : '') + '</b></p>';
+        '<p>Nuevo presupuesto' + (nombre ? ' · <b>' + esc(nombre) + '</b>' : '') + '</p>' +
+        '<p>Tipo de precio: <b>' + (tp ? tp[1] : '') + '</b></p>' +
+        '<p>Forma de pago: <b>' + FORMAS.filter(function (x) { return x[0] === datosPre.forma; })[0][1] + (datosPre.forma === 'tarjeta' ? ' · ' + (datosPre.cuotas === 1 ? '1 pago' : datosPre.cuotas + ' cuotas') : '') + '</b>' +
+        (datosPre.citas ? ' · Citas: <b>' + esc(datosPre.citas) + '</b>' : '') + ' · Estado: <b>' + ESTADOS_PRE.filter(function (x) { return x[0] === datosPre.estado; })[0][1] + '</b></p>';
       if (!d.lineas.length) {
         html += '<div class="alerta">Ningún hallazgo «Requerido» tiene procedimiento. Elige el procedimiento en la tabla del detalle y vuelve a intentarlo.</div>' +
           pieVentana('<button value="cerrar">Cerrar</button>');
@@ -529,13 +565,15 @@
       try {
         var r = await opciones.crearPresupuesto({
           tipo: tipoPrecio,
+          forma_pago: datosPre.forma, cuotas: datosPre.forma === 'tarjeta' ? datosPre.cuotas : null,
+          citas: datosPre.citas ? +datosPre.citas : null, estado: datosPre.estado,
           items: d.lineas.map(function (l) { return { tratamiento: l.tratamiento, pieza: l.pieza, cantidad: l.cantidad, precio: l.precio }; })
         });
         var total = d.lineas.reduce(function (s, l) { return s + l.precio; }, 0);
         var puedeAbrir = opciones.abrirPresupuesto && (!opciones.puedeAbrirPresupuesto || opciones.puedeAbrirPresupuesto());
         dlgPre.innerHTML = '<form method="dialog"><div class="ok"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1B7F4B"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-          '<h4><span>Presupuesto N.º ' + r.id + '</span> <span>creado</span></h4></div>' +
-          '<p>Borrador · ' + d.lineas.length + (d.lineas.length === 1 ? ' tratamiento' : ' tratamientos') + ' · ' + q(total) + '</p>' +
+          '<h4><span>Presupuesto ' + esc(r.codigo || 'N.º ' + r.id) + '</span> <span>creado</span></h4></div>' +
+          '<p>' + ESTADOS_PRE.filter(function (x) { return x[0] === datosPre.estado; })[0][1] + ' · ' + d.lineas.length + (d.lineas.length === 1 ? ' tratamiento' : ' tratamientos') + ' · ' + q(total) + '</p>' +
           '<p>Puedes revisarlo, aplicar descuento y enviarlo desde Presupuesto.</p>' +
           pieVentana('<button value="cerrar">Seguir en el odontograma</button>' + (puedeAbrir ? '<button type="button" class="pri" data-pre-abrir="' + r.id + '">Abrir en Presupuesto</button>' : '')) +
           '</form>';
@@ -552,6 +590,13 @@
     raiz.addEventListener('change', function (e) {
       var t = e.target;
       if (t.matches('[data-tipo-precio]')) { tipoPrecio = t.value; pintar(); return; }
+      if (t.matches('[data-pre-campo]')) {
+        var c = t.dataset.preCampo;
+        if (c === 'forma') { datosPre.forma = t.value; pintar(); }
+        else if (c === 'cuotas') datosPre.cuotas = +t.value;
+        else if (c === 'citas') datosPre.citas = t.value ? String(Math.min(Math.max(parseInt(t.value, 10) || 1, 1), 99)) : '';
+        return;
+      }
       if (t.matches('[data-proc-pieza]')) {
         if (t.value === '-') { ponerProc(+t.dataset.procPieza, t.dataset.procClave, null); return; }
         var item = catalogo.filter(function (c) { return c.k === t.value; })[0];
@@ -561,6 +606,8 @@
     raiz.addEventListener('click', function (e) {
       if (e.target.closest('select')) return;
       if (e.target.closest('[data-ver-sin]')) { verSinProc = !verSinProc; pintar(); return; }
+      var est = e.target.closest('[data-pre-estado]');
+      if (est) { if (!est.disabled) { datosPre.estado = est.dataset.preEstado; pintar(); } return; }
       if (e.target.closest('[data-crear-presupuesto]')) { abrirPresupuesto(); return; }
       if (e.target.closest('[data-imprimir-odg]')) { imprimirDetalle(); return; }
       var b = e.target.closest('[data-denticion],[data-modo],[data-herr]');
@@ -604,6 +651,7 @@
       valor: function () { return JSON.parse(JSON.stringify(datos)); },
       hallazgos: function () { return Object.keys(datos.piezas).length; },
       // lista: [{ id, nombre, tipo, base, precios: { directo: 350, vip: 300 } }] (id null = sugerido sin catálogo)
+      codigoPresupuesto: function (texto) { codigoPre = texto || ''; pintar(); },
       catalogo: function (lista) {
         catalogo = (lista || []).map(function (c, i) { return Object.assign({ k: c.id ? 'id' + c.id : 'n' + i }, c); });
         pintar();

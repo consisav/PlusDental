@@ -5,6 +5,17 @@
   if (!sb) return;
 
   var ESTADOS = { borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado', rechazado: 'Rechazado' };
+  // Estado que se muestra: Activo (borrador o enviado), Aprobado, Proceso (con tratamientos realizados),
+  // Finalizado (todos realizados) y No aprobado (rechazado). Proceso y Finalizado se calculan solos.
+  var ESTADOS_V = { activo: 'Activo', aprobado: 'Aprobado', proceso: 'Proceso', finalizado: 'Finalizado', no_aprobado: 'No aprobado' };
+  function estadoVisible(estado, its) {
+    if (estado === 'rechazado') return 'no_aprobado';
+    if (estado !== 'aprobado') return 'activo';
+    var hechos = (its || []).filter(function (i) { return i.realizado; }).length;
+    return !hechos ? 'aprobado' : hechos === its.length ? 'finalizado' : 'proceso';
+  }
+  var FORMAS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta de crédito', otro: 'Otro' };
+  function codigoDe(p) { return p.codigo || 'N.º ' + p.id; }
   var lista = [], pacientes = [], catalogo = [], filtro = 'todos';
   var actual = null, items = [], cambios = false;
   // Precios activos por tratamiento y tipo (de «Precios y paquetes»): { idTratamiento: { directo: {valor, max}, … } }
@@ -42,7 +53,7 @@
     aviso('preMsg', '');
     $('preBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
     var r = await sb.from('presupuestos')
-      .select('id,fecha,estado,descuento_pct,paciente_id,pacientes(nombre),presupuesto_items(cantidad,precio,realizado)')
+      .select('id,codigo,fecha,estado,descuento_pct,paciente_id,pacientes(nombre),presupuesto_items(cantidad,precio,realizado)')
       .order('id', { ascending: false });
     if (r.error) { $('preBody').innerHTML = ''; aviso('preMsg', traducir(r.error), true); return; }
     lista = r.data;
@@ -67,7 +78,8 @@
     var buscar = $('preBuscar').value.trim().toLowerCase();
     var filas = lista.filter(function (p) {
       var nombre = (p.pacientes && p.pacientes.nombre) || '';
-      return (filtro === 'todos' || p.estado === filtro) && (!buscar || nombre.toLowerCase().indexOf(buscar) >= 0 || String(p.id) === buscar);
+      return (filtro === 'todos' || estadoVisible(p.estado, p.presupuesto_items) === filtro) &&
+        (!buscar || nombre.toLowerCase().indexOf(buscar) >= 0 || String(p.id) === buscar || String(p.codigo || '').toLowerCase().indexOf(buscar) >= 0);
     });
     if (!filas.length) {
       $('preBody').innerHTML = '<tr><td colspan="7">' + (lista.length ? 'Ningún presupuesto coincide.' : 'Todavía no hay presupuestos. Elige un paciente y pulsa «Nuevo presupuesto».') + '</td></tr>';
@@ -77,9 +89,10 @@
       var its = p.presupuesto_items || [];
       var t = totales(its, p.descuento_pct);
       var hechos = its.filter(function (i) { return i.realizado; }).length;
-      return '<tr><td class="fecha">' + p.id + '</td><td><strong>' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</strong></td>' +
+      var ev = estadoVisible(p.estado, its);
+      return '<tr><td class="fecha"><strong>' + esc(codigoDe(p)) + '</strong></td><td><strong>' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</strong></td>' +
         '<td class="fecha">' + fechaCorta(p.fecha) + '</td><td class="num"><strong>' + q(t.total) + '</strong></td>' +
-        '<td><span class="estado estado-' + p.estado + '">' + ESTADOS[p.estado] + '</span></td>' +
+        '<td><span class="estado estado-' + ev + '">' + ESTADOS_V[ev] + '</span></td>' +
         '<td class="fecha">' + (p.estado === 'aprobado' ? hechos + ' de ' + its.length : '—') + '</td>' +
         '<td><button type="button" class="adm-btn" data-abrir="' + p.id + '">Abrir</button></td></tr>';
     }).join('');
@@ -214,6 +227,10 @@
     $('preDescuento').value = Number(actual.descuento_pct) || 0;
     $('preTipo').value = actual.tipo_precio || 'directo';
     $('preNotas').value = actual.notas || '';
+    $('preForma').value = actual.forma_pago || 'efectivo';
+    var cu = String(actual.cuotas || 1);
+    $('preCuotas').innerHTML = '<option value="' + cu + '">' + cu + '</option>'; $('preCuotas').value = cu;
+    $('preCitas').value = actual.citas || '';
     if (editable() && !items.length) items.push({ tratamiento: '', pieza: '', cantidad: 1, precio: 0 });
     pintarEditor();
     ver('preEditor');
@@ -222,10 +239,13 @@
 
   function pintarEditor() {
     var ed = editable();
-    $('preTitulo').textContent = 'Presupuesto N.º ' + actual.id;
+    $('preTitulo').textContent = 'Presupuesto ' + codigoDe(actual);
     $('preSub').textContent = (actual.pacientes ? actual.pacientes.nombre : '') + ' · ' + fechaCorta(actual.fecha) + (actual.creado_por ? ' · por ' + actual.creado_por : '');
-    $('preEstado').className = 'estado estado-' + actual.estado;
-    $('preEstado').textContent = ESTADOS[actual.estado];
+    var ev = estadoVisible(actual.estado, items);
+    $('preEstado').className = 'estado estado-' + ev;
+    $('preEstado').textContent = ESTADOS_V[ev];
+    ['preForma', 'preCuotas', 'preCitas'].forEach(function (id) { $(id).disabled = !ed; });
+    pintarCuotas();
     $('preDescuento').disabled = !ed;
     $('preTipo').disabled = !ed;
     $('preNotas').disabled = !ed;
@@ -255,10 +275,22 @@
     pintarAcciones();
   }
 
+  // Plan de pago: solo con tarjeta de crédito, con el valor de cada cuota
+  function pintarCuotas() {
+    var tarjeta = $('preForma').value === 'tarjeta';
+    $('preCuotasWrap').hidden = !tarjeta;
+    if (!tarjeta || document.activeElement === $('preCuotas')) return;
+    var total = totales(items, $('preDescuento').value).total, sel = $('preCuotas').value || '1';
+    $('preCuotas').innerHTML = [1, 2, 3, 6, 10, 12, 18, 24].map(function (n) {
+      return '<option value="' + n + '"' + (String(n) === sel ? ' selected' : '') + '>' + (n === 1 ? '1 pago' : n + ' cuotas') + (total > 0 ? ' de ' + q(total / n) : '') + '</option>';
+    }).join('');
+  }
+
   function pintarTotales() {
     var t = totales(items, $('preDescuento').value);
     $('preSubtotal').textContent = q(t.subtotal);
     $('preTotal').textContent = q(t.total);
+    pintarCuotas();
     $('preRealizado').textContent = actual.estado === 'aprobado' ? q(t.realizado) : '—';
     document.querySelectorAll('#preItems [data-importe]').forEach(function (td) {
       var it = items[+td.parentNode.dataset.i];
@@ -272,10 +304,12 @@
     var lineas = items.filter(function (it) { return it.tratamiento.trim(); }).map(function (it) {
       return '• ' + it.tratamiento.trim() + (it.pieza ? ' (pieza ' + it.pieza + ')' : '') + (it.cantidad > 1 ? ' x' + it.cantidad : '') + ': ' + q(importe(it));
     });
-    var texto = 'Hola ' + (actual.pacientes ? actual.pacientes.nombre : '') + ', le compartimos su presupuesto de Plus Dental (N.º ' + actual.id + ', ' + fechaCorta(actual.fecha) + '):\n\n' +
+    var texto = 'Hola ' + (actual.pacientes ? actual.pacientes.nombre : '') + ', le compartimos su presupuesto de Plus Dental (' + codigoDe(actual) + ', ' + fechaCorta(actual.fecha) + '):\n\n' +
       lineas.join('\n') + '\n\n' +
       (t.descuento ? 'Subtotal: ' + q(t.subtotal) + '\nDescuento (' + Number($('preDescuento').value) + '%): -' + q(t.descuento) + '\n' : '') +
       'Total: ' + q(t.total) + ' (IVA incluido)' +
+      '\nForma de pago: ' + FORMAS[$('preForma').value || 'efectivo'] + ($('preForma').value === 'tarjeta' ? ' · ' + ($('preCuotas').value === '1' ? '1 pago' : $('preCuotas').value + ' cuotas') : '') +
+      ($('preCitas').value ? '\nCitas estimadas: ' + $('preCitas').value : '') +
       ($('preNotas').value.trim() ? '\n\n' + $('preNotas').value.trim() : '') +
       '\n\nQuedamos a la orden para cualquier duda.';
     var num = String((actual.pacientes && actual.pacientes.telefono) || '').replace(/\D/g, '');
@@ -295,10 +329,10 @@
     }
     if (e === 'borrador' || e === 'enviado') {
       b.push('<button type="button" class="adm-btn adm-primary" data-accion="aprobado">Marcar aprobado</button>');
-      b.push('<button type="button" class="adm-btn" data-accion="rechazado">Marcar rechazado</button>');
+      b.push('<button type="button" class="adm-btn" data-accion="rechazado">Marcar no aprobado</button>');
     }
     if (e === 'enviado' || e === 'rechazado' || (e === 'aprobado' && !items.some(function (i) { return i.realizado; }))) {
-      b.push('<button type="button" class="adm-btn" data-accion="borrador">Volver a borrador</button>');
+      b.push('<button type="button" class="adm-btn" data-accion="borrador">Volver a activo</button>');
     }
     if (esSuper() && e !== 'aprobado') b.push('<button type="button" class="adm-btn" data-accion="borrar" data-confirmar="0">Borrar</button>');
     $('preAcciones').innerHTML = b.join('');
@@ -317,7 +351,10 @@
       p_descuento: Math.min(Math.max(d, 0), 100),
       p_notas: $('preNotas').value,
       p_items: datos,
-      p_tipo: tipoActual()
+      p_tipo: tipoActual(),
+      p_forma_pago: $('preForma').value || 'efectivo',
+      p_cuotas: $('preForma').value === 'tarjeta' ? +($('preCuotas').value || 1) : null,
+      p_citas: $('preCitas').value ? Math.min(Math.max(parseInt($('preCitas').value, 10) || 1, 1), 99) : null
     });
     if (r.error) { aviso('preEdMsg', traducir(r.error), true); return false; }
     cambios = false;
@@ -453,8 +490,8 @@
     aviso('preEdMsg', n ? 'Se aplicaron los precios «' + TIPOS[tipoActual()] + '» a ' + n + (n === 1 ? ' tratamiento' : ' tratamientos') + '. Pulsa «Guardar».' : 'Tipo de precio cambiado. Pulsa «Guardar».');
     var a = $('preWa'); if (a) a.href = mensajeWhatsApp();
   });
-  ['preDescuento', 'preNotas'].forEach(function (id) {
-    $(id).addEventListener('input', function () {
+  ['preDescuento', 'preNotas', 'preForma', 'preCuotas', 'preCitas'].forEach(function (id) {
+    $(id).addEventListener(id === 'preForma' || id === 'preCuotas' ? 'change' : 'input', function () {
       cambios = true;
       pintarTotales();
       var a = $('preWa'); if (a) a.href = mensajeWhatsApp();
@@ -488,7 +525,7 @@
       else b.disabled = false;
       return;
     }
-    var textos = { aprobado: 'Presupuesto aprobado. Marca cada tratamiento como realizado cuando se haga.', rechazado: 'Presupuesto marcado como rechazado.', borrador: 'El presupuesto volvió a borrador y se puede editar.' };
+    var textos = { aprobado: 'Presupuesto aprobado. Marca cada tratamiento como realizado cuando se haga.', rechazado: 'Presupuesto marcado como no aprobado.', borrador: 'El presupuesto volvió a Activo y se puede editar.' };
     if (await cambiarEstado(accion)) aviso('preEdMsg', textos[accion]);
     else b.disabled = false;
   });

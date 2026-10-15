@@ -101,6 +101,10 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .pre-totales b{color:#0B2B40;font-variant-numeric:tabular-nums}
 .pre-totales .total{border-top:1px solid #C4D4DF;padding-top:10px;font-size:18px}.pre-totales .total b{font-size:22px}
 .pre-totales .cargado{font-size:14px}.pre-totales .cargado b{color:#005A87}
+.estado-activo{background:#DBEAFE;color:#1E40AF}.estado-proceso{background:#FEF3C7;color:#92400E}.estado-finalizado{background:#E5E7EB;color:#374151}.estado-no_aprobado{background:#FDE2E4;color:#9F1239}
+.pre-pago{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;max-width:760px}
+.pre-pago label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+.pre-pago .adm-input{width:100%;box-sizing:border-box;border-radius:12px}
 .estado-borrador{background:#EBF0F4;color:#475B68}.estado-enviado{background:#DBEAFE;color:#1E40AF}.estado-aprobado{background:#DCF2EC;color:#08504C}.estado-rechazado{background:#FDE2E4;color:#9F1239}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
 .kpi{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -1054,14 +1058,15 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">
 <div id="preFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar presupuestos">
 <button type="button" class="adm-btn" data-pfiltro="todos" aria-pressed="true">Todos</button>
-<button type="button" class="adm-btn" data-pfiltro="borrador" aria-pressed="false">Borradores</button>
-<button type="button" class="adm-btn" data-pfiltro="enviado" aria-pressed="false">Enviados</button>
+<button type="button" class="adm-btn" data-pfiltro="activo" aria-pressed="false">Activos</button>
 <button type="button" class="adm-btn" data-pfiltro="aprobado" aria-pressed="false">Aprobados</button>
-<button type="button" class="adm-btn" data-pfiltro="rechazado" aria-pressed="false">Rechazados</button>
+<button type="button" class="adm-btn" data-pfiltro="proceso" aria-pressed="false">En proceso</button>
+<button type="button" class="adm-btn" data-pfiltro="finalizado" aria-pressed="false">Finalizados</button>
+<button type="button" class="adm-btn" data-pfiltro="no_aprobado" aria-pressed="false">No aprobados</button>
 </div>
-<input id="preBuscar" type="search" class="adm-input" placeholder="Buscar paciente" aria-label="Buscar presupuesto por paciente">
+<input id="preBuscar" type="search" class="adm-input" placeholder="Buscar paciente o código" aria-label="Buscar presupuesto por paciente o código">
 </div>
-<div class="roles-wrap"><table><thead><tr><th>N.º</th><th>Paciente</th><th>Fecha</th><th class="num">Total</th><th>Estado</th><th>Realizado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="preBody"></tbody></table></div>
+<div class="roles-wrap"><table><thead><tr><th>Código</th><th>Paciente</th><th>Fecha</th><th class="num">Total</th><th>Estado</th><th>Realizado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="preBody"></tbody></table></div>
 <p id="preMsg" class="dlg-msg" role="status"></p>
 </div>
 
@@ -1080,8 +1085,13 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" id="preAgregarProc" class="adm-btn adm-primary">Agregar</button>
 <button type="button" id="preAgregar" class="adm-btn">+ Línea en blanco</button>
 </div>
+<div class="pre-pago">
+<label>Forma de pago<select id="preForma" class="adm-input"><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta de crédito</option><option value="otro">Otro</option></select></label>
+<label id="preCuotasWrap" hidden>Plan de pago<select id="preCuotas" class="adm-input"><option value="1">1 pago</option></select></label>
+<label>Cantidad de citas<input id="preCitas" type="number" min="1" max="99" step="1" inputmode="numeric" class="adm-input" placeholder="Ej.: 3"></label>
+</div>
 <div class="pre-bottom">
-<label class="adm-field" style="flex: 1 1 300px">Notas para el paciente<textarea id="preNotas" rows="4" maxlength="2000" class="pre-notas" placeholder="Ej.: forma de pago, número de citas, cuidados"></textarea></label>
+<label class="adm-field" style="flex: 1 1 300px">Notas para el paciente<textarea id="preNotas" rows="4" maxlength="2000" class="pre-notas" placeholder="Ej.: cuidados e indicaciones"></textarea></label>
 <div class="pre-totales">
 <div><label for="preTipo">Tipo de precio</label><select id="preTipo" class="adm-input" style="width: 180px"><option value="directo">Cliente directo</option><option value="institucional">Institucional</option><option value="vip">VIP</option><option value="referido">Referido</option><option value="paquete">Paquete</option><option value="especial">Especial</option></select></div>
 <div><span>Subtotal</span><b id="preSubtotal"></b></div>
