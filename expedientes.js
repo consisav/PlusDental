@@ -106,7 +106,7 @@
       $(b.dataset.ficha).hidden = b.dataset.ficha !== id;
     });
     if (id === 'fNotas') cargarNotas();
-    if (id === 'fOdonto') cargarHistorial();
+    if (id === 'fOdonto') { cargarHistorial(); cargarCatalogoOdg(); }
     if (id === 'fRx') cargarArchivos();
     if (id === 'fTrat' && window.PD_TRATAMIENTOS) window.PD_TRATAMIENTOS.cargar(actual);
   }
@@ -328,6 +328,42 @@
   // meta guarda, por pieza, la fecha del cambio y las observaciones escritas antes de guardar.
   var base = null, meta = {}, pendientes = [], historial = [];
   var odg = window.Odontograma.crear($('odoComp'), { onCambio: function () { revisarCambios(); } });
+
+  // Procedimientos y precios para el odontograma: catálogo de tratamientos (con sus precios por tipo)
+  // y los procedimientos sugeridos de «Tipos de procedimientos» que aún no están en el catálogo.
+  var catalogoOdgCargado = 0;
+  async function cargarCatalogoOdg() {
+    if (Date.now() - catalogoOdgCargado < 120000) return;
+    var r = await Promise.all([
+      sb.from('tratamientos').select('id,nombre,precio,activo,tipo_id').order('nombre'),
+      sb.from('precios').select('tratamiento_id,tipo,valor,estado'),
+      sb.from('tipos_procedimiento').select('id,nombre,estado,orden,sugeridos').order('orden')
+    ]);
+    if (r[0].error) return;
+    var tipos = r[2].error ? [] : r[2].data.filter(function (t) { return t.estado === 'activo'; });
+    var nombreTipo = {}, ordenTipo = {};
+    tipos.forEach(function (t, i) { nombreTipo[t.id] = t.nombre; ordenTipo[t.id] = i; });
+    var precios = {};
+    (r[1].error ? [] : r[1].data).forEach(function (p) {
+      if (p.estado !== 'activo') return;
+      (precios[p.tratamiento_id] = precios[p.tratamiento_id] || {})[p.tipo] = Number(p.valor);
+    });
+    var lista = r[0].data.filter(function (t) { return t.activo; }).map(function (t) {
+      return { id: t.id, nombre: t.nombre, tipo: nombreTipo[t.tipo_id] || '', orden: t.tipo_id in ordenTipo ? ordenTipo[t.tipo_id] : 999, base: Number(t.precio) || 0, precios: precios[t.id] || {} };
+    });
+    var ya = {};
+    lista.forEach(function (c) { ya[c.nombre.toLowerCase()] = true; });
+    tipos.forEach(function (t, i) {
+      (t.sugeridos || []).forEach(function (n) {
+        if (ya[n.toLowerCase()]) return;
+        ya[n.toLowerCase()] = true;
+        lista.push({ id: null, nombre: n, tipo: t.nombre, orden: i, base: 0, precios: {} });
+      });
+    });
+    lista.sort(function (a, b) { return a.orden - b.orden || a.nombre.localeCompare(b.nombre, 'es'); });
+    catalogoOdgCargado = Date.now();
+    odg.catalogo(lista);
+  }
 
   function dos(n) { return ('0' + n).slice(-2); }
   function valorFechaHora(d) {

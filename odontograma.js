@@ -14,6 +14,36 @@
     { id: 'borrar', nombre: 'Borrar pieza', tipo: 'borrar' }
   ];
   var POR_ID = {}; HERRAMIENTAS.forEach(function (h) { POR_ID[h.id] = h; });
+  // Procedimientos del catálogo relacionados con cada herramienta (por palabras en el nombre)
+  var CLAVES = {
+    caries: ['resina', 'obtura', 'amalgama', 'incrustac', 'ionomero', 'restaura'],
+    obturacion: ['resina', 'obtura', 'amalgama', 'incrustac', 'ionomero', 'restaura'],
+    corona: ['corona'],
+    endodoncia: ['endodon', 'conducto', 'pulpot', 'pulpect', 'apicec'],
+    implante: ['implante'],
+    extraccion: ['extrac', 'exodon', 'cordal', 'tercer molar'],
+    ausente: ['protesis', 'puente', 'implante']
+  };
+  var TIPOS_PRECIO = [['directo', 'Cliente directo'], ['institucional', 'Institucional'], ['vip', 'VIP'], ['referido', 'Referido'], ['paquete', 'Paquete'], ['especial', 'Especial']];
+  var catalogo = [], tipoPrecio = 'directo';
+  function norm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function relacionados(h) {
+    var cl = CLAVES[h] || [];
+    return catalogo.filter(function (c) { var n = norm(c.nombre); return cl.some(function (k) { return n.indexOf(k) >= 0; }); });
+  }
+  function buscarEnCatalogo(proc) {
+    if (!proc) return null;
+    return catalogo.filter(function (c) { return proc.id ? c.id === proc.id : norm(c.nombre) === norm(proc.n); })[0] || null;
+  }
+  function precioDe(item) {
+    if (!item) return null;
+    var v = item.precios[tipoPrecio];
+    if (v == null && tipoPrecio === 'directo' && item.base > 0) v = item.base;
+    return v == null ? null : Number(v);
+  }
+  function q(n) { return 'Q' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function procN(p, clave) { return p && p.proc && p.proc[clave] ? p.proc[clave].n : ''; }
+
   var DENTICIONES = [['permanente', 'Permanente (adulto)'], ['temporal', 'Temporal (niño)'], ['mixta', 'Mixta']];
   var FILAS = {
     psup: [[18, 17, 16, 15, 14, 13, 12, 11], [21, 22, 23, 24, 25, 26, 27, 28]],
@@ -105,6 +135,32 @@
       '.odg-res div{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.55}',
       '.odg-res h4{margin:0 0 6px;font-size:13px;letter-spacing:.5px;text-transform:uppercase}',
       '.odg-res ul{margin:0;padding-left:18px}',
+      '.odg-res{grid-template-columns:minmax(0,1fr)}',
+      '.odg-res .odg-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;background:none;border:0;padding:0;border-radius:0}',
+      '.odg-res .odg-cab h4{margin:0}',
+      '.odg-res label.odg-tp{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}',
+      '.odg-res select{font:inherit;font-size:13.5px;border:1px solid #C4D4DF;border-radius:10px;padding:7px 10px;background:#FFFFFF;color:#0B2B40;max-width:100%;min-height:36px}',
+      '.odg-res select.falta{border-color:' + ROJO + ';color:#9A3B2E;background:#FFF5F5}',
+      '.odg-det{width:100%;border-collapse:collapse;font-size:14px;background:#FFFFFF;border-radius:10px;overflow:hidden}',
+      '.odg-det th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#5A6D7A;padding:8px 10px;border-bottom:1px solid #D9E4EC}',
+      '.odg-det td{padding:7px 10px;border-bottom:1px solid #EEF3F7;vertical-align:middle}',
+      '.odg-det .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}',
+      '.odg-det td.proc{min-width:220px}.odg-det td.proc select{width:100%}',
+      '.odg-det tfoot td{font-weight:800;background:#EEF5FA;border-top:2px solid #0B2B40;border-bottom:0}',
+      '.odg-det .sinp{color:#9A3B2E;font-size:12.5px;font-weight:700}',
+      'dialog.odg-dlg{border:0;border-radius:18px;padding:0;width:min(480px,calc(100vw - 32px));max-height:min(640px,calc(100vh - 40px));box-shadow:0 20px 50px rgba(0,0,0,.25);color:#0B2B40;font-family:Manrope,system-ui,sans-serif}',
+      'dialog.odg-dlg::backdrop{background:rgba(11,43,64,.4)}',
+      '.odg-dlg form{display:flex;flex-direction:column;gap:10px;padding:20px;max-height:inherit;box-sizing:border-box}',
+      '.odg-dlg h4{margin:0;font-size:18px}.odg-dlg p{margin:0;color:#5A6D7A;font-size:13.5px}',
+      '.odg-dlg input{font:inherit;font-size:14px;border:1px solid #C4D4DF;border-radius:10px;padding:9px 12px}',
+      '.odg-dlg .lista{overflow:auto;display:flex;flex-direction:column;gap:8px;min-height:60px;padding:2px}',
+      '.odg-dlg .op{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;font:inherit;font-size:14.5px;font-weight:600;color:#0B2B40;background:#FFFFFF;border:1px solid #D9E4EC;border-radius:12px;padding:10px 14px;cursor:pointer}',
+      '.odg-dlg .op:hover,.odg-dlg .op:focus-visible{border-color:#005A87;background:#EEF5FA;outline:none}',
+      '.odg-dlg .op small{display:block;font-size:12px;color:#5A6D7A;font-weight:500}',
+      '.odg-dlg .pr{font-weight:800;white-space:nowrap}.odg-dlg .sinp{color:#9A3B2E;font-size:12.5px;font-weight:700;white-space:nowrap}',
+      '.odg-dlg .pie{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}',
+      '.odg-dlg .pie button{font:inherit;font-weight:700;font-size:14px;border:1px solid #C4D4DF;border-radius:999px;padding:9px 16px;background:#FFFFFF;color:#0B2B40;cursor:pointer}',
+      '.odg-dlg .pie a{font-size:13px;font-weight:700;color:#005A87;cursor:pointer}',
       '@media (prefers-reduced-motion:reduce){.odg-pz path,.odg-pz .cen{transition:none}}'
     ].join('\n');
     var st = document.createElement('style');
@@ -191,23 +247,58 @@
       return out;
     }
 
-    function resumen() {
+    // Detalle: cada hallazgo con su procedimiento del catálogo y su precio
+    function opcionesProc(h, actual) {
+      var rel = relacionados(h), resto = catalogo.filter(function (c) { return rel.indexOf(c) < 0; });
+      var sel = buscarEnCatalogo(actual);
+      function op(c) { return '<option value="' + c.k + '"' + (sel === c ? ' selected' : '') + '>' + esc(c.nombre) + '</option>'; }
+      var html = !actual ? '<option value="" selected>Elegir procedimiento…</option>'
+        : !sel ? '<option value="" selected>' + esc(actual.n) + '</option>' : '';
+      if (rel.length) html += '<optgroup label="Relacionados">' + rel.map(op).join('') + '</optgroup>';
+      if (resto.length) html += '<optgroup label="Todo el catálogo">' + resto.map(op).join('') + '</optgroup>';
+      if (actual) html += '<option value="-">— Quitar procedimiento —</option>';
+      return html;
+    }
+    function filasDetalle() {
       var req = [], hecho = [];
       ORDEN.forEach(function (n) {
         var p = datos.piezas[n];
         if (!p) return;
         Object.keys(p.caras).forEach(function (cara) {
           var m = p.caras[cara];
-          var linea = '<li><strong>' + n + '</strong> · ' + POR_ID[m.h].nombre + ' ' + nombreCara(cara, n) + '</li>';
-          (m.h === 'caries' || m.c === 'r' ? req : hecho).push(linea);
+          (m.h === 'caries' || m.c === 'r' ? req : hecho).push({ n: n, clave: cara, h: m.h, texto: POR_ID[m.h].nombre + ' ' + nombreCara(cara, n), proc: p.proc && p.proc[cara] });
         });
         Object.keys(p.estados).forEach(function (k) {
-          var linea = '<li><strong>' + n + '</strong> · ' + POR_ID[k].nombre + '</li>';
-          (p.estados[k] === 'r' ? req : hecho).push(linea);
+          (p.estados[k] === 'r' ? req : hecho).push({ n: n, clave: k, h: k, texto: POR_ID[k].nombre, proc: p.proc && p.proc[k] });
         });
       });
-      return '<div><h4 style="color:' + ROJO + '">Requerido (' + req.length + ')</h4>' + (req.length ? '<ul>' + req.join('') + '</ul>' : 'Sin tratamientos pendientes.') + '</div>' +
-        '<div><h4 style="color:' + AZUL + '">Realizado / existente (' + hecho.length + ')</h4>' + (hecho.length ? '<ul>' + hecho.join('') + '</ul>' : 'Sin registros.') + '</div>';
+      return { req: req, hecho: hecho };
+    }
+    function tablaDetalle(filas, conTotal) {
+      var total = 0, sinProc = 0, sinPrecio = 0;
+      var cuerpo = filas.map(function (f) {
+        var item = buscarEnCatalogo(f.proc), precio = f.proc ? precioDe(item) : null;
+        if (f.h !== 'ausente') { if (!f.proc) sinProc++; else if (precio == null) sinPrecio++; else total += precio; }
+        var celda = f.h === 'ausente' ? '—' : catalogo.length
+          ? '<select data-proc-pieza="' + f.n + '" data-proc-clave="' + f.clave + '" class="' + (f.proc ? '' : 'falta') + '" aria-label="Procedimiento de la pieza ' + f.n + ' · ' + esc(f.texto) + '">' + opcionesProc(f.h, f.proc) + '</select>'
+          : esc(f.proc ? f.proc.n : '—');
+        return '<tr><td><strong>' + f.n + '</strong></td><td>' + esc(f.texto) + '</td><td class="proc">' + celda + '</td>' +
+          '<td class="num">' + (precio != null ? q(precio) : f.proc ? '<span class="sinp">Sin precio</span>' : '—') + '</td></tr>';
+      }).join('');
+      var pie = conTotal && filas.length ? '<tfoot><tr><td></td><td>TOTAL ESTIMADO</td><td>' +
+        [sinProc ? sinProc + ' sin procedimiento' : '', sinPrecio ? sinPrecio + ' sin precio' : ''].filter(Boolean).join(' · ') +
+        '</td><td class="num">' + q(total) + '</td></tr></tfoot>' : '';
+      return '<table class="odg-det"><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Procedimiento</th><th class="num">Precio</th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table>';
+    }
+    function resumen() {
+      var f = filasDetalle();
+      var selTipo = '<label class="odg-tp">Tipo de precio <select data-tipo-precio>' + TIPOS_PRECIO.map(function (t) {
+        return '<option value="' + t[0] + '"' + (t[0] === tipoPrecio ? ' selected' : '') + '>' + t[1] + '</option>';
+      }).join('') + '</select></label>';
+      return '<div><div class="odg-cab"><h4 style="color:' + ROJO + '">Requerido (' + f.req.length + ')</h4>' + (f.req.length && catalogo.length ? selTipo : '') + '</div>' +
+        (f.req.length ? tablaDetalle(f.req, true) : 'Sin tratamientos pendientes.') + '</div>' +
+        '<div><div class="odg-cab"><h4 style="color:' + AZUL + '">Realizado / existente (' + f.hecho.length + ')</h4></div>' +
+        (f.hecho.length ? tablaDetalle(f.hecho, false) : 'Sin registros.') + '</div>';
     }
 
     function pintar() {
@@ -241,28 +332,103 @@
       return '<button type="button" data-herr="' + h.id + '" aria-pressed="' + (herramienta === h.id) + '">' + icono(h, modo) + h.nombre + '</button>';
     }
 
+    var agregado = null; // última marca «Requerido» agregada: se pregunta su procedimiento
+    function quitarProc(p, clave) { if (p.proc) { delete p.proc[clave]; if (!Object.keys(p.proc).length) delete p.proc; } }
     function aplicar(n, cara) {
       var h = POR_ID[herramienta], c = h.fijo || modo;
+      agregado = null;
       if (h.tipo === 'borrar') { delete datos.piezas[n]; return true; }
       var p = pieza(n);
       if (h.tipo === 'cara') {
         if (!cara) return false;
         var m = p.caras[cara];
-        if (m && m.h === h.id && m.c === c) delete p.caras[cara];
-        else { p.caras[cara] = { h: h.id, c: c }; delete p.estados.ausente; }
+        if (m && m.h === h.id && m.c === c) { delete p.caras[cara]; quitarProc(p, cara); }
+        else {
+          if (m && m.h !== h.id) quitarProc(p, cara);
+          p.caras[cara] = { h: h.id, c: c }; delete p.estados.ausente; quitarProc(p, 'ausente');
+          if (c === 'r') agregado = { n: n, clave: cara, h: h.id, texto: h.nombre + ' ' + nombreCara(cara, n) };
+        }
       } else {
-        if (p.estados[h.id] === c) delete p.estados[h.id];
+        if (p.estados[h.id] === c) { delete p.estados[h.id]; quitarProc(p, h.id); }
         else {
           p.estados[h.id] = c;
-          if (h.id === 'ausente') { p.caras = {}; p.estados = { ausente: 'a' }; }
-          else delete p.estados.ausente;
+          if (h.id === 'ausente') { p.caras = {}; p.estados = { ausente: 'a' }; delete p.proc; }
+          else { delete p.estados.ausente; quitarProc(p, 'ausente'); }
+          if (c === 'r') agregado = { n: n, clave: h.id, h: h.id, texto: h.nombre };
         }
       }
       limpiarVacias(n);
       return true;
     }
+    function ponerProc(n, clave, item) {
+      var p = datos.piezas[n];
+      if (!p) return;
+      if (item) { p.proc = p.proc || {}; p.proc[clave] = { id: item.id || null, n: item.nombre }; }
+      else quitarProc(p, clave);
+      avisar();
+      pintar();
+    }
 
+    // Ventana para elegir el procedimiento de una marca «Requerido»
+    var dlg = null;
+    function llenarVentana() {
+      var inf = dlg._info, bus = norm(dlg.querySelector('input').value.trim());
+      var rel = relacionados(inf.h);
+      var lista = bus ? catalogo.filter(function (c) { return norm(c.nombre + ' ' + c.tipo).indexOf(bus) >= 0; })
+        : dlg._todos || !rel.length ? catalogo : rel;
+      dlg.querySelector('[data-todos]').hidden = !!(bus || lista === catalogo);
+      dlg.querySelector('.lista').innerHTML = lista.length ? lista.map(function (c) {
+        var pr = precioDe(c);
+        return '<button type="button" class="op" data-k="' + c.k + '"><span>' + esc(c.nombre) + (c.tipo ? '<small>' + esc(c.tipo) + '</small>' : '') + '</span>' +
+          (pr != null ? '<span class="pr">' + q(pr) + '</span>' : '<span class="sinp">Sin precio definido</span>') + '</button>';
+      }).join('') : '<p>No hay procedimientos con ese nombre.</p>';
+    }
+    function abrirVentana(info) {
+      if (!catalogo.length || typeof HTMLDialogElement === 'undefined') return;
+      if (!dlg) {
+        dlg = document.createElement('dialog');
+        dlg.className = 'odg-dlg';
+        dlg.innerHTML = '<form method="dialog"><h4></h4><p></p><input type="search" placeholder="Buscar procedimiento" aria-label="Buscar procedimiento"><div class="lista"></div>' +
+          '<div class="pie"><a data-todos tabindex="0">Ver todo el catálogo</a><button value="despues">Decidir después</button></div></form>';
+        document.body.appendChild(dlg);
+        dlg.addEventListener('click', function (e) {
+          if (e.target === dlg) { dlg.close(); return; }
+          var o = e.target.closest('[data-k]');
+          if (o) {
+            e.preventDefault();
+            var item = catalogo.filter(function (c) { return c.k === o.dataset.k; })[0];
+            var inf = dlg._info;
+            dlg.close();
+            if (item && inf) inf.elegir(inf.n, inf.clave, item);
+            return;
+          }
+          if (e.target.closest('[data-todos]')) { dlg._todos = true; llenarVentana(); dlg.querySelector('input').focus(); }
+        });
+        dlg.querySelector('input').addEventListener('input', llenarVentana);
+      }
+      info.elegir = ponerProc;
+      dlg._info = info; dlg._todos = false;
+      dlg.querySelector('h4').textContent = 'Pieza ' + info.n + ' · ' + info.texto;
+      var tp = TIPOS_PRECIO.filter(function (t) { return t[0] === tipoPrecio; })[0];
+      dlg.querySelector('p').innerHTML = '¿Qué procedimiento se hará? Precios de <b>' + (tp ? tp[1] : '') + '</b>.';
+      dlg.querySelector('input').value = '';
+      llenarVentana();
+      dlg.showModal();
+      var primero = dlg.querySelector('.op');
+      if (primero) primero.focus();
+    }
+
+    raiz.addEventListener('change', function (e) {
+      var t = e.target;
+      if (t.matches('[data-tipo-precio]')) { tipoPrecio = t.value; pintar(); return; }
+      if (t.matches('[data-proc-pieza]')) {
+        if (t.value === '-') { ponerProc(+t.dataset.procPieza, t.dataset.procClave, null); return; }
+        var item = catalogo.filter(function (c) { return c.k === t.value; })[0];
+        if (item) ponerProc(+t.dataset.procPieza, t.dataset.procClave, item);
+      }
+    });
     raiz.addEventListener('click', function (e) {
+      if (e.target.closest('select')) return;
       var b = e.target.closest('[data-denticion],[data-modo],[data-herr]');
       if (b) {
         if (b.dataset.denticion) { datos.denticion = b.dataset.denticion; avisar(); }
@@ -279,6 +445,7 @@
         pintar();
         var mismo = raiz.querySelector('[data-pieza="' + pz.dataset.pieza + '"]');
         if (mismo && document.activeElement === document.body) mismo.focus({ preventScroll: true });
+        if (agregado) abrirVentana(agregado);
       }
     });
     // Teclado: Enter o espacio aplica la herramienta (por cara, sobre la cara oclusal/incisal)
@@ -293,6 +460,7 @@
         pintar();
         var mismo = raiz.querySelector('[data-pieza="' + n + '"]');
         if (mismo) mismo.focus();
+        if (agregado) abrirVentana(agregado);
       }
     });
 
@@ -300,7 +468,12 @@
     return {
       cargar: function (valor, edad) { datos = normalizar(valor, edad); pintar(); },
       valor: function () { return JSON.parse(JSON.stringify(datos)); },
-      hallazgos: function () { return Object.keys(datos.piezas).length; }
+      hallazgos: function () { return Object.keys(datos.piezas).length; },
+      // lista: [{ id, nombre, tipo, base, precios: { directo: 350, vip: 300 } }] (id null = sugerido sin catálogo)
+      catalogo: function (lista) {
+        catalogo = (lista || []).map(function (c, i) { return Object.assign({ k: c.id ? 'id' + c.id : 'n' + i }, c); });
+        pintar();
+      }
     };
   }
 
@@ -319,21 +492,28 @@
     piezas.forEach(function (n) {
       var pa = a.piezas[n] || { caras: {}, estados: {} }, pb = b.piezas[n] || { caras: {}, estados: {} };
       var agregado = [], quitado = [];
+      var procs = [];
+      function conProc(texto, p, clave) { var x = procN(p, clave); return x ? texto + ' → ' + x : texto; }
+      function revisarProc(texto, clave) {
+        var xa = procN(pa, clave), xb = procN(pb, clave);
+        if (xa !== xb) procs.push(texto + ': ' + (xa || 'sin procedimiento') + ' → ' + (xb || 'sin procedimiento'));
+      }
       Object.keys(pa.caras).concat(Object.keys(pb.caras)).filter(function (c, i, arr) { return arr.indexOf(c) === i; }).forEach(function (cara) {
         var ma = pa.caras[cara], mb = pb.caras[cara];
-        if (ma && mb && ma.h === mb.h && ma.c === mb.c) return;
+        if (ma && mb && ma.h === mb.h && ma.c === mb.c) { revisarProc(POR_ID[mb.h].nombre + ' ' + nombreCara(cara, +n), cara); return; }
         if (ma) quitado.push(etiquetaCara(ma, cara, +n));
-        if (mb) agregado.push(etiquetaCara(mb, cara, +n));
+        if (mb) agregado.push(conProc(etiquetaCara(mb, cara, +n), pb, cara));
       });
       Object.keys(pa.estados).concat(Object.keys(pb.estados)).filter(function (k, i, arr) { return arr.indexOf(k) === i; }).forEach(function (k) {
-        if (pa.estados[k] === pb.estados[k]) return;
+        if (pa.estados[k] === pb.estados[k]) { if (pb.estados[k]) revisarProc(POR_ID[k].nombre, k); return; }
         if (pa.estados[k]) quitado.push(etiquetaEstado(k, pa.estados[k]));
-        if (pb.estados[k]) agregado.push(etiquetaEstado(k, pb.estados[k]));
+        if (pb.estados[k]) agregado.push(conProc(etiquetaEstado(k, pb.estados[k]), pb, k));
       });
-      if (agregado.length || quitado.length) {
+      if (agregado.length || quitado.length || procs.length) {
         out.push({
           clave: String(n), pieza: +n,
-          descripcion: [agregado.length ? 'Agregado: ' + agregado.join(', ') : '', quitado.length ? 'Quitado: ' + quitado.join(', ') : ''].filter(Boolean).join(' · ')
+          descripcion: [agregado.length ? 'Agregado: ' + agregado.join(', ') : '', quitado.length ? 'Quitado: ' + quitado.join(', ') : '',
+            procs.length ? 'Procedimiento: ' + procs.join(', ') : ''].filter(Boolean).join(' · ')
         });
       }
     });
