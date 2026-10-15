@@ -106,7 +106,7 @@
       $(b.dataset.ficha).hidden = b.dataset.ficha !== id;
     });
     if (id === 'fNotas') cargarNotas();
-    if (id === 'fOdonto') { cargarHistorial(); cargarCatalogoOdg(); cargarCodigoPresupuesto(); if (window.PD_CUOTAS) window.PD_CUOTAS.cargar(); }
+    if (id === 'fOdonto') { cargarHistorial(); cargarCatalogoOdg(); cargarCodigoPresupuesto(); cargarPresupuestoActual(); if (window.PD_CUOTAS) window.PD_CUOTAS.cargar(); }
     if (id === 'fRx') cargarArchivos();
     if (id === 'fTrat' && window.PD_TRATAMIENTOS) window.PD_TRATAMIENTOS.cargar(actual);
   }
@@ -335,7 +335,8 @@
     // Presupuesto en borrador con los tratamientos requeridos (d.items) y el tipo de precio elegido (d.tipo)
     crearPresupuesto: async function (d) {
       if (!actual) throw new Error('Primero guarda el expediente del paciente.');
-      var r = await sb.from('presupuestos').insert({ paciente_id: actual.id }).select('id').single();
+      var r = await sb.from('presupuestos').insert({ paciente_id: actual.id, origen: 'odontograma' }).select('id').single();
+      if (r.error && /origen/.test(r.error.message || '')) r = await sb.from('presupuestos').insert({ paciente_id: actual.id }).select('id').single();
       if (r.error) throw new Error(traducir(r.error));
       var g = await sb.rpc('guardar_presupuesto', { p_id: r.data.id, p_descuento: 0, p_notas: '', p_items: d.items, p_tipo: d.tipo,
         p_forma_pago: d.forma_pago || 'efectivo', p_cuotas: d.cuotas, p_citas: d.citas, p_sin_recargo: !!d.sin_recargo });
@@ -349,33 +350,27 @@
       if (estadoBd) await sb.from('presupuestos').update({ estado: estadoBd }).eq('id', r.data.id);
       var c = await sb.from('presupuestos').select('codigo').eq('id', r.data.id).maybeSingle();
       cargarCodigoPresupuesto();
+      cargarPresupuestoActual();
       return { id: r.data.id, codigo: !c.error && c.data ? c.data.codigo : null };
     },
     // Reporte impreso con el logo: paciente, médico asignado y los procedimientos requeridos con su valor
-    imprimir: function (d) {
-      var imp = window.PD_IMPRESION;
-      if (!imp || !actual) return;
-      var medico = actual.medico && actual.medico.nombre ? actual.medico.nombre
-        : ($('pDentista').value && $('pDentista').selectedOptions[0] ? $('pDentista').selectedOptions[0].text : 'Sin asignar');
-      var celda = 'padding:8px 6px;border-bottom:1px solid #D9E4EC';
-      var th = celda + ';background:#0B2B40;color:#FFFFFF;font-size:11px;text-transform:uppercase;letter-spacing:.05em';
-      var dato = function (k, v) { return '<div><span style="display:block;font-size:10.5px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">' + k + '</span><b style="font-size:15px">' + v + '</b></div>'; };
-      var html = imp.encabezado('Plan de tratamiento') +
-        '<div style="display:grid;grid-template-columns:2fr 2fr 1fr;gap:12px 18px;margin-bottom:18px">' +
-        dato('Paciente', esc(actual.nombre)) + dato('Médico asignado', esc(medico)) + dato('Tipo de precio', esc(d.tipo)) + '</div>' +
-        '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>' +
-        '<th style="' + th + ';text-align:left">Pieza</th><th style="' + th + ';text-align:left">Hallazgo</th><th style="' + th + ';text-align:left">Procedimiento</th><th style="' + th + ';text-align:right">Valor</th></tr></thead><tbody>' +
-        (d.lineas.length ? d.lineas.map(function (l) {
-          return '<tr><td style="' + celda + ';font-weight:700">' + l.pieza + '</td><td style="' + celda + '">' + esc(l.hallazgo) + '</td><td style="' + celda + '">' + esc(l.procedimiento) + '</td>' +
-            '<td style="' + celda + ';text-align:right">' + 'Q' + l.precio.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td></tr>';
-        }).join('') : '<tr><td colspan="4" style="' + celda + '">No hay procedimientos con valor.</td></tr>') +
-        '<tr><td colspan="3" style="' + celda + ';font-weight:800;background:#EEF5FA">TOTAL ESTIMADO</td><td style="' + celda + ';text-align:right;font-weight:800;background:#EEF5FA">Q' + d.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td></tr>' +
-        '</tbody></table>' +
-        '<p style="margin-top:14px;font-size:12px;color:#5A6D7A">Valores estimados según el odontograma. El costo final se confirma en la evaluación clínica y en el presupuesto.</p>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:56px;font-size:12px;text-align:center;color:#475B68">' +
-        '<div style="border-top:1px solid #0B2B40;padding-top:6px">' + esc(medico) + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div></div>';
-      imp.imprimir(html);
+    // Guardar forma de pago, cuotas y citas del presupuesto ya creado (sube la versión)
+    guardarPresupuesto: async function (p, d) {
+      var items = (p.presupuesto_items || []).slice().sort(function (a, b) { return a.orden - b.orden || a.id - b.id; })
+        .map(function (i) { return { tratamiento: i.tratamiento, pieza: i.pieza || '', cantidad: i.cantidad, precio: Number(i.precio) }; });
+      var g = await sb.rpc('guardar_presupuesto', { p_id: p.id, p_descuento: Number(p.descuento_pct) || 0, p_notas: p.notas || '', p_items: items, p_tipo: p.tipo_precio || 'directo',
+        p_forma_pago: d.forma, p_cuotas: d.forma === 'tarjeta' ? d.cuotas : null, p_citas: d.citas ? +d.citas : null, p_sin_recargo: d.forma === 'tarjeta' && !!d.sinRecargo });
+      if (g.error) throw new Error(/guardar_presupuesto|could not find the function/i.test(g.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql).' : traducir(g.error));
+      await cargarPresupuestoActual();
     },
+    // Cambiar estado (borrador = Activo, aprobado, rechazado = No aprobado); las fechas las registra la base de datos
+    cambiarEstadoPresupuesto: async function (p, estado) {
+      if (estado === 'aprobado' && !(p.presupuesto_items || []).length) throw new Error('El presupuesto no tiene tratamientos; no se puede aprobar.');
+      var r = await sb.from('presupuestos').update({ estado: estado }).eq('id', p.id).select('id');
+      if (r.error || !r.data || !r.data.length) throw new Error(r.error ? traducir(r.error) : 'No tienes permiso para esta acción.');
+      await cargarPresupuestoActual();
+    },
+    imprimir: function (d) { return imprimirPresupuesto(d); },
     puedeAbrirPresupuesto: function () { return !!($('tabPresupuestos') && window.PD_PRESUPUESTOS); },
     abrirPresupuesto: function (id) { $('tabPresupuestos').click(); window.PD_PRESUPUESTOS.abrir(id); }
   });
@@ -383,6 +378,64 @@
   // Procedimientos y precios para el odontograma: catálogo de tratamientos (con sus precios por tipo)
   // y los procedimientos sugeridos de «Tipos de procedimientos» que aún no están en el catálogo.
   // Código que tendrá el próximo presupuesto del paciente: PACIENTE-AÑO-CORRELATIVO-V01 (lo asigna la base de datos)
+  // Reporte del presupuesto: logo, todos los datos del presupuesto en el encabezado y el detalle con valores
+  var COLOR_ESTADO = { activo: ['#DBEAFE', '#1E40AF'], aprobado: ['#DCF2EC', '#08504C'], proceso: ['#FEF3C7', '#92400E'], finalizado: ['#E5E7EB', '#374151'], no_aprobado: ['#FDE2E4', '#9F1239'] };
+  function imprimirPresupuesto(d) {
+    var imp = window.PD_IMPRESION, i = d.info;
+    if (!imp || !actual || !i) return;
+    var dinero = function (n) { return 'Q' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+    var medico = actual.medico && actual.medico.nombre ? actual.medico.nombre
+      : ($('pDentista').value && $('pDentista').selectedOptions[0] ? $('pDentista').selectedOptions[0].text : 'Sin asignar');
+    var ce = COLOR_ESTADO[i.estadoClave] || COLOR_ESTADO.activo;
+    var celda = 'padding:7px 6px;border-bottom:1px solid #D9E4EC';
+    var th = celda + ';background:#0B2B40;color:#FFFFFF;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em';
+    var dato = function (k, v, ancho) {
+      return '<div style="min-width:0' + (ancho ? ';grid-column:' + ancho : '') + '"><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">' + k + '</span>' +
+        '<b style="font-size:13.5px;overflow-wrap:anywhere">' + v + '</b></div>';
+    };
+    var sec = function (t) { return '<div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#005A87;font-weight:800;margin:16px 0 8px;border-bottom:1px solid #D9E4EC;padding-bottom:4px">' + t + '</div>'; };
+    var grilla = function (h) { return '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 16px">' + h + '</div>'; };
+    var html = imp.encabezado('Presupuesto') +
+      // Código y estado destacados
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:12px;padding:10px 14px">' +
+      '<div><span style="display:block;font-size:10px;color:#5A6D7A;letter-spacing:.12em;font-weight:800">CÓDIGO DEL PRESUPUESTO</span><b style="font-size:18px;letter-spacing:.03em">' + esc(i.codigo) + '</b></div>' +
+      '<span style="border-radius:999px;padding:5px 14px;font-size:12px;font-weight:800;background:' + ce[0] + ';color:' + ce[1] + '">' + esc(i.estado).toUpperCase() + '</span></div>' +
+      sec('Paciente') + grilla(dato('Paciente', esc(actual.nombre), 'span 2') + dato('Médico asignado', esc(medico)) + dato('NIT', esc(actual.nit || 'CF'))) +
+      sec('Datos del presupuesto') + grilla(
+        dato('Fecha del presupuesto', esc(i.fecha)) + dato('Elaborado por', esc(i.usuario || '—')) + dato('Tipo de precio', esc(i.tipo)) + dato('Cantidad de citas', esc(i.citas || '—')) +
+        dato('Fecha cambio de estado', esc(i.cambio)) + dato('Fecha de aprobación', esc(i.aprobado)) + dato('Forma de pago', esc(i.formaTexto)) + dato('Plan de pago', esc(i.plan || '—'))) +
+      sec('Detalle') +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>' +
+      '<th style="' + th + ';text-align:left">Pieza</th><th style="' + th + ';text-align:left">Hallazgo</th><th style="' + th + ';text-align:left">Procedimiento</th>' +
+      '<th style="' + th + ';text-align:right">Cant.</th><th style="' + th + ';text-align:right">Precio</th><th style="' + th + ';text-align:right">Total</th></tr></thead><tbody>' +
+      (d.lineas.length ? d.lineas.map(function (l) {
+        return '<tr><td style="' + celda + ';font-weight:700">' + esc(l.pieza) + '</td><td style="' + celda + '">' + esc(l.hallazgo) + '</td><td style="' + celda + '">' + esc(l.procedimiento) + '</td>' +
+          '<td style="' + celda + ';text-align:right">' + l.cantidad + '</td><td style="' + celda + ';text-align:right">' + dinero(l.precio) + '</td><td style="' + celda + ';text-align:right">' + dinero(l.total) + '</td></tr>';
+      }).join('') : '<tr><td colspan="6" style="' + celda + '">No hay procedimientos con valor.</td></tr>') +
+      '</tbody></table>' +
+      // Totales
+      '<div style="display:flex;justify-content:flex-end;margin-top:10px"><table style="border-collapse:collapse;font-size:13px;min-width:280px">' +
+      (i.descuento ? '<tr><td style="padding:4px 8px;color:#5A6D7A">Subtotal</td><td style="padding:4px 8px;text-align:right">' + dinero(i.subtotal) + '</td></tr>' +
+        '<tr><td style="padding:4px 8px;color:#5A6D7A">Descuento (' + i.descuento + ' %)</td><td style="padding:4px 8px;text-align:right">−' + dinero(i.subtotal - i.total) + '</td></tr>' : '') +
+      '<tr><td style="padding:6px 8px;font-weight:800;background:#EEF5FA;border-top:2px solid #0B2B40">TOTAL</td><td style="padding:6px 8px;text-align:right;font-weight:800;background:#EEF5FA;border-top:2px solid #0B2B40">' + dinero(i.total) + '</td></tr>' +
+      (i.totalPagar != null ? '<tr><td style="padding:6px 8px;color:#5A6D7A">' + esc(i.plan) + '</td><td></td></tr><tr><td style="padding:6px 8px;font-weight:800;background:#0B2B40;color:#FFFFFF">TOTAL A PAGAR CON TARJETA</td><td style="padding:6px 8px;text-align:right;font-weight:800;background:#0B2B40;color:#FFFFFF">' + dinero(i.totalPagar) + '</td></tr>' : '') +
+      '</table></div>' +
+      (i.notas ? sec('Notas') + '<div style="font-size:12.5px;white-space:pre-line">' + esc(i.notas) + '</div>' : '') +
+      '<p style="margin-top:14px;font-size:11.5px;color:#5A6D7A">Precios con IVA incluido. ' + (i.existe ? 'Datos del presupuesto al momento de imprimir.' : 'Presupuesto aún no confirmado: valores estimados según el odontograma.') + ' El costo final se confirma en la evaluación clínica.</p>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:46px;font-size:12px;text-align:center;color:#475B68">' +
+      '<div style="border-top:1px solid #0B2B40;padding-top:6px">' + esc(medico) + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div></div>';
+    imp.imprimir(html);
+  }
+
+  // Último presupuesto del paciente creado desde el odontograma
+  async function cargarPresupuestoActual() {
+    if (!actual) return;
+    var pid = actual.id;
+    var r = await sb.from('presupuestos').select('*,presupuesto_items(id,orden,tratamiento,pieza,cantidad,precio,realizado)')
+      .eq('paciente_id', pid).eq('origen', 'odontograma').order('id', { ascending: false }).limit(1);
+    if (!actual || actual.id !== pid) return;
+    odg.presupuestoActual(!r.error && r.data && r.data.length ? r.data[0] : null);
+  }
   async function cargarCodigoPresupuesto() {
     if (!actual) return;
     var pid = actual.id, anio = new Date().getFullYear();

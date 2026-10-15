@@ -221,6 +221,8 @@
     var r = await sb.from('presupuestos').select('*,pacientes(nombre,telefono,dpi),presupuesto_items(*)').eq('id', id).single();
     if (r.error) { aviso('preMsg', traducir(r.error), true); return; }
     actual = r.data;
+    var he = await sb.from('presupuesto_estados').select('de,a,fecha,usuario').eq('presupuesto_id', id).order('id');
+    historialEst = he.error ? [] : he.data;
     items = (actual.presupuesto_items || []).sort(function (a, b) { return a.orden - b.orden || a.id - b.id; })
       .map(function (i) { return { id: i.id, tratamiento: i.tratamiento, pieza: i.pieza || '', cantidad: i.cantidad, precio: Number(i.precio), realizado: i.realizado, realizado_en: i.realizado_en }; });
     cambios = false;
@@ -238,7 +240,22 @@
     $('preEditor').scrollIntoView({ block: 'start' });
   }
 
+  // Fechas del presupuesto (las registra la base de datos) e historial de estados
+  var historialEst = [];
+  function fechaHoraP(t) { return t ? new Date(t).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
+  function pintarFechas() {
+    var a = actual, nombre = { borrador: 'Activo', enviado: 'Activo', aprobado: 'Aprobado', rechazado: 'No aprobado' };
+    $('preFechas').innerHTML = '<div><span>Fecha del presupuesto</span>' + fechaHoraP(a.creado) + '</div>' +
+      '<div><span>Elaborado por</span>' + esc(a.creado_por || '—') + '</div>' +
+      '<div><span>Fecha cambio de estado</span>' + fechaHoraP(a.estado_cambiado) + (a.estado_cambiado_por ? ' · ' + esc(a.estado_cambiado_por) : '') + '</div>' +
+      '<div><span>Fecha de aprobación</span>' + fechaHoraP(a.aprobado_en) + '</div>' +
+      (historialEst.length ? '<div class="hist"><span>Historial de estados</span>' + historialEst.map(function (h) {
+        return fechaHoraP(h.fecha) + ' · ' + (h.de ? nombre[h.de] + ' → ' : '') + nombre[h.a] + (h.usuario ? ' (' + esc(h.usuario) + ')' : '');
+      }).join('<br>') + '</div>' : '');
+  }
+
   function pintarEditor() {
+    pintarFechas();
     var ed = editable();
     $('preTitulo').textContent = 'Presupuesto ' + codigoDe(actual);
     $('preSub').textContent = (actual.pacientes ? actual.pacientes.nombre : '') + ' · ' + fechaCorta(actual.fecha) + (actual.creado_por ? ' · por ' + actual.creado_por : '');

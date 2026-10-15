@@ -171,6 +171,11 @@
       '.odg-res .odg-pre-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}',
       '.odg-res .odg-pre .odg-pre-pie{display:flex;justify-content:space-between;align-items:center;gap:10px 14px;flex-wrap:wrap;border-top:1px solid #D9E4EC;padding-top:12px}',
       '.odg-pre-pie>span{font-size:12.5px;color:#5A6D7A}',
+      '.odg-res .odg-pre .odg-fijo{border:1px solid #D9E4EC;border-radius:10px;padding:8px 10px;min-height:38px;box-sizing:border-box;background:#F1F5F9;font-size:14px;font-weight:500;display:flex;align-items:center}',
+      '.odg-res .odg-pre .odg-fijo.odg-auto{background:#EEF5FA;border-style:dashed;color:#00476B;font-weight:700}',
+      '.odg-pre-msg{margin:0;font-size:13px;color:#08504C;font-weight:600}.odg-pre-msg.error{color:#9F1239}',
+      '.odg-res .odg-pre .odg-pre-cab .odg-est{cursor:default}',
+      '.odg-dlg .op[aria-pressed="true"]{border-color:#005A87;box-shadow:inset 0 0 0 1.5px #005A87;background:#EEF5FA}',
       '.odg-res .odg-pre .cuo-res>div{background:#0B2B40;color:#FFFFFF;border-radius:12px;padding:8px 14px}',
       '.odg-res .odg-pre .cuo-res>div.cuo-cero{background:#DCF2EC;color:#08504C}',
       '.odg-res .odg-pre .cuo-modo{display:inline-flex;border:1px solid #C4D4DF;border-radius:999px;padding:3px;background:#FFFFFF;align-self:flex-start}',
@@ -392,17 +397,44 @@
       pintar();
     }
     // Reporte impreso: los procedimientos requeridos que tienen valor, con el tipo de precio elegido
+    // Datos para el reporte: el presupuesto confirmado (si hay) o el borrador, tal como están en este momento
     function imprimirDetalle() {
       if (!opciones.imprimir) return;
-      var lineas = [];
-      filasDetalle().req.forEach(function (f) {
-        if (!f.proc) return;
-        var v = valorFila(f);
-        if (v.total == null) return;
-        lineas.push({ pieza: piezaDe(f), hallazgo: textoDe(f), procedimiento: f.proc.n + (v.cant > 1 ? ' × ' + v.cant : ''), precio: v.total });
-      });
-      var tp = TIPOS_PRECIO.filter(function (t) { return t[0] === tipoPrecio; })[0];
-      opciones.imprimir({ tipo: tp ? tp[1] : '', lineas: lineas, total: lineas.reduce(function (s, l) { return s + l.precio; }, 0) });
+      var nombreDe = function (lista, k) { var x = lista.filter(function (y) { return y[0] === k; })[0]; return x ? x[1] : ''; };
+      var hallazgos = {};
+      filasDetalle().req.forEach(function (f) { if (f.proc) hallazgos[piezaDe(f) + '|' + f.proc.n.toLowerCase()] = textoDe(f); });
+      var info, lineas = [];
+      if (preActual && !modoNuevo) {
+        var p = preActual, ev = estadoVisible(p);
+        (p.presupuesto_items || []).slice().sort(function (a, b) { return a.orden - b.orden || a.id - b.id; }).forEach(function (i) {
+          lineas.push({ pieza: i.pieza || '—', hallazgo: hallazgos[(i.pieza || '') + '|' + String(i.tratamiento).toLowerCase()] || '—', procedimiento: i.tratamiento,
+            cantidad: i.cantidad, precio: Number(i.precio), total: Math.round(i.cantidad * i.precio * 100) / 100 });
+        });
+        info = { existe: true, codigo: p.codigo || 'N.º ' + p.id, fecha: fechaHora(p.creado), usuario: p.creado_por || '—', estado: nombreDe(ESTADOS_PRE, ev), estadoClave: ev,
+          cambio: fechaHora(p.estado_cambiado) + (p.estado_cambiado_por ? ' · ' + p.estado_cambiado_por : ''), aprobado: fechaHora(p.aprobado_en),
+          tipo: nombreDe(TIPOS_PRECIO, p.tipo_precio || 'directo'), forma: p.forma_pago || 'efectivo', cuotas: p.cuotas || 1, sinRecargo: !!p.sin_recargo,
+          recargoPct: Number(p.recargo_pct) || 0, citas: p.citas || '', descuento: Number(p.descuento_pct) || 0, notas: p.notas || '' };
+      } else {
+        filasDetalle().req.forEach(function (f) {
+          if (!f.proc) return;
+          var v = valorFila(f);
+          if (v.total == null) return;
+          lineas.push({ pieza: piezaDe(f), hallazgo: textoDe(f), procedimiento: f.proc.n, cantidad: v.cant, precio: v.unit, total: v.total });
+        });
+        info = { existe: false, codigo: codigoPre ? codigoPre + ' (se asigna al confirmar)' : 'Se asigna al confirmar', fecha: fechaHora(new Date().toISOString()), usuario: '',
+          estado: nombreDe(ESTADOS_PRE, datosPre.estado), estadoClave: datosPre.estado, cambio: '—', aprobado: '—', tipo: nombreDe(TIPOS_PRECIO, tipoPrecio),
+          forma: datosPre.forma, cuotas: datosPre.cuotas, sinRecargo: datosPre.sinRecargo, recargoPct: null, citas: datosPre.citas, descuento: 0, notas: '' };
+      }
+      info.formaTexto = nombreDe(FORMAS, info.forma);
+      var sub = lineas.reduce(function (s, l) { return s + l.total; }, 0);
+      info.subtotal = Math.round(sub * 100) / 100;
+      info.total = Math.round(sub * (1 - info.descuento / 100) * 100) / 100;
+      if (info.forma === 'tarjeta' && window.PD_CUOTAS) {
+        var c = window.PD_CUOTAS.calcular(info.total, info.cuotas, info.sinRecargo ? 0 : info.recargoPct);
+        info.plan = (info.cuotas === 1 ? '1 pago de ' : info.cuotas + ' cuotas de ') + q(c.cuota) + (info.sinRecargo ? ' · sin recargo' : ' · recargo ' + c.pct + ' %');
+        info.totalPagar = c.total;
+      }
+      opciones.imprimir({ info: info, lineas: lineas });
     }
     var verSinProc = false;
     // Datos del presupuesto que se creará desde el odontograma
@@ -410,7 +442,53 @@
     var CUOTAS = [1, 2, 3, 6, 10, 12, 18, 24];
     var ESTADOS_PRE = [['activo', 'Activo'], ['aprobado', 'Aprobado'], ['proceso', 'Proceso'], ['finalizado', 'Finalizado'], ['no_aprobado', 'No aprobado']];
     var datosPre = { forma: 'efectivo', cuotas: 1, sinRecargo: false, citas: '', estado: 'activo' }, codigoPre = '';
+    // Presupuesto ya confirmado desde el odontograma (el último del paciente)
+    var preActual = null, modoNuevo = false, editandoExist = false, datosExist = null, msgPre = null;
+    function fechaHora(t) { return t ? new Date(t).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
+    function estadoVisible(p) {
+      if (p.estado === 'rechazado') return 'no_aprobado';
+      if (p.estado !== 'aprobado') return 'activo';
+      var its = p.presupuesto_items || [], hechos = its.filter(function (i) { return i.realizado; }).length;
+      return !hechos ? 'aprobado' : hechos === its.length ? 'finalizado' : 'proceso';
+    }
+    function totalPresupuesto(p) {
+      var sub = (p.presupuesto_items || []).reduce(function (t, i) { return t + Number(i.cantidad) * Number(i.precio); }, 0);
+      return Math.round(sub * (1 - (Number(p.descuento_pct) || 0) / 100) * 100) / 100;
+    }
+    function bloqueExistente() {
+      var p = preActual, ev = estadoVisible(p), sup = esSuper(), ed = editandoExist && sup;
+      var editable = p.estado === 'borrador' || p.estado === 'enviado';
+      var d = ed ? datosExist : { forma: p.forma_pago || 'efectivo', cuotas: p.cuotas || 1, sinRecargo: !!p.sin_recargo, citas: p.citas || '' };
+      var nomEst = ESTADOS_PRE.filter(function (x) { return x[0] === ev; })[0][1];
+      var forma = FORMAS.filter(function (x) { return x[0] === d.forma; })[0];
+      var total = totalPresupuesto(p);
+      var campoForma = ed ? '<select data-ex-campo="forma">' + FORMAS.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === d.forma ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>'
+        : '<div class="odg-fijo">' + (forma ? forma[1] : '—') + (d.forma === 'tarjeta' ? ' · ' + (d.cuotas === 1 ? '1 pago' : d.cuotas + ' cuotas') + (d.sinRecargo ? ' sin recargo' : '') : '') + '</div>';
+      var campoCitas = ed ? '<input type="number" min="1" max="99" step="1" inputmode="numeric" data-ex-campo="citas" value="' + esc(d.citas) + '" placeholder="Ej.: 3">' : '<div class="odg-fijo">' + esc(d.citas || '—') + '</div>';
+      var plan = d.forma === 'tarjeta' && window.PD_CUOTAS
+        ? '<div class="odg-pre-campo' + (ed ? '' : ' cuo-bloqueada') + '"><span>Plan de pago con tarjeta</span>' + window.PD_CUOTAS.tabla(total, d.cuotas, ed ? 'ex-cuota' : 'ex-fijo', ed ? null : p.recargo_pct, d.sinRecargo) + '</div>' : '';
+      var pie = !sup ? '' : '<div class="odg-pre-pie">' + (ed
+        ? '<span>Al guardar, el presupuesto sube de versión.</span><div class="odg-fila-acc"><button type="button" class="odg-imp" data-ex-cancelar>Cancelar</button><button type="button" class="odg-crear" data-ex-guardar>Guardar cambios</button></div>'
+        : '<span>Fechas y usuario se registran solos y no se pueden modificar.</span><div class="odg-fila-acc">' +
+          '<button type="button" class="odg-imp" data-ex-mod' + (editable ? '' : ' disabled title="Un presupuesto aprobado o no aprobado ya no se puede modificar"') + '>Modificar presupuesto</button>' +
+          '<button type="button" class="odg-imp" data-ex-estado>Cambiar estado</button><button type="button" class="odg-crear" data-pre-nuevo>Nuevo presupuesto</button></div>') + '</div>';
+      return '<div class="odg-pre' + (ed ? ' odg-pre-ed' : '') + '"><div class="odg-pre-cab"><div class="odg-pre-tit">Datos del presupuesto</div><span class="odg-est odg-est-' + ev + '" aria-hidden="true">' + nomEst + '</span></div>' +
+        '<div class="odg-pre-g">' +
+        '<div class="odg-pre-campo"><span>Código del presupuesto</span><div class="odg-cod"><small>ASIGNADO</small>' + esc(p.codigo || 'N.º ' + p.id) + '</div></div>' +
+        '<div class="odg-pre-campo"><span>Fecha del presupuesto</span><div class="odg-fijo odg-auto">' + fechaHora(p.creado) + '</div></div>' +
+        '<div class="odg-pre-campo"><span>Usuario</span><div class="odg-fijo odg-auto">' + esc(p.creado_por || '—') + '</div></div>' +
+        '<div class="odg-pre-campo"><span>Total del presupuesto</span><div class="odg-fijo odg-auto">' + q(total) + '</div></div>' +
+        '<label class="odg-pre-campo"><span>Forma de pago</span>' + campoForma + '</label>' +
+        '<label class="odg-pre-campo"><span>Cantidad de citas</span>' + campoCitas + '</label>' +
+        '<div class="odg-pre-campo"><span>Fecha cambio de estado</span><div class="odg-fijo odg-auto">' + fechaHora(p.estado_cambiado) + (p.estado_cambiado_por ? ' · ' + esc(p.estado_cambiado_por) : '') + '</div></div>' +
+        '<div class="odg-pre-campo"><span>Fecha de aprobación</span><div class="odg-fijo odg-auto">' + fechaHora(p.aprobado_en) + '</div></div>' +
+        '</div>' + plan +
+        '<div class="odg-pre-campo"><span>Estado</span><div class="odg-pre-est">' + ESTADOS_PRE.map(function (x) {
+          return '<span class="odg-est odg-est-' + x[0] + '" aria-current="' + (x[0] === ev) + '"' + (x[0] === ev ? '' : ' style="opacity:.45"') + '>' + x[1] + '</span>'; }).join('') + '</div></div>' +
+        (msgPre ? '<p class="odg-pre-msg' + (msgPre.error ? ' error' : '') + '" role="status">' + esc(msgPre.texto) + '</p>' : '') + pie + '</div>';
+    }
     function bloquePresupuesto(total) {
+      if (preActual && !modoNuevo) return bloqueExistente();
       var tarjeta = datosPre.forma === 'tarjeta', ed = editandoDatos && esSuper(), dis = ed ? '' : ' disabled';
       // Barra final: guardar lo definido y confirmar (crear) el presupuesto
       var pie = !esSuper() ? '' : '<div class="odg-pre-pie">' + (ed
@@ -418,7 +496,8 @@
           (opciones.crearPresupuesto ? '<button type="button" class="odg-crear" data-datos-confirmar>Guardar y confirmar presupuesto</button>' : '') + '</div>'
         : '<span>Todo lo definido arriba se guarda en el presupuesto al confirmarlo.</span><div class="odg-fila-acc"><button type="button" class="odg-imp" data-datos-mod>Modificar información del presupuesto</button>' +
           (opciones.crearPresupuesto ? '<button type="button" class="odg-crear" data-crear-presupuesto>Confirmar presupuesto</button>' : '') + '</div>') + '</div>';
-      return '<div class="odg-pre' + (ed ? ' odg-pre-ed' : '') + '"><div class="odg-pre-cab"><div class="odg-pre-tit">Datos del presupuesto</div></div><div class="odg-pre-g">' +
+      return '<div class="odg-pre' + (ed ? ' odg-pre-ed' : '') + '"><div class="odg-pre-cab"><div class="odg-pre-tit">' + (preActual ? 'Nuevo presupuesto' : 'Datos del presupuesto') + '</div>' +
+        (preActual ? '<button type="button" class="odg-ver-sin" data-pre-volver>← Volver al presupuesto ' + esc(preActual.codigo || '') + '</button>' : '') + '</div><div class="odg-pre-g">' +
         '<div class="odg-pre-campo"><span>Código del presupuesto</span><div class="odg-cod"><small>SE ASIGNA AL CREAR</small>' + esc(codigoPre || '—') + '</div></div>' +
         '<label class="odg-pre-campo"><span>Forma de pago</span><select data-pre-campo="forma"' + dis + '>' + FORMAS.map(function (x) {
           return '<option value="' + x[0] + '"' + (x[0] === datosPre.forma ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label>' +
@@ -447,7 +526,7 @@
       return '<div><div class="odg-cab"><h4 style="color:' + ROJO + '">Requerido (' + visibles.length + ')</h4>' +
         (f.req.length && catalogo.length ? '<div class="odg-acc">' + selTipo + crearPre + '</div>' : '') + '</div>' +
         (visibles.length ? tablaDetalle(visibles, true) : f.req.length ? '<p class="odg-vacio">Aún no hay hallazgos con procedimiento elegido.</p>' : 'Sin tratamientos pendientes.') + enlace +
-        (opciones.crearPresupuesto && conProc.length ? bloquePresupuesto(totalPre) : '') + '</div>' +
+        (opciones.crearPresupuesto && (conProc.length || (preActual && !modoNuevo)) ? bloquePresupuesto(totalPre) : '') + '</div>' +
         '<div><div class="odg-cab"><h4 style="color:' + AZUL + '">Realizado / existente (' + f.hecho.length + ')</h4></div>' +
         (f.hecho.length ? tablaDetalle(f.hecho, false) : 'Sin registros.') + '</div>';
     }
@@ -571,6 +650,47 @@
     }
 
     // Crear presupuesto con los hallazgos «Requerido» que ya tienen procedimiento (precio del tipo elegido)
+    var dlgEst = null;
+    function abrirCambioEstado() {
+      if (typeof HTMLDialogElement === 'undefined' || !opciones.cambiarEstadoPresupuesto) return;
+      if (!dlgEst) {
+        dlgEst = document.createElement('dialog');
+        dlgEst.className = 'odg-dlg';
+        document.body.appendChild(dlgEst);
+        dlgEst.addEventListener('click', function (e) {
+          if (e.target === dlgEst && !dlgEst._ocupado) { dlgEst.close(); return; }
+          var o = e.target.closest('[data-nuevo-estado]');
+          if (o && !o.disabled) { dlgEst.querySelectorAll('[data-nuevo-estado]').forEach(function (x) { x.setAttribute('aria-pressed', x === o); }); dlgEst.querySelector('[data-est-ok]').disabled = false; return; }
+          var ok = e.target.closest('[data-est-ok]');
+          if (ok && !dlgEst._ocupado) {
+            e.preventDefault();
+            var sel = dlgEst.querySelector('[data-nuevo-estado][aria-pressed="true"]');
+            if (!sel) return;
+            dlgEst._ocupado = true; ok.disabled = true; ok.textContent = 'Cambiando…';
+            opciones.cambiarEstadoPresupuesto(preActual, sel.dataset.nuevoEstado).then(function () {
+              dlgEst._ocupado = false; dlgEst.close(); msgPre = { texto: 'Estado cambiado a ' + sel.textContent.split(' —')[0] + '.' }; pintar();
+            }).catch(function (err) {
+              dlgEst._ocupado = false; ok.disabled = false; ok.textContent = 'Cambiar estado';
+              dlgEst.querySelector('.error').textContent = err.message || String(err);
+            });
+          }
+        });
+        dlgEst.addEventListener('cancel', function (e) { if (dlgEst._ocupado) e.preventDefault(); });
+      }
+      var p = preActual, actualBd = p.estado === 'enviado' ? 'borrador' : p.estado;
+      var opcionesEst = [['borrador', 'Activo', ''], ['aprobado', 'Aprobado', ' — registra la fecha de aprobación'], ['rechazado', 'No aprobado', '']];
+      dlgEst.innerHTML = '<form method="dialog"><h4>Cambiar estado · ' + esc(p.codigo || 'N.º ' + p.id) + '</h4>' +
+        '<p>Estado actual: <b>' + ESTADOS_PRE.filter(function (x) { return x[0] === estadoVisible(p); })[0][1] + '</b> desde ' + fechaHora(p.estado_cambiado) + '</p>' +
+        '<div class="lista">' + opcionesEst.map(function (x) {
+          var dis = x[0] === actualBd;
+          return '<button type="button" class="op" data-nuevo-estado="' + x[0] + '" aria-pressed="false"' + (dis ? ' disabled style="opacity:.5"' : '') + '><span>' + x[1] + '<small>' + (dis ? 'Estado actual' : x[2].replace(' — ', '')) + '</small></span></button>';
+        }).join('') + '</div>' +
+        '<p style="font-size:12.5px">Proceso y Finalizado se ponen solos al marcar tratamientos realizados en Presupuesto.</p>' +
+        '<p class="error" role="alert"></p>' +
+        '<div class="pie der"><button value="cancelar">Cancelar</button><button type="button" class="pri" data-est-ok disabled>Cambiar estado</button></div></form>';
+      dlgEst._ocupado = false;
+      dlgEst.showModal();
+    }
     var dlgPre = null;
     function lineasPresupuesto() {
       var lineas = [], sinProc = [];
@@ -647,6 +767,7 @@
           items: d.lineas.map(function (l) { return { tratamiento: l.tratamiento, pieza: l.pieza, cantidad: l.cantidad, precio: l.precio }; })
         });
         var total = d.lineas.reduce(function (s, l) { return s + l.precio * l.cantidad; }, 0);
+        modoNuevo = false; editandoDatos = false;
         var puedeAbrir = opciones.abrirPresupuesto && (!opciones.puedeAbrirPresupuesto || opciones.puedeAbrirPresupuesto());
         dlgPre.innerHTML = '<form method="dialog"><div class="ok"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1B7F4B"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
           '<h4><span>Presupuesto ' + esc(r.codigo || 'N.º ' + r.id) + '</span> <span>creado</span></h4></div>' +
@@ -667,6 +788,11 @@
     raiz.addEventListener('change', function (e) {
       var t = e.target;
       if (t.matches('[data-tipo-precio]')) { tipoPrecio = t.value; pintar(); return; }
+      if (t.matches('[data-ex-campo]') && datosExist) {
+        if (t.dataset.exCampo === 'forma') { datosExist.forma = t.value; if (t.value === 'tarjeta' && window.PD_CUOTAS) window.PD_CUOTAS.cargar(); pintar(); }
+        else datosExist.citas = t.value ? String(Math.min(Math.max(parseInt(t.value, 10) || 1, 1), 99)) : '';
+        return;
+      }
       if (t.matches('[data-pre-campo]')) {
         var c = t.dataset.preCampo;
         if (c === 'forma') { datosPre.forma = t.value; if (t.value === 'tarjeta' && window.PD_CUOTAS) window.PD_CUOTAS.cargar(); pintar(); }
@@ -694,6 +820,26 @@
       if (e.target.closest('[data-fila-cancelar]')) { editandoFila = null; pintar(); return; }
       if (e.target.closest('[data-datos-mod]') && esSuper()) { editandoDatos = true; copiaDatos = { d: JSON.parse(JSON.stringify(datosPre)), t: tipoPrecio }; pintar(); return; }
       if (e.target.closest('[data-datos-guardar]')) { editandoDatos = false; copiaDatos = null; pintar(); return; }
+      if (e.target.closest('[data-pre-nuevo]') && esSuper()) { modoNuevo = true; editandoDatos = true; msgPre = null; datosPre = { forma: 'efectivo', cuotas: 1, sinRecargo: false, citas: '', estado: 'activo' }; copiaDatos = { d: JSON.parse(JSON.stringify(datosPre)), t: tipoPrecio }; pintar(); return; }
+      if (e.target.closest('[data-pre-volver]')) { modoNuevo = false; editandoDatos = false; pintar(); return; }
+      if (e.target.closest('[data-ex-mod]') && esSuper() && preActual) {
+        editandoExist = true; msgPre = null;
+        datosExist = { forma: preActual.forma_pago || 'efectivo', cuotas: preActual.cuotas || 1, sinRecargo: !!preActual.sin_recargo, citas: preActual.citas ? String(preActual.citas) : '' };
+        if (window.PD_CUOTAS) window.PD_CUOTAS.cargar();
+        pintar(); return;
+      }
+      if (e.target.closest('[data-ex-cancelar]')) { editandoExist = false; datosExist = null; pintar(); return; }
+      if (e.target.closest('[data-ex-guardar]') && opciones.guardarPresupuesto) {
+        var bt = e.target.closest('[data-ex-guardar]'); bt.disabled = true; bt.textContent = 'Guardando…';
+        opciones.guardarPresupuesto(preActual, datosExist).then(function () { editandoExist = false; datosExist = null; msgPre = { texto: 'Cambios guardados.' }; })
+          .catch(function (err) { msgPre = { texto: err.message || String(err), error: true }; }).then(pintar);
+        return;
+      }
+      var exc = e.target.closest('[data-ex-cuota]');
+      if (exc && editandoExist) { datosExist.cuotas = +exc.dataset.exCuota; pintar(); return; }
+      var exm = e.target.closest('[data-ex-cuota-modo]');
+      if (exm && editandoExist) { datosExist.sinRecargo = exm.dataset.exCuotaModo === 'sin'; pintar(); return; }
+      if (e.target.closest('[data-ex-estado]') && esSuper() && preActual) { abrirCambioEstado(); return; }
       if (e.target.closest('[data-datos-confirmar]')) { editandoDatos = false; copiaDatos = null; pintar(); abrirPresupuesto(); return; }
       var modo = e.target.closest('[data-pre-cuota-modo]');
       if (modo) { if (editandoDatos && esSuper()) { datosPre.sinRecargo = modo.dataset.preCuotaModo === 'sin'; pintar(); } return; }
@@ -749,6 +895,13 @@
       hallazgos: function () { return Object.keys(datos.piezas).length; },
       // lista: [{ id, nombre, tipo, base, precios: { directo: 350, vip: 300 } }] (id null = sugerido sin catálogo)
       codigoPresupuesto: function (texto) { codigoPre = texto || ''; pintar(); },
+      // último presupuesto del paciente creado desde el odontograma (null = ninguno)
+      presupuestoActual: function (p) {
+        var mismo = preActual && p && preActual.id === p.id;
+        preActual = p || null;
+        if (!mismo) { modoNuevo = false; editandoExist = false; datosExist = null; msgPre = null; }
+        pintar();
+      },
       // al cargar los % de recargo se vuelve a dibujar la tabla de cuotas
       recargos: function () { if (datosPre.forma === 'tarjeta') pintar(); },
       catalogo: function (lista) {

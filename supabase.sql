@@ -2482,6 +2482,83 @@ $$;
 revoke execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb, text, text, int, int, boolean) from public, anon;
 grant execute on function public.guardar_presupuesto(bigint, numeric, text, jsonb, text, text, int, int, boolean) to authenticated;
 
+-- ===== Fechas de estado del presupuesto e historial =====
+-- Cada cambio de estado registra solo la fecha y el usuario (estado_cambiado / estado_cambiado_por).
+-- Al pasar a «Aprobado» se registra la fecha de aprobación (aprobado_en); si deja de estar aprobado se borra.
+-- Nadie puede escribir estas fechas a mano. El historial guarda todos los cambios de estado.
+-- origen: 'odontograma' para los presupuestos creados desde el odontograma del paciente.
+
+alter table public.presupuestos add column if not exists origen text not null default 'manual' check (origen in ('manual', 'odontograma'));
+alter table public.presupuestos add column if not exists estado_cambiado timestamptz;
+alter table public.presupuestos add column if not exists estado_cambiado_por text;
+alter table public.presupuestos add column if not exists aprobado_en timestamptz;
+
+create table if not exists public.presupuesto_estados (
+  id             bigint generated always as identity primary key,
+  presupuesto_id bigint not null references public.presupuestos (id) on delete cascade,
+  de             text,
+  a              text not null,
+  fecha          timestamptz not null default now(),
+  usuario        text
+);
+create index if not exists presupuesto_estados_pre on public.presupuesto_estados (presupuesto_id);
+alter table public.presupuesto_estados enable row level security;
+drop policy if exists "personal ve estados de presupuestos" on public.presupuesto_estados;
+create policy "personal ve estados de presupuestos" on public.presupuesto_estados for select using (public.es_personal());
+grant select on public.presupuesto_estados to authenticated;
+
+-- Presupuestos anteriores: la última modificación como fecha de estado (y de aprobación si están aprobados)
+do $$ begin
+  alter table public.presupuestos disable trigger user;
+  update public.presupuestos set estado_cambiado = coalesce(actualizado, creado), estado_cambiado_por = creado_por where estado_cambiado is null;
+  update public.presupuestos set aprobado_en = coalesce(actualizado, creado) where estado = 'aprobado' and aprobado_en is null;
+  alter table public.presupuestos enable trigger user;
+end $$;
+
+create or replace function public.presupuesto_estado_fechas()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    new.estado_cambiado := now();
+    new.estado_cambiado_por := v_usuario;
+    new.aprobado_en := case when new.estado = 'aprobado' then now() end;
+    return new;
+  end if;
+  if new.estado is distinct from old.estado then
+    new.estado_cambiado := now();
+    new.estado_cambiado_por := v_usuario;
+    new.aprobado_en := case when new.estado = 'aprobado' then now() end;
+  else
+    new.estado_cambiado := old.estado_cambiado;
+    new.estado_cambiado_por := old.estado_cambiado_por;
+    new.aprobado_en := old.aprobado_en;
+  end if;
+  new.origen := old.origen;
+  return new;
+end;
+$$;
+create or replace function public.presupuesto_estado_historial()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' or new.estado is distinct from old.estado then
+    insert into public.presupuesto_estados (presupuesto_id, de, a, fecha, usuario)
+    values (new.id, case when tg_op = 'UPDATE' then old.estado::text end, new.estado::text, new.estado_cambiado, new.estado_cambiado_por);
+  end if;
+  return null;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'presupuestos_estado_fechas' and tgrelid = 'public.presupuestos'::regclass) then
+    create trigger presupuestos_estado_fechas before insert or update on public.presupuestos
+      for each row execute function public.presupuesto_estado_fechas();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'presupuestos_estado_historial' and tgrelid = 'public.presupuestos'::regclass) then
+    create trigger presupuestos_estado_historial after insert or update on public.presupuestos
+      for each row execute function public.presupuesto_estado_historial();
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
