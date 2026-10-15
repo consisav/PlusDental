@@ -39,7 +39,7 @@
   // Logo y datos de la clínica (izquierda del encabezado de los reportes impresos)
   function logoClinica() {
     return '<div style="display:flex;align-items:center;gap:16px">' +
-      '<img src="logo-plusdental-marca.png?v=2" alt="' + CLINICA.nombre + '" style="width:118px;height:auto">' +
+      '<img src="logo-plusdental-marca.png?v=3" alt="' + CLINICA.nombre + '" style="width:118px;height:auto">' +
       '<div style="font-size:12px;color:#475B68;line-height:1.55"><b style="display:block;font-size:11px;letter-spacing:.16em;color:#005A87">ODONTOLOGÍA INTEGRAL</b>' +
       CLINICA.direccion.replace(', Ciudad', '<br>Ciudad') + '<br>Tel. ' + CLINICA.telefono + '</div></div>';
   }
