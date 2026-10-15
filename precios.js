@@ -9,6 +9,9 @@
   var ESTADOS = { activo: 'Activo', suspendido: 'Suspendido', baja: 'Baja' };
   var tratamientos = [], precios = [], actual = null, editandoId = null, filtro = 'todos';
   var tiposProc = [];   // tipos de procedimientos: la tabla se agrupa por tipo
+  var EN = window.PD_EN_EXTRA = window.PD_EN_EXTRA || {};
+  EN['+ Otro tipo de precio'] = '+ Another price type';
+  EN['Nuevo precio para el mismo procedimiento: elige el tipo de precio, escribe el valor y pulsa «Grabar».'] = 'New price for the same procedure: choose the price type, enter the value and press “Save”.';
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -68,7 +71,7 @@
     '<label>Porcentaje de descuento máximo<span class="ac-pct"><input id="prDescuento" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="0.00"><span aria-hidden="true">%</span></span></label>' +
     '<label>Fecha *<input id="prFecha" type="date" required></label>' +
     '</div></fieldset>' +
-    '<div class="exp-actions ac-acciones"><button type="submit" id="prGrabar" class="dlg-submit">Grabar</button><button type="button" id="prModificar" class="adm-btn adm-primary">Modificar</button><button type="button" id="prCancelar" class="adm-btn">Cancelar</button></div>' +
+    '<div class="exp-actions ac-acciones"><button type="submit" id="prGrabar" class="dlg-submit">Grabar</button><button type="button" id="prModificar" class="adm-btn adm-primary">Modificar</button><button type="button" id="prCancelar" class="adm-btn">Cancelar</button><button type="button" id="prOtro" class="adm-btn" style="margin-left:auto">+ Otro tipo de precio</button></div>' +
     '<p id="prFormMsg" class="dlg-msg" role="status"></p></form></div>';
 
   function ver(id) { ['prLista', 'prFicha'].forEach(function (v) { $(v).hidden = v !== id; }); }
@@ -170,6 +173,11 @@
     $('prGrabar').disabled = !permiso || modo === 'ver' || (modo === 'nuevo' && $('prTipo').dataset.completo === '1');
     $('prModificar').disabled = !permiso || modo !== 'ver';
     $('prCancelar').disabled = modo === 'nuevo';
+    // «+ Otro tipo de precio»: mismo procedimiento, un tipo que aún no tenga precio
+    var faltan = actual ? TIPOS.length - preciosDe(actual.id).length : 0;
+    $('prOtro').hidden = !permiso || modo === 'nuevo';
+    $('prOtro').disabled = faltan <= 0;
+    $('prOtro').title = faltan <= 0 ? 'Este procedimiento ya tiene los seis tipos de precio.' : '';
     $('prModificar').title = !permiso ? 'Solo el Super Administrador puede modificar precios.' : modo === 'nuevo' ? 'Elige un precio de la tabla («Ver») para modificarlo.' : '';
     document.querySelectorAll('#prPrecios [data-prdel]').forEach(function (b) { b.disabled = !permiso; });
   }
@@ -288,6 +296,11 @@
   $('prEstado').addEventListener('change', pintarEstadoSelect);
   $('prForm').addEventListener('submit', grabar);
   $('prModificar').addEventListener('click', modificar);
+  $('prOtro').addEventListener('click', function () {
+    limpiarForm(); pintarFicha();
+    aviso('prFormMsg', 'Nuevo precio para el mismo procedimiento: elige el tipo de precio, escribe el valor y pulsa «Grabar».');
+    $('prTipo').focus();
+  });
   $('prCancelar').addEventListener('click', function () {
     if (modo === 'editar' && seleccionado) { verPrecio(seleccionado); aviso('prFormMsg', 'Se descartaron los cambios.'); return; }
     limpiarForm(); pintarFicha();
