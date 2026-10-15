@@ -129,6 +129,12 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .pre-fechas .hist{grid-column:1/-1;font-size:12.5px;color:#475B68;border-top:1px solid #D9E4EC;padding-top:8px}
 select.pre-ie{font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;padding:5px 8px;border:1px solid transparent;min-height:32px;cursor:pointer}
 .pre-ie-pendiente{background:#EBF0F4;color:#475B68}.pre-ie-proceso{background:#FEF3C7;color:#92400E}.pre-ie-finalizado{background:#DCF2EC;color:#08504C}.pre-ie-eliminado{background:#FDE2E4;color:#9F1239}
+.cita-buscar{display:grid;grid-template-columns:minmax(0,1.5fr) repeat(2,minmax(0,1fr)) minmax(0,1.5fr) auto;gap:10px;align-items:end;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:12px 14px}
+.cita-buscar label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;min-width:0}
+.cita-buscar .adm-input{width:100%;box-sizing:border-box;border-radius:10px;min-height:40px}
+.cita-buscar-acc{display:flex;gap:6px}
+@media (max-width:1100px){.cita-buscar{grid-template-columns:repeat(2,minmax(0,1fr))}.cita-buscar-acc{grid-column:1/-1}}
+@media (max-width:520px){.cita-buscar{grid-template-columns:1fr}}
 .pre-pago{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;max-width:760px}
 .pre-pago label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
 .pre-pago .adm-input{width:100%;box-sizing:border-box;border-radius:12px}
@@ -1000,6 +1006,14 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-btn" data-filtro="cancelada" aria-pressed="false">Canceladas</button>
 <button type="button" class="adm-btn" data-filtro="todas" aria-pressed="false">Todas</button>
 </div>
+<div class="cita-buscar">
+<label>Paciente<select id="cbPaciente" class="adm-input"><option value="">Todos los pacientes</option></select></label>
+<label>Fecha inicial<input id="cbDesde" type="date" class="adm-input"></label>
+<label>Fecha final<input id="cbHasta" type="date" class="adm-input"></label>
+<label>Procedimiento<select id="cbProc" class="adm-input"><option value="">Todos los procedimientos</option></select></label>
+<div class="cita-buscar-acc"><button type="button" id="cbBuscar" class="adm-btn adm-primary">Buscar</button><button type="button" id="cbLimpiar" class="adm-btn">Limpiar</button></div>
+</div>
+<p id="cbResumen" class="dlg-msg" hidden></p>
 <div class="roles-wrap"><table><thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Servicio</th><th>Dentista</th><th>Posición</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="citasBody"></tbody></table></div>
 <p id="citasMsg" class="dlg-msg" role="status"></p>
 

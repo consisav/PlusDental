@@ -135,13 +135,20 @@
   async function cargarCitas() {
     aviso('citasMsg', '');
     $('citasBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
+    var desde = $('cbDesde').value, hasta = $('cbHasta').value;
     function consulta(campos) {
       var q = sb.from('citas').select(campos);
+      if (desde || hasta) {
+        if (desde) q = q.gte('fecha', desde);
+        if (hasta) q = q.lte('fecha', hasta);
+        return q.order('fecha', { ascending: false }).order('hora', { ascending: false }).limit(1000);
+      }
       return periodo === 'proximas'
         ? q.gte('fecha', hoyISO()).order('fecha').order('hora')
         : q.lt('fecha', hoyISO()).order('fecha', { ascending: false }).order('hora', { ascending: false }).limit(300);
     }
-    var r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id,dentista_id');
+    var r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id,dentista_id,paciente_id');
+    if (r.error && /paciente_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id,dentista_id');
     // Si todavía no existen las columnas nuevas, se muestran las citas sin ellas
     if (r.error && /dentista_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id');
     if (r.error && /posicion_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada');
@@ -155,7 +162,42 @@
       return;
     }
     citas = r.data;
+    cargarOpcionesBusqueda();
     pintarCitas();
+  }
+
+  // Listas de la búsqueda: todos los pacientes y los procedimientos que tienen citas
+  var opcionesCargadas = false;
+  async function cargarOpcionesBusqueda() {
+    if (opcionesCargadas) return;
+    var rs = await Promise.all([sb.from('pacientes').select('id,nombre').order('nombre'), sb.from('citas').select('servicio').limit(5000)]);
+    if (rs[0].error && rs[1].error) return;
+    opcionesCargadas = true;
+    var selP = $('cbPaciente'), antesP = selP.value;
+    var nombresCitas = citas.map(function (c) { return c.nombre; });
+    var pac = rs[0].error ? [] : rs[0].data;
+    var conocidos = {}; pac.forEach(function (p) { conocidos[String(p.nombre).toLowerCase()] = 1; });
+    var sueltos = nombresCitas.filter(function (n, i, a) { return n && a.indexOf(n) === i && !conocidos[n.toLowerCase()]; }).sort();
+    selP.innerHTML = '<option value="">Todos los pacientes</option>' + pac.map(function (p) { return '<option value="id:' + p.id + '" data-nombre="' + esc(p.nombre) + '">' + esc(p.nombre) + '</option>'; }).join('') +
+      (sueltos.length ? '<optgroup label="Sin expediente">' + sueltos.map(function (n) { return '<option value="n:' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</optgroup>' : '');
+    selP.value = antesP;
+    var selS = $('cbProc'), antesS = selS.value;
+    var servicios = (rs[1].error ? citas : rs[1].data).map(function (c) { return String(c.servicio || '').trim(); })
+      .filter(function (x, i, a) { return x && a.map(function (y) { return y.toLowerCase(); }).indexOf(x.toLowerCase()) === i; }).sort(function (a, b) { return a.localeCompare(b, 'es'); });
+    selS.innerHTML = '<option value="">Todos los procedimientos</option>' + servicios.map(function (x) { return '<option value="' + esc(x) + '">' + esc(x) + '</option>'; }).join('');
+    selS.value = antesS;
+  }
+  // Paciente y procedimiento elegidos en la búsqueda
+  function coincideBusqueda(c) {
+    var p = $('cbPaciente').value, s = $('cbProc').value;
+    if (p) {
+      if (p.indexOf('id:') === 0) {
+        var opt = $('cbPaciente').selectedOptions[0], nom = opt ? String(opt.dataset.nombre || '').toLowerCase() : '';
+        if (!(c.paciente_id != null ? String(c.paciente_id) === p.slice(3) : String(c.nombre).toLowerCase() === nom)) return false;
+      } else if (String(c.nombre) !== p.slice(2)) return false;
+    }
+    if (s && String(c.servicio || '').trim().toLowerCase() !== s.toLowerCase()) return false;
+    return true;
   }
 
   // Contador del menú: citas próximas sin confirmar
@@ -168,9 +210,15 @@
 
   function pintarCitas() {
     document.querySelectorAll('#citaFiltros [data-filtro]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.filtro === filtro); });
-    document.querySelectorAll('#citaPeriodo [data-periodo]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.periodo === periodo); });
+    var rango = $('cbDesde').value || $('cbHasta').value;
+    document.querySelectorAll('#citaPeriodo [data-periodo]').forEach(function (b) { b.setAttribute('aria-pressed', !rango && b.dataset.periodo === periodo); });
 
-    var lista = citas.filter(function (c) { return filtro === 'todas' || c.estado === filtro; });
+    var lista = citas.filter(function (c) { return (filtro === 'todas' || c.estado === filtro) && coincideBusqueda(c); });
+    var buscando = rango || $('cbPaciente').value || $('cbProc').value;
+    $('cbResumen').hidden = !buscando;
+    if (buscando) $('cbResumen').textContent = lista.length + (lista.length === 1 ? ' cita encontrada' : ' citas encontradas') +
+      (rango ? ' del ' + ($('cbDesde').value ? fechaLarga($('cbDesde').value) : 'inicio') + ' al ' + ($('cbHasta').value ? fechaLarga($('cbHasta').value) : 'último registro') : '') + '.';
+    if (!lista.length && buscando) { $('citasBody').innerHTML = '<tr><td colspan="7">Ninguna cita coincide con la búsqueda.</td></tr>'; return; }
     if (!lista.length) {
       var cuando = periodo === 'proximas' ? 'próximas' : 'anteriores';
       var vacio = { pendiente: 'No hay citas pendientes ' + cuando + '.', confirmada: 'No hay citas confirmadas ' + cuando + '.', cancelada: 'No hay citas canceladas ' + cuando + '.', todas: 'No hay citas ' + cuando + '.' };
@@ -410,8 +458,21 @@
     var b = e.target.closest('[data-periodo]');
     if (!b || b.dataset.periodo === periodo) return;
     periodo = b.dataset.periodo;
+    $('cbDesde').value = ''; $('cbHasta').value = '';
     // En el historial lo útil es ver todo; en las próximas, lo que falta confirmar
     filtro = periodo === 'anteriores' ? 'todas' : 'pendiente';
+    cargarCitas();
+  });
+  // Búsqueda: paciente y procedimiento filtran al momento; las fechas se aplican con «Buscar»
+  $('cbPaciente').addEventListener('change', pintarCitas);
+  $('cbProc').addEventListener('change', pintarCitas);
+  $('cbBuscar').addEventListener('click', function () {
+    if ($('cbDesde').value && $('cbHasta').value && $('cbDesde').value > $('cbHasta').value) { aviso('citasMsg', 'La fecha inicial no puede ser mayor que la final.', true); return; }
+    if (($('cbDesde').value || $('cbHasta').value) && filtro === 'pendiente') filtro = 'todas';
+    cargarCitas();
+  });
+  $('cbLimpiar').addEventListener('click', function () {
+    ['cbPaciente', 'cbProc', 'cbDesde', 'cbHasta'].forEach(function (id) { $(id).value = ''; });
     cargarCitas();
   });
   $('citasBody').addEventListener('change', function (e) {
