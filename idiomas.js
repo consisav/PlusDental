@@ -332,6 +332,10 @@
     [/^Pago registrado con el correlativo (\S+) \(recibo N\.º (\d+)\)\. Puedes imprimirlo o enviarlo desde la lista\.$/, 'Payment registered with sequence No. $1 (receipt No. $2). You can print or send it from the list.'],
     [/^(Factura|Recibo)( [A-Za-z0-9-]+)?$/, function (m, t, n) { return (t === 'Factura' ? 'Invoice' : 'Receipt') + (n || ''); }],
     [/^Cuota (\d+)$/, 'Installment $1'],
+    [/^Agenda de (enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre) (\d{4})$/, function (m, mes, a) {
+      return 'Schedule for ' + { enero: 'January', febrero: 'February', marzo: 'March', abril: 'April', mayo: 'May', junio: 'June', julio: 'July', agosto: 'August', septiembre: 'September', octubre: 'October', noviembre: 'November', diciembre: 'December' }[mes] + ' ' + a;
+    }],
+    [/^\+ (\d+) más$/, '+ $1 more'],
     [/^(\d+) cuotas( de (Q[\d,.]+))?$/, function (m, n, x, v) { return n + ' installments' + (v ? ' of ' + v : ''); }],
     [/^1 pago de (Q[\d,.]+)$/, '1 payment of $1'],
     [/^(\d+) cuotas$/, '$1 installments'],

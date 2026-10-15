@@ -286,6 +286,15 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-celda.cerrado{cursor:default;color:#94A6B2;background:#F5F9FC;border-color:transparent}
 .ag-urg{display:inline-block;background:#FDE2E4;color:#9F1239;border-radius:999px;padding:0 7px;font-size:11px;font-weight:700;margin-left:4px}
 .ag-fijo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#E6F1F8;border:1px solid #C4D4DF;border-radius:12px;padding:10px 14px;font-size:14px;color:#00476B}
+.ag-grid.ag-mes{width:100%;border-collapse:collapse;table-layout:fixed}
+.ag-grid.ag-mes th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#5A6D7A;padding:8px 6px;text-align:left;border-bottom:1px solid #D9E4EC}
+.ag-grid.ag-mes td{vertical-align:top;border:1px solid #EEF3F7;padding:6px;height:96px;background:#FFFFFF}
+.ag-grid.ag-mes td.fuera{background:#F5F9FC;color:#8A9DA9}
+.ag-grid.ag-mes .ag-mes-dia{font:inherit;font-weight:800;font-size:13px;border:0;background:none;color:#0B2B40;padding:0;cursor:pointer;display:flex;justify-content:space-between;width:100%}
+.ag-grid.ag-mes td.hoy .ag-mes-dia{color:#005A87}.ag-grid.ag-mes td.hoy{box-shadow:inset 0 0 0 2px #005A87}
+.ag-grid.ag-mes .ag-mes-dia small{font-weight:600;color:#5A6D7A}
+.ag-grid.ag-mes .ag-mini{display:block;width:100%;text-align:left;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+.ag-grid.ag-mes .mas{font-size:11.5px;color:#005A87;font-weight:700;margin-top:3px;display:block}
 .ag-vista{display:inline-flex;border:1px solid #C4D4DF;border-radius:999px;padding:3px;background:#FFFFFF}
 .ag-vista button{font:inherit;font-size:14px;font-weight:600;border:0;background:transparent;color:#475B68;padding:7px 14px;border-radius:999px;cursor:pointer;min-height:36px}
 .ag-vista button[aria-pressed="true"]{background:#0B2B40;color:#FFFFFF}
@@ -771,7 +780,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="adm-g">
 <button type="button" class="adm-grupo" id="grpAgendas" aria-expanded="false" aria-controls="grpAgendasItems">Agendas<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-g-items" id="grpAgendasItems" role="presentation">
-<button type="button" role="tab" id="tabAgenda" data-tab="admAgenda" aria-selected="false" aria-controls="admAgenda">Agendas clínicas</button>
+<button type="button" role="tab" id="tabAgenda" data-tab="admAgenda" aria-selected="false" aria-controls="admAgenda">Administrar citas</button>
+<button type="button" role="tab" id="tabVerCitas" data-tab="admVerCitas" aria-selected="false" aria-controls="admVerCitas">Visualizar citas</button>
 <button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
 </div>
 </div>
@@ -1011,7 +1021,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 
 <!-- 9. Agenda de clínicas -->
 <div id="admAgenda" role="tabpanel" aria-labelledby="tabAgenda" hidden class="adm-pane">
-<div class="adm-pane-head"><h3 class="adm-h">Agenda de clínicas</h3><span class="pronto-pill" style="background: #E2EEF6; color: #00476B">Asistente inteligente</span></div>
+<div class="adm-pane-head"><h3 class="adm-h">Administrar citas</h3><span class="pronto-pill" style="background: #E2EEF6; color: #00476B">Asistente inteligente</span></div>
 
 <form id="agForm" class="adm-box">
 <div style="display: flex; flex-direction: column; gap: 4px">
@@ -1058,14 +1068,19 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="agSugerencias" class="ag-sugerencias"></div>
 </form>
 
+</div>
+
+<div id="admVerCitas" role="tabpanel" aria-labelledby="tabVerCitas" hidden class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Visualizar citas</h3></div>
 <div class="adm-pane-head">
 <h3 id="agTitulo" style="margin: 0; font-size: 19px; font-weight: 700">Agenda del día</h3>
 <div class="ag-nav">
-<div class="ag-vista" role="group" aria-label="Vista de la agenda"><button type="button" data-vista="dia" aria-pressed="true">Día</button><button type="button" data-vista="semana" aria-pressed="false">Semana</button></div>
+<div class="ag-vista" role="group" aria-label="Vista de la agenda"><button type="button" data-vista="dia" aria-pressed="true">Día</button><button type="button" data-vista="semana" aria-pressed="false">Semana</button><button type="button" data-vista="mes" aria-pressed="false">Mes</button></div>
 <button type="button" id="agPrev" class="adm-btn" aria-label="Día anterior">←</button>
 <input id="agDia" type="date" class="adm-input" aria-label="Día de la agenda" style="width: auto">
 <button type="button" id="agNext" class="adm-btn" aria-label="Día siguiente">→</button>
 <button type="button" id="agHoy" class="adm-btn">Hoy</button>
+<button type="button" id="agImprimir" class="adm-btn adm-primary">Imprimir agenda</button>
 </div>
 </div>
 <div class="roles-wrap"><table class="ag-grid"><thead id="agHead"></thead><tbody id="agBody"></tbody></table></div>

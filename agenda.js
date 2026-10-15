@@ -316,11 +316,23 @@
   // Lunes de la semana de una fecha
   function lunesDe(f) { var d = fecha(f).getDay(); return sumar(f, d === 0 ? -6 : 1 - d); }
 
+  var MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function primeroDelMes(f) { return f.slice(0, 8) + '01'; }
+  function ultimoDelMes(f) { var d = fecha(primeroDelMes(f)); d.setMonth(d.getMonth() + 1); d.setDate(0); return iso(d); }
+  function sumarMeses(f, n) { var d = fecha(primeroDelMes(f)); d.setMonth(d.getMonth() + n); return iso(d); }
+  // Rango que se ve en pantalla (y que se imprime)
+  function rangoVista() {
+    var f = $('agDia').value || hoy();
+    if (vista === 'mes') { var ini = lunesDe(primeroDelMes(f)); var u = ultimoDelMes(f), dsem = fecha(u).getDay(); return { desde: ini, hasta: dsem === 0 ? u : sumar(u, 7 - dsem), mesDesde: primeroDelMes(f), mesHasta: u }; }
+    if (vista === 'semana') { var l = lunesDe(f); return { desde: l, hasta: sumar(l, 5) }; }
+    return { desde: f, hasta: f };
+  }
   async function cargarCitas() {
-    var inicio = lunesDe($('agDia').value), fin = sumar(inicio, 6);
+    var rv = rangoVista(), inicio = rv.desde, fin = rv.hasta;
     var desde = hoy() < inicio ? hoy() : inicio;
     var hasta = sumar(hoy(), DIAS_BUSQUEDA + 31);
     if (fin > hasta) hasta = fin;
+    if (inicio < desde) desde = inicio;
     var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas')
       .gte('fecha', desde).lte('fecha', hasta).neq('estado', 'cancelada');
     if (r.error && /paciente_id|prioridad|notas/.test(r.error.message)) {
@@ -333,13 +345,15 @@
 
   function pintar() {
     document.querySelectorAll('.ag-vista [data-vista]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.vista === vista); });
-    $('agTitulo').textContent = vista === 'semana' ? 'Agenda de la semana' : 'Agenda del día';
-    $('agAyuda').innerHTML = vista === 'semana'
+    var fsel = $('agDia').value || hoy();
+    $('agTitulo').textContent = vista === 'mes' ? 'Agenda de ' + MESES_LARGO[fecha(fsel).getMonth()] + ' ' + fecha(fsel).getFullYear() : vista === 'semana' ? 'Agenda de la semana' : 'Agenda del día';
+    document.querySelector('.ag-grid').classList.toggle('ag-mes', vista === 'mes');
+    $('agAyuda').innerHTML = vista === 'mes' ? 'Toca un día para verlo por salas, o una cita para ver su detalle.' : vista === 'semana'
       ? 'Toca un día o un <b>+ libre</b> para abrirlo por salas y agendar, o una cita para ver su detalle.'
       : 'Toca un espacio <b>Libre</b> para agendar ahí, o una cita para ver su detalle.';
-    $('agPrev').setAttribute('aria-label', vista === 'semana' ? 'Semana anterior' : 'Día anterior');
-    $('agNext').setAttribute('aria-label', vista === 'semana' ? 'Semana siguiente' : 'Día siguiente');
-    if (vista === 'semana') pintarSemana(); else pintarDia();
+    $('agPrev').setAttribute('aria-label', vista === 'mes' ? 'Mes anterior' : vista === 'semana' ? 'Semana anterior' : 'Día anterior');
+    $('agNext').setAttribute('aria-label', vista === 'mes' ? 'Mes siguiente' : vista === 'semana' ? 'Semana siguiente' : 'Día siguiente');
+    if (vista === 'mes') pintarMes(); else if (vista === 'semana') pintarSemana(); else pintarDia();
   }
 
   // Vista de semana: lunes a sábado, todas las salas en cada casilla
@@ -373,6 +387,58 @@
       }).join('') + '</tr>';
     }).join('');
     document.querySelector('.ag-grid').classList.add('semana');
+  }
+
+  // Vista de mes: calendario de lunes a domingo con las citas de cada día
+  function pintarMes() {
+    document.querySelector('.ag-grid').classList.remove('semana');
+    var rv = rangoVista(), dias = [], f = rv.desde;
+    while (f <= rv.hasta) { dias.push(f); f = sumar(f, 1); }
+    $('agHead').innerHTML = '<tr>' + ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(function (d) { return '<th>' + d + '</th>'; }).join('') + '</tr>';
+    var filas = [];
+    for (var i = 0; i < dias.length; i += 7) filas.push(dias.slice(i, i + 7));
+    $('agBody').innerHTML = filas.map(function (sem) {
+      return '<tr>' + sem.map(function (d) {
+        var cs = citas.filter(function (c) { return c.fecha === d; }).sort(function (a, b) { return hhmm(a.hora).localeCompare(hhmm(b.hora)); });
+        var fuera = d < rv.mesDesde || d > rv.mesHasta;
+        var lista = cs.slice(0, 3).map(function (x) {
+          return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '" title="' + esc(hhmm(x.hora) + ' · ' + x.nombre + ' · ' + x.servicio) + '"><b>' + hhmm(x.hora) + '</b> ' + esc(x.nombre) + '</button>';
+        }).join('') + (cs.length > 3 ? '<button type="button" class="mas ag-mini" data-ir-dia="' + d + '" style="border:0;background:none;padding:0">+ ' + (cs.length - 3) + ' más</button>' : '');
+        return '<td class="' + (fuera ? 'fuera' : '') + (d === hoy() ? ' hoy' : '') + '"><button type="button" class="ag-mes-dia" data-ir-dia="' + d + '">' + fecha(d).getDate() +
+          (cs.length ? '<small>' + cs.length + (cs.length === 1 ? ' cita' : ' citas') + '</small>' : '') + '</button>' + lista + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+  }
+
+  // Imprimir la agenda que se ve (día, semana o mes): lista ordenada por fecha y hora
+  function imprimirAgenda() {
+    var imp = window.PD_IMPRESION;
+    if (!imp) return;
+    var rv = rangoVista(), desde = vista === 'mes' ? rv.mesDesde : rv.desde, hasta = vista === 'mes' ? rv.mesHasta : rv.hasta;
+    var lista = citas.filter(function (c) { return c.fecha >= desde && c.fecha <= hasta; })
+      .sort(function (a, b) { return a.fecha.localeCompare(b.fecha) || hhmm(a.hora).localeCompare(hhmm(b.hora)); });
+    var celda = 'padding:7px 6px;border-bottom:1px solid #D9E4EC';
+    var th = celda + ';background:#0B2B40;color:#FFFFFF;font-size:10.5px;text-transform:uppercase;text-align:left';
+    var periodo = vista === 'mes' ? MESES_LARGO[fecha(desde).getMonth()] + ' ' + fecha(desde).getFullYear()
+      : vista === 'semana' ? textoFecha(desde) + ' al ' + textoFecha(hasta) + ' ' + fecha(hasta).getFullYear() : textoFecha(desde) + ' ' + fecha(desde).getFullYear();
+    var titulo = vista === 'mes' ? 'Agenda del mes' : vista === 'semana' ? 'Agenda de la semana' : 'Agenda del día';
+    var cuerpo = '', diaAnt = '';
+    lista.forEach(function (c) {
+      if (c.fecha !== diaAnt) {
+        diaAnt = c.fecha;
+        var n = lista.filter(function (x) { return x.fecha === c.fecha; }).length;
+        cuerpo += '<tr><td colspan="6" style="padding:8px 6px;background:#EEF5FA;font-weight:800">' + textoFecha(c.fecha) + ' · ' + n + (n === 1 ? ' cita' : ' citas') + '</td></tr>';
+      }
+      cuerpo += '<tr><td style="' + celda + ';font-weight:700">' + hhmm(c.hora) + '</td><td style="' + celda + '">' + esc(c.nombre) + (c.prioridad === 'urgente' ? ' <b style="color:#9F1239">(urgente)</b>' : '') + (c.telefono ? '<br><span style="color:#5A6D7A">' + esc(c.telefono) + '</span>' : '') + '</td>' +
+        '<td style="' + celda + '">' + esc(c.servicio || '') + '</td><td style="' + celda + '">' + esc(nombreDentista(c.dentista_id)) + '</td>' +
+        '<td style="' + celda + '">' + esc(c.posicion_id ? nombreSala(c.posicion_id) : 'Sin sala') + '</td><td style="' + celda + '">' + (c.estado === 'pendiente' ? 'Pendiente' : 'Confirmada') + '</td></tr>';
+    });
+    imp.imprimir(imp.encabezado(titulo) +
+      '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:12px;padding:10px 14px;margin-bottom:14px">' +
+      '<div><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Periodo</span><b style="font-size:15px">' + esc(periodo) + '</b></div>' +
+      '<div style="text-align:right"><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Citas</span><b style="font-size:15px">' + lista.length + '</b></div></div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="' + th + '">Hora</th><th style="' + th + '">Paciente</th><th style="' + th + '">Tratamiento</th><th style="' + th + '">Dentista</th><th style="' + th + '">Sala</th><th style="' + th + '">Estado</th></tr></thead><tbody>' +
+      (cuerpo || '<tr><td colspan="6" style="' + celda + '">No hay citas en este periodo.</td></tr>') + '</tbody></table></div>');
   }
 
   function pintarDia() {
@@ -491,8 +557,10 @@
   $('agFijo').addEventListener('click', function (e) { if (e.target.closest('#agQuitarFijo')) { fijo = null; pintarFijo(); } });
 
   $('agDia').addEventListener('change', cargarCitas);
-  $('agPrev').addEventListener('click', function () { $('agDia').value = sumar($('agDia').value || hoy(), vista === 'semana' ? -7 : -1); cargarCitas(); });
-  $('agNext').addEventListener('click', function () { $('agDia').value = sumar($('agDia').value || hoy(), vista === 'semana' ? 7 : 1); cargarCitas(); });
+  function mover(n) { var f = $('agDia').value || hoy(); $('agDia').value = vista === 'mes' ? sumarMeses(f, n) : sumar(f, vista === 'semana' ? 7 * n : n); cargarCitas(); }
+  $('agPrev').addEventListener('click', function () { mover(-1); });
+  $('agNext').addEventListener('click', function () { mover(1); });
+  $('agImprimir').addEventListener('click', imprimirAgenda);
   document.querySelector('.ag-vista').addEventListener('click', function (e) {
     var b = e.target.closest('[data-vista]');
     if (b && b.dataset.vista !== vista) { vista = b.dataset.vista; $('agDetalle').hidden = true; cargarCitas(); }
@@ -509,6 +577,7 @@
     var libre = e.target.closest('[data-libre]');
     if (libre) {
       fijo = { fecha: $('agDia').value, hora: libre.dataset.libre, sala: libre.dataset.sala ? +libre.dataset.sala : null };
+      if ($('admAgenda').hidden && $('tabAgenda')) $('tabAgenda').click();
       pintarFijo();
       $('agForm').scrollIntoView({ block: 'start' });
       aviso('agFormMsg', 'Completa el paciente y el tratamiento y pulsa «Sugerir horarios» para elegir el dentista de ese horario.');
@@ -531,9 +600,10 @@
   });
 
   $('tabAgenda').addEventListener('click', cargar);
+  if ($('tabVerCitas')) $('tabVerCitas').addEventListener('click', cargar);
 
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
-    cargar: function () { if (!$('admAgenda').hidden) cargar(); },
+    cargar: function () { if (!$('admAgenda').hidden || ($('admVerCitas') && !$('admVerCitas').hidden)) cargar(); },
     limpiar: function () {
       dentistas = []; salas = []; pacientes = []; citas = []; bloqueos = []; sugerencias = []; fijo = null;
       ['agSugerencias', 'agBody', 'agHead'].forEach(function (id) { $(id).innerHTML = ''; });
