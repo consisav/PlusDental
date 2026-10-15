@@ -339,6 +339,31 @@
       if (g.error) throw new Error('Se creó el presupuesto N.º ' + r.data.id + ', pero no se pudieron agregar los tratamientos: ' + traducir(g.error));
       return { id: r.data.id };
     },
+    // Reporte impreso con el logo: paciente, médico asignado y los procedimientos requeridos con su valor
+    imprimir: function (d) {
+      var imp = window.PD_IMPRESION;
+      if (!imp || !actual) return;
+      var medico = actual.medico && actual.medico.nombre ? actual.medico.nombre
+        : ($('pDentista').value && $('pDentista').selectedOptions[0] ? $('pDentista').selectedOptions[0].text : 'Sin asignar');
+      var celda = 'padding:8px 6px;border-bottom:1px solid #D9E4EC';
+      var th = celda + ';background:#0B2B40;color:#FFFFFF;font-size:11px;text-transform:uppercase;letter-spacing:.05em';
+      var dato = function (k, v) { return '<div><span style="display:block;font-size:10.5px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">' + k + '</span><b style="font-size:15px">' + v + '</b></div>'; };
+      var html = imp.encabezado('Plan de tratamiento') +
+        '<div style="display:grid;grid-template-columns:2fr 2fr 1fr;gap:12px 18px;margin-bottom:18px">' +
+        dato('Paciente', esc(actual.nombre)) + dato('Médico asignado', esc(medico)) + dato('Tipo de precio', esc(d.tipo)) + '</div>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>' +
+        '<th style="' + th + ';text-align:left">Pieza</th><th style="' + th + ';text-align:left">Hallazgo</th><th style="' + th + ';text-align:left">Procedimiento</th><th style="' + th + ';text-align:right">Valor</th></tr></thead><tbody>' +
+        (d.lineas.length ? d.lineas.map(function (l) {
+          return '<tr><td style="' + celda + ';font-weight:700">' + l.pieza + '</td><td style="' + celda + '">' + esc(l.hallazgo) + '</td><td style="' + celda + '">' + esc(l.procedimiento) + '</td>' +
+            '<td style="' + celda + ';text-align:right">' + 'Q' + l.precio.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td></tr>';
+        }).join('') : '<tr><td colspan="4" style="' + celda + '">No hay procedimientos con valor.</td></tr>') +
+        '<tr><td colspan="3" style="' + celda + ';font-weight:800;background:#EEF5FA">TOTAL ESTIMADO</td><td style="' + celda + ';text-align:right;font-weight:800;background:#EEF5FA">Q' + d.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td></tr>' +
+        '</tbody></table>' +
+        '<p style="margin-top:14px;font-size:12px;color:#5A6D7A">Valores estimados según el odontograma. El costo final se confirma en la evaluación clínica y en el presupuesto.</p>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:56px;font-size:12px;text-align:center;color:#475B68">' +
+        '<div style="border-top:1px solid #0B2B40;padding-top:6px">' + esc(medico) + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div></div>';
+      imp.imprimir(html);
+    },
     puedeAbrirPresupuesto: function () { return !!($('tabPresupuestos') && window.PD_PRESUPUESTOS); },
     abrirPresupuesto: function (id) { $('tabPresupuestos').click(); window.PD_PRESUPUESTOS.abrir(id); }
   });

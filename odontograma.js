@@ -170,6 +170,8 @@
       '.odg-res .odg-acc{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;background:none;border:0;padding:0;border-radius:0}',
       '.odg-crear{font:inherit;font-size:13.5px;font-weight:700;border:0;border-radius:999px;padding:8px 16px;min-height:36px;background:#0B2B40;color:#FFFFFF;cursor:pointer}',
       '.odg-crear:hover{background:#005A87}.odg-crear:focus-visible{outline:2px solid #005A87;outline-offset:2px}',
+      '.odg-imp{font:inherit;font-size:13.5px;font-weight:700;border:1px solid #0B2B40;border-radius:999px;padding:7px 16px;min-height:36px;background:#FFFFFF;color:#0B2B40;cursor:pointer}',
+      '.odg-imp:hover{background:#EEF5FA}.odg-imp:focus-visible{outline:2px solid #005A87;outline-offset:2px}',
       '.odg-dlg .odg-det{font-size:13.5px}.odg-dlg .odg-det td{padding:6px 8px}.odg-dlg .tabla{overflow:auto;min-height:0}',
       '.odg-dlg .alerta{background:#FFF7E6;border:1px solid #F2D29B;color:#7A4B00;border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.5}',
       '.odg-dlg .alerta ul{margin:4px 0 0;padding-left:18px}',
@@ -306,13 +308,27 @@
         '</td><td class="num">' + q(total) + '</td></tr></tfoot>' : '';
       return '<table class="odg-det"><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Procedimiento</th><th class="num">Precio</th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table>';
     }
+    // Reporte impreso: los procedimientos requeridos que tienen valor, con el tipo de precio elegido
+    function imprimirDetalle() {
+      if (!opciones.imprimir) return;
+      var lineas = [];
+      filasDetalle().req.forEach(function (f) {
+        if (!f.proc) return;
+        var precio = precioDe(buscarEnCatalogo(f.proc));
+        if (precio == null) return;
+        lineas.push({ pieza: f.n, hallazgo: f.texto, procedimiento: f.proc.n, precio: precio });
+      });
+      var tp = TIPOS_PRECIO.filter(function (t) { return t[0] === tipoPrecio; })[0];
+      opciones.imprimir({ tipo: tp ? tp[1] : '', lineas: lineas, total: lineas.reduce(function (s, l) { return s + l.precio; }, 0) });
+    }
     var verSinProc = false;
     function resumen() {
       var f = filasDetalle();
       var selTipo = '<label class="odg-tp">Tipo de precio <select data-tipo-precio>' + TIPOS_PRECIO.map(function (t) {
         return '<option value="' + t[0] + '"' + (t[0] === tipoPrecio ? ' selected' : '') + '>' + t[1] + '</option>';
       }).join('') + '</select></label>';
-      var crearPre = opciones.crearPresupuesto ? '<button type="button" class="odg-crear" data-crear-presupuesto>Crear presupuesto</button>' : '';
+      var crearPre = (opciones.imprimir ? '<button type="button" class="odg-imp" data-imprimir-odg>Imprimir</button>' : '') +
+        (opciones.crearPresupuesto ? '<button type="button" class="odg-crear" data-crear-presupuesto>Crear presupuesto</button>' : '');
       // En el detalle «Requerido» solo se ven los hallazgos con procedimiento elegido;
       // los demás quedan en el dibujo y se pueden mostrar para elegirles uno.
       var conProc = f.req.filter(function (x) { return x.proc; }), sinN = f.req.length - conProc.length;
@@ -546,6 +562,7 @@
       if (e.target.closest('select')) return;
       if (e.target.closest('[data-ver-sin]')) { verSinProc = !verSinProc; pintar(); return; }
       if (e.target.closest('[data-crear-presupuesto]')) { abrirPresupuesto(); return; }
+      if (e.target.closest('[data-imprimir-odg]')) { imprimirDetalle(); return; }
       var b = e.target.closest('[data-denticion],[data-modo],[data-herr]');
       if (b) {
         if (b.dataset.denticion) { datos.denticion = b.dataset.denticion; avisar(); }
