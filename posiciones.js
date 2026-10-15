@@ -12,7 +12,10 @@
   // Horario base de la clínica para posiciones nuevas
   var HORARIO_BASE = { 1: { abre: '08:00', cierra: '18:00' }, 2: { abre: '08:00', cierra: '18:00' }, 3: { abre: '08:00', cierra: '18:00' }, 4: { abre: '08:00', cierra: '18:00' }, 5: { abre: '08:00', cierra: '18:00' }, 6: { abre: '08:00', cierra: '12:30' } };
 
-  var posiciones = [], personal = [], actual = null, canal = null, citasHoy = {}, dentistasPorPos = {};
+  var posiciones = [], personal = [], actual = null, canal = null, citasHoy = {}, dentistasPorPos = {}, dentistasLista = [], editando = false;
+  var ESTADOS_REG = { activo: 'Activo', inactivo: 'Inactivo', baja: 'Baja' };
+  function fechaHora(t) { return t ? new Date(t).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
+  function dentistaPrincipal() { var d = dentistasLista.filter(function (x) { return x.rol_sala === 'principal'; })[0] || dentistasLista[0]; return d ? d.id : null; }
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -70,6 +73,9 @@
         (dentistasPorPos[d.posicion_id] = dentistasPorPos[d.posicion_id] || []).push(d.nombre + (d.rol_sala === 'alterno' ? ' (alterno)' : ' (principal)'));
       });
     }
+    var dl = await sb.from('dentistas').select('id,nombre,rol_sala,especialidades,estado').order('nombre');
+    if (dl.error && /rol_sala/.test(dl.error.message)) dl = await sb.from('dentistas').select('id,nombre,especialidades,estado').order('nombre');
+    dentistasLista = dl.error ? [] : dl.data;
     citasHoy = {};
     var c = await sb.from('citas').select('posicion_id').eq('fecha', hoy()).neq('estado', 'cancelada').not('posicion_id', 'is', null);
     if (!c.error) c.data.forEach(function (x) { citasHoy[x.posicion_id] = (citasHoy[x.posicion_id] || 0) + 1; });
@@ -89,10 +95,11 @@
       return;
     }
     $('posGrid').innerHTML = posiciones.map(function (p) {
-      var resp = (dentistasPorPos[p.id] || []).concat(nombresPersonal(p.responsables)).filter(function (n, i, a) { return a.indexOf(n) === i; });
+      var dResp = dentistasLista.filter(function (d) { return d.id === p.dentista_id; })[0];
+      var resp = (dResp ? [dResp.nombre + ' (responsable)'] : []).concat(dentistasPorPos[p.id] || []).concat(nombresPersonal(p.responsables)).filter(function (n, i, a) { return a.indexOf(n) === i; });
       var opciones = Object.keys(ESTADOS).map(function (k) { return '<option value="' + k + '"' + (k === p.estado ? ' selected' : '') + '>' + ESTADOS[k] + '</option>'; }).join('');
       return '<article class="pos-card' + (p.activa ? '' : ' inactiva') + '">' +
-        '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><span class="cod">' + esc(p.codigo) + (p.activa ? '' : ' · inactiva') + '</span>' +
+        '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><span class="cod">' + esc(p.codigo) + (p.activa ? '' : ' · ' + (ESTADOS_REG[p.estado_registro] || 'Inactiva').toLowerCase()) + '</span>' +
         '<select class="pos-estado est-' + p.estado + '" data-estado-pos="' + p.id + '" aria-label="Estado de ' + esc(p.nombre) + '"' + (p.activa ? '' : ' disabled') + '>' + opciones + '</select></div>' +
         '<h4>' + esc(p.nombre) + '</h4>' +
         '<div class="det">' + (p.ubicacion ? esc(p.ubicacion) + '<br>' : '') + (p.especialidad ? '<strong>' + esc(p.especialidad) + '</strong><br>' : '') +
@@ -179,18 +186,37 @@
     $('poEquipo').value = p ? (p.equipamiento || []).join('\n') : '';
     $('poEspecialidad').value = (p && p.especialidad) || '';
     $('poNotas').value = (p && p.notas) || '';
-    $('poActiva').checked = p ? p.activa : true;
-    casillas('poResp', ['odontologo', 'especialista'], p ? p.responsables : []);
+    $('poEstadoReg').value = (p && p.estado_registro) || (p && !p.activa ? 'inactivo' : 'activo');
+    $('poEstadoReg').dataset.estado = $('poEstadoReg').value;
+    var dSel = p ? p.dentista_id : dentistaPrincipal();
+    $('poDentista').innerHTML = '<option value="">Sin asignar</option>' + dentistasLista.filter(function (d) { return d.estado === 'activo' || d.id === dSel; }).map(function (d) {
+      return '<option value="' + d.id + '"' + (d.id === dSel ? ' selected' : '') + '>' + esc(d.nombre) + (d.rol_sala === 'principal' ? ' · principal' : '') + ((d.especialidades || []).length ? ' · ' + esc(d.especialidades.join(', ')) : '') + '</option>';
+    }).join('');
+    $('poUsuario').textContent = p ? (p.registrado_por || '—') : ((window.PD_SESION && window.PD_SESION.usuario()) || '—');
+    $('poFechaReg').textContent = p ? fechaHora(p.creado) : 'Se registra al grabar';
     casillas('poSoporte', ['higienista', 'auxiliar', 'otro'], p ? p.soporte : []);
     pintarHorario(p ? (p.horario || {}) : HORARIO_BASE);
   }
 
+  // Ver (bloqueado) o editar: nueva posición = editar; para modificar una existente, solo el Super Administrador
+  function aplicarModo() {
+    var puede = !actual || esSuper(), ed = editando && puede;
+    $('pDatos').querySelectorAll('fieldset.pos-sec').forEach(function (f) { f.disabled = !ed; });
+    ['poNotas', 'poEstadoReg'].forEach(function (id) { $(id).disabled = !ed; });
+    $('poGrabar').hidden = !ed;
+    $('poGrabar').textContent = actual ? 'Guardar cambios' : 'Grabar';
+    $('poModificar').hidden = ed || !actual || !esSuper();
+    $('poCancelar').hidden = !ed || !actual;
+    $('poSoloSuper').hidden = !(actual && !esSuper());
+  }
   async function abrir(id) {
     aviso('poMsg', '');
+    editando = false;
     var p = posiciones.filter(function (x) { return x.id === id; })[0];
     if (!p) return;
     actual = p;
     rellenar(p);
+    aplicarModo();
     pintarCabecera();
     ver('posFicha');
     parte('pDatos');
@@ -199,12 +225,14 @@
 
   function nueva() {
     actual = null;
+    editando = true;
     aviso('poMsg', '');
     rellenar(null);
+    aplicarModo();
     pintarCabecera();
     ver('posFicha');
     parte('pDatos');
-    $('poCodigo').focus();
+    $('poNombre').focus();
   }
 
   async function guardar(form) {
@@ -212,31 +240,35 @@
     var horario = leerHorario();
     var malo = Object.keys(horario).filter(function (d) { return !horario[d].abre || !horario[d].cierra || horario[d].abre >= horario[d].cierra; });
     if (malo.length) { aviso('poMsg', 'Revisa el horario: la hora de cierre debe ser después de la de apertura.', true); return; }
+    if (actual && !esSuper()) { aviso('poMsg', 'Solo el Super Administrador puede modificar los datos de la posición.', true); return; }
     var datos = {
-      codigo: $('poCodigo').value.trim(),
       nombre: $('poNombre').value.trim(),
       ubicacion: $('poUbicacion').value.trim() || null,
       tipo_sillon: $('poSillon').value.trim() || null,
       equipamiento: $('poEquipo').value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean),
       especialidad: $('poEspecialidad').value.trim() || null,
-      responsables: marcados('poResp'),
+      dentista_id: $('poDentista').value ? +$('poDentista').value : null,
       soporte: marcados('poSoporte'),
       horario: horario,
       notas: $('poNotas').value.trim() || null,
-      activa: $('poActiva').checked
+      estado_registro: $('poEstadoReg').value
     };
-    if (!datos.codigo || !datos.nombre) { aviso('poMsg', 'El ID de clínica y el nombre son obligatorios.', true); return; }
+    if (!datos.nombre) { aviso('poMsg', 'El nombre de la posición es obligatorio.', true); $('poNombre').focus(); return; }
     var boton = form.querySelector('[type=submit]');
     boton.disabled = true;
     aviso('poMsg', 'Guardando…');
     var r = actual
       ? await sb.from('posiciones').update(datos).eq('id', actual.id).select('*').single()
-      : await sb.from('posiciones').insert(datos).select('*').single();
+      : await sb.from('posiciones').insert(Object.assign({ codigo: 'nuevo' }, datos)).select('*').single();
+    if (r.error && /estado_registro|dentista_id|registrado_por/.test(r.error.message || '')) { boton.disabled = false; aviso('poMsg', 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para las posiciones.', true); return; }
     boton.disabled = false;
     if (r.error) { aviso('poMsg', traducir(r.error), true); return; }
     var eraNueva = !actual;
     actual = r.data;
     posiciones = eraNueva ? posiciones.concat([r.data]) : posiciones.map(function (p) { return p.id === r.data.id ? r.data : p; });
+    editando = false;
+    rellenar(actual);
+    aplicarModo();
     pintarCabecera();
     aviso('poMsg', eraNueva ? 'Posición creada. Ya puedes ver su agenda, mantenimiento y rotación.' : 'Cambios guardados.');
   }
@@ -441,4 +473,7 @@
     var r = await sb.from('posiciones').select('id,codigo,nombre').eq('activa', true).order('codigo');
     return r.error ? [] : r.data;
   };
+  $('poModificar').addEventListener('click', function () { if (!esSuper()) return; editando = true; aplicarModo(); aviso('poMsg', 'Haz los cambios y pulsa «Guardar cambios».'); $('poNombre').focus(); });
+  $('poCancelar').addEventListener('click', function () { editando = false; rellenar(actual); aplicarModo(); aviso('poMsg', 'Se descartaron los cambios.'); });
+  $('poEstadoReg').addEventListener('change', function () { this.dataset.estado = this.value; });
 })();

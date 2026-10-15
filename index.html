@@ -1323,9 +1323,12 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <form id="pDatos" class="adm-pane">
 <fieldset class="pos-sec"><legend>1. Identificación y datos básicos</legend>
 <div class="exp-form">
-<label>ID de clínica *<input id="poCodigo" type="text" maxlength="30" required placeholder="Ej.: Clínica 1"></label>
+<label>ID de clínica<input id="poCodigo" type="text" readonly tabindex="-1" class="pg-auto" placeholder="Se asigna al grabar"></label>
 <label>Nombre de la posición *<input id="poNombre" type="text" maxlength="120" required placeholder="Ej.: Gabinete de Ortodoncia"></label>
-<label class="full">Ubicación física<input id="poUbicacion" type="text" maxlength="150" placeholder="Ej.: Planta 1, pasillo B, sala 3"></label>
+<label>Ubicación física<input id="poUbicacion" type="text" maxlength="150" placeholder="Ej.: Planta 1, pasillo B, sala 3"></label>
+<label>Estado<select id="poEstadoReg" class="ac-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="baja">Baja</option></select></label>
+<div class="exp-campo"><span class="pos-lbl">Usuario que graba</span><div id="poUsuario" class="exp-calc">—</div></div>
+<div class="exp-campo"><span class="pos-lbl">Fecha de grabación</span><div id="poFechaReg" class="exp-calc">—</div></div>
 </div>
 </fieldset>
 <fieldset class="pos-sec"><legend>2. Capacidad y equipamiento</legend>
@@ -1338,7 +1341,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </fieldset>
 <fieldset class="pos-sec"><legend>3. Personal y roles asignados</legend>
 <div class="exp-form">
-<div><span class="pos-lbl">Odontólogo / especialista responsable</span><div id="poResp" class="pos-checks"></div></div>
+<label>Odontólogo / especialista responsable<select id="poDentista"><option value="">Sin asignar</option></select></label>
 <div><span class="pos-lbl">Personal de soporte (higienistas, auxiliares)</span><div id="poSoporte" class="pos-checks"></div></div>
 </div>
 <p class="dlg-msg">¿Falta alguien? Agrégalo en «Personal», en la lista de posiciones.</p>
@@ -1349,8 +1352,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="exp-form">
 <label class="full">Notas<textarea id="poNotas" rows="2" maxlength="1000" placeholder="Opcional"></textarea></label>
 </div>
-<label class="pos-activa"><input id="poActiva" type="checkbox" checked> Posición activa (desmárcala si deja de usarse; no se borra su historial)</label>
-<div class="exp-actions"><button type="submit" class="dlg-submit">Guardar posición</button><p id="poMsg" class="dlg-msg" role="status"></p></div>
+<p id="poSoloSuper" class="dlg-msg" hidden>Solo el Super Administrador puede modificar los datos de la posición.</p>
+<div class="exp-actions"><button type="submit" class="dlg-submit" id="poGrabar">Grabar</button><button type="button" id="poModificar" class="adm-btn adm-primary">Modificar</button><button type="button" id="poCancelar" class="adm-btn">Cancelar</button><p id="poMsg" class="dlg-msg" role="status"></p></div>
 </form>
 
 <div id="pAgenda" class="adm-pane" hidden>

@@ -2653,6 +2653,51 @@ begin
 end;
 $$;
 
+-- ===== Posiciones: código automático, estado, responsable y quién la registró =====
+-- ID de clínica automático (1, 2, 3…) que no se puede cambiar. Estado administrativo Activo / Inactivo / Baja
+-- (Activo por defecto; «activa» queda sincronizada para la agenda). Odontólogo responsable de la lista de dentistas.
+-- Usuario y fecha de registro automáticos. Solo el Super Administrador modifica los datos (el estado operativo
+-- Libre/Ocupado/Limpieza/Mantenimiento lo sigue cambiando el personal).
+
+alter table public.posiciones add column if not exists estado_registro text not null default 'activo'
+  check (estado_registro in ('activo', 'inactivo', 'baja'));
+alter table public.posiciones add column if not exists registrado_por text;
+alter table public.posiciones add column if not exists dentista_id bigint references public.dentistas (id) on delete set null;
+update public.posiciones set estado_registro = 'inactivo' where not activa and estado_registro = 'activo';
+
+create or replace function public.posicion_datos_admin()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    perform pg_advisory_xact_lock(918274);
+    new.codigo := (select coalesce(max(codigo::int), 0) + 1 from public.posiciones where codigo ~ '^[0-9]{1,9}$')::text;
+    new.registrado_por := (select usuario from public.perfiles where id = auth.uid());
+    new.creado := now();
+  else
+    new.codigo := old.codigo;
+    new.registrado_por := old.registrado_por;
+    new.creado := old.creado;
+    if not public.es_super_administrador() and (
+         new.nombre is distinct from old.nombre or new.ubicacion is distinct from old.ubicacion or
+         new.tipo_sillon is distinct from old.tipo_sillon or new.equipamiento is distinct from old.equipamiento or
+         new.especialidad is distinct from old.especialidad or new.responsables is distinct from old.responsables or
+         new.soporte is distinct from old.soporte or new.horario is distinct from old.horario or
+         new.notas is distinct from old.notas or new.estado_registro is distinct from old.estado_registro or
+         new.dentista_id is distinct from old.dentista_id or new.activa is distinct from old.activa) then
+      raise exception 'Solo el Super Administrador puede modificar los datos de la posición';
+    end if;
+  end if;
+  new.activa := new.estado_registro = 'activo';
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'posiciones_datos_admin' and tgrelid = 'public.posiciones'::regclass) then
+    create trigger posiciones_datos_admin before insert or update on public.posiciones
+      for each row execute function public.posicion_datos_admin();
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
