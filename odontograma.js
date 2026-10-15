@@ -46,7 +46,12 @@
     return v == null ? null : Number(v);
   }
   function q(n) { return 'Q' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-  function procN(p, clave) { return p && p.proc && p.proc[clave] ? p.proc[clave].n : ''; }
+  function procN(p, clave) {
+    var x = p && p.proc && p.proc[clave];
+    if (!x) return '';
+    return x.n + (x.cant > 1 ? ' × ' + x.cant : '') + (x.precio != null ? ' · ' + q(x.precio) : '') +
+      (x.pieza ? ' · pieza ' + x.pieza : '') + (x.hallazgo ? ' · ' + x.hallazgo : '');
+  }
 
   var DENTICIONES = [['permanente', 'Permanente (adulto)'], ['temporal', 'Temporal (niño)'], ['mixta', 'Mixta']];
   var FILAS = {
@@ -154,6 +159,19 @@
       '.odg-det .sinp{color:#9A3B2E;font-size:12.5px;font-weight:700}',
       '.odg-res button.odg-ver-sin{font:inherit;font-size:13px;font-weight:700;color:#005A87;background:none;border:0;padding:10px 2px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}',
       '.odg-res .odg-vacio{margin:4px 0 0;color:#5A6D7A}',
+      '.odg-fila-acc{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}',
+      '.odg-res .odg-det-wrap{overflow-x:auto;background:none;border:0;padding:0;border-radius:10px}',
+      '.odg-det td:nth-child(2){min-width:120px}.odg-det td.proc{min-width:170px}',
+      '.odg-res .odg-pre .odg-fila-acc{display:flex}',
+      '.odg-det .odg-mod{padding:5px 12px;min-height:32px;font-size:12.5px}',
+      '.odg-det tr.odg-edit td{background:#FFF8E6}',
+      '.odg-det tr.odg-edit input,.odg-det tr.odg-edit select{font:inherit;font-size:13.5px;border:1px solid #C4D4DF;border-radius:8px;padding:6px 8px;min-height:34px;box-sizing:border-box;max-width:100%;background:#FFFFFF}',
+      '.odg-det tr.odg-edit td:nth-child(1) input{width:70px}.odg-det tr.odg-edit td:nth-child(2) input{width:100%;min-width:130px}',
+      '.odg-man{color:#B45309;font-size:12px}',
+      '.odg-res .odg-pre-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}',
+      '.odg-res .odg-pre-ed{background:#FFFBF0;border-radius:12px;padding:14px;margin-top:14px;border-top:0}',
+      '.odg-res .odg-pre select:disabled,.odg-res .odg-pre input:disabled,.odg-res select[data-tipo-precio]:disabled{background:#F1F5F9;color:#0B2B40;-webkit-text-fill-color:#0B2B40;opacity:1;cursor:not-allowed}',
+      '.odg-est:disabled[aria-pressed="true"]{opacity:1}',
       '.odg-res .odg-pre{background:none;border:0;border-top:1px solid #D9E4EC;border-radius:0;padding:14px 0 0;margin-top:14px;display:flex;flex-direction:column;gap:12px}',
       '.odg-res .odg-pre div{background:none;border:0;padding:0;border-radius:0}',
       '.odg-pre-tit{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#005A87;font-weight:800}',
@@ -306,21 +324,67 @@
       });
       return { req: req, hecho: hecho };
     }
+    // Solo el Super Administrador modifica el detalle y los datos del presupuesto; el resto del personal solo ve e imprime
+    function esSuper() { return opciones.esSuper ? !!opciones.esSuper() : true; }
+    var editandoFila = null;            // 'pieza|clave' de la fila en modificación
+    var editandoDatos = false, copiaDatos = null;
+    // Valor de una fila: precio unitario (el escrito a mano o el del catálogo), cantidad y total
+    function valorFila(f) {
+      if (!f.proc) return { unit: null, cant: 1, total: null };
+      var unit = f.proc.precio != null ? Number(f.proc.precio) : precioDe(buscarEnCatalogo(f.proc));
+      var cant = Math.max(parseInt(f.proc.cant, 10) || 1, 1);
+      return { unit: unit, cant: cant, total: unit == null ? null : Math.round(unit * cant * 100) / 100, manual: f.proc.precio != null };
+    }
+    function piezaDe(f) { return f.proc && f.proc.pieza ? f.proc.pieza : String(f.n); }
+    function textoDe(f) { return f.proc && f.proc.hallazgo ? f.proc.hallazgo : f.texto; }
     function tablaDetalle(filas, conTotal) {
-      var total = 0, sinProc = 0, sinPrecio = 0;
+      var total = 0, sinProc = 0, sinPrecio = 0, sup = esSuper();
       var cuerpo = filas.map(function (f) {
-        var item = buscarEnCatalogo(f.proc), precio = f.proc ? precioDe(item) : null;
-        if (f.h !== 'ausente') { if (!f.proc) sinProc++; else if (precio == null) sinPrecio++; else total += precio; }
-        var celda = f.h === 'ausente' ? '—' : catalogo.length
-          ? '<select data-proc-pieza="' + f.n + '" data-proc-clave="' + f.clave + '" class="' + (f.proc ? '' : 'falta') + '" aria-label="Procedimiento de la pieza ' + f.n + ' · ' + esc(f.texto) + '">' + opcionesProc(f.h, f.proc) + '</select>'
-          : esc(f.proc ? f.proc.n : '—');
-        return '<tr><td><strong>' + f.n + '</strong></td><td>' + esc(f.texto) + '</td><td class="proc">' + celda + '</td>' +
-          '<td class="num">' + (precio != null ? q(precio) : f.proc ? '<span class="sinp">Sin precio</span>' : '—') + '</td></tr>';
+        var v = valorFila(f), clave = f.n + '|' + f.clave;
+        if (f.h !== 'ausente') { if (!f.proc) sinProc++; else if (v.total == null) sinPrecio++; else total += v.total; }
+        if (sup && editandoFila === clave && f.h !== 'ausente') {
+          var item = buscarEnCatalogo(f.proc), base = item ? precioDe(item) : null;
+          return '<tr class="odg-edit" data-fila="' + clave + '"><td><input data-ed="pieza" value="' + esc(piezaDe(f)) + '" maxlength="20" aria-label="Pieza"></td>' +
+            '<td><input data-ed="hallazgo" value="' + esc(textoDe(f)) + '" maxlength="80" aria-label="Hallazgo"></td>' +
+            '<td class="proc"><select data-ed="proc" aria-label="Procedimiento">' + opcionesProc(f.h, f.proc) + '</select></td>' +
+            '<td class="num"><input data-ed="cant" type="number" min="1" max="32" step="1" value="' + v.cant + '" aria-label="Cantidad" style="width:64px"></td>' +
+            '<td class="num"><input data-ed="precio" type="number" min="0" step="0.01" value="' + (v.unit != null ? v.unit.toFixed(2) : '') + '" placeholder="' + (base != null ? base.toFixed(2) : '0.00') + '" aria-label="Precio" style="width:104px"></td>' +
+            '<td class="num">—</td><td><div class="odg-fila-acc"><button type="button" class="odg-imp" data-fila-guardar>Guardar</button><button type="button" class="odg-imp" data-fila-cancelar>Cancelar</button></div></td></tr>';
+        }
+        var proc = f.h === 'ausente' ? '—' : f.proc ? esc(f.proc.n) : '<span class="sinp">Sin procedimiento</span>';
+        return '<tr><td><strong>' + esc(piezaDe(f)) + '</strong></td><td>' + esc(textoDe(f)) + '</td><td class="proc">' + proc + '</td>' +
+          '<td class="num">' + (f.proc ? v.cant : '—') + '</td>' +
+          '<td class="num">' + (v.unit != null ? q(v.unit) + (v.manual ? ' <span class="odg-man" title="Precio modificado a mano">✎</span>' : '') : f.proc ? '<span class="sinp">Sin precio</span>' : '—') + '</td>' +
+          '<td class="num">' + (v.total != null ? '<strong>' + q(v.total) + '</strong>' : '—') + '</td>' +
+          '<td>' + (sup && f.h !== 'ausente' && !editandoFila ? '<button type="button" class="odg-imp odg-mod" data-fila-mod="' + clave + '">Modificar</button>' : '') + '</td></tr>';
       }).join('');
       var pie = conTotal && filas.length ? '<tfoot><tr><td></td><td>TOTAL ESTIMADO</td><td>' +
         [sinProc ? sinProc + ' sin procedimiento' : '', sinPrecio ? sinPrecio + ' sin precio' : ''].filter(Boolean).join(' · ') +
-        '</td><td class="num">' + q(total) + '</td></tr></tfoot>' : '';
-      return '<table class="odg-det"><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Procedimiento</th><th class="num">Precio</th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table>';
+        '</td><td></td><td></td><td class="num">' + q(total) + '</td><td></td></tr></tfoot>' : '';
+      return '<div class="odg-det-wrap"><table class="odg-det"><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Procedimiento</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Total</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table></div>';
+    }
+    function guardarFila(tr) {
+      var partes = tr.dataset.fila.split('|'), n = +partes[0], clave = partes[1], p = datos.piezas[n];
+      if (!p) return;
+      var v = function (k) { return tr.querySelector('[data-ed="' + k + '"]').value.trim(); };
+      var sel = v('proc');
+      if (sel === '-') { quitarProc(p, clave); editandoFila = null; avisar(); pintar(); return; }
+      var actualProc = p.proc && p.proc[clave];
+      var item = sel ? catalogo.filter(function (c) { return c.k === sel; })[0] : buscarEnCatalogo(actualProc);
+      if (!item && !actualProc) { tr.querySelector('[data-ed="proc"]').focus(); return; }
+      var nuevo = { id: item ? item.id || null : actualProc.id, n: item ? item.nombre : actualProc.n };
+      var cant = Math.min(Math.max(parseInt(v('cant'), 10) || 1, 1), 32);
+      if (cant > 1) nuevo.cant = cant;
+      var base = item ? precioDe(item) : null, precio = v('precio');
+      if (precio !== '' && !isNaN(Number(precio)) && Number(precio) >= 0 && (base == null || Math.round(Number(precio) * 100) !== Math.round(base * 100))) nuevo.precio = Math.round(Number(precio) * 100) / 100;
+      var fila = filasDetalle().req.concat(filasDetalle().hecho).filter(function (x) { return x.n === n && x.clave === clave; })[0];
+      if (v('pieza') && v('pieza') !== String(n)) nuevo.pieza = v('pieza');
+      if (v('hallazgo') && fila && v('hallazgo') !== fila.texto) nuevo.hallazgo = v('hallazgo');
+      p.proc = p.proc || {};
+      p.proc[clave] = nuevo;
+      editandoFila = null;
+      avisar();
+      pintar();
     }
     // Reporte impreso: los procedimientos requeridos que tienen valor, con el tipo de precio elegido
     function imprimirDetalle() {
@@ -328,9 +392,9 @@
       var lineas = [];
       filasDetalle().req.forEach(function (f) {
         if (!f.proc) return;
-        var precio = precioDe(buscarEnCatalogo(f.proc));
-        if (precio == null) return;
-        lineas.push({ pieza: f.n, hallazgo: f.texto, procedimiento: f.proc.n, precio: precio });
+        var v = valorFila(f);
+        if (v.total == null) return;
+        lineas.push({ pieza: piezaDe(f), hallazgo: textoDe(f), procedimiento: f.proc.n + (v.cant > 1 ? ' × ' + v.cant : ''), precio: v.total });
       });
       var tp = TIPOS_PRECIO.filter(function (t) { return t[0] === tipoPrecio; })[0];
       opciones.imprimir({ tipo: tp ? tp[1] : '', lineas: lineas, total: lineas.reduce(function (s, l) { return s + l.precio; }, 0) });
@@ -342,35 +406,40 @@
     var ESTADOS_PRE = [['activo', 'Activo'], ['aprobado', 'Aprobado'], ['proceso', 'Proceso'], ['finalizado', 'Finalizado'], ['no_aprobado', 'No aprobado']];
     var datosPre = { forma: 'efectivo', cuotas: 1, citas: '', estado: 'activo' }, codigoPre = '';
     function bloquePresupuesto(total) {
-      var tarjeta = datosPre.forma === 'tarjeta';
-      return '<div class="odg-pre"><div class="odg-pre-tit">Datos del presupuesto</div><div class="odg-pre-g">' +
+      var tarjeta = datosPre.forma === 'tarjeta', ed = editandoDatos && esSuper(), dis = ed ? '' : ' disabled';
+      var botones = !esSuper() ? '' : ed
+        ? '<button type="button" class="odg-crear" data-datos-guardar>Guardar</button><button type="button" class="odg-imp" data-datos-cancelar>Cancelar</button>'
+        : '<button type="button" class="odg-imp" data-datos-mod>Modificar información del presupuesto</button>';
+      return '<div class="odg-pre' + (ed ? ' odg-pre-ed' : '') + '"><div class="odg-pre-cab"><div class="odg-pre-tit">Datos del presupuesto</div><div class="odg-fila-acc">' + botones + '</div></div><div class="odg-pre-g">' +
         '<div class="odg-pre-campo"><span>Código del presupuesto</span><div class="odg-cod"><small>SE ASIGNA AL CREAR</small>' + esc(codigoPre || '—') + '</div></div>' +
-        '<label class="odg-pre-campo"><span>Forma de pago</span><select data-pre-campo="forma">' + FORMAS.map(function (x) {
+        '<label class="odg-pre-campo"><span>Forma de pago</span><select data-pre-campo="forma"' + dis + '>' + FORMAS.map(function (x) {
           return '<option value="' + x[0] + '"' + (x[0] === datosPre.forma ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label>' +
-        '<label class="odg-pre-campo"><span>Cantidad de citas</span><input type="number" min="1" max="99" step="1" inputmode="numeric" data-pre-campo="citas" value="' + esc(datosPre.citas) + '" placeholder="Ej.: 3"></label>' +
-        '</div>' + (tarjeta && window.PD_CUOTAS ? '<div class="odg-pre-campo"><span>Plan de pago con tarjeta</span>' + window.PD_CUOTAS.tabla(total, datosPre.cuotas, 'pre-cuota') + '</div>' : '') +
+        '<label class="odg-pre-campo"><span>Cantidad de citas</span><input type="number" min="1" max="99" step="1" inputmode="numeric" data-pre-campo="citas" value="' + esc(datosPre.citas) + '" placeholder="Ej.: 3"' + dis + '></label>' +
+        '</div>' + (tarjeta && window.PD_CUOTAS ? '<div class="odg-pre-campo' + (ed ? '' : ' cuo-bloqueada') + '"><span>Plan de pago con tarjeta</span>' + window.PD_CUOTAS.tabla(total, datosPre.cuotas, 'pre-cuota') + '</div>' : '') +
         '<div class="odg-pre-campo"><span>Estado</span><div class="odg-pre-est" role="group" aria-label="Estado del presupuesto">' + ESTADOS_PRE.map(function (x) {
           var auto = x[0] === 'proceso' || x[0] === 'finalizado';
           return '<button type="button" class="odg-est odg-est-' + x[0] + '" data-pre-estado="' + x[0] + '" aria-pressed="' + (datosPre.estado === x[0]) + '"' +
-            (auto ? ' disabled title="Se pone solo al marcar tratamientos realizados en Presupuesto"' : '') + '>' + x[1] + '</button>'; }).join('') + '</div></div></div>';
+            (auto ? ' disabled title="Se pone solo al marcar tratamientos realizados en Presupuesto"' : ed ? '' : ' disabled') + '>' + x[1] + '</button>'; }).join('') + '</div></div></div>';
     }
     function resumen() {
-      var f = filasDetalle();
-      var selTipo = '<label class="odg-tp">Tipo de precio <select data-tipo-precio>' + TIPOS_PRECIO.map(function (t) {
+      var f = filasDetalle(), sup = esSuper();
+      var selTipo = '<label class="odg-tp">Tipo de precio <select data-tipo-precio' + (sup && editandoDatos ? '' : ' disabled title="Pulsa «Modificar información del presupuesto» para cambiarlo"') + '>' + TIPOS_PRECIO.map(function (t) {
         return '<option value="' + t[0] + '"' + (t[0] === tipoPrecio ? ' selected' : '') + '>' + t[1] + '</option>';
       }).join('') + '</select></label>';
       var crearPre = (opciones.imprimir ? '<button type="button" class="odg-imp" data-imprimir-odg>Imprimir</button>' : '') +
-        (opciones.crearPresupuesto ? '<button type="button" class="odg-crear" data-crear-presupuesto>Crear presupuesto</button>' : '');
+        (opciones.crearPresupuesto && sup ? '<button type="button" class="odg-crear" data-crear-presupuesto>Crear presupuesto</button>' : '');
       // En el detalle «Requerido» solo se ven los hallazgos con procedimiento elegido;
-      // los demás quedan en el dibujo y se pueden mostrar para elegirles uno.
+      // el Super Administrador puede mostrar los demás para elegirles uno.
       var conProc = f.req.filter(function (x) { return x.proc; }), sinN = f.req.length - conProc.length;
+      if (!sup) verSinProc = false;
       var visibles = verSinProc ? f.req : conProc;
-      var enlace = sinN ? '<button type="button" class="odg-ver-sin" data-ver-sin>' + (verSinProc ? 'Ocultar los hallazgos sin procedimiento'
+      var enlace = sinN && sup ? '<button type="button" class="odg-ver-sin" data-ver-sin>' + (verSinProc ? 'Ocultar los hallazgos sin procedimiento'
         : 'Elegir procedimiento para ' + sinN + (sinN === 1 ? ' hallazgo' : ' hallazgos') + ' sin procedimiento') + '</button>' : '';
+      var totalPre = conProc.reduce(function (t, x) { var v = valorFila(x); return t + (v.total || 0); }, 0);
       return '<div><div class="odg-cab"><h4 style="color:' + ROJO + '">Requerido (' + visibles.length + ')</h4>' +
         (f.req.length && catalogo.length ? '<div class="odg-acc">' + selTipo + crearPre + '</div>' : '') + '</div>' +
         (visibles.length ? tablaDetalle(visibles, true) : f.req.length ? '<p class="odg-vacio">Aún no hay hallazgos con procedimiento elegido.</p>' : 'Sin tratamientos pendientes.') + enlace +
-        (opciones.crearPresupuesto && conProc.length ? bloquePresupuesto(conProc.reduce(function (t, x) { var p = precioDe(buscarEnCatalogo(x.proc)); return t + (p || 0); }, 0)) : '') + '</div>' +
+        (opciones.crearPresupuesto && conProc.length ? bloquePresupuesto(totalPre) : '') + '</div>' +
         '<div><div class="odg-cab"><h4 style="color:' + AZUL + '">Realizado / existente (' + f.hecho.length + ')</h4></div>' +
         (f.hecho.length ? tablaDetalle(f.hecho, false) : 'Sin registros.') + '</div>';
     }
@@ -459,7 +528,7 @@
       }).join('') : '<p>No hay procedimientos con ese nombre.</p>';
     }
     function abrirVentana(info) {
-      if (!disponibles().length || typeof HTMLDialogElement === 'undefined') return;
+      if (!esSuper() || !disponibles().length || typeof HTMLDialogElement === 'undefined') return;
       if (!dlg) {
         dlg = document.createElement('dialog');
         dlg.className = 'odg-dlg';
@@ -500,8 +569,8 @@
       filasDetalle().req.forEach(function (f) {
         if (f.h === 'ausente') return;
         if (!f.proc) { sinProc.push(f); return; }
-        var item = buscarEnCatalogo(f.proc), precio = precioDe(item);
-        lineas.push({ tratamiento: item ? item.nombre : f.proc.n, pieza: String(f.n), cantidad: 1, precio: precio == null ? 0 : precio, sinPrecio: precio == null });
+        var item = buscarEnCatalogo(f.proc), v = valorFila(f);
+        lineas.push({ tratamiento: item ? item.nombre : f.proc.n, pieza: piezaDe(f), cantidad: v.cant, precio: v.unit == null ? 0 : v.unit, sinPrecio: v.unit == null });
       });
       return { lineas: lineas, sinProc: sinProc };
     }
@@ -527,17 +596,17 @@
         '<p>Nuevo presupuesto' + (nombre ? ' · <b>' + esc(nombre) + '</b>' : '') + '</p>' +
         '<p>Tipo de precio: <b>' + (tp ? tp[1] : '') + '</b></p>' +
         '<p>Forma de pago: <b>' + FORMAS.filter(function (x) { return x[0] === datosPre.forma; })[0][1] + (datosPre.forma === 'tarjeta' ? ' · ' + (datosPre.cuotas === 1 ? '1 pago' : datosPre.cuotas + ' cuotas') : '') + '</b>' +
-        (datosPre.forma === 'tarjeta' && window.PD_CUOTAS ? ' · Total a pagar: <b>' + q(window.PD_CUOTAS.calcular(d.lineas.reduce(function (s, l) { return s + l.precio; }, 0), datosPre.cuotas).total) + '</b>' : '') +
+        (datosPre.forma === 'tarjeta' && window.PD_CUOTAS ? ' · Total a pagar: <b>' + q(window.PD_CUOTAS.calcular(d.lineas.reduce(function (s, l) { return s + l.precio * l.cantidad; }, 0), datosPre.cuotas).total) + '</b>' : '') +
         (datosPre.citas ? ' · Citas: <b>' + esc(datosPre.citas) + '</b>' : '') + ' · Estado: <b>' + ESTADOS_PRE.filter(function (x) { return x[0] === datosPre.estado; })[0][1] + '</b></p>';
       if (!d.lineas.length) {
         html += '<div class="alerta">Ningún hallazgo «Requerido» tiene procedimiento. Elige el procedimiento en la tabla del detalle y vuelve a intentarlo.</div>' +
           pieVentana('<button value="cerrar">Cerrar</button>');
       } else {
-        var total = d.lineas.reduce(function (s, l) { return s + l.precio; }, 0);
+        var total = d.lineas.reduce(function (s, l) { return s + l.precio * l.cantidad; }, 0);
         var sinPrecio = d.lineas.filter(function (l) { return l.sinPrecio; });
         html += '<div class="tabla"><table class="odg-det"><thead><tr><th>Pieza</th><th>Tratamiento</th><th class="num">Precio</th></tr></thead><tbody>' +
           d.lineas.map(function (l) {
-            return '<tr><td><strong>' + l.pieza + '</strong></td><td>' + esc(l.tratamiento) + '</td><td class="num">' + (l.sinPrecio ? '<span class="sinp">' + q(0) + '</span>' : q(l.precio)) + '</td></tr>';
+            return '<tr><td><strong>' + l.pieza + '</strong></td><td>' + esc(l.tratamiento) + '</td><td class="num">' + (l.sinPrecio ? '<span class="sinp">' + q(0) + '</span>' : (l.cantidad > 1 ? l.cantidad + ' × ' + q(l.precio) + ' = ' : '') + q(l.precio * l.cantidad)) + '</td></tr>';
           }).join('') + '</tbody><tfoot><tr><td></td><td>TOTAL</td><td class="num">' + q(total) + '</td></tr></tfoot></table></div>';
         if (sinPrecio.length) {
           html += '<div class="alerta"><b>Sin precio con este tipo:</b> se agregan en Q0.00 para que escribas el precio en el presupuesto.<ul>' +
@@ -569,7 +638,7 @@
           citas: datosPre.citas ? +datosPre.citas : null, estado: datosPre.estado,
           items: d.lineas.map(function (l) { return { tratamiento: l.tratamiento, pieza: l.pieza, cantidad: l.cantidad, precio: l.precio }; })
         });
-        var total = d.lineas.reduce(function (s, l) { return s + l.precio; }, 0);
+        var total = d.lineas.reduce(function (s, l) { return s + l.precio * l.cantidad; }, 0);
         var puedeAbrir = opciones.abrirPresupuesto && (!opciones.puedeAbrirPresupuesto || opciones.puedeAbrirPresupuesto());
         dlgPre.innerHTML = '<form method="dialog"><div class="ok"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1B7F4B"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
           '<h4><span>Presupuesto ' + esc(r.codigo || 'N.º ' + r.id) + '</span> <span>creado</span></h4></div>' +
@@ -597,6 +666,11 @@
         else if (c === 'citas') datosPre.citas = t.value ? String(Math.min(Math.max(parseInt(t.value, 10) || 1, 1), 99)) : '';
         return;
       }
+      if (t.matches('[data-ed="proc"]')) {
+        var it2 = catalogo.filter(function (c) { return c.k === t.value; })[0], pr = t.closest('tr').querySelector('[data-ed="precio"]');
+        if (it2 && pr) { var b2 = precioDe(it2); pr.value = b2 != null ? b2.toFixed(2) : ''; pr.placeholder = b2 != null ? b2.toFixed(2) : '0.00'; }
+        return;
+      }
       if (t.matches('[data-proc-pieza]')) {
         if (t.value === '-') { ponerProc(+t.dataset.procPieza, t.dataset.procClave, null); return; }
         var item = catalogo.filter(function (c) { return c.k === t.value; })[0];
@@ -606,10 +680,18 @@
     raiz.addEventListener('click', function (e) {
       if (e.target.closest('select')) return;
       if (e.target.closest('[data-ver-sin]')) { verSinProc = !verSinProc; pintar(); return; }
+      var fm = e.target.closest('[data-fila-mod]');
+      if (fm && esSuper()) { editandoFila = fm.dataset.filaMod; pintar(); var pf = raiz.querySelector('.odg-edit [data-ed="proc"]'); if (pf) pf.focus(); return; }
+      if (e.target.closest('[data-fila-guardar]')) { guardarFila(e.target.closest('tr')); return; }
+      if (e.target.closest('[data-fila-cancelar]')) { editandoFila = null; pintar(); return; }
+      if (e.target.closest('[data-datos-mod]') && esSuper()) { editandoDatos = true; copiaDatos = { d: JSON.parse(JSON.stringify(datosPre)), t: tipoPrecio }; pintar(); return; }
+      if (e.target.closest('[data-datos-guardar]')) { editandoDatos = false; copiaDatos = null; pintar(); return; }
+      if (e.target.closest('[data-datos-cancelar]')) { if (copiaDatos) { datosPre = copiaDatos.d; tipoPrecio = copiaDatos.t; } editandoDatos = false; copiaDatos = null; pintar(); return; }
       var cuo = e.target.closest('[data-pre-cuota]');
+      if (cuo && !(editandoDatos && esSuper())) return;
       if (cuo) { datosPre.cuotas = +cuo.dataset.preCuota; pintar(); var f2 = raiz.querySelector('[data-pre-cuota="' + datosPre.cuotas + '"]'); if (f2) f2.focus({ preventScroll: true }); return; }
       var est = e.target.closest('[data-pre-estado]');
-      if (est) { if (!est.disabled) { datosPre.estado = est.dataset.preEstado; pintar(); } return; }
+      if (est) { if (!est.disabled && editandoDatos && esSuper()) { datosPre.estado = est.dataset.preEstado; pintar(); } return; }
       if (e.target.closest('[data-crear-presupuesto]')) { abrirPresupuesto(); return; }
       if (e.target.closest('[data-imprimir-odg]')) { imprimirDetalle(); return; }
       var b = e.target.closest('[data-denticion],[data-modo],[data-herr]');

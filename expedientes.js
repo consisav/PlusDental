@@ -330,6 +330,8 @@
   var odg = window.Odontograma.crear($('odoComp'), {
     onCambio: function () { revisarCambios(); },
     paciente: function () { return actual ? actual.nombre : ''; },
+    // Solo el Super Administrador modifica procedimientos, precios y datos del presupuesto
+    esSuper: function () { return !!(window.PD_SESION && window.PD_SESION.esSuper()); },
     // Presupuesto en borrador con los tratamientos requeridos (d.items) y el tipo de precio elegido (d.tipo)
     crearPresupuesto: async function (d) {
       if (!actual) throw new Error('Primero guarda el expediente del paciente.');
