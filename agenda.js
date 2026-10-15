@@ -315,16 +315,36 @@
     return b.length ? '<div class="ag-aviso-btns">' + b.join('') + '</div>' : '';
   }
 
+  // Horas libres para guardar en un horario específico: sin horas pasadas, bloqueadas ni ocupadas
+  // (ocupada = el médico elegido ya tiene cita, la sala elegida ya está usada, o no queda ninguna sala libre)
+  function horaLibre(f, h, medicoId, salaId) {
+    var ahora = new Date(), hAhora = ('0' + ahora.getHours()).slice(-2) + ':' + ('0' + ahora.getMinutes()).slice(-2);
+    if (f < hoy() || (f === hoy() && h <= hAhora)) return false;
+    if (bloqueado(f, h)) return false;
+    if (medicoId && dentistaOcupado(medicoId, f, h)) return false;
+    var activas = salas.filter(function (x) { return x.activa; });
+    if (salaId) {
+      var sala = salas.filter(function (x) { return x.id === salaId; })[0];
+      return !!sala && salaAbierta(sala, f, h) && !salaOcupada(salaId, f, h);
+    }
+    if (activas.length) return activas.some(function (x) { return salaAbierta(x, f, h) && !salaOcupada(x.id, f, h); });
+    return !citasEn(f, h).length;
+  }
   function opcionesHorario() {
     var f = $('agFechaM').value, actual = $('agHoraM').value;
-    var lista = f && turnos(f).length ? turnos(f) : TURNOS.semana;
-    $('agHoraM').innerHTML = lista.map(function (h) { return '<option value="' + h + '">' + h + '</option>'; }).join('');
-    if (lista.indexOf(actual) >= 0) $('agHoraM').value = actual;
     var sala = $('agSalaM').value;
     $('agSalaM').innerHTML = '<option value="">La del médico</option>' + salas.filter(function (s) { return s.activa; }).map(function (s) {
       return '<option value="' + s.id + '">' + esc(s.codigo + ' · ' + s.nombre) + '</option>';
     }).join('');
     $('agSalaM').value = sala;
+    var medicoId = $('agMedico').value ? +$('agMedico').value : null;
+    var medico = medicoId ? dentistas.filter(function (d) { return d.id === medicoId; })[0] : null;
+    var salaId = sala ? +sala : medico && medico.posicion_id ? medico.posicion_id : null;
+    var lista = f ? turnos(f).filter(function (h) { return horaLibre(f, h, medicoId, salaId); }) : [];
+    $('agHoraM').innerHTML = lista.length ? lista.map(function (h) { return '<option value="' + h + '">' + h + '</option>'; }).join('')
+      : '<option value="">' + (!f ? 'Elige la fecha' : !turnos(f).length ? 'La clínica no atiende ese día' : 'Sin horarios libres ese día') + '</option>';
+    $('agHoraM').disabled = !lista.length;
+    if (lista.indexOf(actual) >= 0) $('agHoraM').value = actual;
   }
 
   // Guardar en el horario elegido: si hay médico elegido se usa; si no, el asistente elige el más adecuado para ese horario
@@ -334,6 +354,7 @@
     if (!$('agTratamiento').value.trim()) { aviso('agMsgM', 'Indica el tratamiento arriba.', true); return; }
     if (!f || !h) { aviso('agMsgM', 'Elige la fecha y la hora.', true); return; }
     if (bloqueado(f, h)) { aviso('agMsgM', 'Ese horario está bloqueado.', true); return; }
+    if (!horaLibre(f, h, $('agMedico').value ? +$('agMedico').value : null, $('agSalaM').value ? +$('agSalaM').value : null)) { aviso('agMsgM', 'Ese horario ya pasó o está ocupado. Elige otra hora.', true); opcionesHorario(); return; }
     var salaElegida = $('agSalaM').value ? +$('agSalaM').value : null;
     var medico = $('agMedico').value ? dentistas.filter(function (d) { return d.id === +$('agMedico').value; })[0] : null;
     var opcion = null;
@@ -424,6 +445,8 @@
       aviso('agMsg', 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para agendar desde aquí.', true);
     }
     citas = r.error ? [] : r.data;
+    $('agFechaM').min = hoy();
+    if ($('agHoraM')) opcionesHorario();
     pintar();
   }
 
@@ -651,6 +674,8 @@
     if (b) agendar(sugerencias[+b.dataset.agendar], b);
   });
   $('agFechaM').addEventListener('change', opcionesHorario);
+  $('agSalaM').addEventListener('change', opcionesHorario);
+  $('agMedico').addEventListener('change', opcionesHorario);
   $('agGuardarM').addEventListener('click', function () { guardarDirecto(this); });
   $('agFijo').addEventListener('click', function (e) { if (e.target.closest('#agQuitarFijo')) { fijo = null; pintarFijo(); } });
 
