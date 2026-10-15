@@ -214,11 +214,22 @@
     $('ecDetalle').scrollIntoView({ block: 'start' });
   }
 
-  function imprimirEstado() {
+  // Estado de cuenta impreso: paciente, código de paciente y médico en el encabezado
+  async function imprimirEstado() {
     var ultimo = movimientos.length ? movimientos[movimientos.length - 1].saldo : 0;
     var celda = 'padding:8px 6px;border-bottom:1px solid #D9E4EC';
+    var pid = ecActual.paciente_id, pac = null;
+    var r = await sb.from('pacientes').select('id,nombre,dpi,nit,medico:dentistas(nombre)').eq('id', pid).maybeSingle();
+    if (r.error) r = await sb.from('pacientes').select('id,nombre,dpi,nit').eq('id', pid).maybeSingle();
+    if (!r.error) pac = r.data;
+    var medico = pac && pac.medico && pac.medico.nombre ? pac.medico.nombre : 'Sin asignar';
+    var dato = function (k, v, ancho) {
+      return '<div style="min-width:0' + (ancho ? ';grid-column:' + ancho : '') + '"><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">' + k + '</span><b style="font-size:14px">' + v + '</b></div>';
+    };
     imprimir(encabezado('Estado de cuenta') +
-      '<div style="font-size:16px;margin-bottom:14px"><strong>' + esc(ecActual.nombre) + '</strong></div>' +
+      '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 16px;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:12px;padding:12px 14px;margin-bottom:16px">' +
+      dato('Paciente', esc(ecActual.nombre || (pac && pac.nombre) || ''), 'span 2') + dato('Código del paciente', String(pid).padStart(4, '0')) + dato('Médico asignado', esc(medico)) +
+      (pac && (pac.dpi || pac.nit) ? dato('DPI', esc(pac.dpi || '—')) + dato('NIT', esc(pac.nit || 'CF')) : '') + '</div>' +
       '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>' +
       ['Fecha', 'Concepto', 'Cargo', 'Pago', 'Saldo'].map(function (h, i) { return '<th style="' + celda + ';text-align:' + (i > 1 ? 'right' : 'left') + '">' + h + '</th>'; }).join('') +
       '</tr></thead><tbody>' + movimientos.map(function (m) {
@@ -226,7 +237,8 @@
           '<td style="' + celda + ';text-align:right">' + (m.cargo ? q(m.cargo) : '') + '</td><td style="' + celda + ';text-align:right">' + (m.abono ? q(m.abono) : '') + '</td>' +
           '<td style="' + celda + ';text-align:right">' + q(m.saldo) + '</td></tr>';
       }).join('') + '</tbody></table>' +
-      '<div style="text-align:right;font-size:18px;margin-top:16px"><strong>' + (ultimo < -0.004 ? 'Saldo a favor: ' + q(-ultimo) : 'Saldo pendiente: ' + q(ultimo)) + '</strong></div></div>');
+      '<div style="text-align:right;font-size:18px;margin-top:16px"><strong>' + (ultimo < -0.004 ? 'Saldo a favor: ' + q(-ultimo) : 'Saldo pendiente: ' + q(ultimo)) + '</strong></div>' +
+      '</div>');
   }
 
   // ---------- Cobros ----------
