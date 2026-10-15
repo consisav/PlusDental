@@ -2559,6 +2559,100 @@ do $$ begin
   end if;
 end $$;
 
+-- ===== Estado de cada procedimiento del presupuesto =====
+-- Pendiente (por defecto), Proceso, Finalizado y Eliminado, con fecha y usuario del cambio.
+-- Solo en presupuestos aprobados. Finalizado = realizado (se carga al estado de cuenta).
+-- Avanzar (Pendiente → Proceso → Finalizado) lo hace todo el personal; volver atrás o Eliminar, solo el Super Administrador.
+-- Eliminado no suma al total ni al estado de cuenta, pero queda en el historial.
+
+alter table public.presupuesto_items add column if not exists estado text not null default 'pendiente'
+  check (estado in ('pendiente', 'proceso', 'finalizado', 'eliminado'));
+alter table public.presupuesto_items add column if not exists estado_fecha timestamptz;
+alter table public.presupuesto_items add column if not exists estado_por text;
+update public.presupuesto_items set estado = 'finalizado', estado_fecha = coalesce(estado_fecha, realizado_en::timestamptz)
+ where realizado and estado <> 'finalizado';
+
+create table if not exists public.presupuesto_item_estados (
+  id       bigint generated always as identity primary key,
+  item_id  bigint not null references public.presupuesto_items (id) on delete cascade,
+  de       text,
+  a        text not null,
+  fecha    timestamptz not null default now(),
+  usuario  text
+);
+create index if not exists presupuesto_item_estados_item on public.presupuesto_item_estados (item_id);
+alter table public.presupuesto_item_estados enable row level security;
+drop policy if exists "personal ve estados de procedimientos" on public.presupuesto_item_estados;
+create policy "personal ve estados de procedimientos" on public.presupuesto_item_estados for select using (public.es_personal());
+grant select on public.presupuesto_item_estados to authenticated;
+
+create or replace function public.cambiar_estado_item(p_item bigint, p_estado text)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_actual text;
+  v_orden constant text[] := array['pendiente', 'proceso', 'finalizado'];
+  v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if p_estado not in ('pendiente', 'proceso', 'finalizado', 'eliminado') then
+    raise exception 'Estado no válido';
+  end if;
+  select i.estado into v_actual from public.presupuesto_items i
+    join public.presupuestos p on p.id = i.presupuesto_id
+   where i.id = p_item and p.estado = 'aprobado';
+  if v_actual is null then
+    raise exception 'El estado de un procedimiento solo se cambia cuando el presupuesto está aprobado';
+  end if;
+  if v_actual = p_estado then return; end if;
+  -- Retroceder, eliminar o recuperar un eliminado: solo el Super Administrador
+  if (p_estado = 'eliminado' or v_actual = 'eliminado' or array_position(v_orden, p_estado) < array_position(v_orden, v_actual))
+     and not public.es_super_administrador() then
+    raise exception 'Solo el Super Administrador puede regresar o eliminar un procedimiento';
+  end if;
+  update public.presupuesto_items
+     set estado = p_estado, estado_fecha = now(), estado_por = v_usuario,
+         realizado = (p_estado = 'finalizado'),
+         realizado_en = case when p_estado = 'finalizado' then current_date end
+   where id = p_item;
+  insert into public.presupuesto_item_estados (item_id, de, a, usuario) values (p_item, v_actual, p_estado, v_usuario);
+end;
+$$;
+revoke execute on function public.cambiar_estado_item(bigint, text) from public, anon;
+grant execute on function public.cambiar_estado_item(bigint, text) to authenticated;
+
+-- La casilla «Realizado» de Presupuesto usa el mismo estado (Finalizado / Pendiente)
+create or replace function public.marcar_realizado(p_item bigint, p_realizado boolean)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_actual text;
+begin
+  select estado into v_actual from public.presupuesto_items where id = p_item;
+  if not p_realizado and v_actual = 'finalizado' and not public.es_super_administrador() then
+    raise exception 'Solo el Super Administrador puede regresar o eliminar un procedimiento';
+  end if;
+  perform public.cambiar_estado_item(p_item, case when p_realizado then 'finalizado' else 'pendiente' end);
+end;
+$$;
+
+-- Un presupuesto aprobado con procedimientos en proceso o finalizados no cambia de estado ni de descuento
+create or replace function public.antes_de_cambiar_presupuesto()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if old.estado = 'aprobado' and exists (
+       select 1 from public.presupuesto_items where presupuesto_id = old.id and (realizado or estado in ('proceso', 'finalizado'))) then
+    if new.estado <> 'aprobado' then
+      raise exception 'Este presupuesto ya tiene tratamientos en proceso o realizados; no puede dejar de estar aprobado';
+    end if;
+    if new.descuento_pct <> old.descuento_pct then
+      raise exception 'Este presupuesto ya tiene tratamientos en proceso o realizados; el descuento no se puede cambiar';
+    end if;
+  end if;
+  new.actualizado := now();
+  return new;
+end;
+$$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

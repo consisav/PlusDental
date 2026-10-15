@@ -363,6 +363,12 @@
       if (g.error) throw new Error(/guardar_presupuesto|could not find the function/i.test(g.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql).' : traducir(g.error));
       await cargarPresupuestoActual();
     },
+    // Estado de un procedimiento del presupuesto (Pendiente, Proceso, Finalizado, Eliminado)
+    cambiarEstadoItem: async function (itemId, estado) {
+      var r = await sb.rpc('cambiar_estado_item', { p_item: itemId, p_estado: estado });
+      if (r.error) throw new Error(/cambiar_estado_item|could not find the function/i.test(r.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql).' : traducir(r.error));
+      await cargarPresupuestoActual();
+    },
     // Cambiar estado (borrador = Activo, aprobado, rechazado = No aprobado); las fechas las registra la base de datos
     cambiarEstadoPresupuesto: async function (p, estado) {
       if (estado === 'aprobado' && !(p.presupuesto_items || []).length) throw new Error('El presupuesto no tiene tratamientos; no se puede aprobar.');

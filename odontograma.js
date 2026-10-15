@@ -174,6 +174,11 @@
       '.odg-res .odg-pre .odg-fijo{border:1px solid #D9E4EC;border-radius:10px;padding:8px 10px;min-height:38px;box-sizing:border-box;background:#F1F5F9;font-size:14px;font-weight:500;display:flex;align-items:center}',
       '.odg-res .odg-pre .odg-fijo.odg-auto{background:#EEF5FA;border-style:dashed;color:#00476B;font-weight:700}',
       '.odg-pre-msg{margin:0;font-size:13px;color:#08504C;font-weight:600}.odg-pre-msg.error{color:#9F1239}',
+      '.odg-ie{display:inline-block;font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;padding:4px 10px;border:1px solid transparent;white-space:nowrap}',
+      'select.odg-ie{padding:5px 8px;cursor:pointer;min-height:32px}',
+      '.odg-ie-pendiente{background:#EBF0F4;color:#475B68}.odg-ie-proceso{background:#FEF3C7;color:#92400E}.odg-ie-finalizado{background:#DCF2EC;color:#08504C}.odg-ie-eliminado{background:#FDE2E4;color:#9F1239}',
+      '.odg-det tr.odg-elim td:not(:nth-last-child(-n+3)){text-decoration:line-through;color:#8A9DA9}',
+      '.odg-por{font-size:11.5px;color:#5A6D7A}',
       '.odg-res .odg-pre .odg-pre-cab .odg-est{cursor:default}',
       '.odg-dlg .op[aria-pressed="true"]{border-color:#005A87;box-shadow:inset 0 0 0 1.5px #005A87;background:#EEF5FA}',
       '.odg-res .odg-pre .cuo-res>div{background:#0B2B40;color:#FFFFFF;border-radius:12px;padding:8px 14px}',
@@ -347,11 +352,36 @@
     }
     function piezaDe(f) { return f.proc && f.proc.pieza ? f.proc.pieza : String(f.n); }
     function textoDe(f) { return f.proc && f.proc.hallazgo ? f.proc.hallazgo : f.texto; }
+    // Estado de cada procedimiento: el de su línea en el presupuesto confirmado (Pendiente si aún no hay)
+    var ESTADOS_ITEM = [['pendiente', 'Pendiente'], ['proceso', 'Proceso'], ['finalizado', 'Finalizado'], ['eliminado', 'Eliminado']];
+    function itemDe(f) {
+      if (!preActual || modoNuevo || !f.proc) return null;
+      var pz = piezaDe(f), nom = String(f.proc.n).toLowerCase();
+      return (preActual.presupuesto_items || []).filter(function (i) { return String(i.pieza || '') === pz && String(i.tratamiento).toLowerCase() === nom; })[0] || null;
+    }
+    function celdaEstado(f, it) {
+      var est = it ? it.estado || (it.realizado ? 'finalizado' : 'pendiente') : 'pendiente';
+      var nom = ESTADOS_ITEM.filter(function (x) { return x[0] === est; })[0][1];
+      var aprobado = preActual && !modoNuevo && preActual.estado === 'aprobado';
+      if (!it || !aprobado || !opciones.cambiarEstadoItem) {
+        var motivo = !preActual || modoNuevo ? 'Se podrá cambiar cuando el presupuesto esté confirmado y aprobado' : !it ? 'Este procedimiento no está en el presupuesto confirmado' : 'Se podrá cambiar cuando el presupuesto esté aprobado';
+        return '<span class="odg-ie odg-ie-' + est + '" title="' + motivo + '">' + nom + '</span>';
+      }
+      var sup = esSuper(), orden = ['pendiente', 'proceso', 'finalizado'];
+      var permitidos = ESTADOS_ITEM.filter(function (x) {
+        if (x[0] === est || sup) return true;
+        return est !== 'eliminado' && x[0] !== 'eliminado' && orden.indexOf(x[0]) > orden.indexOf(est);
+      });
+      return '<select class="odg-ie odg-ie-' + est + '" data-item-estado="' + it.id + '" aria-label="Estado de ' + esc(f.proc.n) + ', pieza ' + esc(piezaDe(f)) + '">' +
+        permitidos.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === est ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>';
+    }
     function tablaDetalle(filas, conTotal) {
-      var total = 0, sinProc = 0, sinPrecio = 0, sup = esSuper();
+      var total = 0, sinProc = 0, sinPrecio = 0, sup = esSuper(), conEstado = conTotal;
       var cuerpo = filas.map(function (f) {
-        var v = valorFila(f), clave = f.n + '|' + f.clave;
-        if (f.h !== 'ausente') { if (!f.proc) sinProc++; else if (v.total == null) sinPrecio++; else total += v.total; }
+        var v = valorFila(f), clave = f.n + '|' + f.clave, it = conEstado ? itemDe(f) : null;
+        var eliminado = it && it.estado === 'eliminado';
+        if (f.h !== 'ausente' && !eliminado) { if (!f.proc) sinProc++; else if (v.total == null) sinPrecio++; else total += v.total; }
+        var colsEstado = conEstado ? '<td>' + (f.proc ? celdaEstado(f, it) : '—') + '</td><td class="fecha">' + (it && it.estado_fecha ? fechaHora(it.estado_fecha) + (it.estado_por ? '<br><span class="odg-por">' + esc(it.estado_por) + '</span>' : '') : '—') + '</td>' : '';
         if (sup && editandoFila === clave && f.h !== 'ausente') {
           var item = buscarEnCatalogo(f.proc), base = item ? precioDe(item) : null;
           return '<tr class="odg-edit" data-fila="' + clave + '"><td><input data-ed="pieza" value="' + esc(piezaDe(f)) + '" maxlength="20" aria-label="Pieza"></td>' +
@@ -359,19 +389,21 @@
             '<td class="proc"><select data-ed="proc" aria-label="Procedimiento">' + opcionesProc(f.h, f.proc) + '</select></td>' +
             '<td class="num"><input data-ed="cant" type="number" min="1" max="32" step="1" value="' + v.cant + '" aria-label="Cantidad" style="width:64px"></td>' +
             '<td class="num"><input data-ed="precio" type="number" min="0" step="0.01" value="' + (v.unit != null ? v.unit.toFixed(2) : '') + '" placeholder="' + (base != null ? base.toFixed(2) : '0.00') + '" aria-label="Precio" style="width:104px"></td>' +
-            '<td class="num">—</td><td><div class="odg-fila-acc"><button type="button" class="odg-imp" data-fila-guardar>Guardar</button><button type="button" class="odg-imp" data-fila-cancelar>Cancelar</button></div></td></tr>';
+            '<td class="num">—</td>' + colsEstado + '<td><div class="odg-fila-acc"><button type="button" class="odg-imp" data-fila-guardar>Guardar</button><button type="button" class="odg-imp" data-fila-cancelar>Cancelar</button></div></td></tr>';
         }
         var proc = f.h === 'ausente' ? '—' : f.proc ? esc(f.proc.n) : '<span class="sinp">Sin procedimiento</span>';
-        return '<tr><td><strong>' + esc(piezaDe(f)) + '</strong></td><td>' + esc(textoDe(f)) + '</td><td class="proc">' + proc + '</td>' +
+        return '<tr' + (eliminado ? ' class="odg-elim"' : '') + '><td><strong>' + esc(piezaDe(f)) + '</strong></td><td>' + esc(textoDe(f)) + '</td><td class="proc">' + proc + '</td>' +
           '<td class="num">' + (f.proc ? v.cant : '—') + '</td>' +
           '<td class="num">' + (v.unit != null ? q(v.unit) + (v.manual ? ' <span class="odg-man" title="Precio modificado a mano">✎</span>' : '') : f.proc ? '<span class="sinp">Sin precio</span>' : '—') + '</td>' +
-          '<td class="num">' + (v.total != null ? '<strong>' + q(v.total) + '</strong>' : '—') + '</td>' +
+          '<td class="num">' + (v.total != null ? '<strong>' + q(v.total) + '</strong>' : '—') + '</td>' + colsEstado +
           '<td>' + (sup && f.h !== 'ausente' && !editandoFila ? '<button type="button" class="odg-imp odg-mod" data-fila-mod="' + clave + '">Modificar</button>' : '') + '</td></tr>';
       }).join('');
+      var vacias = conEstado ? '<td></td><td></td>' : '';
       var pie = conTotal && filas.length ? '<tfoot><tr><td></td><td>TOTAL ESTIMADO</td><td>' +
         [sinProc ? sinProc + ' sin procedimiento' : '', sinPrecio ? sinPrecio + ' sin precio' : ''].filter(Boolean).join(' · ') +
-        '</td><td></td><td></td><td class="num">' + q(total) + '</td><td></td></tr></tfoot>' : '';
-      return '<div class="odg-det-wrap"><table class="odg-det"><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Procedimiento</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Total</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table></div>';
+        '</td><td></td><td></td><td class="num">' + q(total) + '</td>' + vacias + '<td></td></tr></tfoot>' : '';
+      return '<div class="odg-det-wrap"><table class="odg-det"><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Procedimiento</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Total</th>' +
+        (conEstado ? '<th>Estado</th><th>Fecha estado</th>' : '') + '<th><span class="sr-only">Acciones</span></th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table></div>';
     }
     function guardarFila(tr) {
       var partes = tr.dataset.fila.split('|'), n = +partes[0], clave = partes[1], p = datos.piezas[n];
@@ -407,6 +439,7 @@
       if (preActual && !modoNuevo) {
         var p = preActual, ev = estadoVisible(p);
         (p.presupuesto_items || []).slice().sort(function (a, b) { return a.orden - b.orden || a.id - b.id; }).forEach(function (i) {
+          if (i.estado === 'eliminado') return;
           lineas.push({ pieza: i.pieza || '—', hallazgo: hallazgos[(i.pieza || '') + '|' + String(i.tratamiento).toLowerCase()] || '—', procedimiento: i.tratamiento,
             cantidad: i.cantidad, precio: Number(i.precio), total: Math.round(i.cantidad * i.precio * 100) / 100 });
         });
@@ -448,11 +481,13 @@
     function estadoVisible(p) {
       if (p.estado === 'rechazado') return 'no_aprobado';
       if (p.estado !== 'aprobado') return 'activo';
-      var its = p.presupuesto_items || [], hechos = its.filter(function (i) { return i.realizado; }).length;
-      return !hechos ? 'aprobado' : hechos === its.length ? 'finalizado' : 'proceso';
+      var its = (p.presupuesto_items || []).filter(function (i) { return i.estado !== 'eliminado'; });
+      var fin = its.filter(function (i) { return i.estado === 'finalizado' || i.realizado; }).length;
+      var avance = its.filter(function (i) { return i.estado === 'proceso'; }).length + fin;
+      return !avance ? 'aprobado' : its.length && fin === its.length ? 'finalizado' : 'proceso';
     }
     function totalPresupuesto(p) {
-      var sub = (p.presupuesto_items || []).reduce(function (t, i) { return t + Number(i.cantidad) * Number(i.precio); }, 0);
+      var sub = (p.presupuesto_items || []).filter(function (i) { return i.estado !== 'eliminado'; }).reduce(function (t, i) { return t + Number(i.cantidad) * Number(i.precio); }, 0);
       return Math.round(sub * (1 - (Number(p.descuento_pct) || 0) / 100) * 100) / 100;
     }
     function bloqueExistente() {
@@ -525,6 +560,7 @@
       var totalPre = conProc.reduce(function (t, x) { var v = valorFila(x); return t + (v.total || 0); }, 0);
       return '<div><div class="odg-cab"><h4 style="color:' + ROJO + '">Requerido (' + visibles.length + ')</h4>' +
         (f.req.length && catalogo.length ? '<div class="odg-acc">' + selTipo + crearPre + '</div>' : '') + '</div>' +
+        (msgPre && preActual && !modoNuevo && !(opciones.crearPresupuesto && (conProc.length || preActual)) ? '<p class="odg-pre-msg' + (msgPre.error ? ' error' : '') + '">' + esc(msgPre.texto) + '</p>' : '') +
         (visibles.length ? tablaDetalle(visibles, true) : f.req.length ? '<p class="odg-vacio">Aún no hay hallazgos con procedimiento elegido.</p>' : 'Sin tratamientos pendientes.') + enlace +
         (opciones.crearPresupuesto && (conProc.length || (preActual && !modoNuevo)) ? bloquePresupuesto(totalPre) : '') + '</div>' +
         '<div><div class="odg-cab"><h4 style="color:' + AZUL + '">Realizado / existente (' + f.hecho.length + ')</h4></div>' +
@@ -788,6 +824,13 @@
     raiz.addEventListener('change', function (e) {
       var t = e.target;
       if (t.matches('[data-tipo-precio]')) { tipoPrecio = t.value; pintar(); return; }
+      if (t.matches('[data-item-estado]') && opciones.cambiarEstadoItem) {
+        var nuevoEst = t.value; t.disabled = true;
+        opciones.cambiarEstadoItem(+t.dataset.itemEstado, nuevoEst).then(function () {
+          msgPre = { texto: 'Estado del procedimiento: ' + ESTADOS_ITEM.filter(function (x) { return x[0] === nuevoEst; })[0][1] + '.' + (nuevoEst === 'proceso' || nuevoEst === 'finalizado' ? ' Ya aparece en la pestaña Tratamientos.' : '') };
+        }).catch(function (err) { msgPre = { texto: err.message || String(err), error: true }; }).then(pintar);
+        return;
+      }
       if (t.matches('[data-ex-campo]') && datosExist) {
         if (t.dataset.exCampo === 'forma') { datosExist.forma = t.value; if (t.value === 'tarjeta' && window.PD_CUOTAS) window.PD_CUOTAS.cargar(); pintar(); }
         else datosExist.citas = t.value ? String(Math.min(Math.max(parseInt(t.value, 10) || 1, 1), 99)) : '';

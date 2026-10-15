@@ -11,8 +11,21 @@
   function estadoVisible(estado, its) {
     if (estado === 'rechazado') return 'no_aprobado';
     if (estado !== 'aprobado') return 'activo';
-    var hechos = (its || []).filter(function (i) { return i.realizado; }).length;
-    return !hechos ? 'aprobado' : hechos === its.length ? 'finalizado' : 'proceso';
+    var vivos = (its || []).filter(function (i) { return i.estado !== 'eliminado'; });
+    var fin = vivos.filter(function (i) { return i.estado === 'finalizado' || i.realizado; }).length;
+    var avance = fin + vivos.filter(function (i) { return i.estado === 'proceso'; }).length;
+    return !avance ? 'aprobado' : vivos.length && fin === vivos.length ? 'finalizado' : 'proceso';
+  }
+  // Estado de cada procedimiento (Pendiente, Proceso, Finalizado, Eliminado)
+  var ESTADOS_ITEM = { pendiente: 'Pendiente', proceso: 'Proceso', finalizado: 'Finalizado', eliminado: 'Eliminado' };
+  function estadoItem(it) { return it.estado || (it.realizado ? 'finalizado' : 'pendiente'); }
+  function fechaHoraI(t) { return t ? new Date(t).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''; }
+  function selectorEstado(it) {
+    var e = estadoItem(it), orden = ['pendiente', 'proceso', 'finalizado'];
+    var ops = Object.keys(ESTADOS_ITEM).filter(function (k) { return k === e || esSuper() || (e !== 'eliminado' && k !== 'eliminado' && orden.indexOf(k) > orden.indexOf(e)); });
+    return '<select class="pre-ie pre-ie-' + e + '" data-item-estado="' + it.id + '" aria-label="Estado: ' + esc(it.tratamiento) + '">' +
+      ops.map(function (k) { return '<option value="' + k + '"' + (k === e ? ' selected' : '') + '>' + ESTADOS_ITEM[k] + '</option>'; }).join('') + '</select>' +
+      (it.estado_fecha || it.realizado_en ? '<br><span style="font-size:12px;color:#5A6D7A">' + (fechaHoraI(it.estado_fecha) || fechaCorta(it.realizado_en)) + '</span>' : '');
   }
   var FORMAS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta de crédito', otro: 'Otro' };
   function codigoDe(p) { return p.codigo || 'N.º ' + p.id; }
@@ -40,7 +53,7 @@
   }
 
   // Importe de una línea con el descuento del presupuesto aplicado
-  function importe(it) { return redondear(it.cantidad * it.precio); }
+  function importe(it) { return it.estado === 'eliminado' ? 0 : redondear(it.cantidad * it.precio); }
   function totales(lineas, descuento) {
     var sub = redondear(lineas.reduce(function (s, it) { return s + importe(it); }, 0));
     var factor = 1 - (Number(descuento) || 0) / 100;
@@ -53,7 +66,7 @@
     aviso('preMsg', '');
     $('preBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
     var r = await sb.from('presupuestos')
-      .select('id,codigo,fecha,estado,descuento_pct,paciente_id,pacientes(nombre),presupuesto_items(cantidad,precio,realizado)')
+      .select('*,pacientes(nombre),presupuesto_items(*)')
       .order('id', { ascending: false });
     if (r.error) { $('preBody').innerHTML = ''; aviso('preMsg', traducir(r.error), true); return; }
     lista = r.data;
@@ -88,12 +101,12 @@
     $('preBody').innerHTML = filas.map(function (p) {
       var its = p.presupuesto_items || [];
       var t = totales(its, p.descuento_pct);
-      var hechos = its.filter(function (i) { return i.realizado; }).length;
+      var vivos = its.filter(function (i) { return i.estado !== 'eliminado'; }), hechos = vivos.filter(function (i) { return i.realizado || i.estado === 'finalizado'; }).length;
       var ev = estadoVisible(p.estado, its);
       return '<tr><td class="fecha"><strong>' + esc(codigoDe(p)) + '</strong></td><td><strong>' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</strong></td>' +
         '<td class="fecha">' + fechaCorta(p.fecha) + '</td><td class="num"><strong>' + q(t.total) + '</strong></td>' +
         '<td><span class="estado estado-' + ev + '">' + ESTADOS_V[ev] + '</span></td>' +
-        '<td class="fecha">' + (p.estado === 'aprobado' ? hechos + ' de ' + its.length : '—') + '</td>' +
+        '<td class="fecha">' + (p.estado === 'aprobado' ? hechos + ' de ' + vivos.length : '—') + '</td>' +
         '<td><button type="button" class="adm-btn" data-abrir="' + p.id + '">Abrir</button></td></tr>';
     }).join('');
   }
@@ -224,7 +237,7 @@
     var he = await sb.from('presupuesto_estados').select('de,a,fecha,usuario').eq('presupuesto_id', id).order('id');
     historialEst = he.error ? [] : he.data;
     items = (actual.presupuesto_items || []).sort(function (a, b) { return a.orden - b.orden || a.id - b.id; })
-      .map(function (i) { return { id: i.id, tratamiento: i.tratamiento, pieza: i.pieza || '', cantidad: i.cantidad, precio: Number(i.precio), realizado: i.realizado, realizado_en: i.realizado_en }; });
+      .map(function (i) { return { id: i.id, tratamiento: i.tratamiento, pieza: i.pieza || '', cantidad: i.cantidad, precio: Number(i.precio), realizado: i.realizado, realizado_en: i.realizado_en, estado: i.estado, estado_fecha: i.estado_fecha }; });
     cambios = false;
     $('preDescuento').value = Number(actual.descuento_pct) || 0;
     $('preTipo').value = actual.tipo_precio || 'directo';
@@ -282,7 +295,7 @@
           '<td><button type="button" class="adm-btn" data-quitar="' + i + '" style="min-height:38px;padding:6px 12px">Quitar</button></td></tr>';
       }
       var marcar = actual.estado === 'aprobado'
-        ? '<label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#5A6D7A"><input type="checkbox" data-realizado="' + it.id + '"' + (it.realizado ? ' checked' : '') + ' aria-label="Realizado: ' + esc(it.tratamiento) + '">' + (it.realizado && it.realizado_en ? fechaCorta(it.realizado_en) : '') + '</label>'
+        ? selectorEstado(it)
         : '—';
       var tipoIt = tipoDeNombre(it.tratamiento);
       return '<tr><td><strong>' + esc(it.tratamiento) + '</strong>' + (tipoIt ? '<span class="pre-tipo-tag">' + esc(tipoIt) + '</span>' : '') + '</td><td>' + esc(it.pieza || '—') + '</td><td class="num">' + it.cantidad + '</td>' +
@@ -468,6 +481,16 @@
     pintarEditor();
   });
   $('preItems').addEventListener('change', async function (e) {
+    var se = e.target.closest('[data-item-estado]');
+    if (se) {
+      se.disabled = true;
+      var rs = await sb.rpc('cambiar_estado_item', { p_item: +se.dataset.itemEstado, p_estado: se.value });
+      if (rs.error) { se.disabled = false; aviso('preEdMsg', /cambiar_estado_item|could not find the function/i.test(rs.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql).' : traducir(rs.error), true); await abrir(actual.id); return; }
+      var v = se.value;
+      await abrir(actual.id);
+      aviso('preEdMsg', 'Estado del procedimiento: ' + ESTADOS_ITEM[v] + '.' + (v === 'finalizado' ? ' Su costo ya cuenta en el estado de cuenta del paciente.' : v === 'proceso' ? ' Ya aparece en Tratamientos del expediente.' : ''));
+      return;
+    }
     var c = e.target.closest('[data-realizado]');
     if (!c) return;
     c.disabled = true;
