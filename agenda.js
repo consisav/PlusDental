@@ -457,7 +457,7 @@
         var html = cs.map(function (x) {
           var sala = salas.filter(function (s) { return s.id === x.posicion_id; })[0];
           return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '" title="' + esc(x.nombre + ' · ' + x.servicio + ' · ' + nombreDentista(x.dentista_id)) + '">' +
-            (sala ? '<b>' + esc(sala.codigo) + '</b> · ' : '') + esc(x.nombre) + '</button>';
+            (sala ? '<b>' + esc(sala.codigo) + '</b> · ' : '') + nombrePaciente(x) + '<small class="ag-trat">' + esc(x.servicio || '') + '</small></button>';
         }).join('');
         var pasado = f < hoy() || (f === hoy() && h <= hAhora);
         if (bloqueado(f, h)) return '<td>' + html + '<span class="ag-mini cerrado">Bloqueado</span></td>';
@@ -486,7 +486,7 @@
         var cs = citas.filter(function (c) { return c.fecha === d; }).sort(function (a, b) { return hhmm(a.hora).localeCompare(hhmm(b.hora)); });
         var fuera = d < rv.mesDesde || d > rv.mesHasta;
         var lista = cs.slice(0, 3).map(function (x) {
-          return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '" title="' + esc(hhmm(x.hora) + ' · ' + x.nombre + ' · ' + x.servicio) + '"><b>' + hhmm(x.hora) + '</b> ' + esc(x.nombre) + '</button>';
+          return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '" title="' + esc(hhmm(x.hora) + ' · ' + x.nombre + ' · ' + x.servicio) + '"><b>' + hhmm(x.hora) + '</b> ' + nombrePaciente(x) + '<small class="ag-trat">' + esc(x.servicio || '') + '</small></button>';
         }).join('') + (cs.length > 3 ? '<button type="button" class="mas ag-mini" data-ir-dia="' + d + '" style="border:0;background:none;padding:0">+ ' + (cs.length - 3) + ' más</button>' : '');
         return '<td class="' + (fuera ? 'fuera' : '') + (d === hoy() ? ' hoy' : '') + '"><button type="button" class="ag-mes-dia" data-ir-dia="' + d + '">' + fecha(d).getDate() +
           (cs.length ? '<small>' + cs.length + (cs.length === 1 ? ' cita' : ' citas') + '</small>' : '') + '</button>' + lista + '</td>';
@@ -525,6 +525,12 @@
       (cuerpo || '<tr><td colspan="6" style="' + celda + '">No hay citas en este periodo.</td></tr>') + '</tbody></table></div>');
   }
 
+  // Nombre del paciente: si tiene expediente, al tocarlo se abre su expediente
+  function nombrePaciente(x) {
+    return x.paciente_id && window.PD_EXPEDIENTE ? '<span class="ag-pac" data-ir-exp="' + x.paciente_id + '" title="Abrir expediente de ' + esc(x.nombre) + '">' + esc(x.nombre) + '</span>' : esc(x.nombre);
+  }
+  function irExpediente(id) { if (window.PD_EXPEDIENTE) window.PD_EXPEDIENTE.abrir(+id); }
+
   function pintarDia() {
     document.querySelector('.ag-grid').classList.remove('semana');
     var f = $('agDia').value;
@@ -540,7 +546,7 @@
       return '<tr><td class="hora">' + h + '</td>' + cols.map(function (c) {
         var cs = citasEn(f, h).filter(function (x) { return (x.posicion_id || null) === c.id; });
         if (cs.length) return '<td>' + cs.map(function (x) {
-          return '<button type="button" class="ag-celda cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '"><b>' + esc(x.nombre) + '</b>' + (x.prioridad === 'urgente' ? '<span class="ag-urg">Urgente</span>' : '') +
+          return '<button type="button" class="ag-celda cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '"><b>' + nombrePaciente(x) + '</b>' + (x.prioridad === 'urgente' ? '<span class="ag-urg">Urgente</span>' : '') +
             '<br>' + esc(x.servicio) + '<br><span style="color:#5A6D7A">' + esc(nombreDentista(x.dentista_id)) + (x.estado === 'pendiente' ? ' · sin confirmar' : '') + '</span></button>';
         }).join('') + '</td>';
         var pasado = f < hoy() || (esHoy && h <= hAhora);
@@ -564,6 +570,7 @@
       (c.notas ? '<p class="dlg-msg">' + esc(c.notas) + '</p>' : '') +
       '<div class="acciones">' + (c.estado === 'pendiente' ? '<button type="button" class="adm-btn adm-primary" data-det-estado="confirmada" data-id="' + c.id + '">Confirmar</button>' : '') +
       '<button type="button" class="adm-btn" data-det-estado="cancelada" data-id="' + c.id + '" data-confirmar="0">Cancelar cita</button>' +
+      (c.paciente_id && window.PD_EXPEDIENTE ? '<button type="button" class="adm-btn" data-ir-exp="' + c.paciente_id + '">Ver expediente</button>' : '') +
       '<button type="button" class="adm-btn" data-det-cerrar>Cerrar</button></div>' +
       '<span class="pos-lbl" style="margin:4px 0 0">Avisos y recordatorios</span>' + avisosHtml(conCorreo, { paciente: true, medico: true, correo: true });
     $('agDetalle').scrollIntoView({ block: 'nearest' });
@@ -663,6 +670,8 @@
   });
   $('agHoy').addEventListener('click', function () { $('agDia').value = hoy(); cargarCitas(); });
   $('agBody').addEventListener('click', function (e) {
+    var exp = e.target.closest('[data-ir-exp]');
+    if (exp) { e.preventDefault(); e.stopPropagation(); irExpediente(exp.dataset.irExp); return; }
     var irDia = e.target.closest('[data-ir-dia]');
     if (irDia) { $('agDia').value = irDia.dataset.irDia; vista = 'dia'; pintar(); return; }
     var libre = e.target.closest('[data-libre]');
@@ -679,6 +688,8 @@
   });
   $('agDetalle').addEventListener('click', async function (e) {
     if (e.target.closest('[data-det-cerrar]')) { $('agDetalle').hidden = true; return; }
+    var ex2 = e.target.closest('[data-ir-exp]');
+    if (ex2) { irExpediente(ex2.dataset.irExp); return; }
     var b = e.target.closest('[data-det-estado]');
     if (!b) return;
     if (b.dataset.detEstado === 'cancelada' && !pedirConfirmacion(b)) return;

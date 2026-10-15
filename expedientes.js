@@ -327,6 +327,14 @@
   // base = lo último guardado; los cambios pendientes salen de comparar contra ella.
   // meta guarda, por pieza, la fecha del cambio y las observaciones escritas antes de guardar.
   var base = null, meta = {}, pendientes = [], historial = [];
+  // Abrir el expediente de un paciente desde otras pantallas (p. ej. la agenda)
+  window.PD_EXPEDIENTE = {
+    abrir: function (id) {
+      if ($('tabExpedientes')) $('tabExpedientes').click();
+      abrir(id);
+      var p = $('admExpedientes'); if (p) p.scrollIntoView({ block: 'start' });
+    }
+  };
   window.PD_ODONTOGRAMA_ACTUAL = function () { return typeof odg !== 'undefined' && odg ? odg.valor() : null; };
   var odg = window.Odontograma.crear($('odoComp'), {
     onCambio: function () { revisarCambios(); },
