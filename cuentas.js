@@ -60,6 +60,7 @@
     imgs.forEach(function (i) { i.addEventListener('load', seguir); i.addEventListener('error', seguir); });
     setTimeout(function () { if (!listo) { listo = true; window.print(); } }, 2500);
   }
+  window.PD_IMPRESION = { imprimir: imprimir, encabezado: encabezado };
   window.addEventListener('afterprint', function () {
     document.body.classList.remove('imprimir');
     $('impresion').innerHTML = '';

@@ -115,6 +115,12 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 #impresion{display:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .ec-buscar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .ec-buscar select{min-width:260px;max-width:100%}
+.tr-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:1100px){.tr-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tr-kpis .tr-debe b{color:#9A3B2E}
+.tr-pie td{font-weight:800;background:#EEF5FA;border-top:2px solid #0B2B40}
+.tr-sub{font-size:12.5px;color:#5A6D7A}
+.tr-pend{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;background:#FEF3C7;color:#92400E}
 .pg-imprimir{display:flex;align-items:flex-end}
 .pg-imprimir .adm-btn{width:100%;min-height:46px;justify-content:center}
 #pgImprimir:disabled{opacity:.5;cursor:not-allowed}
@@ -806,6 +812,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-btn" data-ficha="fDatos" aria-pressed="true">Datos</button>
 <button type="button" class="adm-btn" data-ficha="fHistoria" aria-pressed="false">Historia médica</button>
 <button type="button" class="adm-btn" data-ficha="fOdonto" aria-pressed="false">Odontograma</button>
+<button type="button" class="adm-btn" data-ficha="fTrat" aria-pressed="false">Tratamientos</button>
 <button type="button" class="adm-btn" data-ficha="fNotas" aria-pressed="false">Notas de visita</button>
 <button type="button" class="adm-btn" data-ficha="fRx" aria-pressed="false">Radiografías</button>
 </div>
@@ -893,6 +900,26 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="roles-wrap"><table><thead><tr><th>Fecha del cambio</th><th>Pieza</th><th>Cambio</th><th>Observaciones</th><th>Usuario</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="odoHist"></tbody></table></div>
 <p id="odoHistMsg" class="dlg-msg" role="status"></p>
 </div>
+</div>
+
+<div id="fTrat" class="adm-pane" hidden>
+<div class="kpis tr-kpis">
+<div class="kpi"><span>Tratamientos realizados</span><b id="trRealizado">Q0.00</b></div>
+<div class="kpi"><span>Pagado</span><b id="trPagado">Q0.00</b></div>
+<div class="kpi"><span>Saldo pendiente</span><b id="trSaldo">Q0.00</b></div>
+<div class="kpi"><span>Por realizar (aprobados)</span><b id="trPendiente">Q0.00</b></div>
+</div>
+<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">
+<div id="trFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar tratamientos">
+<button type="button" class="adm-btn" data-trfiltro="realizados" aria-pressed="true">Realizados <span>(0)</span></button>
+<button type="button" class="adm-btn" data-trfiltro="pendientes" aria-pressed="false">Pendientes <span>(0)</span></button>
+<button type="button" class="adm-btn" data-trfiltro="todos" aria-pressed="false">Todos <span>(0)</span></button>
+</div>
+<button type="button" id="trImprimir" class="adm-btn">Imprimir</button>
+</div>
+<div class="roles-wrap"><table><thead><tr><th>Fecha</th><th>Tratamiento</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Desc.</th><th class="num">Total</th><th>Presupuesto</th></tr></thead><tbody id="trBody"></tbody><tfoot id="trPie" class="tr-pie"></tfoot></table></div>
+<p class="dlg-msg">Los tratamientos se marcan como realizados en <strong>Presupuesto</strong>. Aquí se ven todos juntos, con su precio y el descuento de su presupuesto.</p>
+<p id="trMsg" class="dlg-msg" role="status"></p>
 </div>
 
 <div id="fNotas" class="adm-pane" hidden>
@@ -1952,6 +1979,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="expedientes.js"></script>
 <script src="presupuestos.js"></script>
 <script src="cuentas.js"></script>
+<script src="tratamientos-paciente.js"></script>
 <script src="posiciones.js"></script>
 <script src="dentistas.js"></script>
 <script src="agenda.js"></script>
