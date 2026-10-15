@@ -179,6 +179,7 @@
       '.odg-ie-pendiente{background:#EBF0F4;color:#475B68}.odg-ie-proceso{background:#FEF3C7;color:#92400E}.odg-ie-finalizado{background:#DCF2EC;color:#08504C}.odg-ie-eliminado{background:#FDE2E4;color:#9F1239}',
       '.odg-det tr.odg-elim td:not(:nth-last-child(-n+3)){text-decoration:line-through;color:#8A9DA9}',
       '.odg-por{font-size:11.5px;color:#5A6D7A}',
+      '.odg-res .odg-aviso-est{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#FFF8E6;border:1px solid #F3D9A4;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13px;color:#7A4B00}',
       '.odg-res .odg-pre .odg-pre-cab .odg-est{cursor:default}',
       '.odg-dlg .op[aria-pressed="true"]{border-color:#005A87;box-shadow:inset 0 0 0 1.5px #005A87;background:#EEF5FA}',
       '.odg-res .odg-pre .cuo-res>div{background:#0B2B40;color:#FFFFFF;border-radius:12px;padding:8px 14px}',
@@ -375,6 +376,17 @@
       return '<select class="odg-ie odg-ie-' + est + '" data-item-estado="' + it.id + '" aria-label="Estado de ' + esc(f.proc.n) + ', pieza ' + esc(piezaDe(f)) + '">' +
         permitidos.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === est ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>';
     }
+    // Qué falta para poder cambiar el estado de cada procedimiento
+    function avisoEstado() {
+      var texto = '', boton = '';
+      if (!preActual || modoNuevo) texto = 'Para cambiar el estado de cada procedimiento, primero confirma el presupuesto y luego apruébalo.';
+      else if ((preActual.presupuesto_items || []).length && !('estado' in preActual.presupuesto_items[0])) texto = 'Para cambiar el estado de cada procedimiento falta ejecutar en Supabase el script actualizado (supabase.sql).';
+      else if (preActual.estado !== 'aprobado') {
+        texto = 'El presupuesto ' + (preActual.codigo || 'N.º ' + preActual.id) + ' aún no está aprobado. Al aprobarlo podrás cambiar el estado de cada procedimiento (Pendiente, Proceso, Finalizado, Eliminado).';
+        if (esSuper() && opciones.cambiarEstadoPresupuesto) boton = '<button type="button" class="odg-crear" data-ex-estado>Aprobar presupuesto</button>';
+      }
+      return texto ? '<div class="odg-aviso-est"><span>' + esc(texto) + '</span>' + boton + '</div>' : '';
+    }
     function tablaDetalle(filas, conTotal) {
       var total = 0, sinProc = 0, sinPrecio = 0, sup = esSuper(), conEstado = conTotal;
       var cuerpo = filas.map(function (f) {
@@ -402,7 +414,7 @@
       var pie = conTotal && filas.length ? '<tfoot><tr><td></td><td>TOTAL ESTIMADO</td><td>' +
         [sinProc ? sinProc + ' sin procedimiento' : '', sinPrecio ? sinPrecio + ' sin precio' : ''].filter(Boolean).join(' · ') +
         '</td><td></td><td></td><td class="num">' + q(total) + '</td>' + vacias + '<td></td></tr></tfoot>' : '';
-      return '<div class="odg-det-wrap"><table class="odg-det"><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Procedimiento</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Total</th>' +
+      return (conEstado ? avisoEstado() : '') + '<div class="odg-det-wrap"><table class="odg-det"><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Procedimiento</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Total</th>' +
         (conEstado ? '<th>Estado</th><th>Fecha estado</th>' : '') + '<th><span class="sr-only">Acciones</span></th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table></div>';
     }
     function guardarFila(tr) {
