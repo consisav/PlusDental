@@ -294,6 +294,8 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-celda.libre:hover{background:#E6F1F8}
 .ag-celda.cita{border-left:4px solid #005A87}
 .ag-celda.cita.pendiente{border-left-color:#B45309}
+.ag-celda.cita.reprogramada{border-left-color:#6D28D9}
+.ag-celda.cita.atendida{border-left-color:#1E40AF;opacity:.8}
 .ag-celda.cita.urgente{background:#FFF6F6}
 .ag-celda.cerrado{cursor:default;color:#94A6B2;background:#F5F9FC;border-color:transparent}
 .ag-urg{display:inline-block;background:#FDE2E4;color:#9F1239;border-radius:999px;padding:0 7px;font-size:11px;font-weight:700;margin-left:4px}
@@ -321,6 +323,8 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-pac:hover{color:#005A87;text-decoration-color:#005A87}
 .ag-trat{display:block;font-size:11.5px;color:#5A6D7A;font-weight:500;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ag-mini.cita.pendiente{border-left-color:#B45309}
+.ag-mini.cita.reprogramada{border-left-color:#6D28D9}
+.ag-mini.cita.atendida{border-left-color:#1E40AF;opacity:.8}
 .ag-mini.cita.urgente{background:#FFF6F6;border-left-color:#C0263A}
 .ag-mini.libre{border-style:dashed;color:#005A87;font-weight:600;background:#F5F9FC}
 .ag-mini.cerrado{cursor:default;color:#94A6B2;background:transparent;border-color:transparent}
@@ -629,6 +633,11 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 .estado-pendiente{background:#FEF3C7;color:#92400E}
 .estado-confirmada{background:#DCF2EC;color:#08504C}
 .estado-cancelada{background:#EBF0F4;color:#5A6D7A}
+.estado-reprogramada{background:#EDE9FE;color:#5B21B6}
+.estado-atendida{background:#DBEAFE;color:#1E40AF}
+.cita-grab{display:block;font-size:12px;color:#5A6D7A;margin-top:3px;line-height:1.4}
+#reproDlg{border:0;border-radius:24px;padding:0;width:min(460px,calc(100% - 32px));box-shadow:0 30px 80px rgba(11,43,64,.25);color:#0B2B40}
+#reproDlg::backdrop{background:rgba(11,43,64,.55)}
 .acciones{display:flex;gap:8px;flex-wrap:wrap}
 .acciones .adm-btn{min-height:38px;padding:7px 14px}
 .bloq-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #D9E4EC;font-size:15px}
@@ -1010,8 +1019,10 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 </div>
 <div id="citaFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar citas">
-<button type="button" class="adm-btn" data-filtro="pendiente" aria-pressed="true">Pendientes</button>
+<button type="button" class="adm-btn" data-filtro="pendiente" aria-pressed="true">Programadas</button>
 <button type="button" class="adm-btn" data-filtro="confirmada" aria-pressed="false">Confirmadas</button>
+<button type="button" class="adm-btn" data-filtro="reprogramada" aria-pressed="false">Reprogramadas</button>
+<button type="button" class="adm-btn" data-filtro="atendida" aria-pressed="false">Atendidas</button>
 <button type="button" class="adm-btn" data-filtro="cancelada" aria-pressed="false">Canceladas</button>
 <button type="button" class="adm-btn" data-filtro="todas" aria-pressed="false">Todas</button>
 </div>
@@ -1067,7 +1078,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>Cantidad de citas<input id="agCantidad" type="number" min="1" max="24" step="1" value="1" inputmode="numeric"></label>
 <label id="agCadaWrap" hidden>Cada<select id="agCada"><option value="7">1 semana</option><option value="14">2 semanas</option><option value="21">3 semanas</option><option value="m1" selected>1 mes</option><option value="m2">2 meses</option><option value="m3">3 meses</option><option value="m6">6 meses</option></select></label>
 <label class="full">Motivo u observaciones<textarea id="agNotas" rows="2" maxlength="500" placeholder="Ej.: dolor en pieza 36 desde hace 3 días"></textarea></label>
-<label class="full pos-activa" style="flex-direction: row"><input id="agConfirmada" type="checkbox" checked> Registrar como cita confirmada</label>
+<label>Estado de la cita<select id="agEstado"><option value="pendiente" selected>Programado</option><option value="confirmada">Confirmado</option><option value="atendida">Atendido</option></select></label>
+<div class="exp-campo"><span class="pos-lbl">Fecha y hora de grabación</span><div class="exp-calc">Se registra al grabar</div></div>
+<div class="exp-campo"><span class="pos-lbl">Usuario que graba</span><div id="agUsuarioGraba" class="exp-calc">Sin usuario</div></div>
 <fieldset class="full pos-sec"><legend>Avisos</legend>
 <div class="ag-avisos">
 <label class="pos-activa"><input id="agAvPac" type="checkbox" checked> WhatsApp al paciente</label>
@@ -2043,6 +2056,23 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>Confirmar clave<input id="claveNueva2" type="password" autocomplete="new-password" minlength="8" required></label>
 <button type="submit" class="dlg-submit">Guardar clave</button>
 <p id="claveMsg" class="dlg-msg" role="status"></p>
+</form>
+</dialog>
+
+<dialog id="reproDlg" aria-labelledby="reproTitulo">
+<form id="reproForm" class="dlg-form" style="font-family: 'Manrope', system-ui, sans-serif; padding: 28px">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #005A87">Reprogramar cita</span>
+<h2 id="reproTitulo" style="margin: 0; font-size: 22px; font-weight: 700; overflow-wrap: anywhere"></h2>
+<span id="reproActual" style="color: #475B68; font-size: 14px"></span>
+</div>
+<button type="button" id="reproCerrar" aria-label="Cerrar" style="background: transparent; border: 0; font-size: 28px; line-height: 1; color: #475B68; cursor: pointer; min-width: 44px; min-height: 44px">×</button>
+</div>
+<label>Nueva fecha<input id="reproFecha" type="date" required></label>
+<label>Nueva hora<select id="reproHora" required><option value="">Elige la fecha</option></select></label>
+<button type="submit" class="dlg-submit" id="reproGuardar">Reprogramar</button>
+<p id="reproMsg" class="dlg-msg" role="status"></p>
 </form>
 </dialog>
 

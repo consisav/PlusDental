@@ -39,6 +39,9 @@
   function diaSemana(f) { var d = fecha(f).getDay(); return d === 0 ? '7' : String(d); }
   function turnos(f) { var d = fecha(f).getDay(); return d === 0 ? [] : d === 6 ? TURNOS.sabado : TURNOS.semana; }
   function hhmm(h) { return String(h || '').slice(0, 5); }
+  var ESTADOS_CITA = { pendiente: 'Programado', confirmada: 'Confirmado', reprogramada: 'Reprogramado', atendida: 'Atendido', cancelada: 'Cancelado' };
+  function fechaHoraGrab(t) { return t ? new Date(t).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
+  function usuarioSesion() { return (window.PD_SESION && window.PD_SESION.usuario()) || 'Sin usuario'; }
   function telWa(t) { var n = String(t || '').replace(/\D/g, ''); if (n.length === 8) n = '502' + n; return n; }
   function traducir(err) {
     var m = (err && err.message) || '';
@@ -222,7 +225,7 @@
         p_nombre: nuevo ? $('agNombre').value.trim() : null, p_telefono: nuevo ? $('agTelefono').value.trim() : null,
         p_servicio: $('agTratamiento').value.trim(), p_dentista_id: o.dentista ? o.dentista.id : null, p_posicion_id: o.sala ? o.sala.id : null,
         p_prioridad: $('agPrioridad').value, p_notas: [$('agNotas').value.trim(), lista.length > 1 ? '(cita ' + (i + 1) + ' de ' + lista.length + ')' : ''].filter(Boolean).join(' '),
-        p_estado: $('agConfirmada').checked ? 'confirmada' : 'pendiente'
+        p_estado: $('agEstado').value
       });
       if (r.error) { fallo = textoFecha(o.fecha) + ' · ' + o.hora + ': ' + traducir(r.error); break; }
       hechas.push(o);
@@ -394,7 +397,7 @@
       p_posicion_id: o.sala ? o.sala.id : null,
       p_prioridad: $('agPrioridad').value,
       p_notas: $('agNotas').value.trim(),
-      p_estado: $('agConfirmada').checked ? 'confirmada' : 'pendiente'
+      p_estado: $('agEstado').value
     });
     boton.disabled = false;
     if (r.error) { aviso('agFormMsg', traducir(r.error), true); await cargarCitas(); return; }
@@ -438,8 +441,13 @@
     var hasta = sumar(hoy(), DIAS_BUSQUEDA + 31);
     if (fin > hasta) hasta = fin;
     if (inicio < desde) desde = inicio;
-    var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas')
+    var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada,creada_por,reprogramada_de')
       .gte('fecha', desde).lte('fecha', hasta).neq('estado', 'cancelada');
+    if (r.error && /creada_por|reprogramada_de/.test(r.error.message)) {
+      r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada')
+        .gte('fecha', desde).lte('fecha', hasta).neq('estado', 'cancelada');
+      if (!r.error) aviso('agMsg', 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los estados de la cita.', true);
+    }
     if (r.error && /paciente_id|prioridad|notas/.test(r.error.message)) {
       r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id').gte('fecha', desde).lte('fecha', hasta).neq('estado', 'cancelada');
       aviso('agMsg', 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para agendar desde aquí.', true);
@@ -538,7 +546,7 @@
       }
       cuerpo += '<tr><td style="' + celda + ';font-weight:700">' + hhmm(c.hora) + '</td><td style="' + celda + '">' + esc(c.nombre) + (c.prioridad === 'urgente' ? ' <b style="color:#9F1239">(urgente)</b>' : '') + (c.telefono ? '<br><span style="color:#5A6D7A">' + esc(c.telefono) + '</span>' : '') + '</td>' +
         '<td style="' + celda + '">' + esc(c.servicio || '') + '</td><td style="' + celda + '">' + esc(nombreDentista(c.dentista_id)) + '</td>' +
-        '<td style="' + celda + '">' + esc(c.posicion_id ? nombreSala(c.posicion_id) : 'Sin sala') + '</td><td style="' + celda + '">' + (c.estado === 'pendiente' ? 'Pendiente' : 'Confirmada') + '</td></tr>';
+        '<td style="' + celda + '">' + esc(c.posicion_id ? nombreSala(c.posicion_id) : 'Sin sala') + '</td><td style="' + celda + '">' + (ESTADOS_CITA[c.estado] || c.estado) + '</td></tr>';
     });
     imp.imprimir(imp.encabezado(titulo) +
       '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:12px;padding:10px 14px;margin-bottom:14px">' +
@@ -570,7 +578,7 @@
         var cs = citasEn(f, h).filter(function (x) { return (x.posicion_id || null) === c.id; });
         if (cs.length) return '<td>' + cs.map(function (x) {
           return '<button type="button" class="ag-celda cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '"><b>' + nombrePaciente(x) + '</b>' + (x.prioridad === 'urgente' ? '<span class="ag-urg">Urgente</span>' : '') +
-            '<br>' + esc(x.servicio) + '<br><span style="color:#5A6D7A">' + esc(nombreDentista(x.dentista_id)) + (x.estado === 'pendiente' ? ' · sin confirmar' : '') + '</span></button>';
+            '<br>' + esc(x.servicio) + '<br><span style="color:#5A6D7A">' + esc(nombreDentista(x.dentista_id)) + (x.estado === 'pendiente' ? ' · sin confirmar' : x.estado === 'reprogramada' ? ' · reprogramada' : x.estado === 'atendida' ? ' · atendida' : '') + '</span></button>';
         }).join('') + '</td>';
         var pasado = f < hoy() || (esHoy && h <= hAhora);
         if (bloqueado(f, h)) return '<td><span class="ag-celda cerrado">Bloqueado</span></td>';
@@ -587,11 +595,15 @@
     var pac = pacientes.filter(function (p) { return p.id === c.paciente_id; })[0];
     var conCorreo = Object.assign({}, c, { correo: pac && pac.correo });
     $('agDetalle').hidden = false;
-    $('agDetalle').innerHTML = '<div class="adm-pane-head"><h3 style="margin:0;font-size:18px;font-weight:700">' + esc(c.nombre) + '</h3><span class="estado estado-' + c.estado + '">' + (c.estado === 'pendiente' ? 'Pendiente' : 'Confirmada') + '</span></div>' +
+    $('agDetalle').innerHTML = '<div class="adm-pane-head"><h3 style="margin:0;font-size:18px;font-weight:700">' + esc(c.nombre) + '</h3><span class="estado estado-' + c.estado + '">' + (ESTADOS_CITA[c.estado] || c.estado) + '</span></div>' +
       '<div class="pac-meta"><span><b>' + textoFecha(c.fecha) + ' · ' + hhmm(c.hora) + '</b></span><span>' + esc(c.servicio) + '</span><span>' + esc(nombreDentista(c.dentista_id)) + '</span><span>' + esc(c.posicion_id ? nombreSala(c.posicion_id) : 'Sin sala') + '</span>' +
       (c.telefono ? '<span>WhatsApp ' + esc(c.telefono) + '</span>' : '') + (c.prioridad === 'urgente' ? '<span class="ag-urg">Urgente</span>' : '') + '</div>' +
+      '<div class="pac-meta" style="font-size:13px"><span>Grabada: <b>' + fechaHoraGrab(c.creada) + '</b></span><span>Usuario que graba: <b>' + esc(c.creada_por || 'Sin usuario') + '</b></span>' +
+      (c.reprogramada_de ? '<span>Reprogramada de: <b>' + esc(textoFecha(c.reprogramada_de.slice(0, 10)) + ' · ' + c.reprogramada_de.slice(11, 16)) + '</b></span>' : '') + '</div>' +
       (c.notas ? '<p class="dlg-msg">' + esc(c.notas) + '</p>' : '') +
-      '<div class="acciones">' + (c.estado === 'pendiente' ? '<button type="button" class="adm-btn adm-primary" data-det-estado="confirmada" data-id="' + c.id + '">Confirmar</button>' : '') +
+      '<div class="acciones">' + (c.estado === 'pendiente' || c.estado === 'reprogramada' ? '<button type="button" class="adm-btn adm-primary" data-det-estado="confirmada" data-id="' + c.id + '">Confirmar</button>' : '') +
+      (c.estado !== 'atendida' ? '<button type="button" class="adm-btn" data-det-estado="atendida" data-id="' + c.id + '">Atendido</button>' : '') +
+      (c.estado !== 'atendida' ? '<button type="button" class="adm-btn" data-det-repro="' + c.id + '">Reprogramar</button>' : '') +
       '<button type="button" class="adm-btn" data-det-estado="cancelada" data-id="' + c.id + '" data-confirmar="0">Cancelar cita</button>' +
       (c.paciente_id && window.PD_EXPEDIENTE ? '<button type="button" class="adm-btn" data-ir-exp="' + c.paciente_id + '">Ver expediente</button>' : '') +
       '<button type="button" class="adm-btn" data-det-cerrar>Cerrar</button></div>' +
@@ -634,11 +646,69 @@
     $('agTratamientos').innerHTML = catalogo.concat(SERVICIOS).filter(function (x, i, a) { return a.indexOf(x) === i; })
       .map(function (t) { return '<option value="' + esc(t) + '"></option>'; }).join('');
     if (!$('agFechaM').value) $('agFechaM').value = sumar(hoyF, 1);
+    $('agUsuarioGraba').textContent = usuarioSesion();
     opcionesHorario();
     alCambiarPaciente();
     if (!dentistas.length) aviso('agFormMsg', 'Aún no hay dentistas activos con horario: registra a los dentistas para que el asistente pueda asignarlos.', true);
     await cargarCitas();
   }
+
+  // ---------- Reprogramar: se consulta la nueva fecha y hora ----------
+  var repro = null;
+  async function horasRepro() {
+    var f = $('reproFecha').value, c = repro.cita;
+    $('reproHora').disabled = true;
+    $('reproHora').innerHTML = '<option value="">' + (f ? 'Buscando horas libres…' : 'Elige la fecha') + '</option>';
+    if (!f) return;
+    var r = await sb.from('citas').select('id,hora,dentista_id,posicion_id').eq('fecha', f).neq('estado', 'cancelada');
+    if ($('reproFecha').value !== f) return;
+    var otras = (r.error ? [] : r.data).filter(function (x) { return String(x.id) !== String(c.id); });
+    var ahora = new Date(), hAhora = ('0' + ahora.getHours()).slice(-2) + ':' + ('0' + ahora.getMinutes()).slice(-2);
+    var sala = c.posicion_id ? salas.filter(function (x) { return x.id === c.posicion_id; })[0] : null;
+    var lista = turnos(f).filter(function (h) {
+      if (f < hoy() || (f === hoy() && h <= hAhora) || bloqueado(f, h)) return false;
+      if (f === c.fecha && h === hhmm(c.hora)) return false;
+      if (sala && !salaAbierta(sala, f, h)) return false;
+      return !otras.some(function (x) { return hhmm(x.hora) === h && ((c.dentista_id && x.dentista_id === c.dentista_id) || (c.posicion_id && x.posicion_id === c.posicion_id)); });
+    });
+    $('reproHora').innerHTML = lista.length ? lista.map(function (h) { return '<option value="' + h + '">' + h + '</option>'; }).join('')
+      : '<option value="">' + (!turnos(f).length ? 'La clínica no atiende ese día' : 'Sin horarios libres ese día') + '</option>';
+    $('reproHora').disabled = !lista.length;
+  }
+  async function reprogramar(c, alTerminar) {
+    repro = { cita: c, alTerminar: alTerminar };
+    $('reproTitulo').textContent = c.nombre || '';
+    $('reproActual').textContent = 'Fecha actual: ' + textoFecha(c.fecha) + ' · ' + hhmm(c.hora) + (c.servicio ? ' · ' + c.servicio : '');
+    aviso('reproMsg', '');
+    $('reproGuardar').disabled = false;
+    $('reproFecha').min = hoy();
+    $('reproFecha').value = c.fecha >= hoy() ? c.fecha : hoy();
+    $('reproDlg').showModal();
+    if (!salas.length && !dentistas.length) {
+      var rs = await Promise.all([sb.from('posiciones').select('id,codigo,nombre,especialidad,estado,activa,horario'), sb.from('bloqueos').select('fecha,hora').gte('fecha', hoy())]);
+      salas = rs[0].error ? [] : rs[0].data;
+      bloqueos = rs[1].error ? [] : rs[1].data;
+    }
+    horasRepro();
+  }
+  $('reproFecha').addEventListener('change', horasRepro);
+  $('reproCerrar').addEventListener('click', function () { $('reproDlg').close(); });
+  $('reproForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (!repro || !$('reproFecha').value || !$('reproHora').value) { aviso('reproMsg', 'Elige la nueva fecha y hora.', true); return; }
+    $('reproGuardar').disabled = true;
+    aviso('reproMsg', 'Reprogramando…');
+    var r = await sb.rpc('reprogramar_cita', { p_id: repro.cita.id, p_fecha: $('reproFecha').value, p_hora: $('reproHora').value });
+    $('reproGuardar').disabled = false;
+    if (r.error) {
+      aviso('reproMsg', /reprogramar_cita/.test(r.error.message || '') && /does not exist|could not find/i.test(r.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para reprogramar citas.' : traducir(r.error), true);
+      horasRepro();
+      return;
+    }
+    $('reproDlg').close();
+    if (repro.alTerminar) repro.alTerminar({ fecha: $('reproFecha').value, hora: $('reproHora').value });
+  });
+  window.PD_AGENDA = { reprogramar: reprogramar, estados: ESTADOS_CITA };
 
   function pedirConfirmacion(b) {
     function restaurar() { b.dataset.confirmar = '0'; b.textContent = b.dataset.texto; b.style.borderColor = ''; b.style.color = ''; }
@@ -715,13 +785,19 @@
     if (e.target.closest('[data-det-cerrar]')) { $('agDetalle').hidden = true; return; }
     var ex2 = e.target.closest('[data-ir-exp]');
     if (ex2) { irExpediente(ex2.dataset.irExp); return; }
+    var rp = e.target.closest('[data-det-repro]');
+    if (rp) {
+      var cr = citas.filter(function (x) { return String(x.id) === rp.dataset.detRepro; })[0];
+      if (cr) reprogramar(cr, function () { aviso('agMsg', 'Cita reprogramada.'); $('agDetalle').hidden = true; cargarCitas(); });
+      return;
+    }
     var b = e.target.closest('[data-det-estado]');
     if (!b) return;
     if (b.dataset.detEstado === 'cancelada' && !pedirConfirmacion(b)) return;
     b.disabled = true;
     var r = await sb.from('citas').update({ estado: b.dataset.detEstado }).eq('id', b.dataset.id).select('id');
     if (r.error || !r.data || !r.data.length) { b.disabled = false; aviso('agMsg', r.error ? traducir(r.error) : 'No tienes permiso para esta acción.', true); return; }
-    aviso('agMsg', b.dataset.detEstado === 'cancelada' ? 'Cita cancelada: el horario quedó libre.' : 'Cita confirmada.');
+    aviso('agMsg', b.dataset.detEstado === 'cancelada' ? 'Cita cancelada: el horario quedó libre.' : b.dataset.detEstado === 'atendida' ? 'Cita marcada como atendida.' : 'Cita confirmada.');
     $('agDetalle').hidden = true;
     cargarCitas();
   });

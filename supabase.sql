@@ -2698,6 +2698,135 @@ do $$ begin
   end if;
 end $$;
 
+-- ===== Estados de la cita: Programado, Confirmado, Reprogramado, Atendido y Cancelado =====
+-- Se conservan los valores guardados (pendiente = Programado, confirmada = Confirmado, cancelada = Cancelado)
+-- y se agregan reprogramada y atendida. Al reprogramar se guarda la fecha y hora anterior.
+-- La fecha y hora de grabación (creada) y el usuario que graba (creada_por; «Sin usuario» si se pidió desde la página
+-- sin conectarse) se registran solos. Cada cambio de estado anota cuándo y quién.
+
+alter type public.estado_cita add value if not exists 'reprogramada';
+alter type public.estado_cita add value if not exists 'atendida';
+
+alter table public.citas add column if not exists reprogramada_de text;
+alter table public.citas add column if not exists reprogramada_en timestamptz;
+alter table public.citas add column if not exists reprogramada_por text;
+alter table public.citas add column if not exists estado_cambiado timestamptz;
+alter table public.citas add column if not exists estado_cambiado_por text;
+
+create or replace function public.cita_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    new.creada := now();
+    new.creada_por := coalesce(nullif(new.creada_por, ''), v_usuario, 'Sin usuario');
+    new.estado_cambiado := now();
+    new.estado_cambiado_por := coalesce(v_usuario, 'Sin usuario');
+  else
+    new.creada := old.creada;
+    new.creada_por := old.creada_por;
+    if new.estado is distinct from old.estado then
+      new.estado_cambiado := now();
+      new.estado_cambiado_por := coalesce(v_usuario, 'Sin usuario');
+    end if;
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'citas_registro' and tgrelid = 'public.citas'::regclass) then
+    create trigger citas_registro before insert or update on public.citas
+      for each row execute function public.cita_registro();
+  end if;
+end $$;
+
+-- Citas anteriores sin usuario
+do $$ begin
+  alter table public.citas disable trigger citas_registro;
+  update public.citas set creada_por = 'Sin usuario' where creada_por is null or creada_por = '';
+  update public.citas set estado_cambiado = creada where estado_cambiado is null;
+  alter table public.citas enable trigger citas_registro;
+end $$;
+
+-- Reprogramar: nueva fecha y hora (respeta los cupos por dentista y sala, y los bloqueos)
+create or replace function public.reprogramar_cita(p_id bigint, p_fecha date, p_hora text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if p_fecha is null or p_hora is null or p_hora = '' then
+    raise exception 'Indica la nueva fecha y hora';
+  end if;
+  if p_fecha < current_date then
+    raise exception 'La nueva fecha no puede ser anterior a hoy';
+  end if;
+  if exists (select 1 from public.bloqueos b where b.fecha = p_fecha and (b.hora is null or b.hora = p_hora::time)) then
+    raise exception 'Ese horario está bloqueado';
+  end if;
+  update public.citas
+     set reprogramada_de = to_char(fecha, 'YYYY-MM-DD') || ' ' || to_char(hora, 'HH24:MI'),
+         fecha = p_fecha, hora = p_hora::time,
+         estado = 'reprogramada'::public.estado_cita,
+         reprogramada_en = now(), reprogramada_por = coalesce(v_usuario, 'Sin usuario')
+   where id = p_id and estado <> 'cancelada'::public.estado_cita;
+  if not found then
+    raise exception 'La cita no existe o está cancelada';
+  end if;
+exception
+  when unique_violation then
+    raise exception 'Ese horario ya está ocupado para ese dentista o esa sala';
+end;
+$$;
+revoke execute on function public.reprogramar_cita(bigint, date, text) from public, anon;
+grant execute on function public.reprogramar_cita(bigint, date, text) to authenticated;
+
+-- Agendar desde el panel: estado inicial Programado (pendiente), Confirmado o Atendido
+create or replace function public.agendar_cita(
+  p_fecha date, p_hora text, p_paciente_id bigint, p_nombre text, p_telefono text, p_servicio text,
+  p_dentista_id bigint, p_posicion_id bigint, p_prioridad text, p_notas text, p_estado text)
+returns bigint
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_id bigint;
+  v_nombre text := trim(coalesce(p_nombre, ''));
+  v_tel text := trim(coalesce(p_telefono, ''));
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if p_paciente_id is not null then
+    select coalesce(nullif(v_nombre, ''), nombre), coalesce(nullif(v_tel, ''), telefono, '')
+      into v_nombre, v_tel
+      from public.pacientes where id = p_paciente_id;
+  end if;
+  if coalesce(v_nombre, '') = '' then
+    raise exception 'Indica el paciente';
+  end if;
+  if exists (select 1 from public.bloqueos b where b.fecha = p_fecha and (b.hora is null or b.hora = p_hora::time)) then
+    raise exception 'Ese horario está bloqueado';
+  end if;
+
+  insert into public.citas (fecha, hora, servicio, nombre, telefono, paciente_id, dentista_id, posicion_id,
+                            prioridad, notas, estado, creada_por)
+  values (p_fecha, p_hora::time, coalesce(nullif(trim(p_servicio), ''), 'Evaluación general'), v_nombre, v_tel,
+          p_paciente_id, p_dentista_id, p_posicion_id,
+          case when p_prioridad = 'urgente' then 'urgente' else 'normal' end,
+          nullif(trim(p_notas), ''),
+          (case when p_estado in ('confirmada', 'atendida') then p_estado else 'pendiente' end)::public.estado_cita,
+          (select usuario from public.perfiles where id = auth.uid()))
+  returning id into v_id;
+  return v_id;
+exception
+  when unique_violation then
+    raise exception 'Ese horario ya está ocupado para ese dentista o esa sala';
+end;
+$$;
+revoke execute on function public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text) from public, anon;
+grant execute on function public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

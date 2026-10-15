@@ -101,7 +101,7 @@
     citas: {
       panel: 'admRepCitas', titulo: 'Citas agendadas',
       nota: 'Citas con fecha entre las dos fechas.',
-      estados: { pendiente: ['Pendiente', 'ambar'], confirmada: ['Confirmada', 'verde'], cancelada: ['Cancelada', 'gris'] },
+      estados: { pendiente: ['Programado', 'ambar'], confirmada: ['Confirmado', 'verde'], reprogramada: ['Reprogramado', 'azul'], atendida: ['Atendido', 'azul'], cancelada: ['Cancelado', 'gris'] },
       columnas: [
         ['Fecha', function (f) { return fechaCorta(f.fecha); }],
         ['Hora', function (f) { return String(f.hora || '').slice(0, 5); }],

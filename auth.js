@@ -13,7 +13,8 @@
   var dlg = $('loginDlg'), claveDlg = $('claveDlg'), panel = $('administracion');
   var perfil = null, quiereAdmin = false, usuarios = [], claveDe = null;
   var citas = [], bloqueos = [], filtro = 'pendiente', periodo = 'proximas', posicionesCita = [], dentistasCita = [];
-  var ESTADOS = { pendiente: 'Pendiente', confirmada: 'Confirmada', cancelada: 'Cancelada' };
+  var ESTADOS = { pendiente: 'Programado', confirmada: 'Confirmado', reprogramada: 'Reprogramado', atendida: 'Atendido', cancelada: 'Cancelado' };
+  function fechaHoraGrab(t) { return t ? new Date(t).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
   var DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -147,7 +148,8 @@
         ? q.gte('fecha', hoyISO()).order('fecha').order('hora')
         : q.lt('fecha', hoyISO()).order('fecha', { ascending: false }).order('hora', { ascending: false }).limit(300);
     }
-    var r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id,dentista_id,paciente_id');
+    var r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,creada_por,reprogramada_de,posicion_id,dentista_id,paciente_id');
+    if (r.error && /creada_por|reprogramada_de/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id,dentista_id,paciente_id');
     if (r.error && /paciente_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id,dentista_id');
     // Si todavía no existen las columnas nuevas, se muestran las citas sin ellas
     if (r.error && /dentista_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id');
@@ -221,16 +223,20 @@
     if (!lista.length && buscando) { $('citasBody').innerHTML = '<tr><td colspan="7">Ninguna cita coincide con la búsqueda.</td></tr>'; return; }
     if (!lista.length) {
       var cuando = periodo === 'proximas' ? 'próximas' : 'anteriores';
-      var vacio = { pendiente: 'No hay citas pendientes ' + cuando + '.', confirmada: 'No hay citas confirmadas ' + cuando + '.', cancelada: 'No hay citas canceladas ' + cuando + '.', todas: 'No hay citas ' + cuando + '.' };
+      var vacio = { pendiente: 'No hay citas programadas ' + cuando + '.', confirmada: 'No hay citas confirmadas ' + cuando + '.', reprogramada: 'No hay citas reprogramadas ' + cuando + '.', atendida: 'No hay citas atendidas ' + cuando + '.', cancelada: 'No hay citas canceladas ' + cuando + '.', todas: 'No hay citas ' + cuando + '.' };
       $('citasBody').innerHTML = '<tr><td colspan="7">' + vacio[filtro] + '</td></tr>';
       return;
     }
     $('citasBody').innerHTML = lista.map(function (c) {
       var acciones = '';
-      if (c.estado === 'pendiente') acciones += '<button type="button" class="adm-btn adm-primary" data-cita="' + c.id + '" data-estado="confirmada">Confirmar</button>';
+      if (c.estado === 'pendiente' || c.estado === 'reprogramada') acciones += '<button type="button" class="adm-btn adm-primary" data-cita="' + c.id + '" data-estado="confirmada">Confirmar</button>';
+      if (c.estado !== 'cancelada' && c.estado !== 'atendida') acciones += '<button type="button" class="adm-btn" data-cita="' + c.id + '" data-estado="atendida">Atendido</button>';
+      if (c.estado !== 'cancelada' && c.estado !== 'atendida' && window.PD_AGENDA) acciones += '<button type="button" class="adm-btn" data-repro="' + c.id + '">Reprogramar</button>';
       if (c.estado !== 'cancelada') acciones += '<button type="button" class="adm-btn" data-cita="' + c.id + '" data-estado="cancelada">Cancelar</button>';
       acciones += '<a class="adm-btn" style="text-decoration:none;display:inline-flex;align-items:center" href="' + esc(waPaciente(c)) + '" target="_blank" rel="noopener">WhatsApp</a>';
-      return '<tr><td class="fecha"><strong style="color:#0B2B40">' + fechaLarga(c.fecha) + '</strong><br>' + hhmm(c.hora) + '</td>' +
+      return '<tr><td class="fecha"><strong style="color:#0B2B40">' + fechaLarga(c.fecha) + '</strong><br>' + hhmm(c.hora) +
+        (c.reprogramada_de ? '<span class="cita-grab">Reprogramada de ' + esc(fechaLarga(c.reprogramada_de.slice(0, 10)) + ' · ' + c.reprogramada_de.slice(11, 16)) + '</span>' : '') +
+        '<span class="cita-grab">Grabada: ' + fechaHoraGrab(c.creada) + ' · ' + esc(c.creada_por || 'Sin usuario') + '</span></td>' +
         '<td><strong>' + esc(c.nombre) + '</strong><br><span style="color:#5A6D7A">' + esc(c.telefono) + '</span></td>' +
         '<td>' + esc(c.servicio) + '</td>' +
         '<td>' + selectorDentista(c) + '</td>' +
@@ -295,6 +301,7 @@
     contarPendientes();
     aviso('citasMsg', estado === 'confirmada'
       ? 'Cita confirmada. Avísale al paciente con el botón WhatsApp.'
+      : estado === 'atendida' ? 'Cita marcada como atendida.'
       : 'Cita cancelada. El horario quedó libre en la agenda.');
     pintarCitas();
   }
@@ -482,6 +489,12 @@
     if (den) asignarDentista(den);
   });
   $('citasBody').addEventListener('click', function (e) {
+    var rp = e.target.closest('button[data-repro]');
+    if (rp && window.PD_AGENDA) {
+      var c = citas.filter(function (x) { return String(x.id) === rp.dataset.repro; })[0];
+      if (c) window.PD_AGENDA.reprogramar(c, async function (n) { await cargarCitas(); aviso('citasMsg', 'Cita reprogramada para el ' + fechaLarga(n.fecha) + ' a las ' + n.hora + '. Avísale al paciente con el botón WhatsApp.'); });
+      return;
+    }
     var b = e.target.closest('button[data-cita]');
     if (b) cambiarEstado(b.dataset.cita, b.dataset.estado, b);
   });
