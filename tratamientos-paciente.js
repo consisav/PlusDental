@@ -93,31 +93,58 @@
     $('trPie').innerHTML = '<tr><td></td><td>' + etq + '</td><td></td><td class="num">' + cant + '</td><td></td><td></td><td class="num">' + q(suma) + '</td><td></td></tr>';
   }
 
+  // Reporte: paciente, código de cliente, médico, presupuesto y forma de pago en el encabezado.
+  // Si los procedimientos son de varios presupuestos, se agrupan por presupuesto (cada grupo con su encabezado).
   function imprimirLista() {
     var imp = window.PD_IMPRESION;
     if (!imp || !paciente) return;
     var lista = filas();
     var celda = 'padding:7px 6px;border-bottom:1px solid #D9E4EC';
     var titulo = filtro === 'proceso' ? 'Tratamientos en proceso' : filtro === 'todos' ? 'Tratamientos' : 'Tratamientos finalizados';
+    var medico = paciente.medico && paciente.medico.nombre ? paciente.medico.nombre : 'Sin asignar';
+    var grupos = [], porId = {};
+    lista.forEach(function (i) {
+      var p = i.presupuesto;
+      if (!porId[p.id]) { porId[p.id] = { p: p, items: [] }; grupos.push(porId[p.id]); }
+      porId[p.id].items.push(i);
+    });
+    var uno = grupos.length === 1 ? grupos[0].p : null;
+    var dato = function (k, v, ancho) {
+      return '<div style="min-width:0' + (ancho ? ';grid-column:' + ancho : '') + '"><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">' + k + '</span>' +
+        '<b style="font-size:13.5px;overflow-wrap:anywhere">' + v + '</b></div>';
+    };
+    var cab = '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 16px;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:12px;padding:12px 14px;margin-bottom:16px">' +
+      dato('Paciente', esc(paciente.nombre), 'span 2') + dato('Código de cliente', String(paciente.id).padStart(4, '0')) + dato('Médico asignado', esc(medico)) +
+      dato('DPI', esc(paciente.dpi || '—')) + dato('NIT', esc(paciente.nit || 'CF')) +
+      (uno ? dato('Presupuesto', esc(uno.codigo || 'N.º ' + uno.id)) + dato('Forma de pago', esc(formaPago(uno) || '—'))
+        : dato('Presupuestos', grupos.length ? grupos.length + ' (agrupados abajo)' : '—', 'span 2')) + '</div>';
+    var th = celda + ';background:#0B2B40;color:#FFFFFF;font-size:10.5px;text-transform:uppercase';
+    var encabezadoTabla = '<tr>' + ['Fecha estado', 'Tratamiento', 'Estado', 'Cant.', 'Precio', 'Desc.', 'Total'].map(function (h, k) {
+      return '<th style="' + th + ';text-align:' + (k >= 3 ? 'right' : 'left') + '">' + h + '</th>';
+    }).join('') + '</tr>';
     var suma = 0;
-    var html = imp.encabezado(titulo) +
-      '<div style="font-size:16px;margin-bottom:4px"><strong>' + esc(paciente.nombre) + '</strong></div>' +
-      '<div style="font-size:13px;color:#475B68;margin-bottom:14px">' + [paciente.dpi ? 'DPI ' + esc(paciente.dpi) : '', paciente.nit ? 'NIT ' + esc(paciente.nit) : ''].filter(Boolean).join(' · ') + '</div>' +
-      '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>' +
-      ['Fecha estado', 'Tratamiento', 'Estado', 'Cant.', 'Precio', 'Desc.', 'Total', 'Presupuesto'].map(function (h, k) {
-        return '<th style="' + celda + ';text-align:' + (k >= 3 && k <= 6 ? 'right' : 'left') + ';background:#0B2B40;color:#FFFFFF;font-size:10.5px;text-transform:uppercase">' + h + '</th>';
-      }).join('') + '</tr></thead><tbody>' +
-      lista.map(function (i) {
-        var p = i.presupuesto;
-        suma += total(i);
+    var cuerpo = grupos.map(function (g) {
+      var sub = 0;
+      var filasHtml = g.items.map(function (i) {
+        sub += total(i);
         return '<tr><td style="' + celda + '">' + fechaEstado(i) + '</td><td style="' + celda + '">' + esc(i.tratamiento) + (i.pieza ? ' · pieza ' + esc(i.pieza) : '') + '</td>' +
           '<td style="' + celda + '">' + ESTADOS[estadoDe(i)] + '</td>' +
           '<td style="' + celda + ';text-align:right">' + i.cantidad + '</td><td style="' + celda + ';text-align:right">' + q(i.precio) + '</td>' +
-          '<td style="' + celda + ';text-align:right">' + (Number(p.descuento_pct) || 0) + '%</td><td style="' + celda + ';text-align:right">' + q(total(i)) + '</td>' +
-          '<td style="' + celda + '">' + esc(p.codigo || 'N.º ' + p.id) + (p.forma_pago ? '<br>' + esc(formaPago(p)) : '') + '</td></tr>';
-      }).join('') +
-      '<tr><td colspan="6" style="' + celda + ';font-weight:800;background:#EEF5FA">TOTAL</td><td style="' + celda + ';text-align:right;font-weight:800;background:#EEF5FA">' + q(suma) + '</td><td style="' + celda + ';background:#EEF5FA"></td></tr></tbody></table>' +
-      '<div style="margin-top:18px;font-size:13px;color:#475B68">Finalizado: <b>' + $('trRealizado').textContent + '</b> · Pagado: <b>' + $('trPagado').textContent + '</b> · Saldo: <b>' + $('trSaldo').textContent + '</b></div></div>';
+          '<td style="' + celda + ';text-align:right">' + (Number(g.p.descuento_pct) || 0) + '%</td><td style="' + celda + ';text-align:right">' + q(total(i)) + '</td></tr>';
+      }).join('');
+      suma += sub;
+      var banda = uno ? '' : '<tr><td colspan="7" style="padding:8px 6px;background:#EEF5FA;font-weight:800;font-size:12.5px">Presupuesto ' + esc(g.p.codigo || 'N.º ' + g.p.id) +
+        (g.p.forma_pago ? ' <span style="font-weight:600;color:#475B68">· ' + esc(formaPago(g.p)) + '</span>' : '') + '</td></tr>';
+      var subtotal = uno ? '' : '<tr><td colspan="6" style="' + celda + ';text-align:right;font-weight:700;color:#475B68">Subtotal</td><td style="' + celda + ';text-align:right;font-weight:700">' + q(sub) + '</td></tr>';
+      return banda + filasHtml + subtotal;
+    }).join('');
+    var html = imp.encabezado(titulo) + cab +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead>' + encabezadoTabla + '</thead><tbody>' +
+      (cuerpo || '<tr><td colspan="7" style="' + celda + '">No hay tratamientos con este filtro.</td></tr>') +
+      '<tr><td colspan="6" style="' + celda + ';font-weight:800;background:#EEF5FA">TOTAL</td><td style="' + celda + ';text-align:right;font-weight:800;background:#EEF5FA">' + q(suma) + '</td></tr></tbody></table>' +
+      '<div style="margin-top:18px;font-size:13px;color:#475B68">Finalizado: <b>' + $('trRealizado').textContent + '</b> · Pagado: <b>' + $('trPagado').textContent + '</b> · Saldo: <b>' + $('trSaldo').textContent + '</b></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:46px;font-size:12px;text-align:center;color:#475B68">' +
+      '<div style="border-top:1px solid #0B2B40;padding-top:6px">' + esc(medico) + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div></div>';
     imp.imprimir(html);
   }
 
