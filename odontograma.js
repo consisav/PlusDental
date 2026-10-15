@@ -152,6 +152,8 @@
       '.odg-det td.proc{min-width:220px}.odg-det td.proc select{width:100%}',
       '.odg-det tfoot td{font-weight:800;background:#EEF5FA;border-top:2px solid #0B2B40;border-bottom:0}',
       '.odg-det .sinp{color:#9A3B2E;font-size:12.5px;font-weight:700}',
+      '.odg-res button.odg-ver-sin{font:inherit;font-size:13px;font-weight:700;color:#005A87;background:none;border:0;padding:10px 2px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}',
+      '.odg-res .odg-vacio{margin:4px 0 0;color:#5A6D7A}',
       'dialog.odg-dlg{border:0;border-radius:18px;padding:0;width:min(480px,calc(100vw - 32px));max-height:min(640px,calc(100vh - 40px));box-shadow:0 20px 50px rgba(0,0,0,.25);color:#0B2B40;font-family:Manrope,system-ui,sans-serif}',
       'dialog.odg-dlg::backdrop{background:rgba(11,43,64,.4)}',
       '.odg-dlg form{display:flex;flex-direction:column;gap:10px;padding:20px;max-height:inherit;box-sizing:border-box}',
@@ -304,15 +306,22 @@
         '</td><td class="num">' + q(total) + '</td></tr></tfoot>' : '';
       return '<table class="odg-det"><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Procedimiento</th><th class="num">Precio</th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table>';
     }
+    var verSinProc = false;
     function resumen() {
       var f = filasDetalle();
       var selTipo = '<label class="odg-tp">Tipo de precio <select data-tipo-precio>' + TIPOS_PRECIO.map(function (t) {
         return '<option value="' + t[0] + '"' + (t[0] === tipoPrecio ? ' selected' : '') + '>' + t[1] + '</option>';
       }).join('') + '</select></label>';
       var crearPre = opciones.crearPresupuesto ? '<button type="button" class="odg-crear" data-crear-presupuesto>Crear presupuesto</button>' : '';
-      return '<div><div class="odg-cab"><h4 style="color:' + ROJO + '">Requerido (' + f.req.length + ')</h4>' +
+      // En el detalle «Requerido» solo se ven los hallazgos con procedimiento elegido;
+      // los demás quedan en el dibujo y se pueden mostrar para elegirles uno.
+      var conProc = f.req.filter(function (x) { return x.proc; }), sinN = f.req.length - conProc.length;
+      var visibles = verSinProc ? f.req : conProc;
+      var enlace = sinN ? '<button type="button" class="odg-ver-sin" data-ver-sin>' + (verSinProc ? 'Ocultar los hallazgos sin procedimiento'
+        : 'Elegir procedimiento para ' + sinN + (sinN === 1 ? ' hallazgo' : ' hallazgos') + ' sin procedimiento') + '</button>' : '';
+      return '<div><div class="odg-cab"><h4 style="color:' + ROJO + '">Requerido (' + visibles.length + ')</h4>' +
         (f.req.length && catalogo.length ? '<div class="odg-acc">' + selTipo + crearPre + '</div>' : '') + '</div>' +
-        (f.req.length ? tablaDetalle(f.req, true) : 'Sin tratamientos pendientes.') + '</div>' +
+        (visibles.length ? tablaDetalle(visibles, true) : f.req.length ? '<p class="odg-vacio">Aún no hay hallazgos con procedimiento elegido.</p>' : 'Sin tratamientos pendientes.') + enlace + '</div>' +
         '<div><div class="odg-cab"><h4 style="color:' + AZUL + '">Realizado / existente (' + f.hecho.length + ')</h4></div>' +
         (f.hecho.length ? tablaDetalle(f.hecho, false) : 'Sin registros.') + '</div>';
     }
@@ -535,6 +544,7 @@
     });
     raiz.addEventListener('click', function (e) {
       if (e.target.closest('select')) return;
+      if (e.target.closest('[data-ver-sin]')) { verSinProc = !verSinProc; pintar(); return; }
       if (e.target.closest('[data-crear-presupuesto]')) { abrirPresupuesto(); return; }
       var b = e.target.closest('[data-denticion],[data-modo],[data-herr]');
       if (b) {

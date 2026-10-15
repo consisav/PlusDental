@@ -332,6 +332,7 @@
     [/^Pago registrado con el correlativo (\S+) \(recibo N\.º (\d+)\)\. Puedes imprimirlo o enviarlo desde la lista\.$/, 'Payment registered with sequence No. $1 (receipt No. $2). You can print or send it from the list.'],
     [/^(Factura|Recibo)( [A-Za-z0-9-]+)?$/, function (m, t, n) { return (t === 'Factura' ? 'Invoice' : 'Receipt') + (n || ''); }],
     [/^Cuota (\d+)$/, 'Installment $1'],
+    [/^Elegir procedimiento para (\d+) hallazgos? sin procedimiento$/, function (m, n) { return 'Choose a procedure for ' + n + (n === '1' ? ' finding' : ' findings') + ' without one'; }],
     [/^Impreso el (\d{1,2}) (\S+?)\.? (\d{4})(, \d{1,2}:\d{2})?$/, function (m, d, mes, a, h) {
       var M = { ene: 'Jan', feb: 'Feb', mar: 'Mar', abr: 'Apr', may: 'May', jun: 'Jun', jul: 'Jul', ago: 'Aug', sept: 'Sep', sep: 'Sep', oct: 'Oct', nov: 'Nov', dic: 'Dec' };
       return 'Printed on ' + (M[mes.toLowerCase()] || mes) + ' ' + d + ', ' + a + (h || '');
