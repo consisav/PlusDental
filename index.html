@@ -669,6 +669,19 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 .faq-vermas{align-self:flex-start;margin-top:10px}
 .faq-nada{display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:#FEF3C7;color:#92400E;border-radius:14px;padding:12px 16px;font-weight:600;font-size:15px}
 .faq-nada a{color:#08504C;font-weight:800}
+.faq-ia{border:1px solid #9CC3DA;background:#F2F8FC;border-radius:20px;padding:20px 24px;display:flex;flex-direction:column;gap:10px;max-width:880px}
+.faq-ia-tag{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#005A87}
+.faq-ia-tag small{font-weight:600;letter-spacing:0;text-transform:none;color:#5A6D7A;font-size:12.5px}
+.faq-ia h3{margin:0;font-size:20px;font-weight:700;color:#0B2B40}
+.faq-ia p{margin:0;font-size:16px;line-height:1.65;color:#22394A}
+.faq-ia .faq-ia-nota{font-size:13px;color:#5A6D7A}
+.faq-ia-acc{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.faq-ia-acc a{display:inline-flex;align-items:center;min-height:42px;padding:8px 18px;border-radius:999px;font-weight:700;font-size:14.5px;text-decoration:none;border:1px solid #9CC3DA;color:#00476B;background:#FFFFFF}
+.faq-ia-acc a.prim{background:#005A87;border-color:#005A87;color:#FFFFFF}
+.faq-ia-cargando{display:flex;align-items:center;gap:12px;color:#475B68;font-weight:600}
+.faq-ia-cargando i{width:18px;height:18px;border-radius:50%;border:3px solid #C4D4DF;border-top-color:#005A87;animation:faqGira .8s linear infinite;display:inline-block}
+@keyframes faqGira{to{transform:rotate(360deg)}}
+@media (max-width:640px){.faq-ia{padding:16px}.faq-ia h3{font-size:18px}}
 .faq-nota{margin:0;font-size:13.5px;color:#5A6D7A}
 @media (max-width:900px){.faq-grid{grid-template-columns:minmax(0,1fr)}.faq-mejor{position:static}.faq-mejor h3{font-size:27px}}
 @media (max-width:560px){.faq-buscar{flex-wrap:wrap;border-radius:18px;padding:8px 10px 10px 14px}.faq-buscar input{flex-basis:calc(100% - 40px)}.faq-ir{width:100%}}
@@ -2041,6 +2054,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="submit" class="faq-ir">Buscar respuesta</button>
 </form>
 <div id="faqTemas" class="faq-temas" role="group" aria-label="Temas"></div>
+<section id="faqIA" class="faq-ia" aria-live="polite" hidden></section>
 <div id="faqNada" class="faq-nada" hidden><span>No encontramos una respuesta exacta a tu pregunta.</span><a id="faqWa" href="#" target="_blank" rel="noopener">Pregúntanos por WhatsApp →</a></div>
 <div class="faq-grid">
 <article id="faqMejor" class="faq-mejor" aria-live="polite"></article>

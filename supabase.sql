@@ -2827,6 +2827,27 @@ $$;
 revoke execute on function public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text) from public, anon;
 grant execute on function public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text) to authenticated;
 
+-- ===== Preguntas frecuentes con IA =====
+-- Registro de las preguntas que la página envió a la IA (función faq-ia). Sirve para reutilizar respuestas,
+-- limitar el uso por visitante y por día, y que el personal vea qué dudas no estaban en la página.
+-- Solo la función (con la clave de servicio) escribe aquí; el personal puede leer.
+create table if not exists public.faq_ia_consultas (
+  id bigint generated always as identity primary key,
+  creada timestamptz not null default now(),
+  visitante text not null,
+  pregunta text not null,
+  pregunta_norm text not null,
+  idioma text not null default 'es',
+  respuesta text
+);
+create index if not exists faq_ia_consultas_norm on public.faq_ia_consultas (pregunta_norm, idioma, creada desc);
+create index if not exists faq_ia_consultas_visitante on public.faq_ia_consultas (visitante, creada desc);
+create index if not exists faq_ia_consultas_creada on public.faq_ia_consultas (creada desc);
+alter table public.faq_ia_consultas enable row level security;
+revoke all on public.faq_ia_consultas from anon;
+drop policy if exists faq_ia_personal_lee on public.faq_ia_consultas;
+create policy faq_ia_personal_lee on public.faq_ia_consultas for select to authenticated using (public.es_personal());
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
