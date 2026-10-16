@@ -470,6 +470,17 @@
     $('agPrev').setAttribute('aria-label', vista === 'mes' ? 'Mes anterior' : vista === 'semana' ? 'Semana anterior' : 'Día anterior');
     $('agNext').setAttribute('aria-label', vista === 'mes' ? 'Mes siguiente' : vista === 'semana' ? 'Semana siguiente' : 'Día siguiente');
     if (vista === 'mes') pintarMes(); else if (vista === 'semana') pintarSemana(); else pintarDia();
+    pintarLeyenda();
+  }
+  var COLOR_ESTADO = { pendiente: '#B45309', confirmada: '#4D8B1E', reprogramada: '#6D5BD0', atendida: '#2F78C4' };
+  function pintarLeyenda() {
+    var rv = rangoVista(), d = rv.mesDesde || rv.desde, h = rv.mesHasta || rv.hasta;
+    var enRango = citas.filter(function (c) { return c.fecha >= d && c.fecha <= h; });
+    var urg = enRango.filter(function (c) { return c.prioridad === 'urgente'; }).length;
+    $('agLeyenda').innerHTML = Object.keys(COLOR_ESTADO).map(function (e) {
+      var n = enRango.filter(function (c) { return c.estado === e; }).length;
+      return '<span><i style="background:' + COLOR_ESTADO[e] + '"></i>' + ESTADOS_CITA[e] + ' · <b>' + n + '</b></span>';
+    }).join('') + '<span class="ag-ley-urg">Urgente = borde rojo' + (urg ? ' · <b>' + urg + '</b>' : '') + '</span>';
   }
 
   // Vista de semana: lunes a sábado, todas las salas en cada casilla
@@ -595,20 +606,32 @@
     if (!c) return;
     var pac = pacientes.filter(function (p) { return p.id === c.paciente_id; })[0];
     var conCorreo = Object.assign({}, c, { correo: pac && pac.correo });
+    var activa = c.estado !== 'atendida';
+    var campo = function (t, v) { return '<div><dt>' + t + '</dt><dd>' + v + '</dd></div>'; };
     $('agDetalle').hidden = false;
-    $('agDetalle').innerHTML = '<div class="adm-pane-head"><h3 style="margin:0;font-size:18px;font-weight:700">' + esc(c.nombre) + '</h3><span class="estado estado-' + c.estado + '">' + (ESTADOS_CITA[c.estado] || c.estado) + '</span></div>' +
-      '<div class="pac-meta"><span><b>' + textoFecha(c.fecha) + ' · ' + hhmm(c.hora) + '</b></span><span>' + esc(c.servicio) + '</span><span>' + esc(nombreDentista(c.dentista_id)) + '</span><span>' + esc(c.posicion_id ? nombreSala(c.posicion_id) : 'Sin sala') + '</span>' +
-      (c.telefono ? '<span>WhatsApp ' + esc(c.telefono) + '</span>' : '') + (c.prioridad === 'urgente' ? '<span class="ag-urg">Urgente</span>' : '') + '</div>' +
-      '<div class="pac-meta" style="font-size:13px"><span>Grabada: <b>' + fechaHoraGrab(c.creada) + '</b></span><span>Usuario que graba: <b>' + esc(c.creada_por || 'Sin usuario') + '</b></span>' +
-      (c.reprogramada_de ? '<span>Reprogramada de: <b>' + esc(textoFecha(c.reprogramada_de.slice(0, 10)) + ' · ' + c.reprogramada_de.slice(11, 16)) + '</b></span>' : '') + '</div>' +
-      (c.notas ? '<p class="dlg-msg">' + esc(c.notas) + '</p>' : '') +
-      '<div class="acciones">' + (c.estado === 'pendiente' || c.estado === 'reprogramada' ? '<button type="button" class="adm-btn adm-primary" data-det-estado="confirmada" data-id="' + c.id + '">Confirmar</button>' : '') +
-      (c.estado !== 'atendida' ? '<button type="button" class="adm-btn" data-det-estado="atendida" data-id="' + c.id + '">Atendido</button>' : '') +
-      (c.estado !== 'atendida' ? '<button type="button" class="adm-btn" data-det-repro="' + c.id + '">Reprogramar</button>' : '') +
-      '<button type="button" class="adm-btn" data-det-estado="cancelada" data-id="' + c.id + '" data-confirmar="0">Cancelar cita</button>' +
+    $('agDetalle').classList.add('ag-det');
+    $('agDetalle').innerHTML =
+      '<div class="ag-det-head"><div><h3>' + esc(c.nombre) + (c.prioridad === 'urgente' ? ' <span class="ag-urg">Urgente</span>' : '') + '</h3>' +
+      '<div class="ag-det-cuando">' + textoFecha(c.fecha) + ' · <b>' + hhmm(c.hora) + '</b>' + (c.servicio ? ' · ' + esc(c.servicio) : '') + '</div></div>' +
+      '<div class="ag-det-der"><span class="estado estado-' + c.estado + '">' + (ESTADOS_CITA[c.estado] || c.estado) + '</span>' +
+      '<button type="button" class="ag-det-x" data-det-cerrar aria-label="Cerrar">×</button></div></div>' +
+      '<dl class="ag-det-grid">' +
+      campo('Dentista', esc(nombreDentista(c.dentista_id))) +
+      campo('Sala', esc(c.posicion_id ? nombreSala(c.posicion_id) : 'Sin sala')) +
+      campo('WhatsApp', c.telefono ? esc(c.telefono) : '—') +
+      campo('Fecha y hora de grabación', fechaHoraGrab(c.creada)) +
+      campo('Usuario que graba', esc(c.creada_por || 'Sin usuario')) +
+      campo('Reprogramada de', c.reprogramada_de ? esc(textoFecha(c.reprogramada_de.slice(0, 10)) + ' · ' + c.reprogramada_de.slice(11, 16)) : '—') +
+      '</dl>' +
+      (c.notas ? '<p class="ag-det-notas">' + esc(c.notas) + '</p>' : '') +
+      '<div class="ag-det-acc">' +
+      (c.estado === 'pendiente' || c.estado === 'reprogramada' ? '<button type="button" class="adm-btn adm-primary" data-det-estado="confirmada" data-id="' + c.id + '">Confirmar</button>' : '') +
+      (activa ? '<button type="button" class="adm-btn' + (c.estado === 'confirmada' ? ' adm-primary' : '') + '" data-det-estado="atendida" data-id="' + c.id + '">Atendido</button>' : '') +
+      (activa ? '<button type="button" class="adm-btn" data-det-repro="' + c.id + '">Reprogramar</button>' : '') +
       (c.paciente_id && window.PD_EXPEDIENTE ? '<button type="button" class="adm-btn" data-ir-exp="' + c.paciente_id + '">Ver expediente</button>' : '') +
-      '<button type="button" class="adm-btn" data-det-cerrar>Cerrar</button></div>' +
-      '<span class="pos-lbl" style="margin:4px 0 0">Avisos y recordatorios</span>' + avisosHtml(conCorreo, { paciente: true, medico: true, correo: true });
+      '<button type="button" class="adm-btn ag-det-cancel" data-det-estado="cancelada" data-id="' + c.id + '" data-confirmar="0">Cancelar cita</button>' +
+      '</div>' +
+      '<details class="ag-det-avisos"><summary>Avisos y recordatorios</summary><div>' + avisosHtml(conCorreo, { paciente: true, medico: true, correo: true }) + '</div></details>';
     $('agDetalle').scrollIntoView({ block: 'nearest' });
   }
 

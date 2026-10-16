@@ -293,10 +293,39 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-celda.libre{border-style:dashed;color:#005A87;font-weight:600;background:#F5F9FC}
 .ag-celda.libre:hover{background:#E6F1F8}
 .ag-celda.cita{border-left:4px solid #005A87}
-.ag-celda.cita.pendiente{border-left-color:#B45309}
-.ag-celda.cita.reprogramada{border-left-color:#6D28D9}
-.ag-celda.cita.atendida{border-left-color:#1E40AF;opacity:.8}
-.ag-celda.cita.urgente{background:#FFF6F6}
+.ag-celda.cita.confirmada,.ag-mini.cita.confirmada{background:#EAF5E4;border-color:#CFE5C2;border-left-color:#4D8B1E;color:#234A0B}
+.ag-celda.cita.pendiente,.ag-mini.cita.pendiente{background:#FDF3E1;border-color:#F1DDB4;border-left-color:#B45309;color:#5C3405}
+.ag-celda.cita.reprogramada,.ag-mini.cita.reprogramada{background:#F0EEFE;border-color:#DAD5FA;border-left-color:#6D5BD0;color:#352C80}
+.ag-celda.cita.atendida,.ag-mini.cita.atendida{background:#E8F1FB;border-color:#C9DDF3;border-left-color:#2F78C4;color:#0C3F72}
+.ag-celda.cita.urgente,.ag-mini.cita.urgente{box-shadow:inset 0 0 0 1.5px #C0263A}
+.ag-celda.cita:hover,.ag-mini.cita:hover{filter:brightness(.97)}
+.ag-celda.cita .ag-trat,.ag-mini.cita .ag-trat,.ag-celda.cita span{color:inherit;opacity:.8}
+.ag-leyenda{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.ag-leyenda span{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:#0B2B40;border:1px solid #D9E4EC;background:#FFFFFF;border-radius:999px;padding:5px 12px}
+.ag-leyenda i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.ag-leyenda b{font-variant-numeric:tabular-nums}
+.ag-leyenda .ag-ley-urg{border-style:dashed;color:#9F1239;font-weight:600}
+#agDetalle.ag-det{padding:0 !important;overflow:hidden}
+.ag-det-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 20px;background:#F5F9FC;border-bottom:1px solid #D9E4EC}
+.ag-det-head h3{margin:0;font-size:19px;font-weight:700;color:#0B2B40}
+.ag-det-cuando{font-size:14.5px;color:#475B68;margin-top:3px}
+.ag-det-der{display:flex;align-items:center;gap:10px}
+.ag-det-x{border:0;background:transparent;font-size:26px;line-height:1;color:#475B68;cursor:pointer;min-width:40px;min-height:40px;border-radius:10px}
+.ag-det-x:hover{background:#E6F1F8}
+.ag-det-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;padding:18px 20px;margin:0}
+.ag-det-grid dt{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#5A6D7A;margin:0 0 3px}
+.ag-det-grid dd{margin:0;font-size:14.5px;color:#0B2B40;overflow-wrap:anywhere}
+.ag-det-notas{margin:0 20px 16px;padding:10px 14px;border-radius:12px;background:#F5F9FC;color:#475B68;font-size:14px}
+.ag-det-acc{display:flex;flex-wrap:wrap;gap:8px;padding:14px 20px;border-top:1px solid #D9E4EC}
+.ag-det-acc .ag-det-cancel{margin-left:auto;color:#9F1239;border-color:#F1C7CF}
+.ag-det-avisos{border-top:1px solid #D9E4EC}
+.ag-det-avisos>summary{cursor:pointer;padding:12px 20px;font-weight:700;font-size:14px;color:#00476B;list-style:none}
+.ag-det-avisos>summary::-webkit-details-marker{display:none}
+.ag-det-avisos>summary::before{content:"▸";display:inline-block;margin-right:8px;transition:transform .15s}
+.ag-det-avisos[open]>summary::before{transform:rotate(90deg)}
+.ag-det-avisos>div{padding:0 20px 16px}
+@media (max-width:760px){.ag-det-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.ag-det-grid{grid-template-columns:minmax(0,1fr)}.ag-det-acc .adm-btn{flex:1 1 calc(50% - 8px)}.ag-det-acc .ag-det-cancel{margin-left:0}}
 .ag-celda.cerrado{cursor:default;color:#94A6B2;background:#F5F9FC;border-color:transparent}
 .ag-urg{display:inline-block;background:#FDE2E4;color:#9F1239;border-radius:999px;padding:0 7px;font-size:11px;font-weight:700;margin-left:4px}
 .ag-fijo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#E6F1F8;border:1px solid #C4D4DF;border-radius:12px;padding:10px 14px;font-size:14px;color:#00476B}
@@ -322,10 +351,6 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-pac{font-weight:700;text-decoration:underline;text-decoration-color:#9CC3DA;text-underline-offset:2px;cursor:pointer}
 .ag-pac:hover{color:#005A87;text-decoration-color:#005A87}
 .ag-trat{display:block;font-size:11.5px;color:#5A6D7A;font-weight:500;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ag-mini.cita.pendiente{border-left-color:#B45309}
-.ag-mini.cita.reprogramada{border-left-color:#6D28D9}
-.ag-mini.cita.atendida{border-left-color:#1E40AF;opacity:.8}
-.ag-mini.cita.urgente{background:#FFF6F6;border-left-color:#C0263A}
 .ag-mini.libre{border-style:dashed;color:#005A87;font-weight:600;background:#F5F9FC}
 .ag-mini.cerrado{cursor:default;color:#94A6B2;background:transparent;border-color:transparent}
 .ag-avisos{display:flex;flex-wrap:wrap;gap:10px 28px}
@@ -1204,6 +1229,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" id="agImprimir" class="adm-btn adm-primary">Imprimir agenda</button>
 </div>
 </div>
+<div id="agLeyenda" class="ag-leyenda" aria-live="polite"></div>
 <div class="roles-wrap"><table class="ag-grid"><thead id="agHead"></thead><tbody id="agBody"></tbody></table></div>
 <p id="agAyuda" class="dlg-msg">Toca un espacio <b>Libre</b> para agendar ahí, o una cita para ver su detalle.</p>
 <div id="agDetalle" class="adm-box" hidden></div>
