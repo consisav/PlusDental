@@ -341,8 +341,31 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-vista{display:inline-flex;border:1px solid #C4D4DF;border-radius:999px;padding:3px;background:#FFFFFF}
 .ag-vista button{font:inherit;font-size:14px;font-weight:600;border:0;background:transparent;color:#475B68;padding:7px 14px;border-radius:999px;cursor:pointer;min-height:36px}
 .ag-vista button[aria-pressed="true"]{background:#0B2B40;color:#FFFFFF}
-.ag-grid.semana{min-width:860px;table-layout:fixed}
-.ag-grid.semana th:first-child,.ag-grid.semana td:first-child{width:64px}
+.ag-titulo{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ag-resumen{margin:0;font-size:13.5px;color:#5A6D7A;font-weight:600}.ag-resumen:empty{display:none}.ag-resumen b{color:#0B2B40}
+.ag-grid.semana{min-width:0;width:100%;table-layout:fixed;border-collapse:collapse}
+.ag-grid.semana th:first-child,.ag-grid.semana td:first-child{width:58px}
+.ag-grid.semana th{padding:10px 6px;background:#F5F9FC;border-bottom:1px solid #D9E4EC;letter-spacing:0;text-transform:none}
+.ag-grid.semana th:first-child{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#5A6D7A}
+.ag-grid.semana td{padding:5px;border-bottom:1px solid #EEF3F7;border-left:1px solid #F1F5F8;height:52px}
+.ag-grid.semana td.hora{font-size:13px;color:#475B68;border-left:0;padding-left:10px}
+.ag-grid.semana .hoy{background:#F0F7FC}.ag-grid.semana th.hoy{background:#E2EEF6;box-shadow:inset 0 -2px 0 #005A87}
+.ag-grid.semana td.cerrada{background:repeating-linear-gradient(135deg,#FAFCFD 0 6px,#F3F6F8 6px 12px)}
+.ag-grid.semana td.pasada{background:#FBFCFD}
+.ag-grid.semana .ag-mini{margin-bottom:3px;padding:4px 6px;border-radius:0 7px 7px 0;font-size:12px}
+.ag-grid.semana .ag-mini.libre{opacity:0;border:1px dashed #9CC3DA;border-radius:7px;text-align:center;background:#FFFFFF;transition:opacity .12s}
+.ag-grid.semana td:hover .ag-mini.libre,.ag-grid.semana .ag-mini.libre:focus-visible{opacity:1}
+@media (hover:none){.ag-grid.semana .ag-mini.libre{opacity:.55}}
+.ag-grid.semana .ag-bloq{display:block;font-size:11px;font-weight:700;color:#9F1239;background:#FDF2F4;border-radius:6px;padding:3px 6px;text-align:center}
+.ag-dia-cnt{display:inline-block;align-self:flex-start;font-size:10.5px;font-weight:700;color:#00476B;background:#FFFFFF;border:1px solid #C4D4DF;border-radius:999px;padding:0 7px;margin-top:2px}
+.ag-grid.semana-lista{min-width:0;width:100%}
+.ag-grid.semana-lista td{vertical-align:top;padding:12px}
+.ag-grid.semana-lista td:first-child{width:96px}
+.ag-grid.semana-lista tr.hoy td{background:#F0F7FC}
+.ag-lista-citas{display:flex;flex-direction:column;gap:6px}
+.ag-lista-citas .ag-mini{white-space:normal;margin:0}
+.ag-lista-citas .ag-mini b.ag-h{margin-right:6px}
+.ag-lista-vacia{color:#94A6B2;font-size:13px}
 .ag-dia-btn{font:inherit;font-size:13px;font-weight:700;background:transparent;border:0;color:#0B2B40;cursor:pointer;padding:0;text-align:left;display:flex;flex-direction:column;gap:2px}
 .ag-dia-btn small{font-weight:600;color:#5A6D7A;font-size:11px;letter-spacing:.3px}
 .ag-dia-btn.hoy{color:#005A87}
@@ -1232,7 +1255,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="admVerCitas" role="tabpanel" aria-labelledby="tabVerCitas" hidden class="adm-pane">
 <div class="adm-pane-head"><h3 class="adm-h">Visualizar citas</h3></div>
 <div class="adm-pane-head">
-<h3 id="agTitulo" style="margin: 0; font-size: 19px; font-weight: 700">Agenda del día</h3>
+<div class="ag-titulo"><h3 id="agTitulo" style="margin: 0; font-size: 19px; font-weight: 700">Agenda del día</h3><p id="agResumen" class="ag-resumen"></p></div>
 <div class="ag-nav">
 <div class="ag-vista" role="group" aria-label="Vista de la agenda"><button type="button" data-vista="dia" aria-pressed="true">Día</button><button type="button" data-vista="semana" aria-pressed="false">Semana</button><button type="button" data-vista="mes" aria-pressed="false">Mes</button></div>
 <button type="button" id="agPrev" class="adm-btn" aria-label="Día anterior">←</button>
