@@ -273,10 +273,10 @@
       r.receta_items.map(function (i, k) { return '<tr><td style="' + celda + '">' + (k + 1) + '</td><td style="' + celda + '"><b>' + esc(i.medicamento) + '</b></td><td style="' + celda + '">' + esc(i.dosis || '—') + '</td><td style="' + celda + '">' + esc(i.frecuencia || '—') + '</td><td style="' + celda + '">' + esc(i.duracion || '—') + '</td></tr>'; }).join('') +
       '</tbody></table>' +
       (r.indicaciones ? '<p style="margin:14px 0 0;font-size:13.5px;line-height:1.55"><b>Indicaciones:</b> ' + esc(r.indicaciones) + '</p>' : '') +
-      '<div style="display:flex;justify-content:flex-end;margin-top:70px"><div style="width:280px;text-align:center;border-top:1.5px solid #0B2B40;padding-top:8px;font-size:13px">' +
+      '<div style="display:flex;justify-content:center;margin-top:70px"><div style="width:320px;text-align:center;border-top:1.5px solid #0B2B40;padding-top:8px;font-size:13px">' +
       '<b style="font-size:14px">' + esc(med ? 'Dr(a). ' + med.nombre : 'Médico tratante') + '</b>' + (med && med.colegiado ? '<br>Colegiado ' + esc(med.colegiado) : '') +
       '<br><span style="color:#5A6D7A">Firma y sello</span>' +
-      '<div style="margin-top:14px;padding-top:10px;border-top:1px dashed #C4D4DF;text-align:right;font-size:12px;line-height:1.7;color:#22394A">' +
+      '<div style="margin-top:14px;padding-top:10px;border-top:1px dashed #C4D4DF;text-align:center;font-size:12px;line-height:1.7;color:#22394A">' +
       '<div><span style="color:#5A6D7A">Próxima cita:</span> <b>' + textoProxima(r) + '</b></div>' +
       '<div><span style="color:#5A6D7A">Fecha de grabación:</span> ' + fechaHora(r.creada) + '</div>' +
       '<div><span style="color:#5A6D7A">Usuario que graba:</span> ' + esc(r.creada_por || 'Sin usuario') + '</div>' +
