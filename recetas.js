@@ -75,7 +75,7 @@
   var FRECUENCIAS = ['Cada 4 horas', 'Cada 6 horas', 'Cada 8 horas', 'Cada 12 horas', 'Una vez al día', 'Una vez al día, antes de dormir', 'Solo si hay dolor', 'Dosis única'];
   var DURACIONES = ['Dosis única', '2 días', '3 días', '5 días', '7 días', '10 días', '14 días', 'Hasta terminar el tratamiento', 'Uso continuo'];
 
-  var paciente = null, recetas = [], dentistas = [], citasPac = [], elegida = null, editando = null, visitaAMano = false;
+  var paciente = null, recetas = [], dentistas = [], citasPac = [], elegida = null, editando = null, visitaAMano = false, proximaAMano = false;
 
   function nombreDentista(id) { var d = dentistas.filter(function (x) { return x.id === id; })[0]; return d ? d.nombre : ''; }
   function dentistaDe(id) { return dentistas.filter(function (x) { return x.id === id; })[0] || null; }
@@ -83,6 +83,21 @@
     if (paciente && paciente.dentista_id && dentistaDe(paciente.dentista_id)) return paciente.dentista_id;
     var d = dentistas.filter(function (x) { return x.rol_sala === 'principal' && x.estado === 'activo'; })[0] || dentistas.filter(function (x) { return x.estado === 'activo'; })[0];
     return d ? d.id : null;
+  }
+  function textoProxima(r) { return r.proxima_cita ? fechaLarga(r.proxima_cita) + (r.proxima_hora ? ' · ' + String(r.proxima_hora).slice(0, 5) : '') : 'Sin próxima cita'; }
+  // Próxima cita del paciente después de una fecha (programada, confirmada o reprogramada)
+  function citaSiguiente(f) {
+    return citasPac.filter(function (c) { return c.fecha > f && c.estado !== 'atendida'; })
+      .sort(function (a, b) { return (a.fecha + a.hora) < (b.fecha + b.hora) ? -1 : 1; })[0] || null;
+  }
+  function registroHtml(r, conBoton) {
+    var nueva = !r;
+    return '<div class="rc-registro">' +
+      '<div><span>Fecha y hora de grabación</span>' + (nueva ? 'Se registra al grabar' : fechaHora(r.creada)) + '</div>' +
+      '<div><span>Usuario que graba</span>' + esc(nueva ? ((window.PD_SESION && window.PD_SESION.usuario()) || 'Sin usuario') : (r.creada_por || 'Sin usuario')) + '</div>' +
+      '<div><span>Última modificación</span>' + (r && r.modificada ? fechaHora(r.modificada) + ' · ' + esc(r.modificada_por || '') : '—') + '</div>' +
+      (conBoton ? '<div class="rc-registro-btn"><button type="button" class="adm-btn adm-primary" data-rc-modificar>Modificar receta</button></div>' : '') +
+      '</div>';
   }
   function textoCita(c) { return fechaCorta(c.fecha) + ' · ' + String(c.hora || '').slice(0, 5) + ' · ' + (c.servicio || '') + ' (' + (ESTADOS_CITA[c.estado] || c.estado) + ')'; }
 
@@ -135,14 +150,15 @@
       '<div><span>Fecha de atención</span>' + fechaCorta(r.fecha) + '</div>' +
       '<div><span>N.º de visita</span>' + (r.visita_numero || '—') + (cita ? ' <small class="rc-chip">' + esc(ESTADOS_CITA[cita.estado] || '') + '</small>' : '') + '</div>' +
       '<div><span>N.º de receta</span>' + esc(r.numero || '—') + '</div>' +
-      '<div><span>Médico</span>' + esc(med ? med.nombre : '—') + '</div></div>' +
+      '<div><span>Médico</span>' + esc(med ? med.nombre : '—') + '</div>' +
+      '<div class="rc-proxima"><span>Próxima cita</span>' + textoProxima(r) + '</div></div>' +
       datosPaciente() +
       '<div class="rc-tabla-wrap"><table class="rc-tabla"><thead><tr><th>#</th><th>Medicamento</th><th>Dosis</th><th>Frecuencia</th><th>Duración</th></tr></thead><tbody>' +
       r.receta_items.map(function (i, k) { return '<tr><td>' + (k + 1) + '</td><td><b>' + esc(i.medicamento) + '</b></td><td>' + esc(i.dosis || '—') + '</td><td>' + esc(i.frecuencia || '—') + '</td><td>' + esc(i.duracion || '—') + '</td></tr>'; }).join('') +
       '</tbody></table></div>' +
       (r.indicaciones ? '<p class="rc-ind"><b>Indicaciones:</b> ' + esc(r.indicaciones) + '</p>' : '') +
-      '<p class="rc-reg">Grabada por ' + esc(r.creada_por || 'Sin usuario') + ' · ' + fechaHora(r.creada) +
-      (r.modificada ? ' · Modificada por ' + esc(r.modificada_por || '') + ' · ' + fechaHora(r.modificada) : '') + (cita ? ' · Cita: ' + esc(textoCita(cita)) : '') + '</p>';
+      (cita ? '<p class="rc-reg">Cita de la visita: ' + esc(textoCita(cita)) + '</p>' : '') +
+      registroHtml(r, true);
   }
 
   function filaMed(i) {
@@ -169,6 +185,9 @@
       citasPac.map(function (c) { return '<option value="' + c.id + '"' + (r && r.cita_id === c.id ? ' selected' : '') + '>' + esc(textoCita(c)) + '</option>'; }).join('') + '</select></label>' +
       '<label class="rc-span2">Médico que receta<select id="rcMedico"><option value="">Sin asignar</option>' +
       activos.map(function (d) { return '<option value="' + d.id + '"' + (d.id === med ? ' selected' : '') + '>' + esc(d.nombre) + (d.colegiado ? ' · Col. ' + esc(d.colegiado) : '') + '</option>'; }).join('') + '</select></label>' +
+      '<label>Próxima cita<input id="rcProx" type="date" value="' + (r && r.proxima_cita ? r.proxima_cita : '') + '"></label>' +
+      '<label>Hora<input id="rcProxHora" type="time" step="900" value="' + (r && r.proxima_hora ? String(r.proxima_hora).slice(0, 5) : '') + '"></label>' +
+      '<p id="rcProxInfo" class="rc-span2 dlg-msg"></p>' +
       '<p id="rcVisitaInfo" class="rc-span2 dlg-msg"></p>' +
       '</div>' +
       datosPaciente() +
@@ -177,15 +196,21 @@
       '<p id="rcAlerta" class="rc-alergia rc-alerta" role="alert" hidden></p>' +
       '<button type="button" class="adm-btn" data-rc-agregar>+ Agregar medicamento</button>' +
       '<label class="rc-ind-campo">Indicaciones generales<textarea id="rcInd" rows="2" maxlength="600" placeholder="Ej.: tomar con alimentos; no masticar del lado tratado por 24 horas">' + esc(r ? r.indicaciones || '' : '') + '</textarea></label>' +
-      '<p class="rc-reg">' + (nueva ? 'Fecha, hora y usuario se registran al grabar · ' + esc((window.PD_SESION && window.PD_SESION.usuario()) || 'Sin usuario')
-        : 'Grabada por ' + esc(r.creada_por || 'Sin usuario') + ' · ' + fechaHora(r.creada) + ' · Al guardar queda registrado quién la modificó.') + '</p>' +
+      registroHtml(r, false) +
       '<div class="rc-pie"><button type="button" class="adm-btn" data-rc-cancelar>Cancelar</button><button type="submit" class="dlg-submit" id="rcGrabar">' + (nueva ? 'Grabar receta' : 'Guardar cambios') + '</button></div>' +
       '</form>';
-    visitaAMano = !nueva;
-    if (nueva) sugerirVisita();
+    visitaAMano = !nueva; proximaAMano = !nueva;
+    if (nueva) { sugerirVisita(); sugerirProxima(); }
     revisarAlergias();
   }
 
+  // Propone la próxima cita agendada del paciente (si no se cambió a mano)
+  function sugerirProxima() {
+    if (!$('rcProx')) return;
+    var c = citaSiguiente($('rcFecha').value || hoy());
+    if (!proximaAMano) { $('rcProx').value = c ? c.fecha : ''; $('rcProxHora').value = c ? String(c.hora || '').slice(0, 5) : ''; }
+    $('rcProxInfo').textContent = c ? 'Tomada de la agenda: ' + textoCita(c) + '.' : 'El paciente no tiene otra cita agendada; puedes indicar la fecha sugerida.';
+  }
   async function sugerirVisita() {
     var f = $('rcFecha') && $('rcFecha').value;
     if (!f || !paciente) return;
@@ -220,7 +245,8 @@
       p_visita: $('rcVisita').value ? parseInt($('rcVisita').value, 10) : null,
       p_cita: $('rcCita').value ? +$('rcCita').value : null,
       p_dentista: $('rcMedico').value ? +$('rcMedico').value : null,
-      p_indicaciones: $('rcInd').value, p_items: items
+      p_indicaciones: $('rcInd').value, p_items: items,
+      p_proxima: $('rcProx').value || null, p_proxima_hora: $('rcProxHora').value || null
     });
     if (r.error) { $('rcGrabar').disabled = false; aviso(traducir(r.error), true); return; }
     var p = paciente;
@@ -249,7 +275,12 @@
       (r.indicaciones ? '<p style="margin:14px 0 0;font-size:13.5px;line-height:1.55"><b>Indicaciones:</b> ' + esc(r.indicaciones) + '</p>' : '') +
       '<div style="display:flex;justify-content:flex-end;margin-top:70px"><div style="width:280px;text-align:center;border-top:1.5px solid #0B2B40;padding-top:8px;font-size:13px">' +
       '<b style="font-size:14px">' + esc(med ? 'Dr(a). ' + med.nombre : 'Médico tratante') + '</b>' + (med && med.colegiado ? '<br>Colegiado ' + esc(med.colegiado) : '') +
-      '<br><span style="color:#5A6D7A">Firma y sello</span></div></div>' +
+      '<br><span style="color:#5A6D7A">Firma y sello</span>' +
+      '<div style="margin-top:14px;padding-top:10px;border-top:1px dashed #C4D4DF;text-align:right;font-size:12px;line-height:1.7;color:#22394A">' +
+      '<div><span style="color:#5A6D7A">Próxima cita:</span> <b>' + textoProxima(r) + '</b></div>' +
+      '<div><span style="color:#5A6D7A">Fecha de grabación:</span> ' + fechaHora(r.creada) + '</div>' +
+      '<div><span style="color:#5A6D7A">Usuario que graba:</span> ' + esc(r.creada_por || 'Sin usuario') + '</div>' +
+      '</div></div></div>' +
       '<p style="margin-top:28px;font-size:11px;color:#5A6D7A;text-align:center">Siga las indicaciones de su médico. Ante cualquier reacción, suspenda el medicamento y comuníquese con la clínica.</p></div>');
   }
 
@@ -272,11 +303,12 @@
   $('rcPanel').addEventListener('submit', function (e) { if (e.target.id === 'rcForm') grabar(e); });
   $('rcPanel').addEventListener('change', function (e) {
     var t = e.target;
-    if (t.id === 'rcFecha') sugerirVisita();
+    if (t.id === 'rcFecha') { sugerirVisita(); sugerirProxima(); }
+    if (t.id === 'rcProx' || t.id === 'rcProxHora') proximaAMano = true;
     if (t.id === 'rcVisita') visitaAMano = true;
     if (t.id === 'rcCita' && t.value) {
       var c = citasPac.filter(function (x) { return x.id === +t.value; })[0];
-      if (c) { $('rcFecha').value = c.fecha; if (c.dentista_id && dentistaDe(c.dentista_id)) $('rcMedico').value = String(c.dentista_id); visitaAMano = false; sugerirVisita(); }
+      if (c) { $('rcFecha').value = c.fecha; if (c.dentista_id && dentistaDe(c.dentista_id)) $('rcMedico').value = String(c.dentista_id); visitaAMano = false; sugerirVisita(); sugerirProxima(); }
     }
     // Medicamento frecuente: completa lo que esté vacío
     if (t.dataset && t.dataset.c === 'medicamento' && FRECUENTES[t.value]) {

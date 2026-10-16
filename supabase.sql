@@ -2866,6 +2866,8 @@ create table if not exists public.recetas (
   modificada      timestamptz,
   modificada_por  text
 );
+alter table public.recetas add column if not exists proxima_cita date;
+alter table public.recetas add column if not exists proxima_hora text;
 create index if not exists recetas_paciente on public.recetas (paciente_id, fecha desc);
 
 create table if not exists public.receta_items (
@@ -2937,9 +2939,10 @@ grant execute on function public.visita_sugerida(bigint, date) to authenticated;
 
 -- Grabar o modificar una receta con sus medicamentos (todo junto)
 -- p_items: [{ "medicamento": "...", "dosis": "...", "frecuencia": "...", "duracion": "..." }, ...]
+drop function if exists public.guardar_receta(bigint, bigint, date, int, bigint, bigint, text, jsonb);
 create or replace function public.guardar_receta(
   p_id bigint, p_paciente bigint, p_fecha date, p_visita int, p_cita bigint, p_dentista bigint,
-  p_indicaciones text, p_items jsonb)
+  p_indicaciones text, p_items jsonb, p_proxima date default null, p_proxima_hora text default null)
 returns bigint language plpgsql security definer set search_path = public as $$
 declare v_id bigint; v_n int := 0; e jsonb;
 begin
@@ -2950,12 +2953,12 @@ begin
     raise exception 'Agrega al menos un medicamento';
   end if;
   if p_id is null then
-    insert into public.recetas (paciente_id, fecha, visita_numero, cita_id, dentista_id, indicaciones)
-    values (p_paciente, p_fecha, p_visita, p_cita, p_dentista, nullif(trim(p_indicaciones), ''))
+    insert into public.recetas (paciente_id, fecha, visita_numero, cita_id, dentista_id, indicaciones, proxima_cita, proxima_hora)
+    values (p_paciente, p_fecha, p_visita, p_cita, p_dentista, nullif(trim(p_indicaciones), ''), p_proxima, nullif(trim(p_proxima_hora), ''))
     returning id into v_id;
   else
     update public.recetas set fecha = p_fecha, visita_numero = p_visita, cita_id = p_cita, dentista_id = p_dentista,
-           indicaciones = nullif(trim(p_indicaciones), '')
+           indicaciones = nullif(trim(p_indicaciones), ''), proxima_cita = p_proxima, proxima_hora = nullif(trim(p_proxima_hora), '')
      where id = p_id returning id into v_id;
     if v_id is null then raise exception 'La receta no existe'; end if;
     delete from public.receta_items where receta_id = v_id;
@@ -2970,8 +2973,8 @@ begin
   return v_id;
 end;
 $$;
-revoke execute on function public.guardar_receta(bigint, bigint, date, int, bigint, bigint, text, jsonb) from public, anon;
-grant execute on function public.guardar_receta(bigint, bigint, date, int, bigint, bigint, text, jsonb) to authenticated;
+revoke execute on function public.guardar_receta(bigint, bigint, date, int, bigint, bigint, text, jsonb, date, text) from public, anon;
+grant execute on function public.guardar_receta(bigint, bigint, date, int, bigint, bigint, text, jsonb, date, text) to authenticated;
 
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
