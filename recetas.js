@@ -1,0 +1,300 @@
+// Plus Dental — Expediente > Recetas: recetas médicas del paciente por fecha de atención / número de visita.
+// Número automático (REC-AÑO-correlativo), visita sugerida según citas atendidas y notas de visita,
+// medicamentos con dosis, frecuencia y duración. Se puede modificar e imprimir con logo y firma del médico.
+(function () {
+  var sb = window.PD_SB;
+  if (!sb || !document.getElementById('fRecetas')) return;
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function hoy() { return iso(new Date()); }
+  function fechaCorta(f) { return f ? new Date(f + 'T12:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'; }
+  function fechaLarga(f) { return f ? new Date(f + 'T12:00:00').toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'; }
+  function fechaHora(t) { return t ? new Date(t).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
+  function edad(f) {
+    if (!f) return '';
+    var n = new Date(f + 'T12:00:00'), h = new Date(), a = h.getFullYear() - n.getFullYear();
+    if (h.getMonth() < n.getMonth() || (h.getMonth() === n.getMonth() && h.getDate() < n.getDate())) a--;
+    return a + ' años';
+  }
+  function aviso(t, error) { var m = $('rcMsg'); m.textContent = t || ''; m.style.color = error ? '#9A3B2E' : ''; }
+  function traducir(err) {
+    var m = (err && err.message) || '';
+    if (/recetas|receta_items|guardar_receta|visita_sugerida/.test(m) && /does not exist|could not find/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para las recetas.';
+    if (/row-level security|permission denied|No tienes permiso/i.test(m)) return 'No tienes permiso para esta acción.';
+    return m.replace(/^.*?ERROR:\s*/, '') || 'No se pudo completar la acción.';
+  }
+  var ESTADOS_CITA = { pendiente: 'Programado', confirmada: 'Confirmado', reprogramada: 'Reprogramado', atendida: 'Atendido' };
+
+  // Sugerencias editables al elegir un medicamento frecuente en odontología (el médico decide la indicación final)
+  var FRECUENTES = {
+    'Ibuprofeno 400 mg, tabletas': ['1 tableta', 'Cada 8 horas', '3 días'],
+    'Ibuprofeno 600 mg, tabletas': ['1 tableta', 'Cada 8 horas', '3 días'],
+    'Paracetamol 500 mg, tabletas': ['1 a 2 tabletas', 'Cada 6 horas', '3 días'],
+    'Naproxeno sódico 550 mg, tabletas': ['1 tableta', 'Cada 12 horas', '3 días'],
+    'Ketorolaco 10 mg, tabletas': ['1 tableta', 'Cada 8 horas', '2 días'],
+    'Amoxicilina 500 mg, cápsulas': ['1 cápsula', 'Cada 8 horas', '7 días'],
+    'Amoxicilina + ácido clavulánico 875/125 mg, tabletas': ['1 tableta', 'Cada 12 horas', '7 días'],
+    'Clindamicina 300 mg, cápsulas': ['1 cápsula', 'Cada 6 horas', '7 días'],
+    'Azitromicina 500 mg, tabletas': ['1 tableta', 'Una vez al día', '3 días'],
+    'Metronidazol 500 mg, tabletas': ['1 tableta', 'Cada 8 horas', '7 días'],
+    'Clorhexidina 0.12 %, enjuague bucal': ['15 ml (enjuagar 30 segundos)', 'Cada 12 horas', '10 días'],
+    'Benzocaína 20 %, gel tópico': ['Aplicar en la zona', 'Cada 8 horas si hay molestia', '3 días'],
+    'Fluoruro de sodio 5000 ppm, pasta dental': ['Cepillado', 'Una vez al día, antes de dormir', 'Uso continuo']
+  };
+  // Alergias registradas en el expediente contra medicamentos de la receta (aviso, no bloquea)
+  var CRUCES = [
+    [/penicil/i, /penicil|amoxicil|ampicil|dicloxacil|clavul/i, 'penicilinas'],
+    [/aine|ibuprofen|antiinflamatori|aspirina|acido acetil/i, /ibuprofen|naproxen|ketorolac|diclofenac|aspirina|acido acetil|meloxicam/i, 'antiinflamatorios (AINE)'],
+    [/sulfa/i, /sulfa|trimetoprim/i, 'sulfas'],
+    [/clindamic/i, /clindamic/i, 'clindamicina'],
+    [/metronidaz/i, /metronidaz/i, 'metronidazol'],
+    [/paracetamol|acetaminof/i, /paracetamol|acetaminof/i, 'paracetamol'],
+    [/clorhexid/i, /clorhexid/i, 'clorhexidina'],
+    [/azitromic|macrol|eritromic|claritromic/i, /azitromic|eritromic|claritromic/i, 'macrólidos'],
+    [/lidoca|anest/i, /lidoca|benzoca|anest/i, 'anestésicos locales']
+  ];
+  function alertasAlergia(meds) {
+    var al = paciente && paciente.alergias ? paciente.alergias.normalize('NFD').replace(/[̀-ͯ]/g, '') : '';
+    if (!al) return [];
+    var r = [];
+    meds.forEach(function (m) {
+      var t = m.normalize('NFD').replace(/[̀-ͯ]/g, '');
+      CRUCES.forEach(function (c) { if (c[2] && c[0].test(al) && c[1].test(t)) r.push('«' + m + '»: el paciente es alérgico a ' + c[2] + '.'); });
+    });
+    return r;
+  }
+  function revisarAlergias() {
+    if (!$('rcAlerta')) return [];
+    var meds = [].map.call($('rcMeds').querySelectorAll('[data-c="medicamento"]'), function (i) { return i.value.trim(); }).filter(Boolean);
+    var a = alertasAlergia(meds);
+    $('rcAlerta').hidden = !a.length;
+    $('rcAlerta').innerHTML = a.length ? '<b>Atención · posible alergia</b><br>' + a.map(esc).join('<br>') : '';
+    return a;
+  }
+  var FRECUENCIAS = ['Cada 4 horas', 'Cada 6 horas', 'Cada 8 horas', 'Cada 12 horas', 'Una vez al día', 'Una vez al día, antes de dormir', 'Solo si hay dolor', 'Dosis única'];
+  var DURACIONES = ['Dosis única', '2 días', '3 días', '5 días', '7 días', '10 días', '14 días', 'Hasta terminar el tratamiento', 'Uso continuo'];
+
+  var paciente = null, recetas = [], dentistas = [], citasPac = [], elegida = null, editando = null, visitaAMano = false;
+
+  function nombreDentista(id) { var d = dentistas.filter(function (x) { return x.id === id; })[0]; return d ? d.nombre : ''; }
+  function dentistaDe(id) { return dentistas.filter(function (x) { return x.id === id; })[0] || null; }
+  function medicoPorDefecto() {
+    if (paciente && paciente.dentista_id && dentistaDe(paciente.dentista_id)) return paciente.dentista_id;
+    var d = dentistas.filter(function (x) { return x.rol_sala === 'principal' && x.estado === 'activo'; })[0] || dentistas.filter(function (x) { return x.estado === 'activo'; })[0];
+    return d ? d.id : null;
+  }
+  function textoCita(c) { return fechaCorta(c.fecha) + ' · ' + String(c.hora || '').slice(0, 5) + ' · ' + (c.servicio || '') + ' (' + (ESTADOS_CITA[c.estado] || c.estado) + ')'; }
+
+  async function cargar(p) {
+    paciente = p; recetas = []; elegida = null; editando = null;
+    if (!p) return;
+    aviso('');
+    $('rcLista').innerHTML = '<p class="dlg-msg">Cargando…</p>';
+    $('rcPanel').innerHTML = '';
+    var rs = await Promise.all([
+      sb.from('recetas').select('*,receta_items(*)').eq('paciente_id', p.id).order('fecha', { ascending: false }).order('id', { ascending: false }),
+      dentistas.length ? Promise.resolve({ data: dentistas }) : sb.from('dentistas').select('id,nombre,colegiado,rol_sala,estado,especialidades').order('nombre'),
+      sb.from('citas').select('id,fecha,hora,servicio,estado,dentista_id').eq('paciente_id', p.id).neq('estado', 'cancelada').order('fecha', { ascending: false }).limit(60)
+    ]);
+    if (paciente !== p) return;
+    if (rs[0].error) { $('rcLista').innerHTML = ''; aviso(traducir(rs[0].error), true); return; }
+    recetas = rs[0].data.map(function (r) { r.receta_items = (r.receta_items || []).sort(function (a, b) { return a.orden - b.orden; }); return r; });
+    if (!rs[1].error) dentistas = rs[1].data;
+    citasPac = rs[2].error ? [] : rs[2].data;
+    elegida = recetas[0] ? recetas[0].id : null;
+    pintar();
+  }
+
+  function pintarLista() {
+    $('rcLista').innerHTML = recetas.length ? recetas.map(function (r) {
+      var n = r.receta_items.length;
+      return '<button type="button" class="rc-item" data-rc="' + r.id + '" aria-pressed="' + (r.id === elegida && !editando) + '">' +
+        '<b>' + esc(r.numero || 'Receta') + '</b><span>' + fechaCorta(r.fecha) + (r.visita_numero ? ' · Visita ' + r.visita_numero : '') + '</span>' +
+        '<small>' + n + (n === 1 ? ' medicamento' : ' medicamentos') + '</small></button>';
+    }).join('') : '<p class="rc-vacia">Este paciente aún no tiene recetas.</p>';
+  }
+
+  function datosPaciente() {
+    var p = paciente;
+    return '<div class="rc-pac"><div><span>Paciente</span><b>' + esc(p.nombre) + '</b></div>' +
+      '<div><span>DPI</span>' + esc(p.dpi || '—') + '</div>' +
+      '<div><span>Edad</span>' + esc(edad(p.fecha_nacimiento) || '—') + '</div>' +
+      '<div><span>Teléfono</span>' + esc(p.telefono || '—') + '</div></div>' +
+      (p.alergias ? '<p class="rc-alergia"><b>Alergias:</b> ' + esc(p.alergias) + '</p>' : '') +
+      (p.medicamentos ? '<p class="rc-nota-pac"><b>Medicamentos que ya toma:</b> ' + esc(p.medicamentos) + '</p>' : '');
+  }
+
+  function pintarDetalle(r) {
+    var med = dentistaDe(r.dentista_id);
+    var cita = citasPac.filter(function (c) { return c.id === r.cita_id; })[0];
+    $('rcPanel').innerHTML =
+      '<div class="rc-head"><div><span class="rc-eti">Receta médica</span><h4>' + esc(r.numero || '') + '</h4></div>' +
+      '<div class="rc-acc"><button type="button" class="adm-btn" data-rc-modificar>Modificar</button><button type="button" class="adm-btn adm-primary" data-rc-imprimir>Imprimir receta</button></div></div>' +
+      '<div class="rc-datos">' +
+      '<div><span>Fecha de atención</span>' + fechaCorta(r.fecha) + '</div>' +
+      '<div><span>N.º de visita</span>' + (r.visita_numero || '—') + (cita ? ' <small class="rc-chip">' + esc(ESTADOS_CITA[cita.estado] || '') + '</small>' : '') + '</div>' +
+      '<div><span>N.º de receta</span>' + esc(r.numero || '—') + '</div>' +
+      '<div><span>Médico</span>' + esc(med ? med.nombre : '—') + '</div></div>' +
+      datosPaciente() +
+      '<div class="rc-tabla-wrap"><table class="rc-tabla"><thead><tr><th>#</th><th>Medicamento</th><th>Dosis</th><th>Frecuencia</th><th>Duración</th></tr></thead><tbody>' +
+      r.receta_items.map(function (i, k) { return '<tr><td>' + (k + 1) + '</td><td><b>' + esc(i.medicamento) + '</b></td><td>' + esc(i.dosis || '—') + '</td><td>' + esc(i.frecuencia || '—') + '</td><td>' + esc(i.duracion || '—') + '</td></tr>'; }).join('') +
+      '</tbody></table></div>' +
+      (r.indicaciones ? '<p class="rc-ind"><b>Indicaciones:</b> ' + esc(r.indicaciones) + '</p>' : '') +
+      '<p class="rc-reg">Grabada por ' + esc(r.creada_por || 'Sin usuario') + ' · ' + fechaHora(r.creada) +
+      (r.modificada ? ' · Modificada por ' + esc(r.modificada_por || '') + ' · ' + fechaHora(r.modificada) : '') + (cita ? ' · Cita: ' + esc(textoCita(cita)) : '') + '</p>';
+  }
+
+  function filaMed(i) {
+    i = i || {};
+    return '<div class="rc-med">' +
+      '<label class="rc-m1">Medicamento y presentación<input type="text" list="rcListaMed" maxlength="160" data-c="medicamento" value="' + esc(i.medicamento || '') + '" placeholder="Ej.: Ibuprofeno 400 mg, tabletas"></label>' +
+      '<label>Dosis<input type="text" maxlength="80" data-c="dosis" value="' + esc(i.dosis || '') + '" placeholder="Ej.: 1 tableta"></label>' +
+      '<label>Frecuencia<input type="text" list="rcListaFrec" maxlength="80" data-c="frecuencia" value="' + esc(i.frecuencia || '') + '" placeholder="Ej.: Cada 8 horas"></label>' +
+      '<label>Duración<input type="text" list="rcListaDur" maxlength="60" data-c="duracion" value="' + esc(i.duracion || '') + '" placeholder="Ej.: 3 días"></label>' +
+      '<button type="button" class="rc-quitar" data-rc-quitar aria-label="Quitar medicamento" title="Quitar">×</button></div>';
+  }
+
+  function pintarFormulario(r) {
+    var nueva = !r;
+    var med = r ? r.dentista_id : medicoPorDefecto();
+    var activos = dentistas.filter(function (d) { return d.estado === 'activo' || d.id === med; });
+    $('rcPanel').innerHTML =
+      '<form id="rcForm" class="rc-form">' +
+      '<div class="rc-head"><div><span class="rc-eti">' + (nueva ? 'Nueva receta' : 'Modificar receta') + '</span><h4>' + (nueva ? 'N.º se asigna al grabar' : esc(r.numero)) + '</h4></div></div>' +
+      '<div class="exp-form rc-g4">' +
+      '<label>Fecha de atención *<input id="rcFecha" type="date" required value="' + (r ? r.fecha : hoy()) + '"></label>' +
+      '<label>N.º de visita<input id="rcVisita" type="number" min="1" step="1" inputmode="numeric" value="' + (r && r.visita_numero ? r.visita_numero : '') + '"></label>' +
+      '<label class="rc-span2">Cita de la visita<select id="rcCita"><option value="">Sin cita relacionada</option>' +
+      citasPac.map(function (c) { return '<option value="' + c.id + '"' + (r && r.cita_id === c.id ? ' selected' : '') + '>' + esc(textoCita(c)) + '</option>'; }).join('') + '</select></label>' +
+      '<label class="rc-span2">Médico que receta<select id="rcMedico"><option value="">Sin asignar</option>' +
+      activos.map(function (d) { return '<option value="' + d.id + '"' + (d.id === med ? ' selected' : '') + '>' + esc(d.nombre) + (d.colegiado ? ' · Col. ' + esc(d.colegiado) : '') + '</option>'; }).join('') + '</select></label>' +
+      '<p id="rcVisitaInfo" class="rc-span2 dlg-msg"></p>' +
+      '</div>' +
+      datosPaciente() +
+      '<div class="rc-meds-head"><span class="pos-lbl">Medicamentos</span><small>Al elegir uno de la lista se sugieren dosis, frecuencia y duración; puedes cambiarlas.</small></div>' +
+      '<div id="rcMeds" class="rc-meds">' + ((r && r.receta_items.length ? r.receta_items : [null]).map(filaMed).join('')) + '</div>' +
+      '<p id="rcAlerta" class="rc-alergia rc-alerta" role="alert" hidden></p>' +
+      '<button type="button" class="adm-btn" data-rc-agregar>+ Agregar medicamento</button>' +
+      '<label class="rc-ind-campo">Indicaciones generales<textarea id="rcInd" rows="2" maxlength="600" placeholder="Ej.: tomar con alimentos; no masticar del lado tratado por 24 horas">' + esc(r ? r.indicaciones || '' : '') + '</textarea></label>' +
+      '<p class="rc-reg">' + (nueva ? 'Fecha, hora y usuario se registran al grabar · ' + esc((window.PD_SESION && window.PD_SESION.usuario()) || 'Sin usuario')
+        : 'Grabada por ' + esc(r.creada_por || 'Sin usuario') + ' · ' + fechaHora(r.creada) + ' · Al guardar queda registrado quién la modificó.') + '</p>' +
+      '<div class="rc-pie"><button type="button" class="adm-btn" data-rc-cancelar>Cancelar</button><button type="submit" class="dlg-submit" id="rcGrabar">' + (nueva ? 'Grabar receta' : 'Guardar cambios') + '</button></div>' +
+      '</form>';
+    visitaAMano = !nueva;
+    if (nueva) sugerirVisita();
+    revisarAlergias();
+  }
+
+  async function sugerirVisita() {
+    var f = $('rcFecha') && $('rcFecha').value;
+    if (!f || !paciente) return;
+    var r = await sb.rpc('visita_sugerida', { p_paciente: paciente.id, p_fecha: f });
+    if (!$('rcVisita')) return;
+    if (!r.error && r.data && !visitaAMano) $('rcVisita').value = r.data;
+    $('rcVisitaInfo').textContent = r.error ? '' : 'Visita calculada con las citas atendidas o confirmadas y las notas de visita hasta esa fecha.';
+  }
+
+  function pintar() {
+    pintarLista();
+    if (editando) { pintarFormulario(editando === 'nueva' ? null : recetas.filter(function (r) { return r.id === editando; })[0]); return; }
+    var r = recetas.filter(function (x) { return x.id === elegida; })[0];
+    if (r) pintarDetalle(r);
+    else $('rcPanel').innerHTML = '<div class="rc-vacio"><b>Sin recetas</b><p>Pulsa «+ Nueva receta» para registrar la primera receta de ' + esc(paciente.nombre) + '.</p></div>';
+  }
+
+  async function grabar(e) {
+    e.preventDefault();
+    var items = [].map.call($('rcMeds').querySelectorAll('.rc-med'), function (f) {
+      var o = {}; f.querySelectorAll('[data-c]').forEach(function (i) { o[i.dataset.c] = i.value.trim(); }); return o;
+    }).filter(function (o) { return o.medicamento; });
+    if (!$('rcFecha').value) { aviso('Indica la fecha de atención.', true); return; }
+    if (!items.length) { aviso('Agrega al menos un medicamento.', true); return; }
+    var alertas = revisarAlergias();
+    if (alertas.length && $('rcGrabar').dataset.confirmado !== '1') { $('rcGrabar').dataset.confirmado = '1'; $('rcGrabar').textContent = 'Grabar de todas formas'; aviso('Revisa el aviso de alergia. Si la indicación es correcta, pulsa «Grabar de todas formas».', true); return; }
+    var id = editando === 'nueva' ? null : editando;
+    $('rcGrabar').disabled = true;
+    aviso('Grabando…');
+    var r = await sb.rpc('guardar_receta', {
+      p_id: id, p_paciente: paciente.id, p_fecha: $('rcFecha').value,
+      p_visita: $('rcVisita').value ? parseInt($('rcVisita').value, 10) : null,
+      p_cita: $('rcCita').value ? +$('rcCita').value : null,
+      p_dentista: $('rcMedico').value ? +$('rcMedico').value : null,
+      p_indicaciones: $('rcInd').value, p_items: items
+    });
+    if (r.error) { $('rcGrabar').disabled = false; aviso(traducir(r.error), true); return; }
+    var p = paciente;
+    await cargar(p);
+    elegida = r.data; editando = null; pintar();
+    aviso(id ? 'Cambios guardados.' : 'Receta grabada. Ya puedes imprimirla.');
+  }
+
+  function imprimir(r) {
+    var imp = window.PD_IMPRESION;
+    if (!imp) return;
+    var p = paciente, med = dentistaDe(r.dentista_id);
+    var celda = 'padding:8px 6px;border-bottom:1px solid #D9E4EC;text-align:left;vertical-align:top';
+    var dato = function (t, v) { return '<div><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">' + t + '</span><b style="font-size:13.5px">' + v + '</b></div>'; };
+    imp.imprimir(imp.encabezado('Receta médica · ' + esc(r.numero || '')) +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px 16px;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:12px;padding:12px 14px;margin-bottom:12px">' +
+      dato('Paciente', esc(p.nombre)) + dato('DPI', esc(p.dpi || '—')) + dato('Edad', esc(edad(p.fecha_nacimiento) || '—')) + dato('Teléfono', esc(p.telefono || '—')) +
+      dato('Fecha de atención', fechaLarga(r.fecha)) + dato('N.º de visita', r.visita_numero || '—') + dato('N.º de receta', esc(r.numero || '—')) + dato('Médico', esc(med ? med.nombre : '—')) +
+      '</div>' +
+      (p.alergias ? '<p style="margin:0 0 12px;padding:8px 12px;border-radius:10px;background:#FDE2E4;color:#9F1239;font-size:13px"><b>Alergias:</b> ' + esc(p.alergias) + '</p>' : '') +
+      '<div style="font-family:Georgia,serif;font-size:30px;color:#005A87;margin:4px 0 6px">℞</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#0B2B40;color:#FFFFFF">' +
+      ['#', 'Medicamento', 'Dosis', 'Frecuencia', 'Duración'].map(function (h) { return '<th style="' + celda + ';border-bottom:0;font-size:11px;text-transform:uppercase;letter-spacing:.05em">' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      r.receta_items.map(function (i, k) { return '<tr><td style="' + celda + '">' + (k + 1) + '</td><td style="' + celda + '"><b>' + esc(i.medicamento) + '</b></td><td style="' + celda + '">' + esc(i.dosis || '—') + '</td><td style="' + celda + '">' + esc(i.frecuencia || '—') + '</td><td style="' + celda + '">' + esc(i.duracion || '—') + '</td></tr>'; }).join('') +
+      '</tbody></table>' +
+      (r.indicaciones ? '<p style="margin:14px 0 0;font-size:13.5px;line-height:1.55"><b>Indicaciones:</b> ' + esc(r.indicaciones) + '</p>' : '') +
+      '<div style="display:flex;justify-content:flex-end;margin-top:70px"><div style="width:280px;text-align:center;border-top:1.5px solid #0B2B40;padding-top:8px;font-size:13px">' +
+      '<b style="font-size:14px">' + esc(med ? 'Dr(a). ' + med.nombre : 'Médico tratante') + '</b>' + (med && med.colegiado ? '<br>Colegiado ' + esc(med.colegiado) : '') +
+      '<br><span style="color:#5A6D7A">Firma y sello</span></div></div>' +
+      '<p style="margin-top:28px;font-size:11px;color:#5A6D7A;text-align:center">Siga las indicaciones de su médico. Ante cualquier reacción, suspenda el medicamento y comuníquese con la clínica.</p></div>');
+  }
+
+  // ---------- Eventos ----------
+  $('rcNueva').addEventListener('click', function () { if (!paciente) return; editando = 'nueva'; aviso(''); pintar(); $('rcFecha').focus(); });
+  $('rcLista').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rc]');
+    if (!b) return;
+    elegida = +b.dataset.rc; editando = null; aviso(''); pintar();
+  });
+  $('rcPanel').addEventListener('click', function (e) {
+    var r = recetas.filter(function (x) { return x.id === elegida; })[0];
+    if (e.target.closest('[data-rc-modificar]') && r) { editando = r.id; aviso(''); pintar(); return; }
+    if (e.target.closest('[data-rc-imprimir]') && r) { imprimir(r); return; }
+    if (e.target.closest('[data-rc-cancelar]')) { editando = null; aviso(''); pintar(); return; }
+    if (e.target.closest('[data-rc-agregar]')) { $('rcMeds').insertAdjacentHTML('beforeend', filaMed()); var u = $('rcMeds').lastElementChild.querySelector('input'); if (u) u.focus(); return; }
+    var q = e.target.closest('[data-rc-quitar]');
+    if (q) { if ($('rcMeds').children.length > 1) q.closest('.rc-med').remove(); else q.closest('.rc-med').querySelectorAll('input').forEach(function (i) { i.value = ''; }); }
+  });
+  $('rcPanel').addEventListener('submit', function (e) { if (e.target.id === 'rcForm') grabar(e); });
+  $('rcPanel').addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.id === 'rcFecha') sugerirVisita();
+    if (t.id === 'rcVisita') visitaAMano = true;
+    if (t.id === 'rcCita' && t.value) {
+      var c = citasPac.filter(function (x) { return x.id === +t.value; })[0];
+      if (c) { $('rcFecha').value = c.fecha; if (c.dentista_id && dentistaDe(c.dentista_id)) $('rcMedico').value = String(c.dentista_id); visitaAMano = false; sugerirVisita(); }
+    }
+    // Medicamento frecuente: completa lo que esté vacío
+    if (t.dataset && t.dataset.c === 'medicamento' && FRECUENTES[t.value]) {
+      var fila = t.closest('.rc-med'), s = FRECUENTES[t.value];
+      ['dosis', 'frecuencia', 'duracion'].forEach(function (c, k) { var i = fila.querySelector('[data-c="' + c + '"]'); if (i && !i.value) i.value = s[k]; });
+    }
+    if (t.dataset && t.dataset.c === 'medicamento') revisarAlergias();
+  });
+
+  // Listas de sugerencias
+  document.body.insertAdjacentHTML('beforeend',
+    '<datalist id="rcListaMed">' + Object.keys(FRECUENTES).map(function (m) { return '<option value="' + esc(m) + '"></option>'; }).join('') + '</datalist>' +
+    '<datalist id="rcListaFrec">' + FRECUENCIAS.map(function (m) { return '<option value="' + esc(m) + '"></option>'; }).join('') + '</datalist>' +
+    '<datalist id="rcListaDur">' + DURACIONES.map(function (m) { return '<option value="' + esc(m) + '"></option>'; }).join('') + '</datalist>');
+
+  window.PD_RECETAS = { cargar: cargar };
+  (window.PD_MODULOS = window.PD_MODULOS || []).push({
+    cargar: function () {},
+    limpiar: function () { paciente = null; recetas = []; dentistas = []; citasPac = []; elegida = null; editando = null; $('rcLista').innerHTML = ''; $('rcPanel').innerHTML = ''; aviso(''); }
+  });
+})();

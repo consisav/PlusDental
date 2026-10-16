@@ -109,6 +109,7 @@
     if (id === 'fOdonto') { cargarHistorial(); cargarCatalogoOdg(); cargarCodigoPresupuesto(); cargarPresupuestoActual(); if (window.PD_CUOTAS) window.PD_CUOTAS.cargar(); }
     if (id === 'fRx') cargarArchivos();
     if (id === 'fTrat' && window.PD_TRATAMIENTOS) window.PD_TRATAMIENTOS.cargar(actual);
+    if (id === 'fRecetas' && window.PD_RECETAS) window.PD_RECETAS.cargar(actual);
   }
 
   // Médico principal por defecto: el primer dentista activo marcado como principal (si no hay, el primero activo)

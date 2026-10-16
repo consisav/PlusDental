@@ -2848,6 +2848,131 @@ revoke all on public.faq_ia_consultas from anon;
 drop policy if exists faq_ia_personal_lee on public.faq_ia_consultas;
 create policy faq_ia_personal_lee on public.faq_ia_consultas for select to authenticated using (public.es_personal());
 
+-- ===== Recetas médicas del expediente =====
+-- Cada receta pertenece a un paciente y a una fecha de atención / número de visita (con su cita, si la hay).
+-- Número automático REC-AÑO-correlativo que no se puede cambiar. Medicamentos con dosis, frecuencia y duración.
+-- Todo el personal puede crear y modificar; queda registrado quién la grabó y quién la modificó por última vez.
+create table if not exists public.recetas (
+  id              bigint generated always as identity primary key,
+  paciente_id     bigint not null references public.pacientes (id) on delete cascade,
+  numero          text unique,
+  fecha           date not null default current_date,
+  visita_numero   int,
+  cita_id         bigint references public.citas (id) on delete set null,
+  dentista_id     bigint references public.dentistas (id) on delete set null,
+  indicaciones    text,
+  creada          timestamptz not null default now(),
+  creada_por      text,
+  modificada      timestamptz,
+  modificada_por  text
+);
+create index if not exists recetas_paciente on public.recetas (paciente_id, fecha desc);
+
+create table if not exists public.receta_items (
+  id          bigint generated always as identity primary key,
+  receta_id   bigint not null references public.recetas (id) on delete cascade,
+  orden       int not null default 1,
+  medicamento text not null,
+  dosis       text,
+  frecuencia  text,
+  duracion    text
+);
+create index if not exists receta_items_receta on public.receta_items (receta_id, orden);
+
+create or replace function public.receta_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+        v_anio text;
+begin
+  if tg_op = 'INSERT' then
+    perform pg_advisory_xact_lock(735102);
+    v_anio := to_char(coalesce(new.fecha, current_date), 'YYYY');
+    new.numero := 'REC-' || v_anio || '-' || lpad((select coalesce(max(substring(numero from 10)::int), 0) + 1
+                    from public.recetas where numero ~ ('^REC-' || v_anio || '-[0-9]+$'))::text, 4, '0');
+    new.creada := now();
+    new.creada_por := v_usuario;
+    new.modificada := null; new.modificada_por := null;
+  else
+    new.numero := old.numero; new.creada := old.creada; new.creada_por := old.creada_por;
+    new.paciente_id := old.paciente_id;
+    new.modificada := now(); new.modificada_por := v_usuario;
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'recetas_registro' and tgrelid = 'public.recetas'::regclass) then
+    create trigger recetas_registro before insert or update on public.recetas
+      for each row execute function public.receta_registro();
+  end if;
+end $$;
+
+alter table public.recetas enable row level security;
+alter table public.receta_items enable row level security;
+drop policy if exists recetas_personal_lee on public.recetas;
+create policy recetas_personal_lee on public.recetas for select to authenticated using (public.es_personal());
+drop policy if exists recetas_super_borra on public.recetas;
+create policy recetas_super_borra on public.recetas for delete to authenticated using (public.es_super_administrador());
+drop policy if exists receta_items_personal_lee on public.receta_items;
+create policy receta_items_personal_lee on public.receta_items for select to authenticated using (public.es_personal());
+revoke insert, update, delete on public.recetas, public.receta_items from anon, authenticated;
+grant select on public.recetas, public.receta_items to authenticated;
+grant delete on public.recetas to authenticated;
+
+-- Número de visita sugerido: días distintos con cita atendida/confirmada o nota de visita hasta esa fecha
+create or replace function public.visita_sugerida(p_paciente bigint, p_fecha date)
+returns int language sql stable security definer set search_path = public as $$
+  select case when public.es_personal() then (
+    select count(*)::int from (
+      select fecha from public.citas where paciente_id = p_paciente and fecha <= p_fecha
+        and estado in ('atendida'::public.estado_cita, 'confirmada'::public.estado_cita)
+      union
+      select fecha from public.notas_visita where paciente_id = p_paciente and fecha <= p_fecha
+      union
+      select p_fecha
+    ) d) end;
+$$;
+revoke execute on function public.visita_sugerida(bigint, date) from public, anon;
+grant execute on function public.visita_sugerida(bigint, date) to authenticated;
+
+-- Grabar o modificar una receta con sus medicamentos (todo junto)
+-- p_items: [{ "medicamento": "...", "dosis": "...", "frecuencia": "...", "duracion": "..." }, ...]
+create or replace function public.guardar_receta(
+  p_id bigint, p_paciente bigint, p_fecha date, p_visita int, p_cita bigint, p_dentista bigint,
+  p_indicaciones text, p_items jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint; v_n int := 0; e jsonb;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if p_fecha is null then raise exception 'Indica la fecha de atención'; end if;
+  if jsonb_typeof(p_items) <> 'array' or not exists (
+       select 1 from jsonb_array_elements(p_items) x where trim(coalesce(x->>'medicamento', '')) <> '') then
+    raise exception 'Agrega al menos un medicamento';
+  end if;
+  if p_id is null then
+    insert into public.recetas (paciente_id, fecha, visita_numero, cita_id, dentista_id, indicaciones)
+    values (p_paciente, p_fecha, p_visita, p_cita, p_dentista, nullif(trim(p_indicaciones), ''))
+    returning id into v_id;
+  else
+    update public.recetas set fecha = p_fecha, visita_numero = p_visita, cita_id = p_cita, dentista_id = p_dentista,
+           indicaciones = nullif(trim(p_indicaciones), '')
+     where id = p_id returning id into v_id;
+    if v_id is null then raise exception 'La receta no existe'; end if;
+    delete from public.receta_items where receta_id = v_id;
+  end if;
+  for e in select * from jsonb_array_elements(p_items) loop
+    if trim(coalesce(e->>'medicamento', '')) <> '' then
+      v_n := v_n + 1;
+      insert into public.receta_items (receta_id, orden, medicamento, dosis, frecuencia, duracion)
+      values (v_id, v_n, trim(e->>'medicamento'), nullif(trim(e->>'dosis'), ''), nullif(trim(e->>'frecuencia'), ''), nullif(trim(e->>'duracion'), ''));
+    end if;
+  end loop;
+  return v_id;
+end;
+$$;
+revoke execute on function public.guardar_receta(bigint, bigint, date, int, bigint, bigint, text, jsonb) from public, anon;
+grant execute on function public.guardar_receta(bigint, bigint, date, int, bigint, bigint, text, jsonb) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

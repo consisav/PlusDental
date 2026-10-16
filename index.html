@@ -80,6 +80,48 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .nota-lista li{border-top:1px solid #D9E4EC;padding:16px 0;display:flex;flex-direction:column;gap:6px}
 .nota-lista .meta{font-size:13px;color:#5A6D7A;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
 .nota-lista .texto{font-size:15px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.rc-layout{display:grid;grid-template-columns:minmax(200px,250px) minmax(0,1fr);gap:18px;align-items:start}
+.rc-lado{display:flex;flex-direction:column;gap:10px;border:1px solid #D9E4EC;border-radius:16px;padding:12px;background:#FFFFFF}
+.rc-lado #rcNueva{width:100%;justify-content:center}
+.rc-lista{display:flex;flex-direction:column;gap:6px;max-height:520px;overflow:auto}
+.rc-item{font:inherit;text-align:left;border:1px solid transparent;background:transparent;border-radius:12px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px;color:#0B2B40}
+.rc-item:hover{background:#F5F9FC}.rc-item[aria-pressed="true"]{background:#E2EEF6;border-color:#9CC3DA}
+.rc-item b{font-size:14.5px}.rc-item span{font-size:13px;color:#475B68}.rc-item small{font-size:12px;color:#5A6D7A}
+.rc-vacia{font-size:13.5px;color:#5A6D7A;margin:4px 6px}
+.rc-panel{border:1px solid #D9E4EC;border-radius:18px;padding:20px 22px;background:#FFFFFF;display:flex;flex-direction:column;gap:16px;min-width:0}
+.rc-panel:empty{display:none}
+.rc-form{display:flex;flex-direction:column;gap:16px}
+.rc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;border-bottom:1px solid #EEF3F7;padding-bottom:12px}
+.rc-head h4{margin:2px 0 0;font-size:20px;font-weight:800;color:#0B2B40}
+.rc-eti{font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#005A87}
+.rc-acc{display:flex;gap:8px;flex-wrap:wrap}
+.rc-datos,.rc-pac{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 18px}
+.rc-datos span,.rc-pac span{display:block;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#5A6D7A;margin-bottom:2px}
+.rc-datos>div,.rc-pac>div{font-size:15px;color:#0B2B40;overflow-wrap:anywhere}
+.rc-pac{background:#F5F9FC;border-radius:14px;padding:12px 14px}
+.rc-chip{display:inline-block;font-size:11.5px;font-weight:700;background:#E8F1FB;color:#0C3F72;border-radius:999px;padding:1px 8px;margin-left:4px}
+.rc-alergia{margin:0;padding:9px 14px;border-radius:12px;background:#FDE2E4;color:#9F1239;font-size:14px}
+.rc-nota-pac{margin:0;font-size:13.5px;color:#475B68}
+.rc-tabla-wrap{border:1px solid #D9E4EC;border-radius:14px;overflow:hidden}
+.rc-tabla{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
+.rc-tabla th{background:#F5F9FC;text-align:left;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:#5A6D7A;padding:9px 10px}
+.rc-tabla th:first-child{width:36px}.rc-tabla th:nth-child(2){width:36%}
+.rc-tabla td{padding:10px;border-top:1px solid #EEF3F7;vertical-align:top;overflow-wrap:anywhere}
+.rc-ind{margin:0;font-size:14.5px;line-height:1.55}
+.rc-reg{margin:0;font-size:12.5px;color:#5A6D7A}
+.rc-vacio{text-align:center;padding:30px 10px;color:#475B68}.rc-vacio b{font-size:17px;color:#0B2B40}.rc-vacio p{margin:6px 0 0}
+.rc-g4{grid-template-columns:repeat(4,minmax(0,1fr))}.rc-span2{grid-column:span 2}
+#rcVisitaInfo{margin:-8px 0 0;font-size:12.5px}#rcVisitaInfo:empty{display:none}
+.rc-meds-head{display:flex;flex-direction:column;gap:2px}.rc-meds-head small{font-size:12.5px;color:#5A6D7A}
+.rc-meds{display:flex;flex-direction:column;gap:10px}
+.rc-med{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr) 40px;gap:10px;align-items:end;padding:12px;border:1px solid #D9E4EC;border-radius:14px;background:#FBFDFE}
+.rc-med label,.rc-ind-campo{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;min-width:0}
+.rc-med input,.rc-ind-campo textarea{font:inherit;font-weight:400;font-size:14.5px;padding:10px 12px;border:1px solid #C4D4DF;border-radius:10px;min-height:42px;box-sizing:border-box;width:100%;background:#FFFFFF;color:#0B2B40}
+.rc-quitar{border:1px solid #F1C7CF;background:#FFFFFF;color:#9F1239;border-radius:10px;min-height:42px;font-size:20px;cursor:pointer}
+.rc-pie{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}.rc-pie .dlg-submit{width:auto;min-width:200px;margin:0}
+@media (max-width:1000px){.rc-layout{grid-template-columns:minmax(0,1fr)}.rc-lista{max-height:none;flex-direction:row;overflow-x:auto}.rc-item{min-width:180px}}
+@media (max-width:760px){.rc-datos,.rc-pac,.rc-g4{grid-template-columns:repeat(2,minmax(0,1fr))}.rc-med{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.rc-med .rc-m1{grid-column:1/-1}.rc-quitar{grid-column:2}}
+@media (max-width:480px){.rc-panel{padding:16px}.rc-span2{grid-column:1/-1}.rc-tabla th:nth-child(5),.rc-tabla td:nth-child(5){display:none}.rc-pie .dlg-submit{width:100%}}
 .rx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
 .rx-item{border:1px solid #D9E4EC;border-radius:14px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column}
 .rx-item a.ver{display:block;aspect-ratio:4/3;background:#0B2B40;color:#FFFFFF;text-decoration:none}
@@ -995,6 +1037,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-btn" data-ficha="fTrat" aria-pressed="false">Tratamientos</button>
 <button type="button" class="adm-btn" data-ficha="fNotas" aria-pressed="false">Notas de visita</button>
 <button type="button" class="adm-btn" data-ficha="fRx" aria-pressed="false">Radiografías</button>
+<button type="button" class="adm-btn" data-ficha="fRecetas" aria-pressed="false">Recetas</button>
 </div>
 
 <form id="fDatos" class="exp-form">
@@ -1118,6 +1161,13 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </form>
 <p id="rxMsg" class="dlg-msg" role="status"></p>
 <div id="rxGrid" class="rx-grid"></div>
+</div>
+<div id="fRecetas" class="adm-pane" hidden>
+<div class="rc-layout">
+<aside class="rc-lado"><button type="button" id="rcNueva" class="adm-btn adm-primary">+ Nueva receta</button><div id="rcLista" class="rc-lista"></div></aside>
+<section id="rcPanel" class="rc-panel" aria-live="polite"></section>
+</div>
+<p id="rcMsg" class="dlg-msg" role="status"></p>
 </div>
 </div>
 </div>
@@ -2241,6 +2291,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="presupuestos.js"></script>
 <script src="cuentas.js"></script>
 <script src="tratamientos-paciente.js"></script>
+<script src="recetas.js"></script>
 <script src="posiciones.js"></script>
 <script src="dentistas.js"></script>
 <script src="agenda.js"></script>
