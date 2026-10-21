@@ -6,6 +6,7 @@
   if (!sb || !document.getElementById('fRecetas')) return;
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function norm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
   function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function hoy() { return iso(new Date()); }
   function fechaCorta(f) { return f ? new Date(f + 'T12:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'; }
@@ -191,10 +192,10 @@
       '<p id="rcVisitaInfo" class="rc-span2 dlg-msg"></p>' +
       '</div>' +
       datosPaciente() +
-      '<section class="rc-ia" aria-labelledby="rcIaTit"><div class="rc-ia-cab"><b id="rcIaTit">✦ Sugerir receta con IA</b><small>Medicamentos disponibles en Guatemala</small></div>' +
+      '<section class="rc-ia" aria-labelledby="rcIaTit"><div class="rc-ia-cab"><b id="rcIaTit">✦ Sugerir receta</b><small>Protocolos clínicos o IA que corre en este equipo · sin clave ni costo</small></div>' +
       '<label class="rc-ind-campo">Diagnóstico<textarea id="rcDiag" rows="2" maxlength="1500" placeholder="Ej.: pulpitis irreversible pieza 36, dolor intenso nocturno"></textarea></label>' +
       '<div id="rcIaCtx" class="rc-ia-ctx"></div>' +
-      '<div class="rc-ia-acc"><button type="button" class="adm-btn adm-primary" data-rc-ia>Generar sugerencia</button><span id="rcIaMsg" class="dlg-msg" role="status"></span></div>' +
+      '<div class="rc-ia-acc"><button type="button" class="adm-btn adm-primary" data-rc-protocolo>Sugerir por protocolo</button><button type="button" class="adm-btn" data-rc-local>Generar con IA local (sin clave)</button><span id="rcIaMsg" class="dlg-msg" role="status"></span></div>' +
       '<div id="rcIaRes" class="rc-ia-res" hidden></div></section>' +
       '<div class="rc-meds-head"><span class="pos-lbl">Medicamentos</span><small>Al elegir uno de la lista se sugieren dosis, frecuencia y duración; puedes cambiarlas.</small></div>' +
       '<div id="rcMeds" class="rc-meds">' + ((r && r.receta_items.length ? r.receta_items : [null]).map(filaMed).join('')) + '</div>' +
@@ -269,42 +270,148 @@
       chips.map(function (c) { return '<span class="rc-ia-chip ' + c[1] + '">' + esc(c[0]) + '</span>'; }).join('') +
       (trat.length || notas.length ? '' : '<span class="rc-ia-chip">Sin tratamientos ni nota de visita registrados ese día</span>');
   }
-  async function generarIA(boton) {
-    var diag = $('rcDiag').value.trim();
+  // Datos del caso para los dos métodos (protocolos e IA local)
+  async function datosCaso() {
     if (!ctxIA) await contextoIA();
-    if (!diag && !(ctxIA && ctxIA.tratamientos.length)) { aviso('Escribe el diagnóstico o registra el tratamiento realizado ese día para pedir la sugerencia.', true); $('rcDiag').focus(); return; }
-    var p = paciente;
-    boton.disabled = true;
-    $('rcIaMsg').textContent = 'Generando la sugerencia… puede tardar unos segundos.';
-    var r = await sb.functions.invoke('receta-ia', { body: { contexto: {
-      fecha: $('rcFecha').value, edad: edad(p.fecha_nacimiento), alergias: p.alergias || '', enfermedades: p.enfermedades || '', medicamentos: p.medicamentos || '',
-      diagnostico: diag, tratamientos: ctxIA ? ctxIA.tratamientos.join('; ') : '', cita: ctxIA ? ctxIA.cita : '', hallazgos: ctxIA ? ctxIA.hallazgos : ''
-    } } });
-    boton.disabled = false;
-    if (!$('rcMeds')) return;
-    var d = r.data;
-    if (r.error) {
-      var estado = r.error.context && r.error.context.status, cuerpo = null;
-      try { cuerpo = r.error.context && r.error.context.json ? await r.error.context.json() : null; } catch (err) { cuerpo = null; }
-      var cod = cuerpo && cuerpo.error;
-      $('rcIaMsg').textContent = !estado || estado === 404 ? 'La función «receta-ia» todavía no está instalada en Supabase (o no hay conexión a internet).'
-        : cod === 'sin_clave' ? 'Falta guardar la clave de Anthropic (ANTHROPIC_API_KEY) en los secretos de Supabase.'
-        : estado === 401 || estado === 403 || cod === 'permiso' ? 'Solo el personal con sesión iniciada puede usar la sugerencia con IA.'
-        : cod === 'rechazo' ? 'La IA no pudo sugerir una receta para este caso. Escríbela manualmente.'
-        : cod === 'ocupado' ? 'La IA está ocupada. Intenta de nuevo en un momento.'
-        : 'No se pudo obtener la sugerencia. Intenta de nuevo.';
-      return;
+    var p = paciente, diag = $('rcDiag').value.trim();
+    var anios = p.fecha_nacimiento ? parseInt(edad(p.fecha_nacimiento), 10) : null;
+    return {
+      diagnostico: diag, tratamientos: ctxIA ? ctxIA.tratamientos : [], cita: ctxIA ? ctxIA.cita : '', hallazgos: ctxIA ? ctxIA.hallazgos : '',
+      alergias: p.alergias || '', enfermedades: p.enfermedades || '', medicamentos: p.medicamentos || '', edad: anios
+    };
+  }
+  function sinDatos(c) { return !c.diagnostico && !c.tratamientos.length && !c.cita; }
+
+  // ---------- Método 1: protocolos clínicos (sin internet ni clave) ----------
+  function protocolo(c) {
+    var t = norm([c.diagnostico, c.tratamientos.join(' '), c.cita].join(' '));
+    var al = norm(c.alergias), enf = norm(c.enfermedades + ' ' + c.medicamentos);
+    var alergiaPen = /penicil|amoxicil|ampicil/.test(al);
+    var sinAine = /aine|ibuprofen|naproxen|aspirina|antiinflam|ketorolac|diclofen/.test(al) ||
+      /hipertens|presion alta|renal|rinon|ulcera|gastritis|sangrado digest|embaraz|anticoag|warfarin|clopidog|losartan|enalapril|asma/.test(enf);
+    var sinParacet = /paracetamol|acetaminof/.test(al);
+    var embarazo = /embaraz/.test(enf);
+    var meds = [], adv = [], por = [];
+    function med(nombre, dosis, frec, dur) { if (!meds.some(function (m) { return m.medicamento === nombre; })) meds.push({ medicamento: nombre, dosis: dosis, frecuencia: frec, duracion: dur }); }
+    function analgesico(dias, fuerte) {
+      if (!sinAine) med(fuerte ? 'Ibuprofeno 600 mg, tabletas' : 'Ibuprofeno 400 mg, tabletas', '1 tableta', 'Cada 8 horas', dias + ' días');
+      else if (!sinParacet) med('Paracetamol 500 mg, tabletas', '1 a 2 tabletas', 'Cada 6 horas', dias + ' días');
+      else adv.push('El paciente no puede tomar antiinflamatorios ni paracetamol: elige el analgésico manualmente.');
     }
-    var meds = (d && d.medicamentos) || [];
+    function antibiotico() {
+      if (alergiaPen) { med('Clindamicina 300 mg, cápsulas', '1 cápsula', 'Cada 6 horas', '7 días'); adv.push('Alergia a penicilina: se usa clindamicina en lugar de amoxicilina.'); }
+      else med('Amoxicilina 500 mg, cápsulas', '1 cápsula', 'Cada 8 horas', '7 días');
+    }
+    var infeccion = /absceso|infecc|pus|celulitis|flemon|pericoronar|fistula|hinchaz/.test(t);
+    var cirugia = /extrac|exodon|cordal|tercer molar|cirug|implante|injerto|apicect/.test(t);
+    var endo = /endodon|conducto|pulpitis|pulpar|nervio|pulpot|pulpect/.test(t);
+    var encias = /gingiv|periodon|encia|sangr|raspado|curetaje|limpieza profunda/.test(t);
+    var alveolitis = /alveolitis/.test(t);
+    var sensib = /sensib|blanqueam/.test(t);
+    var dolor = /dolor|inflam|molest|duele/.test(t);
+    if (infeccion) { antibiotico(); analgesico(5, true); por.push('infección'); }
+    if (cirugia) {
+      analgesico(3, true);
+      if (/implante|cordal|tercer molar|injerto/.test(t) && !infeccion) { antibiotico(); por.push('cirugía con riesgo de infección'); }
+      med('Clorhexidina 0.12 %, enjuague bucal', '15 ml (enjuagar 30 segundos)', 'Cada 12 horas, desde el día siguiente', '7 días');
+      por.push('cirugía o extracción');
+    }
+    if (alveolitis) { med('Clorhexidina 0.12 %, enjuague bucal', '15 ml (enjuagar 30 segundos)', 'Cada 12 horas', '10 días'); analgesico(5, true); por.push('alveolitis'); }
+    if (endo) { analgesico(3, false); por.push('endodoncia o dolor pulpar'); }
+    if (encias) { med('Clorhexidina 0.12 %, enjuague bucal', '15 ml (enjuagar 30 segundos)', 'Cada 12 horas', '10 días'); por.push('encías'); }
+    if (sensib) { med('Fluoruro de sodio 5000 ppm, pasta dental', 'Cepillado', 'Una vez al día, antes de dormir', 'Uso continuo'); por.push('sensibilidad'); }
+    if (dolor && !meds.length) { analgesico(3, false); por.push('dolor o inflamación'); }
+    if (c.edad != null && c.edad < 12 && meds.length) adv.push('Paciente de ' + c.edad + ' años: ajusta las dosis a su peso (presentación pediátrica en suspensión).');
+    if (embarazo) { adv.push('Embarazo: evita antiinflamatorios y metronidazol en el primer trimestre; confirma con su médico.'); }
+    if (sinAine && !/aine|ibuprofen/.test(al) && meds.some(function (m) { return /paracetamol/i.test(m.medicamento); })) adv.push('Se prefirió paracetamol por las condiciones del paciente (presión, riñón, estómago, embarazo o anticoagulantes).');
+    var ind = [];
+    if (cirugia || alveolitis) ind.push('No enjuagarse ni escupir con fuerza las primeras 24 horas; dieta blanda y fría; no fumar.');
+    if (meds.some(function (m) { return /ibuprofeno|clindamicina|amoxicilina/i.test(m.medicamento); })) ind.push('Tomar los medicamentos con alimentos.');
+    if (meds.some(function (m) { return /amoxicilina|clindamicina/i.test(m.medicamento); })) ind.push('Completar el antibiótico aunque se sienta mejor.');
+    return {
+      medicamentos: meds, indicaciones: ind.join(' '), advertencias: adv,
+      razonamiento: meds.length ? 'Protocolo por ' + por.join(', ') + '.' : 'Ningún protocolo indica medicamento para este caso (por ejemplo, resina o limpieza sin dolor).'
+    };
+  }
+  function aplicarSugerencia(d, fuente) {
+    var meds = d.medicamentos || [];
     $('rcMeds').innerHTML = (meds.length ? meds : [null]).map(filaMed).join('');
-    if (d.indicaciones) $('rcInd').value = $('rcInd').value.trim() ? $('rcInd').value.trim() + '\n' + d.indicaciones : d.indicaciones;
-    $('rcIaMsg').textContent = meds.length ? 'Sugerencia lista: revisa los medicamentos de abajo.' : 'La IA considera que no hace falta medicamento.';
+    if (d.indicaciones && $('rcInd').value.indexOf(d.indicaciones) < 0) $('rcInd').value = $('rcInd').value.trim() ? $('rcInd').value.trim() + '\n' + d.indicaciones : d.indicaciones;
+    $('rcIaMsg').textContent = meds.length ? 'Sugerencia lista: revisa los medicamentos de abajo.' : 'No se sugiere medicamento para este caso.';
     $('rcIaRes').hidden = false;
-    $('rcIaRes').innerHTML = '<p class="rc-ia-aviso">Sugerencia de IA: el médico debe revisarla y ajustarla antes de grabar.</p>' +
+    $('rcIaRes').innerHTML = '<p class="rc-ia-aviso">Sugerencia ' + fuente + ': el médico debe revisarla y ajustarla antes de grabar.</p>' +
       (d.razonamiento ? '<p>' + esc(d.razonamiento) + '</p>' : '') +
       ((d.advertencias || []).length ? '<ul>' + d.advertencias.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>' : '');
     $('rcGrabar').dataset.confirmado = '0'; $('rcGrabar').textContent = editando === 'nueva' ? 'Grabar receta' : 'Guardar cambios';
     revisarAlergias();
+  }
+  async function sugerirProtocolo() {
+    var c = await datosCaso();
+    if (sinDatos(c)) { $('rcIaMsg').textContent = 'Escribe el diagnóstico o registra el tratamiento del día para sugerir la receta.'; $('rcDiag').focus(); return; }
+    aplicarSugerencia(protocolo(c), 'por protocolo');
+  }
+
+  // ---------- Método 2: IA local en el navegador (WebLLM, sin clave) ----------
+  // El modelo se descarga una vez (≈1.8 GB) y queda guardado en este equipo; solo elige medicamentos del catálogo.
+  var MODELO_LOCAL = 'Qwen2.5-3B-Instruct-q4f16_1-MLC', motor = null, cargandoMotor = null;
+  async function motorLocal() {
+    if (motor) return motor;
+    if (!cargandoMotor) cargandoMotor = (async function () {
+      var webllm = await import('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.84/+esm');
+      return webllm.CreateMLCEngine(MODELO_LOCAL, {
+        initProgressCallback: function (p) {
+          if ($('rcIaMsg')) $('rcIaMsg').textContent = 'Preparando la IA en este equipo… ' + Math.round((p.progress || 0) * 100) + '% (la primera vez descarga el modelo; después es inmediato).';
+        }
+      });
+    })();
+    try { motor = await cargandoMotor; return motor; } catch (err) { cargandoMotor = null; throw err; }
+  }
+  function delCatalogo(nombre) {
+    var n = norm(nombre), primera = n.split(/[\s,]+/)[0];
+    return Object.keys(FRECUENTES).filter(function (k) { return norm(k) === n; })[0] ||
+      Object.keys(FRECUENTES).filter(function (k) { return norm(k).split(/[\s,]+/)[0] === primera && primera.length > 4; })[0] || null;
+  }
+  async function generarLocal(boton) {
+    if (!navigator.gpu) { $('rcIaMsg').textContent = 'Este navegador o equipo no permite IA local (necesita WebGPU: Chrome o Edge actualizados en computadora). Usa «Sugerir por protocolo».'; return; }
+    var c = await datosCaso();
+    if (sinDatos(c)) { $('rcIaMsg').textContent = 'Escribe el diagnóstico o registra el tratamiento del día para sugerir la receta.'; $('rcDiag').focus(); return; }
+    var base = protocolo(c);
+    boton.disabled = true;
+    try {
+      var e = await motorLocal();
+      $('rcIaMsg').textContent = 'La IA local está analizando el caso…';
+      var catalogo = Object.keys(FRECUENTES).map(function (k) { return '- ' + k + ' (' + FRECUENTES[k].join(', ') + ')'; }).join('\n');
+      var esquema = JSON.stringify({ type: 'object', properties: {
+        medicamentos: { type: 'array', items: { type: 'object', properties: { medicamento: { type: 'string' }, dosis: { type: 'string' }, frecuencia: { type: 'string' }, duracion: { type: 'string' } }, required: ['medicamento', 'dosis', 'frecuencia', 'duracion'] } },
+        indicaciones: { type: 'string' }, advertencias: { type: 'array', items: { type: 'string' } }, razonamiento: { type: 'string' } },
+        required: ['medicamentos', 'indicaciones', 'advertencias', 'razonamiento'] });
+      var r = await e.chat.completions.create({
+        temperature: 0.2, max_tokens: 900,
+        response_format: { type: 'json_object', schema: esquema },
+        messages: [
+          { role: 'system', content: 'Eres un asistente clínico para odontólogos en Guatemala. Propones una receta odontológica que el odontólogo revisará. Responde solo en JSON y en español. Usa ÚNICAMENTE medicamentos de este catálogo, con su nombre exacto:\n' + catalogo + '\nRespeta las alergias (nunca un medicamento de la familia a la que es alérgico), la edad, las enfermedades y los medicamentos que ya toma. Antibióticos solo si hay infección o cirugía con riesgo. Si no hace falta medicamento, devuelve la lista vacía.' },
+          { role: 'user', content: 'Caso:\nEdad: ' + (c.edad != null ? c.edad + ' años' : 'no registrada') + '\nAlergias: ' + (c.alergias || 'ninguna registrada') + '\nEnfermedades: ' + (c.enfermedades || 'ninguna registrada') +
+            '\nMedicamentos que ya toma: ' + (c.medicamentos || 'ninguno') + '\nDiagnóstico: ' + (c.diagnostico || 'no indicado') + '\nTratamientos del día: ' + (c.tratamientos.join('; ') || 'ninguno') +
+            '\nCita: ' + (c.cita || '-') + '\nPropuesta según protocolo (puedes ajustarla): ' + JSON.stringify(base.medicamentos) }
+        ]
+      });
+      var d = JSON.parse(r.choices[0].message.content || '{}');
+      // Solo medicamentos del catálogo; lo demás se descarta y se avisa
+      var fuera = [];
+      d.medicamentos = (d.medicamentos || []).filter(function (m) {
+        var k = m && m.medicamento && delCatalogo(m.medicamento);
+        if (!k) { if (m && m.medicamento) fuera.push(m.medicamento); return false; }
+        m.medicamento = k; return true;
+      });
+      d.advertencias = (d.advertencias || []).concat(base.advertencias.filter(function (a) { return (d.advertencias || []).indexOf(a) < 0; }));
+      if (fuera.length) d.advertencias.push('Se descartó por no estar en el catálogo: ' + fuera.join(', ') + '.');
+      aplicarSugerencia(d, 'de la IA local');
+    } catch (err) {
+      console.error(err);
+      $('rcIaMsg').textContent = 'No se pudo usar la IA local en este equipo (' + (err && err.message ? err.message.slice(0, 120) : 'error') + '). Se aplicó la sugerencia por protocolo.';
+      aplicarSugerencia(base, 'por protocolo');
+    }
+    boton.disabled = false;
   }
 
   function pintar() {
@@ -383,8 +490,9 @@
     if (e.target.closest('[data-rc-modificar]') && r) { editando = r.id; aviso(''); pintar(); return; }
     if (e.target.closest('[data-rc-imprimir]') && r) { imprimir(r); return; }
     if (e.target.closest('[data-rc-cancelar]')) { editando = null; aviso(''); pintar(); return; }
-    var ia = e.target.closest('[data-rc-ia]');
-    if (ia) { generarIA(ia); return; }
+    if (e.target.closest('[data-rc-protocolo]')) { sugerirProtocolo(); return; }
+    var loc = e.target.closest('[data-rc-local]');
+    if (loc) { generarLocal(loc); return; }
     if (e.target.closest('[data-rc-agregar]')) { $('rcMeds').insertAdjacentHTML('beforeend', filaMed()); var u = $('rcMeds').lastElementChild.querySelector('input'); if (u) u.focus(); return; }
     var q = e.target.closest('[data-rc-quitar]');
     if (q) { if ($('rcMeds').children.length > 1) q.closest('.rc-med').remove(); else q.closest('.rc-med').querySelectorAll('input').forEach(function (i) { i.value = ''; }); }
