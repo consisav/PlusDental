@@ -65,15 +65,15 @@
     estado();
     if (orden) {
       detener();
-      if (/^(guard|grab)/.test(orden)) { var g = document.querySelector('#fHistoria [data-exp-accion="guardar"]'); if (g) g.click(); }
-      else if (/^cancel/.test(orden)) { var c = document.querySelector('#fHistoria [data-exp-accion="cancelar"]'); if (c) c.click(); }
+      if (/^(guard|grab)/.test(orden)) { if (!$('hmGuardar').disabled) $('hmGuardar').click(); }
+      else if (/^cancel/.test(orden)) { if (!$('hmCancelar').hidden) $('hmCancelar').click(); }
     }
   }
 
   // El registro debe estar en modo edición para dictar
   function modoEdicion() {
     var fs = $('pHistoriaCampos');
-    if (fs && fs.disabled) { var b = document.querySelector('#fHistoria [data-exp-accion="editar"]'); if (b) b.click(); }
+    if (fs && fs.disabled && window.PD_HISTORIAS) window.PD_HISTORIAS.modificar();
     return !(fs && fs.disabled);
   }
   function estado(parcial) {
@@ -122,6 +122,6 @@
     iniciar(b.dataset.hvCampo);
   });
   // Al cambiar de paciente o de pestaña, se deja de escuchar
-  document.addEventListener('click', function (e) { if (escuchando && e.target.closest('#fichaTabs [data-ficha], [data-exp-accion="cancelar"]')) detener(); });
+  document.addEventListener('click', function (e) { if (escuchando && e.target.closest('#fichaTabs [data-ficha], #hmCancelar')) detener(); });
   window.PD_VOZ_HISTORIA = { procesar: function (t) { procesar(t); } };
 })();

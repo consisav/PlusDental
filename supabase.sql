@@ -2976,6 +2976,115 @@ $$;
 revoke execute on function public.guardar_receta(bigint, bigint, date, int, bigint, bigint, text, jsonb, date, text) from public, anon;
 grant execute on function public.guardar_receta(bigint, bigint, date, int, bigint, bigint, text, jsonb, date, text) to authenticated;
 
+-- ===== Historia médica por fecha =====
+-- Cada paciente puede tener varios registros de historia médica, uno por fecha, ligados a una cita de la agenda
+-- (número de cita = orden de la cita entre las del paciente). Los datos del registro más reciente se copian solos
+-- a la ficha del paciente (alergias, enfermedades, medicamentos) para las recetas y avisos de alergia.
+-- Todo el personal crea y modifica; solo el Super Administrador elimina.
+create table if not exists public.historias_medicas (
+  id              bigint generated always as identity primary key,
+  paciente_id     bigint not null references public.pacientes (id) on delete cascade,
+  fecha           date not null default current_date,
+  cita_id         bigint references public.citas (id) on delete set null,
+  cita_numero     int,
+  alergias        text,
+  enfermedades    text,
+  medicamentos    text,
+  creada          timestamptz not null default now(),
+  creada_por      text,
+  modificada      timestamptz,
+  modificada_por  text
+);
+create unique index if not exists historias_medicas_fecha on public.historias_medicas (paciente_id, fecha);
+
+create or replace function public.historia_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+begin
+  if tg_op = 'INSERT' then
+    new.creada := now();
+    new.creada_por := coalesce(nullif(new.creada_por, ''), v_usuario);
+    new.modificada := null; new.modificada_por := null;
+  else
+    new.creada := old.creada; new.creada_por := old.creada_por; new.paciente_id := old.paciente_id;
+    new.modificada := now(); new.modificada_por := v_usuario;
+  end if;
+  return new;
+end;
+$$;
+-- La ficha del paciente refleja siempre el registro más reciente
+create or replace function public.historia_a_paciente()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_pac bigint := coalesce(new.paciente_id, old.paciente_id); h record;
+begin
+  select alergias, enfermedades, medicamentos into h from public.historias_medicas
+   where paciente_id = v_pac order by fecha desc, id desc limit 1;
+  update public.pacientes set alergias = h.alergias, enfermedades = h.enfermedades, medicamentos = h.medicamentos
+   where id = v_pac and (alergias is distinct from h.alergias or enfermedades is distinct from h.enfermedades or medicamentos is distinct from h.medicamentos);
+  return null;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'historias_registro' and tgrelid = 'public.historias_medicas'::regclass) then
+    create trigger historias_registro before insert or update on public.historias_medicas
+      for each row execute function public.historia_registro();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'historias_a_paciente' and tgrelid = 'public.historias_medicas'::regclass) then
+    create trigger historias_a_paciente after insert or update or delete on public.historias_medicas
+      for each row execute function public.historia_a_paciente();
+  end if;
+end $$;
+
+-- Lo que ya estaba en la ficha del paciente pasa a ser su primer registro
+insert into public.historias_medicas (paciente_id, fecha, alergias, enfermedades, medicamentos, creada_por)
+select p.id, coalesce(p.actualizado::date, p.creado::date, current_date), p.alergias, p.enfermedades, p.medicamentos, 'Registro anterior'
+  from public.pacientes p
+ where (coalesce(p.alergias, '') <> '' or coalesce(p.enfermedades, '') <> '' or coalesce(p.medicamentos, '') <> '')
+   and not exists (select 1 from public.historias_medicas h where h.paciente_id = p.id);
+
+alter table public.historias_medicas enable row level security;
+drop policy if exists historias_personal_lee on public.historias_medicas;
+create policy historias_personal_lee on public.historias_medicas for select to authenticated using (public.es_personal());
+revoke insert, update, delete on public.historias_medicas from anon, authenticated;
+grant select on public.historias_medicas to authenticated;
+
+-- Grabar (p_id nulo) o modificar un registro
+create or replace function public.guardar_historia(
+  p_id bigint, p_paciente bigint, p_fecha date, p_cita bigint, p_cita_numero int,
+  p_alergias text, p_enfermedades text, p_medicamentos text)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if p_fecha is null then raise exception 'Indica la fecha del registro'; end if;
+  if p_id is null then
+    insert into public.historias_medicas (paciente_id, fecha, cita_id, cita_numero, alergias, enfermedades, medicamentos)
+    values (p_paciente, p_fecha, p_cita, p_cita_numero, nullif(trim(p_alergias), ''), nullif(trim(p_enfermedades), ''), nullif(trim(p_medicamentos), ''))
+    returning id into v_id;
+  else
+    update public.historias_medicas set fecha = p_fecha, cita_id = p_cita, cita_numero = p_cita_numero,
+           alergias = nullif(trim(p_alergias), ''), enfermedades = nullif(trim(p_enfermedades), ''), medicamentos = nullif(trim(p_medicamentos), '')
+     where id = p_id returning id into v_id;
+    if v_id is null then raise exception 'El registro no existe'; end if;
+  end if;
+  return v_id;
+exception
+  when unique_violation then raise exception 'Ya existe un registro de historia médica con esa fecha para este paciente';
+end;
+$$;
+revoke execute on function public.guardar_historia(bigint, bigint, date, bigint, int, text, text, text) from public, anon;
+grant execute on function public.guardar_historia(bigint, bigint, date, bigint, int, text, text, text) to authenticated;
+
+create or replace function public.eliminar_historia(p_id bigint)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_super_administrador() then raise exception 'Solo el Super Administrador puede eliminar registros de historia médica'; end if;
+  delete from public.historias_medicas where id = p_id;
+end;
+$$;
+revoke execute on function public.eliminar_historia(bigint) from public, anon;
+grant execute on function public.eliminar_historia(bigint) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

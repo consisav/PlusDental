@@ -193,6 +193,18 @@ select.pre-ie{font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;
 .hv-barra .cb-voz-ayuda{flex:1 1 320px}
 .hv-estado{flex-basis:100%;margin:0;font-size:13.5px;color:#08504C}.hv-estado:empty{display:none}.hv-parcial{color:#5A6D7A;font-style:italic}
 .hv-campo{display:flex;flex-direction:column;gap:6px}
+.hm-registros{display:flex;flex-direction:column;gap:8px}
+.hm-lista{display:flex;flex-wrap:wrap;gap:8px}
+.hm-chip{font:inherit;font-size:13.5px;font-weight:700;border:1px solid #C4D4DF;background:#FFFFFF;color:#0B2B40;border-radius:999px;padding:7px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.hm-chip small{font-size:11px;font-weight:700;color:#08504C;background:#DCF2EC;border-radius:999px;padding:1px 7px}
+.hm-chip[aria-pressed="true"]{background:#0B2B40;border-color:#0B2B40;color:#FFFFFF}.hm-chip[aria-pressed="true"] small{background:#FFFFFF}
+.hm-chip-nuevo{background:#E2EEF6;border-style:dashed;border-color:#005A87;color:#00476B;cursor:default}
+.hm-acc{display:flex;flex-wrap:wrap;align-items:center;gap:10px;border-top:1px solid #EEF3F7;padding-top:14px}
+.hm-acc .dlg-submit{width:auto;min-width:150px;margin:0}
+.hm-acc button:disabled{opacity:.45;cursor:not-allowed}
+.hm-eliminar{color:#9F1239;border-color:#F1C7CF}
+.hm-acc .dlg-msg{flex-basis:100%;margin:0}
+@media (max-width:520px){.hm-acc>button{flex:1 1 calc(50% - 10px)}}
 .hv-cab{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .hv-cab label{font-size:14px;font-weight:600}
 .hv-btn{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:700;border:1px solid #C4D4DF;background:#FFFFFF;color:#00476B;border-radius:999px;padding:4px 12px;min-height:30px;cursor:pointer}
@@ -1117,16 +1129,22 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </form>
 
 <form id="fHistoria" class="exp-form" hidden>
+<div class="full hm-registros"><span class="pos-lbl">Registros por fecha</span><div id="hmLista" class="hm-lista"></div></div>
 <div class="full hv-barra"><button type="button" id="hvVoz" class="cb-voz-btn" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg><span id="hvVozTxt">Dictar historia médica</span></button><span id="hvAyuda" class="cb-voz-ayuda">Di el campo y su contenido: «alergias penicilina, enfermedades diabetes, medicamentos metformina 850 mg cada 12 horas… <b>guardar</b>». Para corregir: «cambiar alergias por…» o «borrar medicamentos».</span><p id="hvEstado" class="hv-estado" aria-live="polite"></p></div>
 <fieldset id="pHistoriaCampos" class="full campos"><div class="exp-form">
+<label>Fecha *<input id="hmFecha" type="date" required></label>
+<label>Número de cita (agenda)<select id="hmCita"><option value="">Sin cita relacionada</option></select></label>
 <div class="full hv-campo"><div class="hv-cab"><label for="pAlergias">Alergias</label><button type="button" class="hv-btn" data-hv-campo="pAlergias" aria-pressed="false" aria-label="Dictar alergias" title="Dictar solo este campo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>Dictar</button></div><textarea id="pAlergias" rows="3" maxlength="2000" placeholder="Ej.: penicilina, látex. Escribe «Ninguna» si no tiene."></textarea></div>
 <div class="full hv-campo"><div class="hv-cab"><label for="pEnfermedades">Enfermedades y condiciones</label><button type="button" class="hv-btn" data-hv-campo="pEnfermedades" aria-pressed="false" aria-label="Dictar enfermedades y condiciones" title="Dictar solo este campo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>Dictar</button></div><textarea id="pEnfermedades" rows="3" maxlength="2000" placeholder="Ej.: diabetes, hipertensión, embarazo"></textarea></div>
 <div class="full hv-campo"><div class="hv-cab"><label for="pMedicamentos">Medicamentos actuales</label><button type="button" class="hv-btn" data-hv-campo="pMedicamentos" aria-pressed="false" aria-label="Dictar medicamentos actuales" title="Dictar solo este campo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>Dictar</button></div><textarea id="pMedicamentos" rows="3" maxlength="2000" placeholder="Nombre y dosis"></textarea></div>
 </div></fieldset>
-<div class="full exp-actions">
-<button type="button" class="adm-btn adm-primary" data-exp-accion="editar">Modificar registro</button>
-<button type="submit" class="dlg-submit" data-exp-accion="guardar">Guardar historia médica</button>
-<button type="button" class="adm-btn" data-exp-accion="cancelar">Cancelar</button>
+<p id="hmReg" class="full rc-reg"></p>
+<div class="full hm-acc">
+<button type="submit" id="hmGuardar" class="dlg-submit">Guardar</button>
+<button type="button" id="hmModificar" class="adm-btn adm-primary">Modificar</button>
+<button type="button" id="hmEliminar" class="adm-btn hm-eliminar">Eliminar</button>
+<button type="button" id="hmNuevo" class="adm-btn">+ Agregar nuevo registro</button>
+<button type="button" id="hmCancelar" class="adm-btn" hidden>Cancelar</button>
 <p id="fHistoriaMsg" class="dlg-msg" role="status"></p>
 </div>
 </form>
@@ -2327,6 +2345,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="cuentas.js"></script>
 <script src="tratamientos-paciente.js"></script>
 <script src="recetas.js"></script>
+<script src="historias-medicas.js"></script>
 <script src="posiciones.js"></script>
 <script src="dentistas.js"></script>
 <script src="agenda.js"></script>

@@ -6,8 +6,7 @@
   var BUCKET = 'expedientes';
   var CAMPOS = {
     nombre: 'pNombre', dpi: 'pDpi', nit: 'pNit', fecha_nacimiento: 'pNacimiento', telefono: 'pTelefono', direccion: 'pDireccion',
-    emergencia_nombre: 'pEmNombre', emergencia_telefono: 'pEmTelefono', estado: 'pEstado', correo: 'pCorreo',
-    alergias: 'pAlergias', enfermedades: 'pEnfermedades', medicamentos: 'pMedicamentos'
+    emergencia_nombre: 'pEmNombre', emergencia_telefono: 'pEmTelefono', estado: 'pEstado', correo: 'pCorreo'
   };
 
   var ESTADOS_PAC = { activo: 'Activo', inactivo: 'Inactivo', suspendido: 'Suspendido', baja: 'Baja' };
@@ -109,6 +108,7 @@
     if (id === 'fOdonto') { cargarHistorial(); cargarCatalogoOdg(); cargarCodigoPresupuesto(); cargarPresupuestoActual(); if (window.PD_CUOTAS) window.PD_CUOTAS.cargar(); }
     if (id === 'fRx') cargarArchivos();
     if (id === 'fTrat' && window.PD_TRATAMIENTOS) window.PD_TRATAMIENTOS.cargar(actual);
+    if (id === 'fHistoria' && window.PD_HISTORIAS) window.PD_HISTORIAS.cargar(actual);
     if (id === 'fRecetas' && window.PD_RECETAS) window.PD_RECETAS.cargar(actual);
   }
 
@@ -159,7 +159,6 @@
   // Modo consulta / modo edición ("Modificar registro")
   function aplicarModo() {
     $('pDatosCampos').disabled = !editando;
-    $('pHistoriaCampos').disabled = !editando;
     document.querySelectorAll('[data-exp-accion]').forEach(function (b) {
       var a = b.dataset.expAccion;
       b.hidden = a === 'editar' ? (editando || !actual) : !editando;
@@ -169,16 +168,15 @@
     editando = true;
     if (!$('pDentista').value) $('pDentista').value = medicoPorDefecto();
     aplicarModo();
-    ['fDatosMsg', 'fHistoriaMsg'].forEach(function (m) { aviso(m, 'Modo edición: haz los cambios y pulsa «Guardar».'); });
-    var primero = $('fDatos').hidden ? $('pAlergias') : $('pNombre');
-    primero.focus();
+    aviso('fDatosMsg', 'Modo edición: haz los cambios y pulsa «Guardar».');
+    $('pNombre').focus();
   }
   function cancelar() {
     if (!actual) { verLista(); return; }
     rellenar(actual);
     editando = false;
     aplicarModo();
-    ['fDatosMsg', 'fHistoriaMsg'].forEach(function (m) { aviso(m, 'Se descartaron los cambios.'); });
+    aviso('fDatosMsg', 'Se descartaron los cambios.');
   }
 
   // ---------- Foto del paciente ----------
@@ -694,11 +692,6 @@
     e.preventDefault();
     if (!editando) return;
     guardar(['nombre', 'dpi', 'nit', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'emergencia_nombre', 'emergencia_telefono', 'estado'], 'fDatosMsg', this.querySelector('[type=submit]'));
-  });
-  $('fHistoria').addEventListener('submit', function (e) {
-    e.preventDefault();
-    if (!editando) return;
-    guardar(['alergias', 'enfermedades', 'medicamentos'], 'fHistoriaMsg', this.querySelector('[type=submit]'));
   });
 
   $('odoGuardar').addEventListener('click', function () { guardarOdonto(this); });
