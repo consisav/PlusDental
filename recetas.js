@@ -191,6 +191,11 @@
       '<p id="rcVisitaInfo" class="rc-span2 dlg-msg"></p>' +
       '</div>' +
       datosPaciente() +
+      '<section class="rc-ia" aria-labelledby="rcIaTit"><div class="rc-ia-cab"><b id="rcIaTit">✦ Sugerir receta con IA</b><small>Medicamentos disponibles en Guatemala</small></div>' +
+      '<label class="rc-ind-campo">Diagnóstico<textarea id="rcDiag" rows="2" maxlength="1500" placeholder="Ej.: pulpitis irreversible pieza 36, dolor intenso nocturno"></textarea></label>' +
+      '<div id="rcIaCtx" class="rc-ia-ctx"></div>' +
+      '<div class="rc-ia-acc"><button type="button" class="adm-btn adm-primary" data-rc-ia>Generar sugerencia</button><span id="rcIaMsg" class="dlg-msg" role="status"></span></div>' +
+      '<div id="rcIaRes" class="rc-ia-res" hidden></div></section>' +
       '<div class="rc-meds-head"><span class="pos-lbl">Medicamentos</span><small>Al elegir uno de la lista se sugieren dosis, frecuencia y duración; puedes cambiarlas.</small></div>' +
       '<div id="rcMeds" class="rc-meds">' + ((r && r.receta_items.length ? r.receta_items : [null]).map(filaMed).join('')) + '</div>' +
       '<p id="rcAlerta" class="rc-alergia rc-alerta" role="alert" hidden></p>' +
@@ -201,6 +206,7 @@
       '</form>';
     visitaAMano = !nueva; proximaAMano = !nueva;
     if (nueva) { sugerirVisita(); sugerirProxima(); }
+    contextoIA();
     revisarAlergias();
   }
 
@@ -218,6 +224,86 @@
     if (!$('rcVisita')) return;
     if (!r.error && r.data && !visitaAMano) $('rcVisita').value = r.data;
     $('rcVisitaInfo').textContent = r.error ? '' : 'Visita calculada con las citas atendidas o confirmadas y las notas de visita hasta esa fecha.';
+  }
+
+  // ---------- Sugerencia con IA ----------
+  // Junta lo que la IA toma en cuenta: nota de visita (diagnóstico), tratamientos de la fecha, cita y odontograma
+  var ctxIA = null, turnoIA = 0;
+  function isoLocal(t) { return t ? iso(new Date(t)) : ''; }
+  function hallazgosOdontograma() {
+    var v = window.PD_ODONTOGRAMA_ACTUAL ? window.PD_ODONTOGRAMA_ACTUAL() : null;
+    if (!v || !v.piezas) return '';
+    var NOM = { caries: 'caries', obturacion: 'obturación', corona: 'corona', endodoncia: 'endodoncia', implante: 'implante', extraccion: 'extracción indicada' };
+    return Object.keys(v.piezas).map(function (n) {
+      var p = v.piezas[n], out = [];
+      Object.keys(p.caras || {}).forEach(function (k) { var m = p.caras[k]; if (m.h === 'caries' || m.c === 'r') out.push((NOM[m.h] || m.h) + ' ' + k); });
+      Object.keys(p.estados || {}).forEach(function (k) { if (p.estados[k] === 'r') out.push(NOM[k] || k); });
+      return out.length ? 'pieza ' + n + ': ' + out.join(', ') : '';
+    }).filter(Boolean).join('; ');
+  }
+  async function contextoIA() {
+    if (!$('rcIaCtx') || !paciente) return;
+    var f = $('rcFecha').value, turno = ++turnoIA, p = paciente;
+    $('rcIaCtx').innerHTML = '<span class="dlg-msg">Revisando la fecha…</span>';
+    var rs = await Promise.all([
+      sb.from('notas_visita').select('texto').eq('paciente_id', p.id).eq('fecha', f),
+      sb.from('presupuesto_items').select('tratamiento,pieza,estado,estado_fecha,realizado_en,presupuesto:presupuestos!inner(paciente_id)').eq('presupuesto.paciente_id', p.id)
+    ]);
+    if (turno !== turnoIA || !$('rcIaCtx')) return;
+    var notas = rs[0].error ? [] : rs[0].data.map(function (n) { return n.texto; });
+    var trat = rs[1].error ? [] : rs[1].data.filter(function (i) {
+      return i.estado !== 'eliminado' && (isoLocal(i.estado_fecha) === f || i.realizado_en === f);
+    }).map(function (i) { return i.tratamiento + (i.pieza ? ' (pieza ' + i.pieza + ')' : ''); });
+    var cSel = $('rcCita').value ? citasPac.filter(function (c) { return c.id === +$('rcCita').value; })[0] : citasPac.filter(function (c) { return c.fecha === f; })[0];
+    ctxIA = { notas: notas, tratamientos: trat, cita: cSel ? cSel.servicio : '', hallazgos: hallazgosOdontograma() };
+    if (!$('rcDiag').value.trim() && notas.length) $('rcDiag').value = notas.join('\n');
+    var chips = [];
+    trat.forEach(function (t) { chips.push(['Tratamiento: ' + t, '']); });
+    if (ctxIA.cita) chips.push(['Cita: ' + ctxIA.cita, '']);
+    if (ctxIA.hallazgos) chips.push(['Odontograma: ' + ctxIA.hallazgos, '']);
+    if (p.alergias) chips.push(['Alergias: ' + p.alergias, 'mal']);
+    if (p.enfermedades) chips.push([p.enfermedades, '']);
+    if (p.medicamentos) chips.push(['Toma: ' + p.medicamentos, '']);
+    if (edad(p.fecha_nacimiento)) chips.unshift([edad(p.fecha_nacimiento), '']);
+    $('rcIaCtx').innerHTML = '<span class="rc-ia-lbl">La IA toma en cuenta (' + fechaCorta(f) + '):</span>' +
+      chips.map(function (c) { return '<span class="rc-ia-chip ' + c[1] + '">' + esc(c[0]) + '</span>'; }).join('') +
+      (trat.length || notas.length ? '' : '<span class="rc-ia-chip">Sin tratamientos ni nota de visita registrados ese día</span>');
+  }
+  async function generarIA(boton) {
+    var diag = $('rcDiag').value.trim();
+    if (!ctxIA) await contextoIA();
+    if (!diag && !(ctxIA && ctxIA.tratamientos.length)) { aviso('Escribe el diagnóstico o registra el tratamiento realizado ese día para pedir la sugerencia.', true); $('rcDiag').focus(); return; }
+    var p = paciente;
+    boton.disabled = true;
+    $('rcIaMsg').textContent = 'Generando la sugerencia… puede tardar unos segundos.';
+    var r = await sb.functions.invoke('receta-ia', { body: { contexto: {
+      fecha: $('rcFecha').value, edad: edad(p.fecha_nacimiento), alergias: p.alergias || '', enfermedades: p.enfermedades || '', medicamentos: p.medicamentos || '',
+      diagnostico: diag, tratamientos: ctxIA ? ctxIA.tratamientos.join('; ') : '', cita: ctxIA ? ctxIA.cita : '', hallazgos: ctxIA ? ctxIA.hallazgos : ''
+    } } });
+    boton.disabled = false;
+    if (!$('rcMeds')) return;
+    var d = r.data;
+    if (r.error) {
+      var estado = r.error.context && r.error.context.status, cuerpo = null;
+      try { cuerpo = r.error.context && r.error.context.json ? await r.error.context.json() : null; } catch (err) { cuerpo = null; }
+      var cod = cuerpo && cuerpo.error;
+      $('rcIaMsg').textContent = estado === 404 || cod === 'sin_clave' ? 'Falta instalar en Supabase la función «receta-ia» con la clave de Anthropic.'
+        : estado === 401 || estado === 403 || cod === 'permiso' ? 'Solo el personal con sesión iniciada puede usar la sugerencia con IA.'
+        : cod === 'rechazo' ? 'La IA no pudo sugerir una receta para este caso. Escríbela manualmente.'
+        : cod === 'ocupado' ? 'La IA está ocupada. Intenta de nuevo en un momento.'
+        : 'No se pudo obtener la sugerencia. Intenta de nuevo.';
+      return;
+    }
+    var meds = (d && d.medicamentos) || [];
+    $('rcMeds').innerHTML = (meds.length ? meds : [null]).map(filaMed).join('');
+    if (d.indicaciones) $('rcInd').value = $('rcInd').value.trim() ? $('rcInd').value.trim() + '\n' + d.indicaciones : d.indicaciones;
+    $('rcIaMsg').textContent = meds.length ? 'Sugerencia lista: revisa los medicamentos de abajo.' : 'La IA considera que no hace falta medicamento.';
+    $('rcIaRes').hidden = false;
+    $('rcIaRes').innerHTML = '<p class="rc-ia-aviso">Sugerencia de IA: el médico debe revisarla y ajustarla antes de grabar.</p>' +
+      (d.razonamiento ? '<p>' + esc(d.razonamiento) + '</p>' : '') +
+      ((d.advertencias || []).length ? '<ul>' + d.advertencias.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>' : '');
+    $('rcGrabar').dataset.confirmado = '0'; $('rcGrabar').textContent = editando === 'nueva' ? 'Grabar receta' : 'Guardar cambios';
+    revisarAlergias();
   }
 
   function pintar() {
@@ -296,6 +382,8 @@
     if (e.target.closest('[data-rc-modificar]') && r) { editando = r.id; aviso(''); pintar(); return; }
     if (e.target.closest('[data-rc-imprimir]') && r) { imprimir(r); return; }
     if (e.target.closest('[data-rc-cancelar]')) { editando = null; aviso(''); pintar(); return; }
+    var ia = e.target.closest('[data-rc-ia]');
+    if (ia) { generarIA(ia); return; }
     if (e.target.closest('[data-rc-agregar]')) { $('rcMeds').insertAdjacentHTML('beforeend', filaMed()); var u = $('rcMeds').lastElementChild.querySelector('input'); if (u) u.focus(); return; }
     var q = e.target.closest('[data-rc-quitar]');
     if (q) { if ($('rcMeds').children.length > 1) q.closest('.rc-med').remove(); else q.closest('.rc-med').querySelectorAll('input').forEach(function (i) { i.value = ''; }); }
@@ -303,7 +391,7 @@
   $('rcPanel').addEventListener('submit', function (e) { if (e.target.id === 'rcForm') grabar(e); });
   $('rcPanel').addEventListener('change', function (e) {
     var t = e.target;
-    if (t.id === 'rcFecha') { sugerirVisita(); sugerirProxima(); }
+    if (t.id === 'rcFecha') { sugerirVisita(); sugerirProxima(); contextoIA(); }
     if (t.id === 'rcProx' || t.id === 'rcProxHora') proximaAMano = true;
     if (t.id === 'rcVisita') visitaAMano = true;
     if (t.id === 'rcCita' && t.value) {
