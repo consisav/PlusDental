@@ -960,8 +960,69 @@
       }
     });
 
+    // ---------- Dictado por voz ----------
+    // Procedimiento dicho (por palabras) o, si no se dijo, el más adecuado del catálogo con precio
+    function procDictado(texto, h, nCaras) {
+      var lista = disponibles();
+      if (texto) {
+        var t = norm(texto), pal = t.split(/\s+/).filter(function (w) { return w.length > 2 && ['del', 'con', 'una', 'las', 'los'].indexOf(w) < 0; });
+        var mejor = null;
+        lista.forEach(function (c) {
+          var nom = norm(c.nombre), pts = pal.filter(function (w) { return nom.indexOf(w.slice(0, 6)) >= 0; }).length;
+          if (!pts) return;
+          if (/\buna\b/.test(t) && /\buna\b/.test(nom)) pts += 1;
+          if (/\b(varias|dos|tres)\b/.test(t) && /varias/.test(nom)) pts += 1;
+          if (!mejor || pts > mejor.pts) mejor = { c: c, pts: pts };
+        });
+        if (mejor) return mejor.c;
+      }
+      var rel = relacionados(h);
+      if (!rel.length) return null;
+      if (h === 'caries' || h === 'obturacion') {
+        var quiere = nCaras > 1 ? /varias|dos|tres|compuesta/ : /una|simple/;
+        return rel.filter(function (c) { return quiere.test(norm(c.nombre)); })[0] || rel[0];
+      }
+      return rel[0];
+    }
+    // ins: { n, h, caras: ['O','D'], c: 'r'|'a', proc: 'texto dicho' } → { ok, texto, proc, precio }
+    function dictar(ins) {
+      var h = POR_ID[ins.h], n = +ins.n;
+      if (!h) return { ok: false, texto: 'No entendí el hallazgo.' };
+      if (ORDEN.indexOf(n) < 0) return { ok: false, texto: 'La pieza ' + ins.n + ' no existe en la notación FDI.' };
+      var temporal = n >= 51;
+      if ((temporal && datos.denticion === 'permanente') || (!temporal && datos.denticion === 'temporal')) datos.denticion = 'mixta';
+      if (h.tipo === 'borrar') { delete datos.piezas[n]; avisar(); pintar(); return { ok: true, texto: 'Pieza ' + n + ': marcas borradas.' }; }
+      var c = h.fijo || ins.c || 'r', p = pieza(n), claves = [];
+      if (h.tipo === 'cara') {
+        var g = geometria(n), caras = (ins.caras && ins.caras.length ? ins.caras : [g.centro]).map(function (k) { return k === 'O' && n % 10 <= 3 ? 'I' : k === 'I' && n % 10 > 3 ? 'O' : k; });
+        caras.forEach(function (k) { if (p.caras[k] && p.caras[k].h !== h.id) quitarProc(p, k); p.caras[k] = { h: h.id, c: c }; if (claves.indexOf(k) < 0) claves.push(k); });
+        delete p.estados.ausente; quitarProc(p, 'ausente');
+      } else {
+        if (h.id === 'ausente') { p.caras = {}; p.estados = { ausente: 'a' }; delete p.proc; }
+        else { p.estados[h.id] = c; delete p.estados.ausente; quitarProc(p, 'ausente'); }
+        claves.push(h.id);
+      }
+      var desc = h.nombre + (h.tipo === 'cara' ? ' ' + claves.map(function (k) { return nombreCara(k, n); }).join(' y ') : '') + (h.fijo ? '' : c === 'r' ? ' (requerido)' : ' (realizado)');
+      var res = { ok: true, texto: 'Pieza ' + n + ': ' + desc };
+      if (c === 'r' && h.id !== 'ausente') {
+        var item = procDictado(ins.proc, h.id, claves.length);
+        if (item) {
+          p.proc = p.proc || {};
+          p.proc[claves[0]] = { id: item.id || null, n: item.nombre };
+          res.proc = item.nombre; res.precio = precioDe(item);
+          res.texto += ' → ' + item.nombre + (res.precio != null ? ' ' + q(res.precio) : '');
+        } else res.texto += ' (no hay procedimiento con precio en el catálogo)';
+      }
+      avisar();
+      pintar();
+      return res;
+    }
+
     pintar();
     return {
+      dictar: dictar,
+      crearPresupuesto: function () { abrirPresupuesto(); },
+      totalRequerido: function () { return lineasPresupuesto().lineas.reduce(function (s, l) { return s + l.precio * l.cantidad; }, 0); },
       cargar: function (valor, edad) { datos = normalizar(valor, edad); pintar(); },
       valor: function () { return JSON.parse(JSON.stringify(datos)); },
       hallazgos: function () { return Object.keys(datos.piezas).length; },

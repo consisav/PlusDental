@@ -193,6 +193,12 @@ select.pre-ie{font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;
 .hv-barra .cb-voz-ayuda{flex:1 1 320px}
 .hv-estado{flex-basis:100%;margin:0;font-size:13.5px;color:#08504C}.hv-estado:empty{display:none}.hv-parcial{color:#5A6D7A;font-style:italic}
 .hv-campo{display:flex;flex-direction:column;gap:6px}
+.od-voz{margin-bottom:12px}
+.od-voz-panel{flex-basis:100%;display:flex;flex-direction:column;gap:6px;background:#FFFFFF;border:1px dashed #9CC3DA;border-radius:12px;padding:10px 14px}
+.od-voz-panel p{margin:0}.od-voz-panel p:empty{display:none}
+.od-voz-log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.od-voz-log:empty{display:none}.od-voz-log li.ok{color:#08504C}.od-voz-log li.mal{color:#9A3B2E}.od-voz-log li:first-child{font-weight:700}
+.od-voz-total{font-weight:800;color:#0B2B40;font-size:14.5px}
 .hm-registros{display:flex;flex-direction:column;gap:8px}
 .hm-lista{display:flex;flex-wrap:wrap;gap:8px}
 .hm-chip{font:inherit;font-size:13.5px;font-weight:700;border:1px solid #C4D4DF;background:#FFFFFF;color:#0B2B40;border-radius:999px;padding:7px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
@@ -1151,6 +1157,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 
 <div id="fOdonto" class="adm-pane" hidden>
 <p class="dlg-msg">Elige la dentición y una herramienta. Las de «Por cara» se aplican tocando la cara; las de «Pieza completa», tocando cualquier parte de la pieza. Toca de nuevo para quitar la marca.</p>
+<div class="hv-barra od-voz"><button type="button" id="odVoz" class="cb-voz-btn" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg><span id="odVozTxt">Dictar odontograma</span></button><span id="odAyuda" class="cb-voz-ayuda">Di cada trabajo: «pieza 16 caries oclusal y distal, resina de varias superficies; pieza 21 corona de porcelana; pieza 38 extracción; pieza 46 obturación realizada… <b>crear presupuesto</b>». Cada trabajo requerido pasa solo al presupuesto con su precio.</span><div id="odVozPanel" class="od-voz-panel" hidden><p id="odVozOi" class="hv-parcial"></p><ul id="odVozLog" class="od-voz-log"></ul><p id="odVozTotal" class="od-voz-total"></p></div></div>
 <div id="odoComp"></div>
 <div id="odoPend" class="adm-box" hidden>
 <div style="display: flex; flex-direction: column; gap: 4px">
@@ -2339,6 +2346,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="auth.js"></script>
 <script src="voz-citas.js"></script>
 <script src="voz-historia.js"></script>
+<script src="voz-odontograma.js"></script>
 <script src="odontograma.js"></script>
 <script src="expedientes.js"></script>
 <script src="presupuestos.js"></script>
