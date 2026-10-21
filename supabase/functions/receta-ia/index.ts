@@ -5,7 +5,7 @@
 // Variables (Supabase → Edge Functions → Secrets):
 //   ANTHROPIC_API_KEY  clave de API de Anthropic (console.anthropic.com → API Keys)
 // SUPABASE_URL y SUPABASE_ANON_KEY las pone Supabase automáticamente.
-// Dejar activado «Verify JWT»: solo usuarios con sesión iniciada (y del personal) pueden usarla.
+// La función comprueba ella misma que quien llama sea del personal (sesión iniciada + es_personal).
 import Anthropic from 'npm:@anthropic-ai/sdk';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
