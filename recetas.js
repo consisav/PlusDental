@@ -287,7 +287,8 @@
       var estado = r.error.context && r.error.context.status, cuerpo = null;
       try { cuerpo = r.error.context && r.error.context.json ? await r.error.context.json() : null; } catch (err) { cuerpo = null; }
       var cod = cuerpo && cuerpo.error;
-      $('rcIaMsg').textContent = estado === 404 || cod === 'sin_clave' ? 'Falta instalar en Supabase la función «receta-ia» con la clave de Anthropic.'
+      $('rcIaMsg').textContent = !estado || estado === 404 ? 'La función «receta-ia» todavía no está instalada en Supabase (o no hay conexión a internet).'
+        : cod === 'sin_clave' ? 'Falta guardar la clave de Anthropic (ANTHROPIC_API_KEY) en los secretos de Supabase.'
         : estado === 401 || estado === 403 || cod === 'permiso' ? 'Solo el personal con sesión iniciada puede usar la sugerencia con IA.'
         : cod === 'rechazo' ? 'La IA no pudo sugerir una receta para este caso. Escríbela manualmente.'
         : cod === 'ocupado' ? 'La IA está ocupada. Intenta de nuevo en un momento.'
