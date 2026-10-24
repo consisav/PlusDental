@@ -542,6 +542,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .adm-g.abierto .adm-chev{transform:rotate(-135deg) translate(-2px,-2px)}
 .adm-g-items{display:none;flex-direction:column;gap:2px;padding:0 0 12px}
 .adm-g.abierto .adm-g-items{display:flex}
+.adm-sep{display:block;height:1px;background:#D9E4EC;margin:6px 10px 6px 22px}
 .adm-g:not(.abierto):has(.adm-count:not([hidden])) .adm-grupo::before{content:"";width:9px;height:9px;border-radius:50%;background:#B45309;margin-left:auto;margin-right:12px;order:1}
 .adm-g:not(.abierto):has(.adm-count:not([hidden])) .adm-chev{order:2}
 @media (prefers-reduced-motion:reduce){.adm-chev{transition:none}}
@@ -1039,9 +1040,11 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-grupo" id="grpCatalogos" aria-expanded="false" aria-controls="grpCatalogosItems">Catálogos iniciales<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-g-items" id="grpCatalogosItems" role="presentation">
 <button type="button" role="tab" id="tabTiposDen" data-tab="admTiposDen" aria-selected="false" aria-controls="admTiposDen">Tipos de dentistas</button>
-<button type="button" role="tab" id="tabAsistentes" data-tab="admAsistentes" aria-selected="false" aria-controls="admAsistentes">Asistentes dentales</button>
 <button type="button" role="tab" id="tabDentistas" data-tab="admDentistas" aria-selected="false" aria-controls="admDentistas">Dentistas</button>
+<button type="button" role="tab" id="tabAsistentes" data-tab="admAsistentes" aria-selected="false" aria-controls="admAsistentes">Asistentes dentales</button>
+<span class="adm-sep" role="separator" aria-hidden="true"></span>
 <button type="button" role="tab" id="tabPosiciones" data-tab="admPosiciones" aria-selected="false" aria-controls="admPosiciones">Posiciones y clínicas</button>
+<span class="adm-sep" role="separator" aria-hidden="true"></span>
 <button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios">Administración de usuarios</button>
 <button type="button" role="tab" id="tabAgentes" data-tab="admAgentes" aria-selected="false" aria-controls="admAgentes">Agente comercial</button>
 <button type="button" role="tab" id="tabRecargos" data-tab="admRecargos" aria-selected="false" aria-controls="admRecargos">Recargos de tarjeta</button>
