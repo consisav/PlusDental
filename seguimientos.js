@@ -193,7 +193,7 @@
     var ia = window.PD_IA_LOCAL && window.PD_IA_LOCAL.disponible(), tel = p ? telWa(p.telefono) : '';
     function bloque(clase, titulo, arr) { return arr.length ? '<div class="tr-acc-b ' + clase + '"><b>' + titulo + '</b><ul>' + arr.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>' : ''; }
     $('trSeg').innerHTML =
-      '<div class="tr-seg-cab"><div><b>Acciones del paciente para su recuperación</b><small>' + esc(lista.map(function (i) { return i.tratamiento; }).join(', ')) + ' · ' + esc(acciones.fuente) + '</small></div>' +
+      '<div class="tr-seg-cab"><div><b>Cuidados del paciente para su recuperación</b><small>' + esc(lista.map(function (i) { return i.tratamiento; }).join(', ')) + ' · ' + esc(acciones.fuente) + '</small></div>' +
       '<div class="tr-seg-acc"><button type="button" class="adm-btn" data-acc-protocolo>Por protocolo</button>' +
       '<button type="button" class="adm-btn adm-primary" data-acc-ia' + (ia ? '' : ' disabled title="La IA local necesita Chrome o Edge actualizados en computadora (WebGPU)"') + '>✦ Generar con IA local</button></div></div>' +
       '<p id="trSegMsg" class="dlg-msg" role="status"></p>' +
