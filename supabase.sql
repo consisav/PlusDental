@@ -3392,6 +3392,121 @@ $$;
 revoke execute on function public.bot_agendar(date, text, text, text, text) from public;
 grant execute on function public.bot_agendar(date, text, text, text, text) to anon, authenticated;
 
+-- ===== Órdenes de laboratorio dental =====
+-- Solicitudes de trabajos a laboratorios (coronas, puentes, prótesis, férulas…) con su seguimiento por etapas.
+-- Número automático LAB-AÑO-correlativo. Cada cambio de estado queda en el historial con fecha y usuario.
+create table if not exists public.laboratorios (
+  id         bigint generated always as identity primary key,
+  nombre     text not null check (char_length(nombre) between 1 and 120),
+  contacto   text,
+  telefono   text,
+  correo     text,
+  direccion  text,
+  activo     boolean not null default true,
+  creado     timestamptz not null default now()
+);
+create unique index if not exists laboratorios_nombre on public.laboratorios (lower(nombre));
+
+create table if not exists public.ordenes_lab (
+  id              bigint generated always as identity primary key,
+  numero          text unique,
+  paciente_id     bigint not null references public.pacientes (id) on delete cascade,
+  dentista_id     bigint references public.dentistas (id) on delete set null,
+  laboratorio_id  bigint references public.laboratorios (id) on delete set null,
+  cita_id         bigint references public.citas (id) on delete set null,
+  trabajo         text not null,
+  piezas          text,
+  material        text,
+  color           text,
+  impresion       text,
+  envia           text[] not null default '{}',
+  indicaciones    text,
+  fecha_envio     date,
+  fecha_entrega   date,
+  fecha_recibida  date,
+  costo           numeric(12,2),
+  estado          text not null default 'borrador'
+                  check (estado in ('borrador', 'enviada', 'proceso', 'prueba', 'recibida', 'colocada', 'devuelta', 'cancelada')),
+  estado_fecha    timestamptz,
+  estado_por      text,
+  creada          timestamptz not null default now(),
+  creada_por      text,
+  modificada      timestamptz,
+  modificada_por  text
+);
+create index if not exists ordenes_lab_paciente on public.ordenes_lab (paciente_id, creada desc);
+
+create table if not exists public.ordenes_lab_estados (
+  id        bigint generated always as identity primary key,
+  orden_id  bigint not null references public.ordenes_lab (id) on delete cascade,
+  estado    text not null,
+  fecha     timestamptz not null default now(),
+  usuario   text,
+  nota      text
+);
+create index if not exists ordenes_lab_estados_orden on public.ordenes_lab_estados (orden_id, fecha);
+
+create or replace function public.orden_lab_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario'); v_anio text;
+begin
+  if tg_op = 'INSERT' then
+    perform pg_advisory_xact_lock(hashtext('ordenes_lab_numero'));
+    v_anio := to_char(current_date, 'YYYY');
+    new.numero := 'LAB-' || v_anio || '-' || lpad((select coalesce(max(substring(numero from 10)::int), 0) + 1
+                    from public.ordenes_lab where numero ~ ('^LAB-' || v_anio || '-[0-9]+$'))::text, 4, '0');
+    new.creada := now(); new.creada_por := v_usuario;
+    new.modificada := null; new.modificada_por := null;
+    new.estado_fecha := now(); new.estado_por := v_usuario;
+  else
+    new.numero := old.numero; new.creada := old.creada; new.creada_por := old.creada_por; new.paciente_id := old.paciente_id;
+    new.modificada := now(); new.modificada_por := v_usuario;
+    if new.estado is distinct from old.estado then new.estado_fecha := now(); new.estado_por := v_usuario; end if;
+  end if;
+  if new.estado = 'enviada' and new.fecha_envio is null then new.fecha_envio := current_date; end if;
+  if new.estado in ('recibida', 'colocada') and new.fecha_recibida is null then new.fecha_recibida := current_date; end if;
+  return new;
+end;
+$$;
+create or replace function public.orden_lab_historial()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' or new.estado is distinct from old.estado then
+    insert into public.ordenes_lab_estados (orden_id, estado, usuario) values (new.id, new.estado, new.estado_por);
+  end if;
+  return null;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'ordenes_lab_registro' and tgrelid = 'public.ordenes_lab'::regclass) then
+    create trigger ordenes_lab_registro before insert or update on public.ordenes_lab for each row execute function public.orden_lab_registro();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'ordenes_lab_historial' and tgrelid = 'public.ordenes_lab'::regclass) then
+    create trigger ordenes_lab_historial after insert or update on public.ordenes_lab for each row execute function public.orden_lab_historial();
+  end if;
+end $$;
+
+alter table public.laboratorios enable row level security;
+alter table public.ordenes_lab enable row level security;
+alter table public.ordenes_lab_estados enable row level security;
+drop policy if exists laboratorios_personal on public.laboratorios;
+create policy laboratorios_personal on public.laboratorios for all to authenticated using (public.es_personal()) with check (public.es_personal());
+drop policy if exists ordenes_lab_lee on public.ordenes_lab;
+create policy ordenes_lab_lee on public.ordenes_lab for select to authenticated using (public.es_personal());
+drop policy if exists ordenes_lab_crea on public.ordenes_lab;
+create policy ordenes_lab_crea on public.ordenes_lab for insert to authenticated with check (public.es_personal());
+drop policy if exists ordenes_lab_edita on public.ordenes_lab;
+create policy ordenes_lab_edita on public.ordenes_lab for update to authenticated using (public.es_personal()) with check (public.es_personal());
+drop policy if exists ordenes_lab_borra on public.ordenes_lab;
+create policy ordenes_lab_borra on public.ordenes_lab for delete to authenticated using (public.es_super_administrador());
+drop policy if exists ordenes_lab_estados_lee on public.ordenes_lab_estados;
+create policy ordenes_lab_estados_lee on public.ordenes_lab_estados for select to authenticated using (public.es_personal());
+drop policy if exists ordenes_lab_estados_nota on public.ordenes_lab_estados;
+create policy ordenes_lab_estados_nota on public.ordenes_lab_estados for update to authenticated using (public.es_personal()) with check (public.es_personal());
+grant select, insert, update, delete on public.laboratorios to authenticated;
+grant select, insert, update, delete on public.ordenes_lab to authenticated;
+grant select, update on public.ordenes_lab_estados to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

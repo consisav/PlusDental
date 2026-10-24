@@ -111,6 +111,18 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .rc-tabla td{padding:10px;border-top:1px solid #EEF3F7;vertical-align:top;overflow-wrap:anywhere}
 .rc-ind{margin:0;font-size:14.5px;line-height:1.55}
 .rc-reg{margin:0;font-size:12.5px;color:#5A6D7A}
+.ol-resumen{font-size:12.5px;color:#5A6D7A;padding:0 4px}.ol-resumen:empty{display:none}
+.ol-est{display:inline-block;align-self:flex-start;margin-top:4px;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 9px;background:#EBF0F4;color:#475B68}
+.ol-est.enviada,.ol-est.proceso{background:#FEF3C7;color:#92400E}.ol-est.prueba{background:#EDE9FE;color:#5B21B6}.ol-est.recibida{background:#DBEAFE;color:#1E40AF}.ol-est.colocada{background:#DCF2EC;color:#08504C}.ol-est.devuelta,.ol-est.atrasada{background:#FDE2E4;color:#9F1239}.ol-est.cancelada{background:#EBF0F4;color:#5A6D7A;text-decoration:line-through}
+.rc-item.ol-tarde{border-color:#F1C7CF}
+.ol-etapas{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12.5px}.ol-etapas span{padding:5px 11px;border-radius:999px;background:#F1F5F8;color:#7A8D9A;font-weight:600}.ol-etapas span.ok{background:#DCF2EC;color:#08504C}.ol-etapas span.on{background:#005A87;color:#FFFFFF}.ol-etapas i{color:#9CB3C2;font-style:normal}
+.ol-aviso{margin:0;padding:9px 14px;border-radius:12px;background:#F1F5F8;color:#475B68;font-size:14px;font-weight:600}.ol-aviso.tarde{background:#FDE2E4;color:#9F1239}
+.ol-datos small{display:block;font-size:12px;color:#5A6D7A}
+.ol-envia{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.ol-envia .pos-lbl{flex-basis:100%}.ol-envia span:not(.pos-lbl){font-size:13px;background:#E2EEF6;color:#00476B;border-radius:999px;padding:4px 11px;font-weight:600}
+.ol-cambio{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:12px 14px}.ol-cambio label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}.ol-cambio select,.ol-cambio input{font:inherit;font-size:14px;padding:8px 12px;border:1px solid #C4D4DF;border-radius:10px;min-height:40px;background:#FFFFFF}.ol-cambio .ol-nota{flex:1 1 240px}.ol-cambio .ol-nota input{width:100%;box-sizing:border-box}
+.ol-hist{display:flex;flex-direction:column;gap:6px}.ol-hist>div{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13.5px;border-left:3px solid #9CC3DA;padding:3px 0 3px 10px}.ol-hist span{color:#5A6D7A}.ol-hist em{flex-basis:100%;color:#22394A}
+.ol-labnuevo{background:#F5F9FC;border:1px dashed #9CC3DA;border-radius:12px;padding:12px}
+.ol-sug{margin:-6px 0 0;font-size:12.5px;color:#5A6D7A}.ol-sug button{font:inherit;font-size:12.5px;font-weight:700;border:1px dashed #9CC3DA;background:#FFFFFF;color:#00476B;border-radius:999px;padding:2px 10px;margin-left:4px;cursor:pointer}
 .de-firmas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .de-firmas>p{grid-column:1/-1;margin:0}
 .de-firma-card{display:flex;flex-direction:column;gap:8px;border:1px solid #D9E4EC;border-radius:14px;padding:12px;background:#FFFFFF}
@@ -1162,6 +1174,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-btn" data-ficha="fNotas" aria-pressed="false">Notas de visita</button>
 <button type="button" class="adm-btn" data-ficha="fRx" aria-pressed="false">Radiografías</button>
 <button type="button" class="adm-btn" data-ficha="fRecetas" aria-pressed="false">Recetas</button>
+<button type="button" class="adm-btn" data-ficha="fLab" aria-pressed="false">Órdenes de laboratorio</button>
 </div>
 
 <form id="fDatos" class="exp-form">
@@ -1300,6 +1313,13 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </form>
 <p id="rxMsg" class="dlg-msg" role="status"></p>
 <div id="rxGrid" class="rx-grid"></div>
+</div>
+<div id="fLab" class="adm-pane" hidden>
+<div class="rc-layout">
+<aside class="rc-lado"><button type="button" id="olNueva" class="adm-btn adm-primary">+ Nueva orden</button><small id="olResumen" class="ol-resumen"></small><div id="olLista" class="rc-lista"></div></aside>
+<section id="olPanel" class="rc-panel" aria-live="polite"></section>
+</div>
+<p id="olMsg" class="dlg-msg" role="status"></p>
 </div>
 <div id="fRecetas" class="adm-pane" hidden>
 <div class="rc-layout">
@@ -2444,6 +2464,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="cuentas.js"></script>
 <script src="tratamientos-paciente.js"></script>
 <script src="recetas.js"></script>
+<script src="laboratorio.js"></script>
 <script src="historias-medicas.js"></script>
 <script src="seguimientos.js"></script>
 <script src="posiciones.js"></script>
