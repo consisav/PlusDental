@@ -3218,6 +3218,54 @@ select v.nombre, v.especialidad, v.descripcion, v.formacion, v.atiende, v.orden
 -- Tipo de médico (catálogo «Tipos de dentistas»)
 alter table public.dentistas add column if not exists tipo_id bigint references public.tipos_dentista (id) on delete set null;
 
+-- ===== Asistentes dentales =====
+-- Usa la tabla «personal» (roles auxiliar e higienista, los que se asignan a cada dentista) con sus datos completos:
+-- código automático AS-001, DPI, dirección, fecha de inicio, fotografía y funciones. Queda registrado quién graba y modifica.
+alter table public.personal add column if not exists codigo text;
+alter table public.personal add column if not exists dpi text;
+alter table public.personal add column if not exists direccion text;
+alter table public.personal add column if not exists fecha_inicio date;
+alter table public.personal add column if not exists foto text;
+alter table public.personal add column if not exists funciones text[] not null default '{}';
+alter table public.personal add column if not exists registrado_por text;
+alter table public.personal add column if not exists actualizado timestamptz;
+alter table public.personal add column if not exists actualizado_por text;
+create unique index if not exists personal_codigo on public.personal (codigo) where codigo is not null;
+
+create or replace function public.personal_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'sistema');
+begin
+  if tg_op = 'INSERT' then
+    new.registrado_por := v_usuario;
+    new.creado := now();
+  else
+    new.registrado_por := old.registrado_por; new.creado := old.creado;
+    if old.codigo is not null then new.codigo := old.codigo; end if;
+    new.actualizado := now(); new.actualizado_por := v_usuario;
+  end if;
+  -- Código automático para asistentes e higienistas
+  if new.codigo is null and new.rol in ('auxiliar', 'higienista') then
+    perform pg_advisory_xact_lock(hashtext('personal_codigo_asistente'));
+    new.codigo := 'AS-' || lpad(((select coalesce(max(substring(codigo from 4)::int), 0) from public.personal where codigo ~ '^AS-\d+$') + 1)::text, 3, '0');
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'personal_registro' and tgrelid = 'public.personal'::regclass) then
+    create trigger personal_registro before insert or update on public.personal
+      for each row execute function public.personal_registro();
+  end if;
+end $$;
+
+-- Asistentes que ya existían reciben su código
+do $$ declare r record; begin
+  for r in select id from public.personal where codigo is null and rol in ('auxiliar', 'higienista') order by id loop
+    update public.personal set codigo = null where id = r.id;
+  end loop;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
