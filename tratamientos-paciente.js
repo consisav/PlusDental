@@ -20,7 +20,7 @@
   function fechaDe(i) { return i.estado_fecha ? isoLocal(new Date(i.estado_fecha)) : i.realizado_en || ''; }
   function fechas() { return trasladados().map(fechaDe).filter(function (f, k, a) { return f && a.indexOf(f) === k; }).sort().reverse(); }
   function porFecha(lista) { var f = fechaSel || fechas()[0]; return !f || f === 'todas' ? lista : lista.filter(function (i) { return fechaDe(i) === f; }); }
-  function textoFecha(f) { return new Date(f + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }); }
+  function textoFecha(f) { return new Date(f + 'T12:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }); }
 
   // Estado de un procedimiento (los anteriores al estado por procedimiento: realizado = Finalizado)
   function estadoDe(i) { return i.estado || (i.realizado ? 'finalizado' : 'pendiente'); }
@@ -74,7 +74,7 @@
     $('trPendiente').textContent = q(tPorHacer);
     // Fechas de tratamiento (por defecto la última)
     var fs = fechas(), fActual = fechaSel || fs[0] || 'todas';
-    $('trFecha').innerHTML = fs.map(function (f, k) { return '<option value="' + f + '">' + textoFecha(f) + (k === 0 ? ' · última' : '') + '</option>'; }).join('') +
+    $('trFecha').innerHTML = fs.map(function (f, k) { return '<option value="' + f + '"' + (k === 0 ? ' title="Última fecha de tratamientos"' : '') + '>' + textoFecha(f) + '</option>'; }).join('') +
       '<option value="todas">Todas las fechas</option>';
     $('trFecha').value = fActual;
     $('trFecha').disabled = !fs.length;
