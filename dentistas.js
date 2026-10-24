@@ -96,6 +96,14 @@
     posiciones = p.error ? [] : p.data;
     var s = await sb.from('personal').select('id,nombre,rol,activo').order('nombre');
     personal = s.error ? [] : s.data;
+    // Áreas del catálogo «Tipos de dentistas» que aún no están en la lista de especialidades
+    if (window.PD_TIPOS_DENTISTA) {
+      var td = await window.PD_TIPOS_DENTISTA();
+      td.forEach(function (t) {
+        if (!ESPECIALIDADES.some(function (e) { return sinTildes(e[0]) === sinTildes(t.especialidad); }))
+          ESPECIALIDADES.push([t.especialidad, sinTildes(t.nombre + ' ' + (t.atiende || []).join(' '))]);
+      });
+    }
   }
 
   function nombrePosicion(id) { var p = posiciones.filter(function (x) { return x.id === id; })[0]; return p ? p.codigo + ' · ' + p.nombre : '—'; }

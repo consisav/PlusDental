@@ -3091,6 +3091,130 @@ grant execute on function public.eliminar_historia(bigint) to authenticated;
 alter table public.dentistas add column if not exists firma text;
 alter table public.dentistas add column if not exists sello text;
 
+-- ===== Tipos de dentistas =====
+-- Catálogo de los tipos de odontólogos que ejercen en Guatemala (general y especialistas), con su área de
+-- especialidad, la formación habitual y los casos que atienden. El área se usa en la ficha de cada dentista
+-- (Especialidades) y en el asistente de la agenda. Código automático TD-01, TD-02…
+create table if not exists public.tipos_dentista (
+  id              bigint generated always as identity primary key,
+  codigo          text,
+  nombre          text not null check (char_length(nombre) between 1 and 120),
+  especialidad    text not null check (char_length(especialidad) between 1 and 120),
+  descripcion     text check (char_length(descripcion) <= 600),
+  formacion       text check (char_length(formacion) <= 400),
+  atiende         text[] not null default '{}',
+  estado          text not null default 'activo' check (estado in ('activo', 'inactivo')),
+  orden           int not null default 0,
+  registrado_por  text,
+  creado          timestamptz not null default now(),
+  actualizado_por text,
+  actualizado     timestamptz not null default now()
+);
+create unique index if not exists tipos_dentista_nombre on public.tipos_dentista (lower(nombre));
+create unique index if not exists tipos_dentista_codigo on public.tipos_dentista (codigo);
+
+create or replace function public.tipos_dentista_auditoria()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    perform pg_advisory_xact_lock(hashtext('tipos_dentista_codigo'));
+    new.codigo := 'TD-' || lpad(((select coalesce(max(substring(codigo from 4)::int), 0) from public.tipos_dentista where codigo ~ '^TD-\d+$') + 1)::text, 2, '0');
+    new.registrado_por := coalesce(v_usuario, 'sistema');
+    new.creado := now();
+  else
+    new.codigo := old.codigo; new.registrado_por := old.registrado_por; new.creado := old.creado;
+  end if;
+  new.nombre := trim(new.nombre); new.especialidad := trim(new.especialidad);
+  new.actualizado_por := coalesce(v_usuario, 'sistema');
+  new.actualizado := now();
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'tipos_dentista_auditoria' and tgrelid = 'public.tipos_dentista'::regclass) then
+    create trigger tipos_dentista_auditoria before insert or update on public.tipos_dentista
+      for each row execute function public.tipos_dentista_auditoria();
+  end if;
+end $$;
+
+alter table public.tipos_dentista enable row level security;
+drop policy if exists "personal administra tipos de dentista" on public.tipos_dentista;
+create policy "personal administra tipos de dentista" on public.tipos_dentista for all
+  using (public.es_personal()) with check (public.es_personal());
+grant select, insert, update, delete on public.tipos_dentista to authenticated;
+
+-- Tipos de dentistas en Guatemala (solo se agregan los que falten)
+insert into public.tipos_dentista (nombre, especialidad, descripcion, formacion, atiende, orden)
+select v.nombre, v.especialidad, v.descripcion, v.formacion, v.atiende, v.orden
+  from (values
+    (1, 'Odontólogo general (Cirujano dentista)', 'Odontología general',
+     'Primer contacto del paciente: diagnostica, previene y resuelve los tratamientos más comunes, y refiere al especialista cuando hace falta.',
+     'Licenciatura en Cirugía Dental (5 a 6 años) y colegiado activo en el Colegio Estomatológico de Guatemala.',
+     array['Examen y diagnóstico', 'Limpiezas y prevención', 'Resinas y restauraciones', 'Extracciones simples', 'Urgencias dentales', 'Referencia a especialistas']),
+    (2, 'Ortodoncista', 'Ortodoncia y ortopedia maxilar',
+     'Corrige la posición de los dientes y la mordida, y guía el crecimiento de los maxilares en niños y adolescentes.',
+     'Cirujano dentista con maestría o especialidad en Ortodoncia y Ortopedia Dentomaxilar (2 a 3 años).',
+     array['Brackets metálicos y estéticos', 'Alineadores transparentes', 'Ortopedia maxilar en niños', 'Retenedores', 'Mordida cruzada o abierta']),
+    (3, 'Endodoncista', 'Endodoncia',
+     'Trata el nervio y los conductos del diente para eliminar el dolor y la infección y conservar la pieza.',
+     'Cirujano dentista con especialidad o maestría en Endodoncia (2 años).',
+     array['Tratamiento de conductos', 'Retratamientos', 'Pulpotomías y pulpectomías', 'Cirugía apical', 'Dolor dental intenso']),
+    (4, 'Periodoncista', 'Periodoncia',
+     'Previene y trata las enfermedades de las encías y del hueso que sostiene los dientes.',
+     'Cirujano dentista con especialidad o maestría en Periodoncia (2 a 3 años).',
+     array['Gingivitis y periodontitis', 'Raspado y alisado radicular', 'Cirugía periodontal', 'Injertos de encía', 'Mantenimiento periodontal']),
+    (5, 'Prostodoncista (Rehabilitador oral)', 'Rehabilitación oral',
+     'Devuelve función y estética reponiendo dientes perdidos o muy dañados con coronas, puentes y prótesis.',
+     'Cirujano dentista con especialidad en Prostodoncia o Rehabilitación Oral (2 a 3 años).',
+     array['Coronas y puentes', 'Prótesis removibles y totales', 'Prótesis sobre implantes', 'Rehabilitación de toda la boca', 'Incrustaciones']),
+    (6, 'Odontopediatra', 'Odontopediatría',
+     'Atiende a bebés, niños y adolescentes, con manejo de conducta y prevención desde temprana edad.',
+     'Cirujano dentista con especialidad en Odontopediatría (2 años).',
+     array['Primera visita y prevención infantil', 'Selladores y flúor', 'Pulpotomías en dientes de leche', 'Coronas de acero', 'Mantenedores de espacio']),
+    (7, 'Cirujano oral y maxilofacial', 'Cirugía oral y maxilofacial',
+     'Realiza cirugías de la boca, los maxilares y la cara, desde cordales complicadas hasta corrección de deformidades.',
+     'Cirujano dentista con residencia hospitalaria en Cirugía Oral y Maxilofacial (3 a 4 años).',
+     array['Extracción de cordales', 'Dientes retenidos', 'Quistes y tumores de los maxilares', 'Fracturas faciales', 'Cirugía ortognática']),
+    (8, 'Implantólogo oral', 'Implantología oral',
+     'Coloca implantes dentales para reponer dientes perdidos y prepara el hueso cuando hace falta.',
+     'Cirujano dentista con diplomado, especialidad o maestría en Implantología Oral.',
+     array['Implantes unitarios', 'Implantes para puentes y prótesis', 'Injertos de hueso', 'Elevación de seno maxilar', 'Carga inmediata']),
+    (9, 'Odontólogo estético', 'Odontología estética',
+     'Mejora la apariencia de la sonrisa con tratamientos conservadores y estéticos.',
+     'Cirujano dentista con diplomado o maestría en Odontología Estética o Restauradora.',
+     array['Diseño de sonrisa', 'Carillas de porcelana o resina', 'Blanqueamiento dental', 'Resinas estéticas', 'Contorneado de encías']),
+    (10, 'Patólogo bucal (Medicina oral)', 'Patología y medicina bucal',
+     'Diagnostica y trata lesiones y enfermedades de la boca, incluida la detección temprana del cáncer oral.',
+     'Cirujano dentista con especialidad en Patología o Medicina Bucal.',
+     array['Lesiones y llagas que no sanan', 'Biopsias', 'Enfermedades de la mucosa', 'Detección de cáncer oral', 'Manifestaciones orales de enfermedades']),
+    (11, 'Radiólogo oral y maxilofacial', 'Radiología oral y maxilofacial',
+     'Toma e interpreta radiografías y tomografías de los dientes y la cara para el diagnóstico.',
+     'Cirujano dentista con especialidad en Radiología Oral y Maxilofacial.',
+     array['Radiografía panorámica', 'Tomografía (CBCT)', 'Cefalometría para ortodoncia', 'Informes radiológicos', 'Planificación de implantes']),
+    (12, 'Especialista en ATM y dolor orofacial', 'Trastornos temporomandibulares y dolor orofacial',
+     'Trata los problemas de la articulación de la mandíbula, el bruxismo y el dolor de cara y cabeza de origen dental.',
+     'Cirujano dentista con formación de posgrado en Oclusión, ATM y Dolor Orofacial.',
+     array['Bruxismo', 'Dolor o chasquido de la mandíbula', 'Placas de relajación', 'Limitación al abrir la boca', 'Dolor orofacial crónico']),
+    (13, 'Odontogeriatra', 'Odontogeriatría',
+     'Atiende a adultos mayores considerando sus enfermedades, medicamentos y necesidades de prótesis.',
+     'Cirujano dentista con formación de posgrado en Odontogeriatría.',
+     array['Prótesis en adultos mayores', 'Boca seca', 'Pacientes con varias enfermedades', 'Atención domiciliaria', 'Prevención en la tercera edad']),
+    (14, 'Odontólogo de pacientes con necesidades especiales', 'Odontología para pacientes con necesidades especiales',
+     'Atiende a personas con discapacidad física o intelectual, o con condiciones médicas complejas.',
+     'Cirujano dentista con formación de posgrado en atención de pacientes especiales.',
+     array['Pacientes con discapacidad', 'Atención con sedación', 'Pacientes con enfermedades sistémicas', 'Manejo de conducta', 'Prevención adaptada']),
+    (15, 'Odontólogo forense', 'Odontología forense',
+     'Aplica la odontología a casos legales: identificación de personas, estimación de edad y peritajes.',
+     'Cirujano dentista con formación en Odontología Forense o Legal.',
+     array['Identificación por registros dentales', 'Estimación de edad', 'Peritajes', 'Análisis de mordeduras']),
+    (16, 'Odontólogo en salud pública', 'Salud pública bucal',
+     'Diseña y ejecuta programas de prevención y educación en salud bucal para comunidades y escuelas.',
+     'Cirujano dentista con maestría en Salud Pública.',
+     array['Programas escolares de prevención', 'Jornadas comunitarias', 'Educación en salud bucal', 'Fluorización'])
+  ) as v(orden, nombre, especialidad, descripcion, formacion, atiende)
+ where not exists (select 1 from public.tipos_dentista t where lower(t.nombre) = lower(v.nombre));
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
