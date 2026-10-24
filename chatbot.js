@@ -55,6 +55,23 @@
     chips.innerHTML = lista.map(function (o) { return '<button type="button" data-v="' + esc(o[1] != null ? o[1] : o[0]) + '">' + esc(o[0]) + '</button>'; }).join('');
   }
   function botonWa(texto, etiqueta) { return '<a class="bot-wa-btn" href="' + wa(texto) + '" target="_blank" rel="noopener">' + esc(etiqueta || 'Continuar por WhatsApp') + '</a>'; }
+  // WhatsApp automático: se abre una pestaña en el clic de «Confirmar» y, al registrarse la cita, se carga el mensaje
+  var ventanaWa = null;
+  function prepararWa() { try { ventanaWa = window.open('about:blank', '_blank'); } catch (e) { ventanaWa = null; } }
+  function enviarWa(texto) {
+    if (ventanaWa && !ventanaWa.closed) { try { ventanaWa.location.href = wa(texto); ventanaWa = null; return true; } catch (e) { /* bloqueada */ } }
+    ventanaWa = null; return false;
+  }
+  function cancelarWa() { if (ventanaWa && !ventanaWa.closed) { try { ventanaWa.close(); } catch (e) { /* ya cerrada */ } } ventanaWa = null; }
+  function avisoWa(enviado, texto) {
+    return (enviado ? '<br><small class="bot-nota">📲 Abrimos WhatsApp con el mensaje listo: solo pulsa <b>Enviar</b>. Si no se abrió o no llegó, reenvíalo aquí:</small>'
+      : '<br><small class="bot-nota">Envíanos este aviso por WhatsApp:</small>') + botonWa(texto, enviado ? 'Reenviar por WhatsApp' : 'Avisar por WhatsApp');
+  }
+  // Acciones que terminan en una cita registrada (y en el aviso por WhatsApp)
+  function terminaEnCita(v, texto) {
+    return (paso === 'agendar_ok' && (v === 'si' || /^(si|sí|confirmar|ok|dale)/i.test(texto || ''))) || String(v).indexOf('conf:') === 0 ||
+      (paso === 'repro_hora' && ((disponible && disponible[datos.fecha]) || []).indexOf(String(v).trim()) >= 0);
+  }
   var MENU = [['Agendar una cita', 'agendar'], ['Confirmar mi cita', 'confirmar'], ['Reprogramar mi cita', 'reprogramar'], ['Horarios y ubicación', 'info'], ['Tengo una duda', 'duda']];
 
   // ---------- Estado de la conversación ----------
@@ -119,12 +136,14 @@
     var r = await sb.rpc('solicitar_cita', { p_fecha: datos.fecha, p_hora: datos.hora, p_servicio: datos.servicio, p_nombre: datos.nombre, p_telefono: datos.telefono });
     var msg = 'Hola Plus Dental, soy ' + datos.nombre + '. Solicité una cita de ' + datos.servicio + ' el ' + fechaTexto(datos.fecha) + ' a las ' + datos.hora + '.';
     if (r.error) {
+      cancelarWa();
       var ocupado = /disponible/i.test(r.error.message || '');
       await responder((ocupado ? 'Ese horario se acaba de ocupar. Elige otro, por favor.' : 'No pude registrar la cita en este momento.') + (ocupado ? '' : ' ' + botonWa(msg, 'Enviarla por WhatsApp')));
       if (ocupado) return elegirDia('agendar');
       return menu();
     }
-    await responder('¡Listo! ✅ Registramos tu cita de <b>' + esc(datos.servicio) + '</b> para el <b>' + fechaTexto(datos.fecha) + ' a las ' + datos.hora + '</b>. Te escribiremos por WhatsApp para confirmarla. Puedes adelantar la conversación aquí: ' + botonWa(msg, 'Avisar por WhatsApp'));
+    var enviado = enviarWa(msg);
+    await responder('¡Listo! ✅ Registramos tu cita de <b>' + esc(datos.servicio) + '</b> para el <b>' + fechaTexto(datos.fecha) + ' a las ' + datos.hora + '</b>. Te escribiremos por WhatsApp para confirmarla.' + avisoWa(enviado, msg));
     return menu('¿Te ayudo con algo más?');
   }
 
@@ -177,18 +196,23 @@
   async function confirmarCita(id) {
     var r = await sb.rpc('bot_confirmar', { p_tel: ident.tel, p_dpi4: ident.dpi, p_cita: +id });
     var c = (datos.citas || []).filter(function (x) { return x.id === +id; })[0];
-    if (r.error || !r.data || !r.data.ok) { await responder(r.error ? 'No pude confirmar la cita ahora.' : motivo(r.data)); return menu(); }
-    await responder('¡Gracias! ✅ Tu cita del <b>' + (c ? fechaTexto(c.fecha) + ' a las ' + c.hora : '') + '</b> quedó <b>confirmada</b>. Te esperamos en ' + DIRECCION + '.');
+    if (r.error || !r.data || !r.data.ok) { cancelarWa(); await responder(r.error ? 'No pude confirmar la cita ahora.' : motivo(r.data)); return menu(); }
+    var msgC = 'Hola Plus Dental, confirmo mi cita' + (c ? ' de ' + c.servicio + ' del ' + fechaTexto(c.fecha) + ' a las ' + c.hora : '') + '.';
+    var envC = enviarWa(msgC);
+    await responder('¡Gracias! ✅ Tu cita del <b>' + (c ? fechaTexto(c.fecha) + ' a las ' + c.hora : '') + '</b> quedó <b>confirmada</b>. Te esperamos en ' + DIRECCION + '.' + avisoWa(envC, msgC));
     return menu('¿Te ayudo con algo más?');
   }
   async function reprogramarCita(f, h) {
     var r = await sb.rpc('bot_reprogramar', { p_tel: ident.tel, p_dpi4: ident.dpi, p_cita: datos.cita, p_fecha: f, p_hora: h });
     if (r.error || !r.data || !r.data.ok) {
+      cancelarWa();
       await responder(r.error ? 'No pude reprogramar la cita ahora.' : motivo(r.data));
       if (r.data && r.data.motivo === 'ocupado') return elegirDia('repro');
       return menu();
     }
-    await responder('¡Listo! ✅ Tu cita quedó para el <b>' + fechaTexto(f) + ' a las ' + h + '</b>. Te escribiremos por WhatsApp para confirmarla. ' + botonWa('Hola Plus Dental, reprogramé mi cita para el ' + fechaTexto(f) + ' a las ' + h + '.', 'Avisar por WhatsApp'));
+    var msgR = 'Hola Plus Dental, reprogramé mi cita para el ' + fechaTexto(f) + ' a las ' + h + '.';
+    var envR = enviarWa(msgR);
+    await responder('¡Listo! ✅ Tu cita quedó para el <b>' + fechaTexto(f) + ' a las ' + h + '</b>. Te escribiremos por WhatsApp para confirmarla.' + avisoWa(envR, msgR));
     return menu('¿Te ayudo con algo más?');
   }
 
@@ -304,6 +328,7 @@
     var b = e.target.closest('[data-v]');
     if (!b) return;
     decir(esc(b.textContent), 'yo');
+    if (terminaEnCita(b.dataset.v, b.textContent)) prepararWa();
     procesar(b.dataset.v, b.textContent);
   });
   form.addEventListener('submit', function (e) {
@@ -313,6 +338,7 @@
     entrada.value = '';
     // El DPI no se muestra completo en la conversación
     decir(paso === 'id_dpi' ? '••••' : esc(t), 'yo');
+    if (terminaEnCita(t, t)) prepararWa();
     procesar(t, t);
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) abrir(false); });
