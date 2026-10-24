@@ -32,7 +32,7 @@
   // Dentistas que tienen la especialidad de este tipo
   function dentistasDe(t) {
     var e = norm(t.especialidad);
-    return dentistas.filter(function (d) { return (d.especialidades || []).some(function (x) { return norm(x) === e; }); });
+    return dentistas.filter(function (d) { return d.tipo_id === t.id || (d.especialidades || []).some(function (x) { return norm(x) === e; }); });
   }
 
   $('admTiposDen').innerHTML =
@@ -68,8 +68,9 @@
     $('tdGrid').innerHTML = '<p class="dlg-msg">Cargando…</p>';
     var r = await Promise.all([
       sb.from('tipos_dentista').select('*').order('orden').order('codigo'),
-      sb.from('dentistas').select('id,nombre,especialidades,estado').order('nombre')
+      sb.from('dentistas').select('id,nombre,especialidades,estado,tipo_id').order('nombre')
     ]);
+    if (r[1].error && /tipo_id/.test(r[1].error.message || '')) r[1] = await sb.from('dentistas').select('id,nombre,especialidades,estado').order('nombre');
     if (r[0].error) { $('tdGrid').innerHTML = ''; aviso('tdMsg', traducir(r[0].error), true); return; }
     tipos = r[0].data; dentistas = r[1].error ? [] : r[1].data;
     pintarLista();
@@ -187,7 +188,7 @@
 
   // Áreas de especialidad activas para otras pantallas (ficha del dentista, agenda)
   window.PD_TIPOS_DENTISTA = async function () {
-    var r = await sb.from('tipos_dentista').select('nombre,especialidad,atiende,estado').eq('estado', 'activo').order('orden');
+    var r = await sb.from('tipos_dentista').select('id,codigo,nombre,especialidad,atiende,estado').order('orden');
     return r.error ? [] : r.data;
   };
 

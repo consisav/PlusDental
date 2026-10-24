@@ -3215,6 +3215,9 @@ select v.nombre, v.especialidad, v.descripcion, v.formacion, v.atiende, v.orden
   ) as v(orden, nombre, especialidad, descripcion, formacion, atiende)
  where not exists (select 1 from public.tipos_dentista t where lower(t.nombre) = lower(v.nombre));
 
+-- Tipo de médico (catálogo «Tipos de dentistas»)
+alter table public.dentistas add column if not exists tipo_id bigint references public.tipos_dentista (id) on delete set null;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

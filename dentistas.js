@@ -36,7 +36,7 @@
   ];
 
   var dentistas = [], posiciones = [], personal = [], titulos = [], actual = null, editando = false, filtro = 'activo';
-  var especialidades = [], sugerencias = [], marcada = -1, fotos = {};
+  var especialidades = [], sugerencias = [], marcada = -1, fotos = {}, tiposDen = [];
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -99,13 +99,20 @@
     // Áreas del catálogo «Tipos de dentistas» que aún no están en la lista de especialidades
     if (window.PD_TIPOS_DENTISTA) {
       var td = await window.PD_TIPOS_DENTISTA();
-      td.forEach(function (t) {
+      tiposDen = td;
+      td.filter(function (t) { return t.estado === 'activo'; }).forEach(function (t) {
         if (!ESPECIALIDADES.some(function (e) { return sinTildes(e[0]) === sinTildes(t.especialidad); }))
           ESPECIALIDADES.push([t.especialidad, sinTildes(t.nombre + ' ' + (t.atiende || []).join(' '))]);
       });
     }
   }
 
+  // Tipo de médico: lista del catálogo «Tipos de dentistas» (los inactivos solo si ya estaban asignados)
+  function opcionesTipo(sel) {
+    $('deTipo').innerHTML = '<option value="">Sin asignar</option>' + tiposDen.filter(function (t) { return t.estado === 'activo' || t.id === sel; }).map(function (t) {
+      return '<option value="' + t.id + '"' + (t.id === sel ? ' selected' : '') + '>' + esc(t.nombre) + '</option>';
+    }).join('');
+  }
   function nombrePosicion(id) { var p = posiciones.filter(function (x) { return x.id === id; })[0]; return p ? p.codigo + ' · ' + p.nombre : '—'; }
 
   function pintarLista() {
@@ -202,6 +209,7 @@
     $('deCorreo').value = (d && d.correo) || '';
     $('deDireccion').value = (d && d.direccion) || '';
     $('deColegiado').value = (d && d.colegiado) || '';
+    opcionesTipo(d ? d.tipo_id || null : null);
     $('deInicioProf').value = (d && d.inicio_profesion) || '';
     $('deIngreso').value = d ? d.fecha_ingreso : hoy();
     $('deSalida').value = (d && d.fecha_salida) || '';
@@ -300,6 +308,7 @@
       correo: $('deCorreo').value.trim() || null,
       direccion: $('deDireccion').value.trim() || null,
       colegiado: $('deColegiado').value.trim() || null,
+      tipo_id: $('deTipo').value ? +$('deTipo').value : null,
       inicio_profesion: $('deInicioProf').value || null,
       especialidades: especialidades.slice(),
       fecha_ingreso: $('deIngreso').value || hoy(),
@@ -337,6 +346,12 @@
     aviso('deMsg', (eraNuevo ? 'Dentista registrado. Ya puedes agregar su foto y sus títulos.' : 'Cambios guardados.') + aviso_salida, !!aviso_salida);
     sincronizarFotoPublica();
   }
+
+  // Al elegir el tipo de médico se agrega su área a las especialidades (si no estaba)
+  $('deTipo').addEventListener('change', function () {
+    var t = tiposDen.filter(function (x) { return x.id === +$('deTipo').value; })[0];
+    if (t && !especialidades.some(function (e) { return sinTildes(e) === sinTildes(t.especialidad); })) { especialidades.push(t.especialidad); pintarChips(); }
+  });
 
   // ---------- Especialidades (buscador inteligente) ----------
   function pintarChips() {
