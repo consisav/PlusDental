@@ -472,5 +472,16 @@
     if (nuevo) nuevo.focus();
   });
   $('faqVerMas').addEventListener('click', function () { todas = true; pintar(); });
+  // Búsqueda para el asistente virtual: la pregunta frecuente que mejor responde un texto (o null)
+  window.PD_FAQ = {
+    buscar: function (texto) {
+      var q = claves(texto);
+      if (!q.length) return null;
+      var con = FAQ.map(function (f, i) { return [i, puntaje(i, q)]; }).filter(function (x) { return x[1] > 0; }).sort(function (a, b) { return b[1] - a[1]; });
+      if (!con.length) return null;
+      var i = con[0][0];
+      return { pregunta: FAQ[i][1], respuesta: FAQ[i][2], recomendaciones: FAQ[i][3], cobertura: cobertura(i, texto) };
+    }
+  };
   pintar();
 })();

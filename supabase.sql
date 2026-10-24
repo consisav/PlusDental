@@ -3266,6 +3266,116 @@ do $$ declare r record; begin
   end loop;
 end $$;
 
+-- ===== Asistente virtual de la página (chat 24/7) =====
+-- El paciente se identifica con su teléfono y los 4 últimos dígitos de su DPI para ver, confirmar o reprogramar
+-- sus citas. Máximo 5 intentos fallidos por teléfono cada hora. Agendar usa disponibilidad() y solicitar_cita().
+create table if not exists public.bot_intentos (
+  id       bigint generated always as identity primary key,
+  telefono text not null,
+  creado   timestamptz not null default now()
+);
+create index if not exists bot_intentos_tel on public.bot_intentos (telefono, creado desc);
+alter table public.bot_intentos enable row level security;
+revoke all on public.bot_intentos from anon, authenticated;
+
+create or replace function public.bot_digitos(t text) returns text language sql immutable as $$
+  select right(regexp_replace(coalesce(t, ''), '\D', '', 'g'), 8);
+$$;
+
+-- Pacientes que coinciden con teléfono + 4 últimos del DPI (vacío si no coinciden o hay demasiados intentos)
+create or replace function public.bot_verificar(p_tel text, p_dpi4 text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_tel text := public.bot_digitos(p_tel); v_ids bigint[];
+begin
+  if length(v_tel) < 8 or coalesce(p_dpi4, '') !~ '^\d{4}$' then
+    return jsonb_build_object('ok', false, 'motivo', 'datos');
+  end if;
+  if (select count(*) from public.bot_intentos where telefono = v_tel and creado > now() - interval '1 hour') >= 5 then
+    return jsonb_build_object('ok', false, 'motivo', 'bloqueado');
+  end if;
+  select array_agg(id) into v_ids from public.pacientes
+   where public.bot_digitos(telefono) = v_tel and right(regexp_replace(coalesce(dpi, ''), '\D', '', 'g'), 4) = p_dpi4;
+  if v_ids is null then
+    insert into public.bot_intentos (telefono) values (v_tel);
+    return jsonb_build_object('ok', false, 'motivo', 'no_coincide');
+  end if;
+  return jsonb_build_object('ok', true, 'ids', to_jsonb(v_ids), 'tel', v_tel);
+end;
+$$;
+revoke execute on function public.bot_verificar(text, text) from public, anon, authenticated;
+
+-- Próximas citas del paciente verificado
+create or replace function public.bot_mis_citas(p_tel text, p_dpi4 text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v jsonb := public.bot_verificar(p_tel, p_dpi4);
+begin
+  if not (v->>'ok')::boolean then return v; end if;
+  return jsonb_build_object('ok', true,
+    'nombre', (select split_part(nombre, ' ', 1) from public.pacientes where id = (v->'ids'->>0)::bigint),
+    'citas', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'fecha', c.fecha, 'hora', to_char(c.hora, 'HH24:MI'), 'servicio', c.servicio,
+        'estado', c.estado, 'dentista', d.nombre) order by c.fecha, c.hora)
+      from public.citas c left join public.dentistas d on d.id = c.dentista_id
+     where c.fecha >= (now() at time zone 'America/Guatemala')::date
+       and c.estado in ('pendiente', 'confirmada', 'reprogramada')
+       and (c.paciente_id in (select jsonb_array_elements_text(v->'ids')::bigint)
+            or (c.paciente_id is null and public.bot_digitos(c.telefono) = v->>'tel'))), '[]'::jsonb));
+end;
+$$;
+
+-- La cita pertenece al paciente verificado
+create or replace function public.bot_cita_del_paciente(v jsonb, p_cita bigint)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.citas c where c.id = p_cita
+    and c.fecha >= (now() at time zone 'America/Guatemala')::date
+    and c.estado in ('pendiente', 'confirmada', 'reprogramada')
+    and (c.paciente_id in (select jsonb_array_elements_text(v->'ids')::bigint)
+         or (c.paciente_id is null and public.bot_digitos(c.telefono) = v->>'tel')));
+$$;
+revoke execute on function public.bot_cita_del_paciente(jsonb, bigint) from public, anon, authenticated;
+
+create or replace function public.bot_confirmar(p_tel text, p_dpi4 text, p_cita bigint)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v jsonb := public.bot_verificar(p_tel, p_dpi4);
+begin
+  if not (v->>'ok')::boolean then return v; end if;
+  if not public.bot_cita_del_paciente(v, p_cita) then return jsonb_build_object('ok', false, 'motivo', 'cita'); end if;
+  update public.citas set estado = 'confirmada' where id = p_cita and estado in ('pendiente', 'reprogramada');
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+create or replace function public.bot_reprogramar(p_tel text, p_dpi4 text, p_cita bigint, p_fecha date, p_hora text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v jsonb := public.bot_verificar(p_tel, p_dpi4); c record; v_den bigint; v_pos bigint;
+begin
+  if not (v->>'ok')::boolean then return v; end if;
+  if not public.bot_cita_del_paciente(v, p_cita) then return jsonb_build_object('ok', false, 'motivo', 'cita'); end if;
+  if not exists (select 1 from public.disponibilidad(p_fecha, p_fecha) d where d.hora = p_hora and d.libre) then
+    return jsonb_build_object('ok', false, 'motivo', 'ocupado');
+  end if;
+  select * into c from public.citas where id = p_cita;
+  -- El mismo dentista si está libre; si no, otro dentista libre a esa hora
+  select d.id, d.posicion_id into v_den, v_pos from public.dentistas d
+   where public.dentista_libre(d, p_fecha, p_hora::time)
+   order by (d.id is distinct from c.dentista_id), (d.rol_sala = 'alterno'), d.nombre limit 1;
+  update public.citas
+     set reprogramada_de = to_char(fecha, 'YYYY-MM-DD') || ' ' || to_char(hora, 'HH24:MI'),
+         fecha = p_fecha, hora = p_hora::time, estado = 'reprogramada',
+         dentista_id = coalesce(v_den, dentista_id), posicion_id = coalesce(v_pos, posicion_id),
+         reprogramada_en = now(), reprogramada_por = 'Asistente virtual'
+   where id = p_cita;
+  return jsonb_build_object('ok', true);
+exception
+  when unique_violation then return jsonb_build_object('ok', false, 'motivo', 'ocupado');
+end;
+$$;
+revoke execute on function public.bot_mis_citas(text, text) from public;
+revoke execute on function public.bot_confirmar(text, text, bigint) from public;
+revoke execute on function public.bot_reprogramar(text, text, bigint, date, text) from public;
+grant execute on function public.bot_mis_citas(text, text) to anon, authenticated;
+grant execute on function public.bot_confirmar(text, text, bigint) to anon, authenticated;
+grant execute on function public.bot_reprogramar(text, text, bigint, date, text) to anon, authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
