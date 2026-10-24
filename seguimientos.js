@@ -282,5 +282,9 @@
     e.stopImmediatePropagation();
     if (activo === 'seg') imprimir(); else imprimirAcciones();
   }, true);
-  window.PD_SEGUIMIENTOS = { reiniciar: function () { if (activo) activar(false); plan = null; acciones = null; } };
+  window.PD_SEGUIMIENTOS = {
+    reiniciar: function () { if (activo) activar(false); plan = null; acciones = null; },
+    // Al cambiar la fecha se rehace el plan o las acciones con los tratamientos de esa fecha
+    refrescar: function () { if (activo) activar(activo); }
+  };
 })();

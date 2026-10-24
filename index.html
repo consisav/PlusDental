@@ -111,6 +111,9 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .rc-tabla td{padding:10px;border-top:1px solid #EEF3F7;vertical-align:top;overflow-wrap:anywhere}
 .rc-ind{margin:0;font-size:14.5px;line-height:1.55}
 .rc-reg{margin:0;font-size:12.5px;color:#5A6D7A}
+.tr-der{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tr-fecha{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#475B68}
+.tr-fecha select{min-height:42px;border-radius:999px;padding:6px 14px;font-weight:600;max-width:240px}
 .tr-seg-btn{border-color:#9CC3DA;color:#00476B}.tr-seg-btn[aria-pressed="true"]{background:#005A87;border-color:#005A87;color:#FFFFFF}
 .tr-seg{display:flex;flex-direction:column;gap:12px}
 .tr-seg-cab{display:flex;justify-content:space-between;align-items:center;gap:10px 16px;flex-wrap:wrap;background:#F2F8FC;border:1px solid #9CC3DA;border-radius:16px;padding:14px 16px}
@@ -1216,7 +1219,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-btn tr-seg-btn" id="trSegBtn" aria-pressed="false">✦ Seguimientos</button>
 <button type="button" class="adm-btn tr-seg-btn" id="trAccBtn" aria-pressed="false">✦ Acciones paciente</button>
 </div>
-<button type="button" id="trImprimir" class="adm-btn">Imprimir</button>
+<div class="tr-der"><label class="tr-fecha">Fecha<select id="trFecha" class="adm-input" aria-label="Fecha de los tratamientos"></select></label><button type="button" id="trImprimir" class="adm-btn">Imprimir</button></div>
 </div>
 <div class="roles-wrap"><table><thead><tr><th>Fecha estado</th><th>Tratamiento</th><th>Estado</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Desc.</th><th class="num">Total</th><th>Presupuesto</th></tr></thead><tbody id="trBody"></tbody><tfoot id="trPie" class="tr-pie"></tfoot></table></div>
 <div id="trSeg" class="tr-seg" hidden></div>

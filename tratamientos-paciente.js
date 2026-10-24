@@ -14,7 +14,13 @@
 
   var ESTADOS = { pendiente: 'Pendiente', proceso: 'Proceso', finalizado: 'Finalizado', eliminado: 'Eliminado' };
   var FORMAS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta de crédito', otro: 'Otro' };
-  var paciente = null, items = [], saldo = null, filtro = 'finalizado';
+  var paciente = null, items = [], saldo = null, filtro = 'finalizado', fechaSel = null; // fechaSel: null = la última fecha; 'todas'
+  function isoLocal(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  // Fecha del tratamiento: la de su último cambio de estado (o la de realizado, en los anteriores)
+  function fechaDe(i) { return i.estado_fecha ? isoLocal(new Date(i.estado_fecha)) : i.realizado_en || ''; }
+  function fechas() { return trasladados().map(fechaDe).filter(function (f, k, a) { return f && a.indexOf(f) === k; }).sort().reverse(); }
+  function porFecha(lista) { var f = fechaSel || fechas()[0]; return !f || f === 'todas' ? lista : lista.filter(function (i) { return fechaDe(i) === f; }); }
+  function textoFecha(f) { return new Date(f + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }); }
 
   // Estado de un procedimiento (los anteriores al estado por procedimiento: realizado = Finalizado)
   function estadoDe(i) { return i.estado || (i.realizado ? 'finalizado' : 'pendiente'); }
@@ -27,7 +33,7 @@
   }
 
   async function cargar(p) {
-    paciente = p; items = []; saldo = null;
+    paciente = p; items = []; saldo = null; fechaSel = null;
     if (!p) return;
     $('trBody').innerHTML = '<tr><td colspan="8">Cargando…</td></tr>';
     aviso('');
@@ -51,7 +57,7 @@
 
   // En esta pestaña solo están los procedimientos en Proceso o Finalizados
   function trasladados() { return items.filter(function (i) { var e = estadoDe(i); return e === 'proceso' || e === 'finalizado'; }); }
-  function filas() { return trasladados().filter(function (i) { return filtro === 'todos' || estadoDe(i) === filtro; }); }
+  function filas() { return porFecha(trasladados()).filter(function (i) { return filtro === 'todos' || estadoDe(i) === filtro; }); }
 
   function pintar() {
     var fin = items.filter(function (i) { return estadoDe(i) === 'finalizado'; });
@@ -66,8 +72,16 @@
     $('trSaldo').textContent = sal < -0.004 ? q(-sal) + ' a favor' : q(Math.max(sal, 0));
     $('trSaldo').parentElement.classList.toggle('tr-debe', sal > 0.004);
     $('trPendiente').textContent = q(tPorHacer);
+    // Fechas de tratamiento (por defecto la última)
+    var fs = fechas(), fActual = fechaSel || fs[0] || 'todas';
+    $('trFecha').innerHTML = fs.map(function (f, k) { return '<option value="' + f + '">' + textoFecha(f) + (k === 0 ? ' · última' : '') + '</option>'; }).join('') +
+      '<option value="todas">Todas las fechas</option>';
+    $('trFecha').value = fActual;
+    $('trFecha').disabled = !fs.length;
+    var enFecha = porFecha(trasladados());
+    var nFin = enFecha.filter(function (i) { return estadoDe(i) === 'finalizado'; }).length, nProc = enFecha.filter(function (i) { return estadoDe(i) === 'proceso'; }).length;
     document.querySelectorAll('#trFiltros [data-trfiltro]').forEach(function (b) {
-      var n = b.dataset.trfiltro === 'finalizado' ? fin.length : b.dataset.trfiltro === 'proceso' ? proc.length : fin.length + proc.length;
+      var n = b.dataset.trfiltro === 'finalizado' ? nFin : b.dataset.trfiltro === 'proceso' ? nProc : nFin + nProc;
       b.querySelector('span').textContent = '(' + n + ')';
       b.setAttribute('aria-pressed', b.dataset.trfiltro === filtro);
     });
@@ -110,7 +124,8 @@
     if (!imp || !paciente) return;
     var lista = filas();
     var celda = 'padding:7px 6px;border-bottom:1px solid #D9E4EC';
-    var titulo = filtro === 'proceso' ? 'Tratamientos en proceso' : filtro === 'todos' ? 'Tratamientos' : 'Tratamientos finalizados';
+    var titulo = (filtro === 'proceso' ? 'Tratamientos en proceso' : filtro === 'todos' ? 'Tratamientos' : 'Tratamientos finalizados') +
+      ($('trFecha').value && $('trFecha').value !== 'todas' ? ' · ' + textoFecha($('trFecha').value) : '');
     var medico = paciente.medico && paciente.medico.nombre ? paciente.medico.nombre : 'Sin asignar';
     var grupos = [], porId = {};
     lista.forEach(function (i) {
@@ -164,8 +179,12 @@
     if (b) { filtro = b.dataset.trfiltro; pintar(); }
   });
   $('trImprimir').addEventListener('click', imprimirLista);
+  $('trFecha').addEventListener('change', function () {
+    fechaSel = this.value; pintar();
+    if (window.PD_SEGUIMIENTOS && window.PD_SEGUIMIENTOS.refrescar) window.PD_SEGUIMIENTOS.refrescar();
+  });
 
-  window.PD_TRATAMIENTOS = { cargar: function (p) { if (window.PD_SEGUIMIENTOS) window.PD_SEGUIMIENTOS.reiniciar(); return cargar(p); }, items: trasladados, paciente: function () { return paciente; } };
+  window.PD_TRATAMIENTOS = { cargar: function (p) { if (window.PD_SEGUIMIENTOS) window.PD_SEGUIMIENTOS.reiniciar(); return cargar(p); }, items: function () { return porFecha(trasladados()); }, paciente: function () { return paciente; } };
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () {},
     limpiar: function () { paciente = null; items = []; saldo = null; $('trBody').innerHTML = ''; $('trPie').innerHTML = ''; }
