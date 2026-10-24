@@ -119,9 +119,10 @@
 
   // Reporte: paciente, código de cliente, médico, presupuesto y forma de pago en el encabezado.
   // Si los procedimientos son de varios presupuestos, se agrupan por presupuesto (cada grupo con su encabezado).
-  function imprimirLista() {
+  async function imprimirLista() {
     var imp = window.PD_IMPRESION;
     if (!imp || !paciente) return;
+    var firma = window.PD_FIRMA ? await window.PD_FIRMA.cargar(paciente.dentista_id, paciente.medico && paciente.medico.nombre) : null;
     var lista = filas();
     var celda = 'padding:7px 6px;border-bottom:1px solid #D9E4EC';
     var titulo = (filtro === 'proceso' ? 'Tratamientos en proceso' : filtro === 'todos' ? 'Tratamientos' : 'Tratamientos finalizados') +
@@ -168,8 +169,8 @@
       (cuerpo || '<tr><td colspan="7" style="' + celda + '">No hay tratamientos con este filtro.</td></tr>') +
       '<tr><td colspan="6" style="' + celda + ';font-weight:800;background:#EEF5FA">TOTAL</td><td style="' + celda + ';text-align:right;font-weight:800;background:#EEF5FA">' + q(suma) + '</td></tr></tbody></table>' +
       '<div style="margin-top:18px;font-size:13px;color:#475B68">Finalizado: <b>' + $('trRealizado').textContent + '</b> · Pagado: <b>' + $('trPagado').textContent + '</b> · Saldo: <b>' + $('trSaldo').textContent + '</b></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:46px;font-size:12px;text-align:center;color:#475B68">' +
-      '<div style="border-top:1px solid #0B2B40;padding-top:6px">' + esc(medico) + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div>' +
+      (firma ? window.PD_FIRMA.conPaciente(firma, 'Firma del paciente', paciente.nombre) : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:46px;font-size:12px;text-align:center;color:#475B68">' +
+      '<div style="border-top:1px solid #0B2B40;padding-top:6px">' + esc(medico) + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div>') +
       imagenOdontograma() + '</div>';
     imp.imprimir(html);
   }

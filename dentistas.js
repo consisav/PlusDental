@@ -379,8 +379,85 @@
     $('deEspInput').focus();
   }
 
+  // ---------- Firma electrónica y sello ----------
+  var TIPOS_FIRMA = { Firma: { col: 'firma', max: [700, 260] }, Sello: { col: 'sello', max: [420, 420] } };
+  async function pintarFirmas() {
+    for (var tipo in TIPOS_FIRMA) {
+      var col = TIPOS_FIRMA[tipo].col, ruta = actual && actual[col];
+      $('de' + tipo + 'Btn').textContent = ruta ? 'Cambiar' : 'Subir';
+      $('de' + tipo + 'Quitar').hidden = !ruta;
+      $('de' + tipo + 'Vista').textContent = !actual ? 'Disponible después de guardar' : ruta ? 'Cargando…' : (tipo === 'Firma' ? 'Sin firma' : 'Sin sello');
+      if (ruta) {
+        var u = await sb.storage.from(BUCKET).createSignedUrl(ruta, 3600);
+        if (!u.error && actual && actual[col] === ruta) $('de' + tipo + 'Vista').innerHTML = '<img src="' + esc(u.data.signedUrl) + '&t=' + Date.now() + '" alt="' + tipo + ' de ' + esc(actual.nombre) + '">';
+      }
+    }
+  }
+  // Reduce la imagen y vuelve transparente el fondo blanco del papel
+  function prepararFirma(archivo, max) {
+    return new Promise(function (ok, falla) {
+      var img = new Image(), url = URL.createObjectURL(archivo);
+      img.onload = function () {
+        var escala = Math.min(1, max[0] / img.width, max[1] / img.height);
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * escala)); c.height = Math.max(1, Math.round(img.height * escala));
+        var g = c.getContext('2d'); g.drawImage(img, 0, 0, c.width, c.height);
+        var d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+        for (var i = 0; i < p.length; i += 4) {
+          var claro = Math.min(p[i], p[i + 1], p[i + 2]);
+          if (claro > 235) p[i + 3] = 0; else if (claro > 200) p[i + 3] = Math.round(p[i + 3] * (235 - claro) / 35);
+        }
+        g.putImageData(d, 0, 0);
+        URL.revokeObjectURL(url);
+        c.toBlob(function (b) { b ? ok(b) : falla(new Error('No se pudo procesar la imagen.')); }, 'image/png');
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); falla(new Error('El archivo no es una imagen válida.')); };
+      img.src = url;
+    });
+  }
+  async function subirFirma(tipo, archivo) {
+    if (!archivo || !actual) return;
+    var t = TIPOS_FIRMA[tipo], boton = $('de' + tipo + 'Btn');
+    boton.disabled = true;
+    aviso('deFirmaMsg', 'Subiendo ' + (tipo === 'Firma' ? 'la firma' : 'el sello') + '…');
+    try {
+      var blob = await prepararFirma(archivo, t.max);
+      var ruta = 'fotos/' + t.col + '-dentista-' + actual.id + '.png';
+      var up = await sb.storage.from(BUCKET).upload(ruta, blob, { contentType: 'image/png', upsert: true });
+      if (up.error) throw up.error;
+      var cambios = {}; cambios[t.col] = ruta;
+      var r = await sb.from('dentistas').update(cambios).eq('id', actual.id).select('*').single();
+      if (r.error) throw r.error;
+      actual = r.data;
+      dentistas = dentistas.map(function (d) { return d.id === actual.id ? actual : d; });
+      if (window.PD_FIRMA) window.PD_FIRMA.olvidar(actual.id);
+      aviso('deFirmaMsg', (tipo === 'Firma' ? 'Firma guardada.' : 'Sello guardado.') + ' Ya aparece en los reportes de ' + actual.nombre + '.');
+      await pintarFirmas();
+    } catch (e) {
+      aviso('deFirmaMsg', /firma|sello/.test(e.message || '') && /column|does not exist|schema cache/i.test(e.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para la firma y el sello.'
+        : /válida|procesar/.test(e.message || '') ? e.message : traducir(e), true);
+    } finally { boton.disabled = false; }
+  }
+  async function quitarFirma(tipo) {
+    if (!actual) return;
+    var t = TIPOS_FIRMA[tipo], cambios = {}; cambios[t.col] = null;
+    var r = await sb.from('dentistas').update(cambios).eq('id', actual.id).select('*').single();
+    if (r.error) { aviso('deFirmaMsg', traducir(r.error), true); return; }
+    actual = r.data;
+    dentistas = dentistas.map(function (d) { return d.id === actual.id ? actual : d; });
+    if (window.PD_FIRMA) window.PD_FIRMA.olvidar(actual.id);
+    aviso('deFirmaMsg', tipo === 'Firma' ? 'Se quitó la firma.' : 'Se quitó el sello.');
+    pintarFirmas();
+  }
+  ['Firma', 'Sello'].forEach(function (tipo) {
+    $('de' + tipo + 'Btn').addEventListener('click', function () { $('de' + tipo + 'Archivo').click(); });
+    $('de' + tipo + 'Archivo').addEventListener('change', function () { var f = this.files[0]; this.value = ''; subirFirma(tipo, f); });
+    $('de' + tipo + 'Quitar').addEventListener('click', function () { quitarFirma(tipo); });
+  });
+
   // ---------- Foto ----------
   async function pintarFoto() {
+    pintarFirmas();
     var vista = $('deFotoVista');
     $('deFotoBtn').disabled = !actual;
     $('deFotoBtn').textContent = actual && actual.foto ? 'Cambiar foto' : 'Subir foto';

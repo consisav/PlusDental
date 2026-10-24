@@ -452,9 +452,10 @@
     aviso(id ? 'Cambios guardados.' : 'Receta grabada. Ya puedes imprimirla.');
   }
 
-  function imprimir(r) {
+  async function imprimir(r) {
     var imp = window.PD_IMPRESION;
     if (!imp) return;
+    var firma = window.PD_FIRMA ? await window.PD_FIRMA.cargar(r.dentista_id) : null;
     var p = paciente, med = dentistaDe(r.dentista_id);
     var celda = 'padding:8px 6px;border-bottom:1px solid #D9E4EC;text-align:left;vertical-align:top';
     var dato = function (t, v) { return '<div><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">' + t + '</span><b style="font-size:13.5px">' + v + '</b></div>'; };
@@ -470,9 +471,8 @@
       r.receta_items.map(function (i, k) { return '<tr><td style="' + celda + '">' + (k + 1) + '</td><td style="' + celda + '"><b>' + esc(i.medicamento) + '</b></td><td style="' + celda + '">' + esc(i.dosis || '—') + '</td><td style="' + celda + '">' + esc(i.frecuencia || '—') + '</td><td style="' + celda + '">' + esc(i.duracion || '—') + '</td></tr>'; }).join('') +
       '</tbody></table>' +
       (r.indicaciones ? '<p style="margin:14px 0 0;font-size:13.5px;line-height:1.55"><b>Indicaciones:</b> ' + esc(r.indicaciones) + '</p>' : '') +
-      '<div style="display:flex;justify-content:center;margin-top:70px"><div style="width:320px;text-align:center;border-top:1.5px solid #0B2B40;padding-top:8px;font-size:13px">' +
-      '<b style="font-size:14px">' + esc(med ? 'Dr(a). ' + med.nombre : 'Médico tratante') + '</b>' + (med && med.colegiado ? '<br>Colegiado ' + esc(med.colegiado) : '') +
-      '<br><span style="color:#5A6D7A">Firma y sello</span>' +
+      '<div style="display:flex;justify-content:center;margin-top:44px"><div style="width:320px;text-align:center;font-size:13px">' +
+      (firma ? window.PD_FIRMA.bloque(firma, { ancho: 320 }) : '<div style="border-top:1.5px solid #0B2B40;padding-top:8px"><b style="font-size:14px">' + esc(med ? 'Dr(a). ' + med.nombre : 'Médico tratante') + '</b>' + (med && med.colegiado ? '<br>Colegiado ' + esc(med.colegiado) : '') + '<br><span style="color:#5A6D7A">Firma y sello</span></div>') +
       '<div style="margin-top:14px;padding-top:10px;border-top:1px dashed #C4D4DF;text-align:center;font-size:12px;line-height:1.7;color:#22394A">' +
       '<div><span style="color:#5A6D7A">Próxima cita:</span> <b>' + textoProxima(r) + '</b></div>' +
       '<div><span style="color:#5A6D7A">Fecha de grabación:</span> ' + fechaHora(r.creada) + '</div>' +

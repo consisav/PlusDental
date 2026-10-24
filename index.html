@@ -111,6 +111,14 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .rc-tabla td{padding:10px;border-top:1px solid #EEF3F7;vertical-align:top;overflow-wrap:anywhere}
 .rc-ind{margin:0;font-size:14.5px;line-height:1.55}
 .rc-reg{margin:0;font-size:12.5px;color:#5A6D7A}
+.de-firmas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.de-firmas>p{grid-column:1/-1;margin:0}
+.de-firma-card{display:flex;flex-direction:column;gap:8px;border:1px solid #D9E4EC;border-radius:14px;padding:12px;background:#FFFFFF}
+.de-firma-cab{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}.de-firma-cab small{font-size:12px;color:#5A6D7A}
+.de-firma-vista{height:120px;border:1px dashed #C4D4DF;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#94A6B2;font-size:13px;background:repeating-conic-gradient(#F5F9FC 0% 25%,#FFFFFF 0% 50%) 50%/16px 16px}
+.de-firma-vista img{max-width:92%;max-height:108px;object-fit:contain}
+.de-firma-acc{display:flex;gap:8px}
+@media (max-width:640px){.de-firmas{grid-template-columns:minmax(0,1fr)}}
 .tr-der{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .tr-fecha{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#475B68}
 .tr-fecha select{min-height:42px;border-radius:999px;padding:6px 14px;font-weight:600;max-width:240px}
@@ -1879,6 +1887,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>Correo electrónico<input id="deCorreo" type="email" maxlength="120"></label>
 <label>Código de colegiado activo (opcional)<input id="deColegiado" type="text" maxlength="30"></label>
 <label class="full">Dirección<input id="deDireccion" type="text" maxlength="250"></label>
+<div class="full de-firmas"><div class="de-firma-card"><div class="de-firma-cab"><span class="pos-lbl">Firma electrónica</span><small>Aparece sobre la línea de firma</small></div><div id="deFirmaVista" class="de-firma-vista de-firma">Sin firma</div><div class="de-firma-acc"><button type="button" id="deFirmaBtn" class="adm-btn">Subir</button><button type="button" id="deFirmaQuitar" class="adm-btn hm-eliminar" hidden>Quitar</button></div><input id="deFirmaArchivo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><div class="de-firma-card"><div class="de-firma-cab"><span class="pos-lbl">Sello profesional</span><small>Se coloca junto a la firma</small></div><div id="deSelloVista" class="de-firma-vista de-sello">Sin sello</div><div class="de-firma-acc"><button type="button" id="deSelloBtn" class="adm-btn">Subir</button><button type="button" id="deSelloQuitar" class="adm-btn hm-eliminar" hidden>Quitar</button></div><input id="deSelloArchivo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><p id="deFirmaMsg" class="dlg-msg">Sube una imagen PNG con fondo transparente o una foto clara sobre papel blanco: el fondo blanco se quita solo. Se usan en recetas, presupuestos, tratamientos y estados de cuenta.</p></div>
 </div>
 </fieldset>
 
@@ -2371,6 +2380,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="supabase-client.js"></script>
+<script src="firmas.js"></script>
 <script src="app.js"></script>
 <script src="auth.js"></script>
 <script src="voz-citas.js"></script>

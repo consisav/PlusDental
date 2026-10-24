@@ -219,10 +219,11 @@
     var ultimo = movimientos.length ? movimientos[movimientos.length - 1].saldo : 0;
     var celda = 'padding:8px 6px;border-bottom:1px solid #D9E4EC';
     var pid = ecActual.paciente_id, pac = null;
-    var r = await sb.from('pacientes').select('id,nombre,dpi,nit,medico:dentistas(nombre)').eq('id', pid).maybeSingle();
+    var r = await sb.from('pacientes').select('id,nombre,dpi,nit,dentista_id,medico:dentistas(nombre)').eq('id', pid).maybeSingle();
     if (r.error) r = await sb.from('pacientes').select('id,nombre,dpi,nit').eq('id', pid).maybeSingle();
     if (!r.error) pac = r.data;
     var medico = pac && pac.medico && pac.medico.nombre ? pac.medico.nombre : 'Sin asignar';
+    var firmaMed = pac && pac.dentista_id && window.PD_FIRMA ? await window.PD_FIRMA.cargar(pac.dentista_id, medico) : null;
     var dato = function (k, v, ancho) {
       return '<div style="min-width:0' + (ancho ? ';grid-column:' + ancho : '') + '"><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">' + k + '</span><b style="font-size:14px">' + v + '</b></div>';
     };
@@ -238,6 +239,7 @@
           '<td style="' + celda + ';text-align:right">' + q(m.saldo) + '</td></tr>';
       }).join('') + '</tbody></table>' +
       '<div style="text-align:right;font-size:18px;margin-top:16px"><strong>' + (ultimo < -0.004 ? 'Saldo a favor: ' + q(-ultimo) : 'Saldo pendiente: ' + q(ultimo)) + '</strong></div>' +
+      (firmaMed ? '<div style="display:flex;justify-content:flex-end;margin-top:30px">' + window.PD_FIRMA.bloque(firmaMed, { etiqueta: 'Médico asignado' }) + '</div>' : '') +
       '</div>');
   }
 

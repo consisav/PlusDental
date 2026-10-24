@@ -3085,6 +3085,12 @@ $$;
 revoke execute on function public.eliminar_historia(bigint) from public, anon;
 grant execute on function public.eliminar_historia(bigint) to authenticated;
 
+-- ===== Firma electrónica y sello del médico =====
+-- Imágenes PNG guardadas en el almacenamiento privado «expedientes» (carpeta fotos/). Se imprimen en recetas,
+-- presupuestos, tratamientos y estados de cuenta donde aparece el médico.
+alter table public.dentistas add column if not exists firma text;
+alter table public.dentistas add column if not exists sello text;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

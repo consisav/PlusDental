@@ -395,9 +395,11 @@
   // Código que tendrá el próximo presupuesto del paciente: PACIENTE-AÑO-CORRELATIVO-V01 (lo asigna la base de datos)
   // Reporte del presupuesto: logo, todos los datos del presupuesto en el encabezado y el detalle con valores
   var COLOR_ESTADO = { activo: ['#DBEAFE', '#1E40AF'], aprobado: ['#DCF2EC', '#08504C'], proceso: ['#FEF3C7', '#92400E'], finalizado: ['#E5E7EB', '#374151'], no_aprobado: ['#FDE2E4', '#9F1239'] };
-  function imprimirPresupuesto(d) {
+  async function imprimirPresupuesto(d) {
     var imp = window.PD_IMPRESION, i = d.info;
     if (!imp || !actual || !i) return;
+    var idMedico = actual.dentista_id || ($('pDentista').value ? +$('pDentista').value : null);
+    var firma = window.PD_FIRMA ? await window.PD_FIRMA.cargar(idMedico, actual.medico && actual.medico.nombre) : null;
     var dinero = function (n) { return 'Q' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
     var medico = actual.medico && actual.medico.nombre ? actual.medico.nombre
       : ($('pDentista').value && $('pDentista').selectedOptions[0] ? $('pDentista').selectedOptions[0].text : 'Sin asignar');
@@ -437,8 +439,8 @@
       '</table></div>' +
       (i.notas ? sec('Notas') + '<div style="font-size:12.5px;white-space:pre-line">' + esc(i.notas) + '</div>' : '') +
       '<p style="margin-top:14px;font-size:11.5px;color:#5A6D7A">Precios con IVA incluido. ' + (i.existe ? 'Datos del presupuesto al momento de imprimir.' : 'Presupuesto aún no confirmado: valores estimados según el odontograma.') + ' El costo final se confirma en la evaluación clínica.</p>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:46px;font-size:12px;text-align:center;color:#475B68">' +
-      '<div style="border-top:1px solid #0B2B40;padding-top:6px">' + esc(medico) + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div></div>';
+      (firma ? window.PD_FIRMA.conPaciente(firma, 'Firma del paciente', actual.nombre) : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:46px;font-size:12px;text-align:center;color:#475B68">' +
+      '<div style="border-top:1px solid #0B2B40;padding-top:6px">' + esc(medico) + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div>') + '</div>';
     imp.imprimir(html);
   }
 
