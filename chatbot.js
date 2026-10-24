@@ -133,8 +133,11 @@
     opciones([['Confirmar cita', 'si'], ['Cambiar horario', 'otro_dia'], ['Cancelar', 'menu']]);
   }
   async function guardarAgenda() {
-    var r = await sb.rpc('solicitar_cita', { p_fecha: datos.fecha, p_hora: datos.hora, p_servicio: datos.servicio, p_nombre: datos.nombre, p_telefono: datos.telefono });
-    var msg = 'Hola Plus Dental, soy ' + datos.nombre + '. Solicité una cita de ' + datos.servicio + ' el ' + fechaTexto(datos.fecha) + ' a las ' + datos.hora + '.';
+    // El paciente confirmó en el chat: la cita se registra ya Confirmada (si la función nueva aún no está, queda Programada)
+    var args = { p_fecha: datos.fecha, p_hora: datos.hora, p_servicio: datos.servicio, p_nombre: datos.nombre, p_telefono: datos.telefono };
+    var r = await sb.rpc('bot_agendar', args), confirmada = !r.error;
+    if (r.error && /bot_agendar/.test(r.error.message || '') && /could not find|does not exist|schema cache/i.test(r.error.message || '')) { r = await sb.rpc('solicitar_cita', args); confirmada = false; }
+    var msg = 'Hola Plus Dental, soy ' + datos.nombre + '. Agendé y confirmé mi cita de ' + datos.servicio + ' el ' + fechaTexto(datos.fecha) + ' a las ' + datos.hora + '.';
     if (r.error) {
       cancelarWa();
       var ocupado = /disponible/i.test(r.error.message || '');
@@ -143,7 +146,7 @@
       return menu();
     }
     var enviado = enviarWa(msg);
-    await responder('¡Listo! ✅ Registramos tu cita de <b>' + esc(datos.servicio) + '</b> para el <b>' + fechaTexto(datos.fecha) + ' a las ' + datos.hora + '</b>. Te escribiremos por WhatsApp para confirmarla.' + avisoWa(enviado, msg));
+    await responder('¡Listo! ✅ Registramos tu cita de <b>' + esc(datos.servicio) + '</b> para el <b>' + fechaTexto(datos.fecha) + ' a las ' + datos.hora + '</b>' + (confirmada ? ' y quedó <b>confirmada</b>. ¡Te esperamos!' : '. Te escribiremos por WhatsApp para confirmarla.') + avisoWa(enviado, msg));
     return menu('¿Te ayudo con algo más?');
   }
 

@@ -3376,6 +3376,22 @@ grant execute on function public.bot_mis_citas(text, text) to anon, authenticate
 grant execute on function public.bot_confirmar(text, text, bigint) to anon, authenticated;
 grant execute on function public.bot_reprogramar(text, text, bigint, date, text) to anon, authenticated;
 
+-- Agendar desde el asistente: el paciente confirmó en el chat, así que la cita queda Confirmada (no Programada)
+create or replace function public.bot_agendar(p_fecha date, p_hora text, p_servicio text, p_nombre text, p_telefono text)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint;
+begin
+  v_id := public.solicitar_cita(p_fecha, p_hora, p_servicio, p_nombre, p_telefono);
+  update public.citas
+     set estado = 'confirmada',
+         notas = trim(coalesce(notas || ' ', '') || 'Agendada y confirmada por el paciente en el asistente virtual.')
+   where id = v_id;
+  return v_id;
+end;
+$$;
+revoke execute on function public.bot_agendar(date, text, text, text, text) from public;
+grant execute on function public.bot_agendar(date, text, text, text, text) to anon, authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
