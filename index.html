@@ -111,6 +111,17 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .rc-tabla td{padding:10px;border-top:1px solid #EEF3F7;vertical-align:top;overflow-wrap:anywhere}
 .rc-ind{margin:0;font-size:14.5px;line-height:1.55}
 .rc-reg{margin:0;font-size:12.5px;color:#5A6D7A}
+.tr-seg-btn{border-color:#9CC3DA;color:#00476B}.tr-seg-btn[aria-pressed="true"]{background:#005A87;border-color:#005A87;color:#FFFFFF}
+.tr-seg{display:flex;flex-direction:column;gap:12px}
+.tr-seg-cab{display:flex;justify-content:space-between;align-items:center;gap:10px 16px;flex-wrap:wrap;background:#F2F8FC;border:1px solid #9CC3DA;border-radius:16px;padding:14px 16px}
+.tr-seg-cab b{display:block;font-size:16px;color:#0B2B40}.tr-seg-cab small{font-size:12.5px;color:#5A6D7A}
+.tr-seg-acc{display:flex;gap:8px;flex-wrap:wrap}.tr-seg-acc button:disabled{opacity:.5;cursor:not-allowed}
+#trSegMsg{margin:0}#trSegMsg:empty{display:none}
+.tr-seg-tabla{width:100%}.tr-seg-tabla td{vertical-align:middle}
+.tr-seg-est{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700}
+.tr-seg-est.vencido{background:#FDE2E4;color:#9F1239}.tr-seg-est.proximo{background:#FEF3C7;color:#92400E}.tr-seg-est.futuro{background:#E8F1FB;color:#0C3F72}
+.tr-seg-agendar{min-height:34px;padding:5px 12px;font-size:13px}
+.tr-seg-cuid{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:14px;padding:12px 16px;font-size:14px}.tr-seg-cuid ul{margin:6px 0 0;padding-left:18px;color:#22394A}
 .rc-ia{display:flex;flex-direction:column;gap:10px;border:1px solid #9CC3DA;background:#F2F8FC;border-radius:16px;padding:14px 16px}
 .rc-ia-cab{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}.rc-ia-cab b{font-size:15.5px;color:#00476B}.rc-ia-cab small{font-size:12.5px;color:#5A6D7A}
 .rc-ia-ctx{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.rc-ia-lbl{font-size:12.5px;color:#5A6D7A;margin-right:2px}
@@ -1197,10 +1208,12 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-btn" data-trfiltro="finalizado" aria-pressed="true">Finalizados <span>(0)</span></button>
 <button type="button" class="adm-btn" data-trfiltro="proceso" aria-pressed="false">En proceso <span>(0)</span></button>
 <button type="button" class="adm-btn" data-trfiltro="todos" aria-pressed="false">Todos <span>(0)</span></button>
+<button type="button" class="adm-btn tr-seg-btn" id="trSegBtn" aria-pressed="false">✦ Seguimientos</button>
 </div>
 <button type="button" id="trImprimir" class="adm-btn">Imprimir</button>
 </div>
 <div class="roles-wrap"><table><thead><tr><th>Fecha estado</th><th>Tratamiento</th><th>Estado</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Desc.</th><th class="num">Total</th><th>Presupuesto</th></tr></thead><tbody id="trBody"></tbody><tfoot id="trPie" class="tr-pie"></tfoot></table></div>
+<div id="trSeg" class="tr-seg" hidden></div>
 <p class="dlg-msg">Aquí pasan los procedimientos de presupuestos aprobados cuando su estado cambia a <strong>Proceso</strong> o <strong>Finalizado</strong> (en el odontograma o en Presupuesto), con los datos de su presupuesto. Solo los finalizados se cargan al estado de cuenta.</p>
 <p id="trMsg" class="dlg-msg" role="status"></p>
 </div>
@@ -2361,6 +2374,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="tratamientos-paciente.js"></script>
 <script src="recetas.js"></script>
 <script src="historias-medicas.js"></script>
+<script src="seguimientos.js"></script>
 <script src="posiciones.js"></script>
 <script src="dentistas.js"></script>
 <script src="agenda.js"></script>

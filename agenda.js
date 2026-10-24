@@ -766,7 +766,22 @@
     $('reproDlg').close();
     if (repro.alTerminar) repro.alTerminar({ fecha: $('reproFecha').value, hora: $('reproHora').value });
   });
-  window.PD_AGENDA = { reprogramar: reprogramar, estados: ESTADOS_CITA };
+  // Abre «Administrar citas» con el paciente, el tratamiento y la fecha desde la que buscar (p. ej. desde Seguimientos)
+  function preparar(o) {
+    if ($('tabAgenda')) $('tabAgenda').click();
+    var intentos = 0;
+    (function esperar() {
+      var op = $('agPaciente').querySelector('option[value="' + o.pacienteId + '"]');
+      if (!op && intentos++ < 40) { setTimeout(esperar, 150); return; }
+      if (typeof nuevaCita === 'function') nuevaCita();
+      if (op) { $('agPaciente').value = String(o.pacienteId); alCambiarPaciente(); }
+      $('agTratamiento').value = o.tratamiento || ''; alCambiarTratamiento();
+      if (o.fecha) { $('agDesde').value = o.fecha; $('agFechaM').value = o.fecha; }
+      aviso('agFormMsg', 'Seguimiento listo para agendar: pulsa «Buscar los mejores horarios» o elige «Ya tengo fecha y hora».');
+      $('agForm').scrollIntoView({ block: 'start' });
+    })();
+  }
+  window.PD_AGENDA = { reprogramar: reprogramar, estados: ESTADOS_CITA, preparar: preparar };
 
   function pedirConfirmacion(b) {
     function restaurar() { b.dataset.confirmar = '0'; b.textContent = b.dataset.texto; b.style.borderColor = ''; b.style.color = ''; }

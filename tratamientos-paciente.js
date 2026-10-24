@@ -165,7 +165,7 @@
   });
   $('trImprimir').addEventListener('click', imprimirLista);
 
-  window.PD_TRATAMIENTOS = { cargar: cargar };
+  window.PD_TRATAMIENTOS = { cargar: function (p) { if (window.PD_SEGUIMIENTOS) window.PD_SEGUIMIENTOS.reiniciar(); return cargar(p); }, items: trasladados, paciente: function () { return paciente; } };
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () {},
     limpiar: function () { paciente = null; items = []; saldo = null; $('trBody').innerHTML = ''; $('trPie').innerHTML = ''; }

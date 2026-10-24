@@ -354,13 +354,16 @@
   // ---------- Método 2: IA local en el navegador (WebLLM, sin clave) ----------
   // El modelo se descarga una vez (≈1.8 GB) y queda guardado en este equipo; solo elige medicamentos del catálogo.
   var MODELO_LOCAL = 'Qwen2.5-3B-Instruct-q4f16_1-MLC', motor = null, cargandoMotor = null;
-  async function motorLocal() {
+  var avisoMotor = null;
+  async function motorLocal(avisar) {
+    if (avisar) avisoMotor = avisar;
     if (motor) return motor;
     if (!cargandoMotor) cargandoMotor = (async function () {
       var webllm = await import('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.84/+esm');
       return webllm.CreateMLCEngine(MODELO_LOCAL, {
         initProgressCallback: function (p) {
-          if ($('rcIaMsg')) $('rcIaMsg').textContent = 'Preparando la IA en este equipo… ' + Math.round((p.progress || 0) * 100) + '% (la primera vez descarga el modelo; después es inmediato).';
+          var t = 'Preparando la IA en este equipo… ' + Math.round((p.progress || 0) * 100) + '% (la primera vez descarga el modelo; después es inmediato).';
+          if (avisoMotor) avisoMotor(t);
         }
       });
     })();
@@ -378,7 +381,7 @@
     var base = protocolo(c);
     boton.disabled = true;
     try {
-      var e = await motorLocal();
+      var e = await motorLocal(function (t) { if ($('rcIaMsg')) $('rcIaMsg').textContent = t; });
       $('rcIaMsg').textContent = 'La IA local está analizando el caso…';
       var catalogo = Object.keys(FRECUENTES).map(function (k) { return '- ' + k + ' (' + FRECUENTES[k].join(', ') + ')'; }).join('\n');
       var esquema = JSON.stringify({ type: 'object', properties: {
@@ -522,6 +525,7 @@
     '<datalist id="rcListaDur">' + DURACIONES.map(function (m) { return '<option value="' + esc(m) + '"></option>'; }).join('') + '</datalist>');
 
   window.PD_RECETAS = { cargar: cargar };
+  window.PD_IA_LOCAL = { disponible: function () { return !!navigator.gpu; }, motor: motorLocal };
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () {},
     limpiar: function () { paciente = null; recetas = []; dentistas = []; citasPac = []; elegida = null; editando = null; $('rcLista').innerHTML = ''; $('rcPanel').innerHTML = ''; aviso(''); }
