@@ -139,32 +139,148 @@
       '<p style="margin-top:18px;font-size:11.5px;color:#5A6D7A">Fechas sugeridas; el odontólogo las confirma según la evolución. Para agendar: WhatsApp +502 3756-5739.</p></div>');
   }
 
-  function activar(si) {
-    activo = si;
+  // ---------- Acciones del paciente: qué hacer para recuperarse (dirigido al paciente) ----------
+  // [patrón, hacer, evitar, señales de alarma]
+  var ACCIONES = [
+    [/implante/, ['Aplique frío en la cara 15 minutos cada hora durante el primer día.', 'Coma blando y frío los primeros días, del lado contrario al implante.', 'Cepíllese con cepillo suave y haga los enjuagues indicados desde el día siguiente.'],
+      ['No fume ni tome alcohol durante al menos 2 semanas.', 'No mastique alimentos duros sobre el implante.'], ['Sangrado que no para', 'Hinchazón que aumenta después del tercer día', 'Fiebre', 'Movilidad del implante']],
+    [/cordal|tercer molar|cirug|extrac|exodon/, ['Muerda la gasa 30 a 45 minutos después del procedimiento.', 'Aplique frío en la cara las primeras 24 horas (15 minutos sí, 15 no).', 'Coma blando y frío los primeros 2 días y tome bastante agua.', 'Duerma con la cabeza un poco elevada la primera noche.'],
+      ['No escupa, no se enjuague con fuerza y no use pajilla las primeras 24 horas.', 'No fume ni tome alcohol al menos 3 días.', 'No se toque la herida con la lengua ni con los dedos.'], ['Sangrado abundante después de 24 horas', 'Dolor intenso que aumenta al tercer día', 'Mal olor o mal sabor fuerte', 'Fiebre o hinchazón que crece']],
+    [/endodon|conducto|pulpect|pulpot/, ['Tome los analgésicos indicados si hay molestia; es normal sentir sensibilidad al morder unos días.', 'Mastique del lado contrario hasta que la pieza tenga su restauración definitiva.', 'Asista a la cita para la corona o restauración final.'],
+      ['No muerda alimentos duros (hielo, nueces, caramelos) con la pieza tratada.'], ['Hinchazón en la encía o la cara', 'Dolor fuerte que no cede con el analgésico', 'Se cae o rompe la curación provisional']],
+    [/corona|puente|incrustac|carilla/, ['Use hilo dental o cepillo interdental alrededor de la prótesis todos los días.', 'Si la mordida se siente alta, avise para ajustarla.'],
+      ['Evite alimentos muy pegajosos las primeras 24 horas.', 'No muerda objetos duros (uñas, lapiceros, hielo).'], ['La corona se mueve o se despega', 'Dolor al morder que no mejora en una semana']],
+    [/protesis|placa|dentadura/, ['Retire la prótesis por la noche y déjela en agua limpia.', 'Lávela a diario con cepillo y jabón neutro.', 'Comience con alimentos blandos cortados en trozos pequeños.'],
+      ['No la limpie con agua caliente ni cloro.'], ['Llagas o zonas de presión que no sanan en una semana']],
+    [/raspado|curetaje|periodon|alisado/, ['Haga los enjuagues de clorhexidina indicados.', 'Cepíllese 3 veces al día con cepillo suave y use hilo dental.'],
+      ['No fume: retrasa la curación de las encías.', 'Evite alimentos muy calientes o picantes 2 días.'], ['Sangrado que no para', 'Encía muy inflamada o con pus']],
+    [/ortodon|bracket|alineador/, ['Cepíllese después de cada comida y use cepillo interdental.', 'Use cera de ortodoncia si algún bracket lastima.'],
+      ['Evite alimentos duros o pegajosos (chicle, caramelos, elotes enteros).'], ['Se despega un bracket o un alambre lastima']],
+    [/blanqueam/, ['Use pasta para dientes sensibles si hay sensibilidad.'],
+      ['Durante 48 horas evite café, té, vino, refrescos de cola, salsas oscuras y tabaco.'], ['Sensibilidad muy fuerte que no baja en 3 días']],
+    [/resina|obtura|amalgama|restaura|ionomero/, ['Puede comer cuando pase la anestesia (cuidado de no morderse la mejilla).', 'Es normal un poco de sensibilidad al frío unos días.'],
+      ['Evite morder objetos duros con la pieza restaurada.'], ['Sensibilidad o dolor que dura más de 2 semanas', 'La restauración se siente alta al morder']],
+    [/limpieza|profilax|detartraje/, ['Cepíllese 3 veces al día y use hilo dental a diario.', 'Puede haber sensibilidad leve 1 o 2 días.'],
+      ['Evite fumar y bebidas muy pigmentadas las primeras horas.'], []],
+    [/sellante|fluor/, ['Siga cepillándose con pasta con flúor.'], ['No coma ni beba 30 minutos después del flúor.'], []]
+  ];
+  function accionesProtocolo(lista) {
+    var hacer = [], evitar = [], alarma = [];
+    function add(arr, x) { x.forEach(function (v) { if (arr.indexOf(v) < 0) arr.push(v); }); }
+    lista.forEach(function (i) {
+      var t = norm(i.tratamiento), reg = ACCIONES.filter(function (a) { return a[0].test(t); })[0];
+      if (reg) { add(hacer, reg[1]); add(evitar, reg[2]); add(alarma, reg[3]); }
+    });
+    if (!hacer.length) add(hacer, ['Cepíllese 3 veces al día y use hilo dental.', 'Asista a sus controles programados.']);
+    add(hacer, ['Tome los medicamentos de su receta tal como se le indicó.']);
+    return { hacer: hacer, evitar: evitar, alarma: alarma, mensaje: '', fuente: 'según protocolos' };
+  }
+  var acciones = null;
+  function nombreCorto() { var p = paciente(); return p ? String(p.nombre).split(' ')[0] : ''; }
+  function textoWhatsApp() {
+    var a = acciones, lista = items();
+    return 'Hola ' + nombreCorto() + ', le escribimos de Plus Dental. Después de su tratamiento (' + lista.map(function (i) { return i.tratamiento; }).join(', ') + '):\n\n' +
+      (a.mensaje ? a.mensaje + '\n\n' : '') +
+      'Qué hacer:\n' + a.hacer.map(function (x) { return '• ' + x; }).join('\n') +
+      (a.evitar.length ? '\n\nQué evitar:\n' + a.evitar.map(function (x) { return '• ' + x; }).join('\n') : '') +
+      (a.alarma.length ? '\n\nLlámenos si tiene: ' + a.alarma.join(', ') + '.' : '') + '\n\nCualquier duda, escríbanos por este medio.';
+  }
+  function telWa(t) { var n = String(t || '').replace(/\D/g, ''); if (n.length === 8) n = '502' + n; return n; }
+  function pintarAcciones() {
+    var lista = items(), p = paciente();
+    if (!lista.length) { $('trSeg').innerHTML = '<p class="dlg-msg">Aún no hay tratamientos en proceso ni finalizados para sugerir acciones al paciente.</p>'; return; }
+    if (!acciones) acciones = accionesProtocolo(lista);
+    var ia = window.PD_IA_LOCAL && window.PD_IA_LOCAL.disponible(), tel = p ? telWa(p.telefono) : '';
+    function bloque(clase, titulo, arr) { return arr.length ? '<div class="tr-acc-b ' + clase + '"><b>' + titulo + '</b><ul>' + arr.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>' : ''; }
+    $('trSeg').innerHTML =
+      '<div class="tr-seg-cab"><div><b>Acciones del paciente para su recuperación</b><small>' + esc(lista.map(function (i) { return i.tratamiento; }).join(', ')) + ' · ' + esc(acciones.fuente) + '</small></div>' +
+      '<div class="tr-seg-acc"><button type="button" class="adm-btn" data-acc-protocolo>Por protocolo</button>' +
+      '<button type="button" class="adm-btn adm-primary" data-acc-ia' + (ia ? '' : ' disabled title="La IA local necesita Chrome o Edge actualizados en computadora (WebGPU)"') + '>✦ Generar con IA local</button></div></div>' +
+      '<p id="trSegMsg" class="dlg-msg" role="status"></p>' +
+      (acciones.mensaje ? '<p class="tr-acc-msg">' + esc(acciones.mensaje) + '</p>' : '') +
+      '<div class="tr-acc-grid">' + bloque('si', '✓ Qué hacer', acciones.hacer) + bloque('no', '✕ Qué evitar', acciones.evitar) + bloque('alerta', '⚠ Llame a la clínica si tiene', acciones.alarma) + '</div>' +
+      '<div class="tr-seg-acc">' + (tel ? '<a class="adm-btn adm-primary" target="_blank" rel="noopener" href="https://wa.me/' + tel + '?text=' + encodeURIComponent(textoWhatsApp()) + '">Enviar al paciente por WhatsApp</a>' : '<span class="dlg-msg">El paciente no tiene teléfono registrado para enviarlo por WhatsApp.</span>') + '</div>' +
+      '<p class="dlg-msg">Sugerencia ' + esc(acciones.fuente) + ': revísala antes de entregarla al paciente.</p>';
+  }
+  async function generarAccionesIA(boton) {
+    var lista = items(), p = paciente();
+    if (!lista.length || !window.PD_IA_LOCAL) return;
+    boton.disabled = true;
+    var msg = function (t) { if ($('trSegMsg')) $('trSegMsg').textContent = t; };
+    var base = accionesProtocolo(lista);
+    try {
+      var motor = await window.PD_IA_LOCAL.motor(msg);
+      msg('La IA local está preparando las recomendaciones para el paciente…');
+      var esquema = JSON.stringify({ type: 'object', properties: { mensaje: { type: 'string' }, hacer: { type: 'array', items: { type: 'string' } }, evitar: { type: 'array', items: { type: 'string' } }, alarma: { type: 'array', items: { type: 'string' } } }, required: ['mensaje', 'hacer', 'evitar', 'alarma'] });
+      var r = await motor.chat.completions.create({
+        temperature: 0.3, max_tokens: 900, response_format: { type: 'json_object', schema: esquema },
+        messages: [
+          { role: 'system', content: 'Eres un asistente de una clínica dental en Guatemala. Escribe recomendaciones de recuperación DIRIGIDAS AL PACIENTE, tratándolo de usted, en español sencillo y amable. «mensaje»: 1 o 2 oraciones de ánimo y resumen. «hacer»: acciones concretas para recuperarse. «evitar»: lo que no debe hacer. «alarma»: señales por las que debe llamar a la clínica. Frases cortas. No recetes medicamentos nuevos ni des dosis: solo «tome los medicamentos de su receta». Responde solo en JSON.' },
+          { role: 'user', content: 'Paciente' + (p && p.fecha_nacimiento ? ' de ' + Math.floor((Date.now() - new Date(p.fecha_nacimiento + 'T12:00:00')) / 31557600000) + ' años' : '') + (p && p.enfermedades ? ' con: ' + p.enfermedades : '') +
+            '.\nTratamientos realizados:\n' + lista.map(function (i) { return '- ' + i.tratamiento + (i.pieza ? ' (pieza ' + i.pieza + ')' : '') + ', ' + (i.estado === 'proceso' ? 'en proceso' : 'finalizado') + ' el ' + (i.fecha || hoy()); }).join('\n') +
+            '\nReferencia por protocolo: ' + JSON.stringify({ hacer: base.hacer, evitar: base.evitar, alarma: base.alarma }) }
+        ]
+      });
+      var d = JSON.parse(r.choices[0].message.content || '{}');
+      function limpia(a) { return (a || []).map(function (x) { return String(x).trim().slice(0, 220); }).filter(Boolean).slice(0, 10); }
+      var hacer = limpia(d.hacer);
+      if (!hacer.length) throw new Error('La IA no devolvió recomendaciones');
+      acciones = { hacer: hacer, evitar: limpia(d.evitar), alarma: limpia(d.alarma).length ? limpia(d.alarma) : base.alarma, mensaje: String(d.mensaje || '').slice(0, 300), fuente: 'de la IA local' };
+      pintarAcciones();
+      msg('Recomendaciones generadas por la IA local. Revísalas antes de enviarlas.');
+    } catch (err) {
+      console.error(err);
+      acciones = base; pintarAcciones();
+      msg('No se pudo usar la IA local en este equipo (' + (err && err.message ? err.message.slice(0, 100) : 'error') + '). Se muestran las acciones por protocolo.');
+    }
+  }
+  function imprimirAcciones() {
+    var imp = window.PD_IMPRESION, p = paciente(), a = acciones;
+    if (!imp || !p || !a) return;
+    function lista(titulo, color, arr) { return arr.length ? '<div style="break-inside:avoid;margin-top:14px"><div style="font-weight:800;color:' + color + ';font-size:14px;margin-bottom:4px">' + titulo + '</div><ul style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.6">' + arr.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>' : ''; }
+    imp.imprimir(imp.encabezado('Indicaciones para su recuperación') +
+      '<div style="background:#F5F9FC;border:1px solid #D9E4EC;border-radius:12px;padding:12px 14px;font-size:13.5px"><b>' + esc(p.nombre) + '</b><br><span style="color:#475B68">Tratamientos: ' + esc(items().map(function (i) { return i.tratamiento + (i.pieza ? ' (pieza ' + i.pieza + ')' : ''); }).join(', ')) + '</span></div>' +
+      (a.mensaje ? '<p style="font-size:14px;margin:14px 0 0">' + esc(a.mensaje) + '</p>' : '') +
+      lista('✓ Qué hacer', '#08504C', a.hacer) + lista('✕ Qué evitar', '#9F1239', a.evitar) + lista('⚠ Llame a la clínica si tiene', '#92400E', a.alarma) +
+      '<p style="margin-top:22px;font-size:12px;color:#5A6D7A">Dudas o urgencias: WhatsApp +502 3756-5739 · Reforma Montúfar, zona 10.</p></div>');
+  }
+
+  // ---------- Modo de la pestaña: tabla, Seguimientos o Acciones del paciente ----------
+  function activar(modo) {
+    activo = modo || false;
     var tabla = $('trBody').closest('.roles-wrap');
-    if (tabla) tabla.hidden = si;
-    $('trSeg').hidden = !si;
-    $('trSegBtn').setAttribute('aria-pressed', si);
-    if (si) {
+    if (tabla) tabla.hidden = !!activo;
+    $('trSeg').hidden = !activo;
+    $('trSegBtn').setAttribute('aria-pressed', activo === 'seg');
+    $('trAccBtn').setAttribute('aria-pressed', activo === 'acc');
+    if (activo) {
       document.querySelectorAll('#trFiltros [data-trfiltro]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
-      plan = null; pintar();
+      if (activo === 'seg') { plan = null; pintar(); } else { acciones = null; pintarAcciones(); }
     }
   }
   $('trFiltros').addEventListener('click', function (e) {
-    if (e.target.closest('#trSegBtn')) { activar(true); return; }
+    if (e.target.closest('#trSegBtn')) { activar('seg'); return; }
+    if (e.target.closest('#trAccBtn')) { activar('acc'); return; }
     if (e.target.closest('[data-trfiltro]') && activo) activar(false);
   });
   $('trSeg').addEventListener('click', function (e) {
     if (e.target.closest('[data-seg-protocolo]')) { plan = protocolo(items()); pintar(); return; }
     var b = e.target.closest('[data-seg-ia]');
     if (b) { generarIA(b); return; }
+    if (e.target.closest('[data-acc-protocolo]')) { acciones = accionesProtocolo(items()); pintarAcciones(); return; }
+    var ai = e.target.closest('[data-acc-ia]');
+    if (ai) { generarAccionesIA(ai); return; }
     var ag = e.target.closest('[data-seg-agendar]');
     if (ag && plan) {
       var paso = plan.pasos[+ag.dataset.segAgendar], p = paciente();
       if (paso && p && window.PD_AGENDA && window.PD_AGENDA.preparar) window.PD_AGENDA.preparar({ pacienteId: p.id, tratamiento: paso.accion, fecha: paso.fecha < hoy() ? hoy() : paso.fecha });
     }
   });
-  // Con Seguimientos activo, «Imprimir» imprime el plan
-  $('trImprimir').addEventListener('click', function (e) { if (activo) { e.stopImmediatePropagation(); imprimir(); } }, true);
-  window.PD_SEGUIMIENTOS = { reiniciar: function () { if (activo) activar(false); plan = null; } };
+  // Con Seguimientos o Acciones activo, «Imprimir» imprime eso
+  $('trImprimir').addEventListener('click', function (e) {
+    if (!activo) return;
+    e.stopImmediatePropagation();
+    if (activo === 'seg') imprimir(); else imprimirAcciones();
+  }, true);
+  window.PD_SEGUIMIENTOS = { reiniciar: function () { if (activo) activar(false); plan = null; acciones = null; } };
 })();

@@ -121,6 +121,11 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .tr-seg-est{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700}
 .tr-seg-est.vencido{background:#FDE2E4;color:#9F1239}.tr-seg-est.proximo{background:#FEF3C7;color:#92400E}.tr-seg-est.futuro{background:#E8F1FB;color:#0C3F72}
 .tr-seg-agendar{min-height:34px;padding:5px 12px;font-size:13px}
+.tr-acc-msg{margin:0;font-size:15px;color:#0B2B40;background:#FFFFFF;border-left:4px solid #005A87;padding:8px 14px}
+.tr-acc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tr-acc-b{border-radius:14px;padding:12px 16px;font-size:14px;border:1px solid}.tr-acc-b b{display:block;font-size:14.5px;margin-bottom:4px}.tr-acc-b ul{margin:0;padding-left:18px;line-height:1.55}
+.tr-acc-b.si{background:#EAF5E4;border-color:#CFE5C2;color:#234A0B}.tr-acc-b.no{background:#FDF2F4;border-color:#F1C7CF;color:#7A1E30}.tr-acc-b.alerta{background:#FDF3E1;border-color:#F1DDB4;color:#5C3405}
+@media (max-width:900px){.tr-acc-grid{grid-template-columns:minmax(0,1fr)}}
 .tr-seg-cuid{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:14px;padding:12px 16px;font-size:14px}.tr-seg-cuid ul{margin:6px 0 0;padding-left:18px;color:#22394A}
 .rc-ia{display:flex;flex-direction:column;gap:10px;border:1px solid #9CC3DA;background:#F2F8FC;border-radius:16px;padding:14px 16px}
 .rc-ia-cab{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}.rc-ia-cab b{font-size:15.5px;color:#00476B}.rc-ia-cab small{font-size:12.5px;color:#5A6D7A}
@@ -1209,6 +1214,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-btn" data-trfiltro="proceso" aria-pressed="false">En proceso <span>(0)</span></button>
 <button type="button" class="adm-btn" data-trfiltro="todos" aria-pressed="false">Todos <span>(0)</span></button>
 <button type="button" class="adm-btn tr-seg-btn" id="trSegBtn" aria-pressed="false">✦ Seguimientos</button>
+<button type="button" class="adm-btn tr-seg-btn" id="trAccBtn" aria-pressed="false">✦ Acciones paciente</button>
 </div>
 <button type="button" id="trImprimir" class="adm-btn">Imprimir</button>
 </div>
