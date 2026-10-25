@@ -3556,6 +3556,51 @@ drop policy if exists constancias_borra on public.constancias;
 create policy constancias_borra on public.constancias for delete to authenticated using (public.es_super_administrador());
 grant select, insert, delete on public.constancias to authenticated;
 
+-- ===== Portal del paciente («Mi expediente») =====
+-- Cada paciente puede tener un usuario de tipo Cliente. Al conectarse, ese usuario ve solo su propia información
+-- (datos, próximas citas, recetas, tratamientos, estado de cuenta y constancias), sin poder modificarla.
+alter table public.pacientes add column if not exists usuario text;
+create unique index if not exists pacientes_usuario_unico on public.pacientes (usuario) where usuario is not null;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'pacientes_usuario_fk') then
+    alter table public.pacientes add constraint pacientes_usuario_fk foreign key (usuario)
+      references public.perfiles (usuario) on update cascade on delete set null;
+  end if;
+end $$;
+
+create or replace function public.mi_portal()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_usuario text := (select usuario from public.perfiles where id = auth.uid()); p record;
+begin
+  if v_usuario is null then return jsonb_build_object('ok', false, 'motivo', 'sesion'); end if;
+  select pa.*, d.nombre as medico into p from public.pacientes pa left join public.dentistas d on d.id = pa.dentista_id
+   where pa.usuario = v_usuario limit 1;
+  if p.id is null then return jsonb_build_object('ok', false, 'motivo', 'sin_paciente', 'usuario', v_usuario); end if;
+  return jsonb_build_object('ok', true,
+    'paciente', jsonb_build_object('id', p.id, 'nombre', p.nombre, 'dpi', p.dpi, 'nit', p.nit, 'fecha_nacimiento', p.fecha_nacimiento,
+      'telefono', p.telefono, 'correo', p.correo, 'direccion', p.direccion, 'medico', p.medico, 'alergias', p.alergias),
+    'citas', coalesce((select jsonb_agg(jsonb_build_object('fecha', c.fecha, 'hora', to_char(c.hora, 'HH24:MI'), 'servicio', c.servicio, 'estado', c.estado, 'dentista', d.nombre) order by c.fecha, c.hora)
+      from public.citas c left join public.dentistas d on d.id = c.dentista_id
+     where c.paciente_id = p.id and c.fecha >= (now() at time zone 'America/Guatemala')::date and c.estado in ('pendiente', 'confirmada', 'reprogramada')), '[]'::jsonb),
+    'recetas', coalesce((select jsonb_agg(jsonb_build_object('numero', r.numero, 'fecha', r.fecha, 'indicaciones', r.indicaciones, 'proxima_cita', r.proxima_cita, 'proxima_hora', r.proxima_hora,
+        'dentista', d.nombre, 'colegiado', d.colegiado, 'dentista_id', r.dentista_id,
+        'items', coalesce((select jsonb_agg(jsonb_build_object('medicamento', i.medicamento, 'dosis', i.dosis, 'frecuencia', i.frecuencia, 'duracion', i.duracion) order by i.orden) from public.receta_items i where i.receta_id = r.id), '[]'::jsonb))
+        order by r.fecha desc, r.id desc)
+      from public.recetas r left join public.dentistas d on d.id = r.dentista_id where r.paciente_id = p.id), '[]'::jsonb),
+    'tratamientos', coalesce((select jsonb_agg(jsonb_build_object('tratamiento', i.tratamiento, 'pieza', i.pieza, 'estado', coalesce(i.estado, case when i.realizado then 'finalizado' else 'pendiente' end),
+        'fecha', coalesce(i.estado_fecha::date, i.realizado_en), 'total', round(i.cantidad * i.precio * (1 - coalesce(pr.descuento_pct, 0) / 100), 2)) order by coalesce(i.estado_fecha::date, i.realizado_en) desc nulls last)
+      from public.presupuesto_items i join public.presupuestos pr on pr.id = i.presupuesto_id
+     where pr.paciente_id = p.id and pr.estado = 'aprobado' and coalesce(i.estado, case when i.realizado then 'finalizado' else 'pendiente' end) in ('proceso', 'finalizado')), '[]'::jsonb),
+    'saldo', (select jsonb_build_object('cargos', s.cargos, 'abonos', s.abonos, 'saldo', s.saldo) from public.saldos_pacientes s where s.paciente_id = p.id),
+    'pagos', coalesce((select jsonb_agg(jsonb_build_object('fecha', g.fecha, 'monto', g.monto, 'metodo', g.metodo, 'concepto', g.concepto) order by g.fecha desc, g.id desc)
+      from public.pagos g where g.paciente_id = p.id and not g.anulado), '[]'::jsonb),
+    'constancias', coalesce((select jsonb_agg(jsonb_build_object('numero', c.numero, 'fecha', c.fecha, 'dirigida', c.dirigida, 'texto', c.texto, 'creada', c.creada, 'dentista', d.nombre, 'colegiado', d.colegiado, 'dentista_id', c.dentista_id) order by c.creada desc)
+      from public.constancias c left join public.dentistas d on d.id = c.dentista_id where c.paciente_id = p.id), '[]'::jsonb));
+end;
+$$;
+revoke execute on function public.mi_portal() from public, anon;
+grant execute on function public.mi_portal() to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

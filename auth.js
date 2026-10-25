@@ -54,6 +54,7 @@
     }
     pintarBoton();
     if (!esPersonal()) cerrarPanel();
+    if (!perfil && window.PD_PORTAL) window.PD_PORTAL.cerrar();
     if (dlg.open && !$('sessionView').hidden && !perfil) abrir(quiereAdmin);
   }
 
@@ -81,6 +82,7 @@
     $('adminNote').hidden = !(quiereAdmin && !esPersonal());
     $('adminNote').textContent = 'Tu usuario es de tipo Cliente. Administración es solo para el personal de la clínica.';
     $('goAdminBtn').hidden = !esPersonal();
+    $('goPortalBtn').hidden = esPersonal() || !window.PD_PORTAL;
     vista('sessionView');
   }
 
@@ -407,6 +409,7 @@
     $('loginPass').value = '';
     if (r.error) { aviso('loginMsg', traducir(r.error), true); return; }
     await cargarPerfil();
+    if (!esPersonal() && !quiereAdmin && window.PD_PORTAL) { dlg.close(); window.PD_PORTAL.abrir(); return; }
     abrir(quiereAdmin);
   });
 
@@ -440,9 +443,11 @@
     perfil = null;
     pintarBoton();
     cerrarPanel();
+    if (window.PD_PORTAL) window.PD_PORTAL.cerrar();
     abrir(false);
   });
   $('goAdminBtn').addEventListener('click', function () { dlg.close(); abrirPanel(); });
+  $('goPortalBtn').addEventListener('click', function () { dlg.close(); window.PD_PORTAL.abrir(); });
   $('myPassBtn').addEventListener('click', function () { abrirClave(null); });
 
   $('admRecargar').addEventListener('click', cargarPanel);

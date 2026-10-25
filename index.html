@@ -961,6 +961,39 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .cols4{grid-template-columns:minmax(0,1fr) !important}
 .hero-h{font-size:42px !important}
 }
+/* Mi expediente (portal del paciente) */
+#miPortal{background:#F5F9FC;border-bottom:1px solid #D9E4EC;scroll-margin-top:96px}
+.mp-sub{margin:4px 0 0;font-size:14px;color:#0B2B40;font-weight:800}.mp-sub ~ .mp-sub{margin-top:10px;padding-top:12px;border-top:1px solid #D9E4EC}
+.mp-wrap{max-width:1180px;margin:0 auto;padding:48px 32px;display:flex;flex-direction:column;gap:24px}
+.mp-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.mp-head h2{margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:44px;line-height:1.05;color:#0B2B40;overflow-wrap:anywhere}
+.mp-head p{margin:6px 0 0;color:#475B68;font-size:15px}
+.mp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.mp-card{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:18px;padding:20px 22px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.mp-card h3{margin:0;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#005A87;font-weight:800}
+.mp-dos{grid-column:1/-1}
+.mp-datos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 18px}
+.mp-datos div{min-width:0}.mp-datos span,.mp-saldo span{display:block;font-size:11px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.mp-datos b{font-size:14.5px;color:#0B2B40;overflow-wrap:anywhere}.mp-ancho{grid-column:1/-1}
+.mp-alerta{margin:0;padding:8px 12px;border-radius:10px;background:#FDE2E4;color:#9F1239;font-size:14px}
+.mp-nota,.mp-vacio{margin:0;font-size:13.5px;color:#5A6D7A}
+.mp-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.mp-lista li{display:flex;align-items:center;gap:14px;padding:10px 0;border-top:1px solid #EEF3F7}.mp-lista li:first-child{border-top:0;padding-top:0}
+.mp-fecha{display:flex;flex-direction:column;min-width:96px}.mp-fecha b{font-size:18px;color:#0B2B40}.mp-fecha span{font-size:12.5px;color:#475B68}
+.mp-txt{flex:1;min-width:0;display:flex;flex-direction:column}.mp-txt b{font-size:14.5px;color:#0B2B40}.mp-txt span{font-size:13px;color:#475B68;overflow-wrap:anywhere}
+.mp-lista .adm-btn{min-height:36px;padding:6px 14px;font-size:13.5px}
+.mp-pill{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap;background:#E3EAF0;color:#22394A}
+.mp-pendiente{background:#DBEAFE;color:#1E40AF}.mp-confirmada,.mp-t-finalizado{background:#DCF2EC;color:#08504C}.mp-reprogramada,.mp-t-proceso{background:#FEF3C7;color:#92400E}
+.mp-saldo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.mp-saldo div{background:#F5F9FC;border-radius:12px;padding:10px 12px;min-width:0}.mp-saldo b{font-size:18px;color:#0B2B40}
+.mp-saldo .mp-debe{background:#FDE2E4}.mp-saldo .mp-debe b{color:#9F1239}.mp-saldo .mp-ok{background:#DCF2EC}.mp-saldo .mp-ok b{color:#08504C}
+.mp-tabla{width:100%;border-collapse:collapse;font-size:14px}
+.mp-tabla th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#5A6D7A;padding:6px 8px;border-bottom:1px solid #D9E4EC}
+.mp-tabla td{padding:8px;border-bottom:1px solid #EEF3F7;color:#0B2B40;vertical-align:top}.mp-tabla small{color:#5A6D7A}.mp-num{text-align:right;white-space:nowrap}
+.mp-aviso{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:18px;padding:22px;font-size:15px;color:#22394A;line-height:1.6}
+.mp-link{font-weight:700;color:#005A87}
+@media (max-width:860px){.mp-grid{grid-template-columns:1fr}.mp-datos{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.mp-wrap{padding:32px 16px}.mp-head h2{font-size:34px}.mp-datos,.mp-saldo{grid-template-columns:1fr}.mp-lista li{flex-wrap:wrap}.mp-tabla{font-size:13px}.mp-tabla th,.mp-tabla td{padding:6px 4px}}
 </style>
 
 <style id="movil">
@@ -1062,6 +1095,18 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 
 <!-- ADMINISTRACIÓN: solo visible para Administrador y Super Administrador -->
+<section id="miPortal" hidden aria-labelledby="mpNombre">
+<div class="mp-wrap">
+<div class="mp-head">
+<div style="min-width:0"><span style="font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:600;color:#005A87">Mi expediente</span>
+<h2 id="mpNombre">Mi expediente</h2>
+<p>Tu información en Plus Dental: solo puedes consultarla. Para cualquier cambio, comunícate con la clínica.</p></div>
+<div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" id="mpActualizar" class="adm-btn">Actualizar</button><button type="button" id="mpCerrar" class="adm-btn">Cerrar</button></div>
+</div>
+<div id="mpCuerpo" class="mp-grid"></div>
+</div>
+</section>
+
 <section id="administracion" hidden style="background: #FFFFFF; border-bottom: 1px solid #D9E4EC">
 <div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 56px 48px; display: flex; flex-direction: column; gap: 28px">
 <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap">
@@ -1207,7 +1252,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>Fecha de nacimiento<input id="pNacimiento" type="date"></label>
 <label>Edad<output id="pEdad" class="pg-auto pg-out">—</output></label>
 <label class="pg-s2">DPI<input id="pDpi" type="text" inputmode="numeric" maxlength="20" placeholder="0000 00000 0000"></label>
-<label class="pg-s2">NIT<input id="pNit" type="text" maxlength="20" placeholder="Ej.: 1234567-8 o CF" autocomplete="off"></label>
+<label>NIT<input id="pNit" type="text" maxlength="20" placeholder="Ej.: 1234567-8 o CF" autocomplete="off"></label>
+<label>Usuario del portal<select id="pUsuario"><option value="">Sin usuario</option></select></label>
 </div>
 <div class="pg-sec"><b aria-hidden="true">2</b>Contacto</div>
 <div class="pg-grid">
@@ -2408,6 +2454,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 <p id="adminNote" class="dlg-msg" hidden></p>
 <button type="button" id="goAdminBtn" class="dlg-submit" hidden>Ver usuarios</button>
+<button type="button" id="goPortalBtn" class="dlg-submit" hidden>Ver mi expediente</button>
 <div style="display: flex; gap: 8px 24px; flex-wrap: wrap">
 <button type="button" id="myPassBtn" class="dlg-link">Cambiar mi clave</button>
 <button type="button" id="logoutBtn" class="dlg-link">Cerrar sesión</button>
@@ -2492,6 +2539,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="chatbot.js"></script>
+<script src="portal.js"></script>
 <script src="idiomas-admin.js"></script>
 <script src="movil.js"></script>
 <script src="idiomas.js"></script>

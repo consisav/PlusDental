@@ -11,7 +11,7 @@
 
   var ESTADOS_PAC = { activo: 'Activo', inactivo: 'Inactivo', suspendido: 'Suspendido', baja: 'Baja' };
   var pacientes = [], actual = null, odontoCambiado = false;
-  var filtroEstado = 'activo', editando = false, fotos = {}, medicos = [], agentesCat = [];
+  var filtroEstado = 'activo', editando = false, fotos = {}, medicos = [], agentesCat = [], clientes = [], usuariosTomados = {}, hayUsuario = false;
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -36,6 +36,8 @@
   function fechaHoraCorta(f) { return f ? new Date(f).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '—'; }
   function traducir(err) {
     var m = (err && err.message) || '';
+    if (/pacientes_usuario_unico/i.test(m)) return 'Ese usuario ya está asignado a otro paciente.';
+    if (/pacientes_usuario_fk/i.test(m)) return 'Ese usuario ya no existe. Elige otro de la lista.';
     if (/pacientes_dpi_unico|duplicate key/i.test(m)) return 'Ya existe un paciente con ese DPI.';
     if (/odontograma_cambios|guardar_odontograma|editar_cambio_odontograma/i.test(m) && /does not exist|could not find/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para el historial del odontograma.';
     if (/relation .*(pacientes|notas_visita).* does not exist|could not find the table/i.test(m)) return 'Falta ejecutar en Supabase el script de expedientes.';
@@ -130,6 +132,35 @@
   async function cargarMedicos() {
     var r = await Promise.all([window.PD_DENTISTAS ? window.PD_DENTISTAS() : [], window.PD_AGENTES ? window.PD_AGENTES() : []]);
     medicos = r[0]; agentesCat = r[1];
+    await cargarUsuarios();
+  }
+
+  // Usuario del portal: los usuarios de tipo Cliente que no estén asignados a otro paciente.
+  // Si la columna pacientes.usuario aún no existe (falta el SQL), el campo queda deshabilitado.
+  async function cargarUsuarios() {
+    var r = await Promise.all([
+      sb.from('perfiles').select('usuario,nombre').eq('rol', 'cliente').order('usuario'),
+      sb.from('pacientes').select('id,usuario').not('usuario', 'is', null)
+    ]);
+    hayUsuario = !r[1].error;
+    clientes = r[0].error ? [] : (r[0].data || []);
+    usuariosTomados = {};
+    (r[1].data || []).forEach(function (p) { usuariosTomados[p.usuario] = p.id; });
+  }
+  function opcionesUsuarios(p) {
+    var sel = $('pUsuario'), elegido = (p && p.usuario) || '';
+    if (!hayUsuario) {
+      sel.innerHTML = '<option value="">Falta ejecutar supabase.sql</option>';
+      sel.title = 'Ejecuta en Supabase el script actualizado para asignar usuarios a los pacientes.';
+      sel.disabled = true; return;
+    }
+    sel.disabled = false; sel.title = 'Usuario de tipo Cliente con el que el paciente ve su expediente («Mi expediente»).';
+    var lista = clientes.filter(function (c) { var t = usuariosTomados[c.usuario]; return !t || (p && t === p.id); });
+    if (elegido && !lista.some(function (c) { return c.usuario === elegido; })) lista.unshift({ usuario: elegido });
+    sel.innerHTML = '<option value="">Sin usuario</option>' + lista.map(function (c) {
+      return '<option value="' + esc(c.usuario) + '"' + (c.nombre && c.nombre !== c.usuario ? ' title="' + esc(c.nombre) + '"' : '') + '>' + esc(c.usuario) + '</option>';
+    }).join('');
+    sel.value = elegido;
   }
 
   // Agente comercial: lista del catálogo (solo activos, más el que ya tenga el paciente). Por defecto el 0 «NINGUNO».
@@ -148,6 +179,7 @@
     opcionesMedicos(p ? p.dentista_id : null);
     if (!p) $('pDentista').value = medicoPorDefecto();
     opcionesAgentes(p ? p.agente_id : null);
+    opcionesUsuarios(p);
     pintarDerivados();
   }
 
@@ -298,6 +330,7 @@
     if (claves.indexOf('nombre') >= 0) {
       o.dentista_id = $('pDentista').value ? +$('pDentista').value : null;
       o.agente_id = $('pAgente').value ? +$('pAgente').value : null;   // vacío = Supabase pone el agente 0
+      if (hayUsuario) o.usuario = $('pUsuario').value || null;
     }
     return o;
   }
@@ -314,6 +347,7 @@
     if (r.error) { aviso(msgId, traducir(r.error), true); return; }
     var eraNuevo = !actual;
     actual = r.data;
+    if (hayUsuario) { Object.keys(usuariosTomados).forEach(function (u) { if (usuariosTomados[u] === actual.id) delete usuariosTomados[u]; }); if (actual.usuario) usuariosTomados[actual.usuario] = actual.id; }
     if (eraNuevo) cargarOdonto();
     rellenar(actual);
     editando = false;
