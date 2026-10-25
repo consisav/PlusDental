@@ -159,7 +159,7 @@
     if (elegido && !lista.some(function (c) { return c.usuario === elegido; })) lista.unshift({ usuario: elegido });
     sel.innerHTML = '<option value="">Sin usuario</option>' + lista.map(function (c) {
       return '<option value="' + esc(c.usuario) + '"' + (c.nombre && c.nombre !== c.usuario ? ' title="' + esc(c.nombre) + '"' : '') + '>' + esc(c.usuario) + '</option>';
-    }).join('');
+    }).join('') + (lista.length ? '' : '<option value="" disabled>— No hay usuarios Cliente disponibles —</option>');
     sel.value = elegido;
   }
 
