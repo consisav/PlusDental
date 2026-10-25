@@ -1079,6 +1079,15 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="adm-layout">
 <div class="adm-menu" role="tablist" aria-label="Menú de administración" aria-orientation="vertical">
 <div class="adm-g">
+<button type="button" class="adm-grupo" id="grpPacientes" aria-expanded="false" aria-controls="grpPacientesItems">Pacientes<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-g-items" id="grpPacientesItems" role="presentation">
+<button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expediente de pacientes</button>
+<button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuesto</button>
+<button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
+<button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
+</div>
+</div>
+<div class="adm-g">
 <button type="button" class="adm-grupo" id="grpCatalogos" aria-expanded="false" aria-controls="grpCatalogosItems">Catálogos iniciales<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-g-items" id="grpCatalogosItems" role="presentation">
 <button type="button" role="tab" id="tabTiposDen" data-tab="admTiposDen" aria-selected="false" aria-controls="admTiposDen">Tipos de dentistas</button>
@@ -1106,15 +1115,6 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" role="tab" id="tabAgenda" data-tab="admAgenda" aria-selected="false" aria-controls="admAgenda">Administrar citas</button>
 <button type="button" role="tab" id="tabVerCitas" data-tab="admVerCitas" aria-selected="false" aria-controls="admVerCitas">Visualizar citas</button>
 <button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
-</div>
-</div>
-<div class="adm-g">
-<button type="button" class="adm-grupo" id="grpPacientes" aria-expanded="false" aria-controls="grpPacientesItems">Pacientes<span class="adm-chev" aria-hidden="true"></span></button>
-<div class="adm-g-items" id="grpPacientesItems" role="presentation">
-<button type="button" role="tab" id="tabExpedientes" data-tab="admExpedientes" aria-selected="false" aria-controls="admExpedientes">Expediente de pacientes</button>
-<button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuesto</button>
-<button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
-<button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
 </div>
 </div>
 <div class="adm-g">
