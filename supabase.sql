@@ -3507,6 +3507,55 @@ grant select, insert, update, delete on public.laboratorios to authenticated;
 grant select, insert, update, delete on public.ordenes_lab to authenticated;
 grant select, update on public.ordenes_lab_estados to authenticated;
 
+-- ===== Constancias médicas =====
+-- Cada constancia emitida queda registrada con número CM-AÑO-correlativo, el texto impreso, quién la emitió y cuándo.
+create table if not exists public.constancias (
+  id            bigint generated always as identity primary key,
+  numero        text unique,
+  paciente_id   bigint not null references public.pacientes (id) on delete cascade,
+  dentista_id   bigint references public.dentistas (id) on delete set null,
+  fecha         date not null,
+  hora_entrada  text,
+  hora_salida   text,
+  diagnostico   text,
+  tratamiento   text,
+  reposo_dias   int not null default 0 check (reposo_dias between 0 and 60),
+  reposo_desde  date,
+  reposo_hasta  date,
+  dirigida      text,
+  texto         text not null,
+  creada        timestamptz not null default now(),
+  creada_por    text
+);
+create index if not exists constancias_paciente on public.constancias (paciente_id, creada desc);
+
+create or replace function public.constancia_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_anio text := to_char(current_date, 'YYYY');
+begin
+  perform pg_advisory_xact_lock(hashtext('constancias_numero'));
+  new.numero := 'CM-' || v_anio || '-' || lpad((select coalesce(max(substring(numero from 9)::int), 0) + 1
+                  from public.constancias where numero ~ ('^CM-' || v_anio || '-[0-9]+$'))::text, 4, '0');
+  new.creada := now();
+  new.creada_por := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'constancias_registro' and tgrelid = 'public.constancias'::regclass) then
+    create trigger constancias_registro before insert on public.constancias for each row execute function public.constancia_registro();
+  end if;
+end $$;
+
+alter table public.constancias enable row level security;
+drop policy if exists constancias_lee on public.constancias;
+create policy constancias_lee on public.constancias for select to authenticated using (public.es_personal());
+drop policy if exists constancias_crea on public.constancias;
+create policy constancias_crea on public.constancias for insert to authenticated with check (public.es_personal());
+drop policy if exists constancias_borra on public.constancias;
+create policy constancias_borra on public.constancias for delete to authenticated using (public.es_super_administrador());
+grant select, insert, delete on public.constancias to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
