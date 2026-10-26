@@ -5,7 +5,8 @@
   if (!sb) return;
 
   var BUCKET = 'expedientes';
-  var clientes = [], usuariosTomados = {}, hayUsuario = false;   // usuario del sistema del dentista («Mis pacientes»)
+  var clientes = [], usuariosTomados = {}, hayUsuario = false;
+  var ROLES_USR = { cliente: 'Cliente', administrador: 'Administrador', super_administrador: 'Super Administrador' };   // usuario del sistema del dentista («Mis pacientes»)
   var ESTADOS = { activo: 'Activo', inactivo: 'Inactivo', baja: 'Baja' };
   var EST_POS = { libre: 'Libre', ocupado: 'Ocupado', limpieza: 'En limpieza', mantenimiento: 'Fuera de servicio' };
   var DIAS = [['1', 'Lunes'], ['2', 'Martes'], ['3', 'Miércoles'], ['4', 'Jueves'], ['5', 'Viernes'], ['6', 'Sábado'], ['7', 'Domingo']];
@@ -110,11 +111,11 @@
     }
   }
 
-  // Usuario del sistema: usuarios tipo Cliente que no estén asignados a un paciente ni a otro dentista.
-  // Con ese usuario el dentista ve solo sus pacientes y su expediente (portal «Mis pacientes»).
+  // Usuario del sistema: todos los usuarios (clientes y administradores) que no estén asignados a un paciente ni a otro dentista.
+  // Con ese usuario el dentista abre «Mis pacientes»: solo sus pacientes y su expediente.
   async function cargarUsuarios() {
     var r = await Promise.all([
-      sb.from('perfiles').select('usuario,nombre').eq('rol', 'cliente').order('usuario'),
+      sb.from('perfiles').select('usuario,nombre,rol').order('usuario'),
       sb.from('pacientes').select('usuario').not('usuario', 'is', null)
     ]);
     hayUsuario = dentistas.length ? Object.prototype.hasOwnProperty.call(dentistas[0], 'usuario') : !r[1].error;
@@ -130,8 +131,8 @@
     var lista = clientes.filter(function (c) { var t = usuariosTomados[c.usuario]; return !t || (d && t === d.id); });
     if (elegido && !lista.some(function (c) { return c.usuario === elegido; })) lista.unshift({ usuario: elegido });
     sel.innerHTML = '<option value="">Sin usuario</option>' + lista.map(function (c) {
-      return '<option value="' + esc(c.usuario) + '"' + (c.nombre && c.nombre !== c.usuario ? ' title="' + esc(c.nombre) + '"' : '') + '>' + esc(c.usuario) + '</option>';
-    }).join('') + (lista.length ? '' : '<option value="" disabled>— No hay usuarios Cliente disponibles —</option>');
+      return '<option value="' + esc(c.usuario) + '"' + (c.nombre && c.nombre !== c.usuario ? ' title="' + esc(c.nombre) + '"' : '') + '>' + esc(c.usuario) + (ROLES_USR[c.rol] ? ' · ' + ROLES_USR[c.rol] : '') + '</option>';
+    }).join('') + (lista.length ? '' : '<option value="" disabled>— No hay usuarios disponibles —</option>');
     sel.value = elegido;
   }
 

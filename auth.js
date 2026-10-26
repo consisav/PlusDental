@@ -83,6 +83,10 @@
     $('adminNote').textContent = 'Tu usuario es de tipo Cliente. Administración es solo para el personal de la clínica.';
     $('goAdminBtn').hidden = !esPersonal();
     $('goPortalBtn').hidden = esPersonal() || !window.PD_PORTAL;
+    $('goPortalBtn').textContent = 'Abrir mi portal';
+    if (esPersonal() && window.PD_PORTAL) window.PD_PORTAL.esDentista().then(function (si) {
+      if (si && perfil && !$('sessionView').hidden) { $('goPortalBtn').textContent = 'Mis pacientes'; $('goPortalBtn').hidden = false; }
+    });
     vista('sessionView');
   }
 

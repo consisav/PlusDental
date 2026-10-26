@@ -367,5 +367,8 @@
   $('mpActualizar').addEventListener('click', abrir);
   $('mpCerrar').addEventListener('click', cerrar);
 
-  window.PD_PORTAL = { abrir: abrir, cerrar: cerrar };
+  // ¿El usuario conectado está asignado a un dentista? (para mostrar «Mis pacientes» también al personal)
+  async function esDentista() { var r = await sb.rpc('dentista_pacientes'); return !r.error && !!(r.data && r.data.ok); }
+
+  window.PD_PORTAL = { abrir: abrir, cerrar: cerrar, esDentista: esDentista };
 })();
