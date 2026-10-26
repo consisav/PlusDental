@@ -670,6 +670,31 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .rep-tabla tr.rep-sub td{background:#F5F9FC;font-weight:700}
 .rep-tabla tr.rep-total td{border-top:2px solid #0B2B40;font-weight:800}
 .pr-tabla td,.pr-tabla th{white-space:nowrap}
+/* Precios por procedimiento: tabla de ancho fijo dentro de su recuadro, con el botón en su propia columna */
+.roles-wrap.pr-wrap{overflow-x:auto}
+#administracion .pr-wrap .pr-tabla th.num,#administracion .pr-wrap .pr-tabla td.num{text-align:right;padding-right:14px}
+.pr-wrap .pr-celda{align-items:flex-end;text-align:right}
+#admPrecios .pr-barra{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:end}
+#admPrecios .pr-barra .pr-tipo-proc{min-width:0}
+#admPrecios .pr-barra select{width:100%}
+@media (max-width:760px){#admPrecios .pr-barra{grid-template-columns:1fr}}
+.roles-wrap.pr-wrap table.pr-tabla{width:100%;min-width:900px;table-layout:fixed}
+.pr-tabla col.pr-col-proc{width:21%}.pr-tabla col.pr-col-acc{width:92px}
+.pr-wrap .pr-tabla th,.pr-wrap .pr-tabla td{padding:10px 8px;white-space:normal;vertical-align:middle}
+.pr-wrap .pr-tabla th{font-size:11px;letter-spacing:.06em;line-height:1.3}
+.pr-wrap .pr-tabla td:first-child,.pr-wrap .pr-tabla th:first-child{min-width:0;max-width:none;padding-left:14px}
+.pr-wrap .pr-tabla td:first-child b{font-size:14px;line-height:1.35}
+.pr-wrap .pr-celda{gap:2px;min-width:0}
+.pr-wrap .pr-celda b{font-size:14px}
+.pr-wrap .pr-celda small{font-size:11px;line-height:1.3}
+.pr-est{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#08504C}
+.pr-est::before{content:"";width:7px;height:7px;border-radius:50%;background:#1D9E75}
+.pr-est-suspendido{color:#92400E}.pr-est-suspendido::before{background:#D97706}
+.pr-est-baja{color:#9F1239}.pr-est-baja::before{background:#E11D48}
+.pr-wrap td.pr-acc,.pr-wrap th.pr-acc{text-align:center;padding-right:10px}
+.pr-wrap .pr-abrir{min-height:34px;padding:5px 14px;font-size:13px;width:100%;max-width:76px}
+.pr-wrap tr.pr-grupo td{padding:9px 14px}
+
 /* tabla de precios ajustada a la izquierda: columnas del ancho de su contenido */
 .roles-wrap table.pr-tabla{width:auto}
 .pr-tabla th,.pr-tabla td{padding:10px 14px}

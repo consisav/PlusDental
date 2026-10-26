@@ -54,7 +54,7 @@
     '<div id="prFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar por estado">' +
     [['todos', 'Todos'], ['activo', 'Activos'], ['suspendido', 'Suspendidos'], ['baja', 'Baja']].map(function (f) { return '<button type="button" class="adm-btn" data-prfiltro="' + f[0] + '" aria-pressed="' + (f[0] === 'todos') + '">' + f[1] + '</button>'; }).join('') +
     '</div><input id="prBuscar" type="search" class="adm-input" placeholder="Buscar procedimiento" aria-label="Buscar procedimiento" style="width: 100%; max-width: 320px"></div>' +
-    '<div class="roles-wrap"><table class="pr-tabla"><thead><tr><th>Procedimiento</th>' + TIPOS.map(function (t) { return '<th class="num">' + t[1] + '</th>'; }).join('') + '<th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="prBody"></tbody></table></div>' +
+    '<div class="roles-wrap pr-wrap"><table class="pr-tabla"><colgroup><col class="pr-col-proc">' + TIPOS.map(function () { return '<col>'; }).join('') + '<col class="pr-col-acc"></colgroup><thead><tr><th>Procedimiento</th>' + TIPOS.map(function (t) { return '<th class="num">' + t[1] + '</th>'; }).join('') + '<th class="pr-acc"><span class="sr-only">Abrir</span></th></tr></thead><tbody id="prBody"></tbody></table></div>' +
     '<p id="prMsg" class="dlg-msg" role="status"></p></div>' +
 
     '<div id="prFicha" class="adm-pane" hidden>' +
@@ -83,7 +83,7 @@
 
   async function cargar() {
     aviso('prMsg', '');
-    $('prBody').innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
+    $('prBody').innerHTML = '<tr><td colspan="8">Cargando…</td></tr>';
     var r = await Promise.all([
       sb.from('tratamientos').select('id,nombre,precio,activo,tipo_id').order('nombre'),
       sb.from('precios').select('*'),
@@ -133,7 +133,7 @@
 
   function celda(p) {
     if (!p || (filtro !== 'todos' && p.estado !== filtro)) return '<td class="num pr-vacio">—</td>';
-    return '<td class="num"><span class="pr-celda"><b>' + q(p.valor) + '</b>' + (p.valor_usd != null ? '<small>' + usd(p.valor_usd) + '</small>' : '') + '<small>máx. ' + pct(p.descuento_max) + '</small>' + pill(p.estado) + '</span></td>';
+    return '<td class="num"><span class="pr-celda"><b>' + q(p.valor) + '</b>' + (p.valor_usd != null ? '<small>' + usd(p.valor_usd) + '</small>' : '') + '<small>máx. ' + pct(p.descuento_max) + '</small><span class="pr-est pr-est-' + p.estado + '">' + ESTADOS[p.estado] + '</span></span></td>';
   }
   var filasVisibles = [];
   function pintarLista() {
@@ -147,17 +147,17 @@
     }).filter(function (g) { return g.filas.length; });
     filasVisibles = [].concat.apply([], grupos.map(function (g) { return g.filas; }));
     $('prBody').innerHTML = !tiposProc.length && !tratamientos.length
-      ? '<tr><td colspan="7">Aún no hay procedimientos. Crea los tipos de procedimientos en «Tipos de procedimientos» (ejecuta el script actualizado de Supabase para cargar los de Guatemala).</td></tr>'
-      : !grupos.length ? '<tr><td colspan="7">No hay procedimientos con ese filtro.</td></tr>'
+      ? '<tr><td colspan="8">Aún no hay procedimientos. Crea los tipos de procedimientos en «Tipos de procedimientos» (ejecuta el script actualizado de Supabase para cargar los de Guatemala).</td></tr>'
+      : !grupos.length ? '<tr><td colspan="8">No hay procedimientos con ese filtro.</td></tr>'
       : grupos.map(function (g) {
-        return (g.titulo ? '<tr class="pr-grupo"><td colspan="7">' + esc(g.titulo) + '</td></tr>' : '') + g.filas.map(fila).join('');
+        return (g.titulo ? '<tr class="pr-grupo"><td colspan="8">' + esc(g.titulo) + '</td></tr>' : '') + g.filas.map(fila).join('');
       }).join('');
   }
   function fila(t) {
     var ps = t.virtual ? [] : preciosDe(t.id);
     return '<tr' + (t.virtual ? ' class="pr-sugerido"' : '') + '><td><b>' + esc(t.nombre) + '</b>' + (!t.virtual && !t.activo ? ' <span class="ac-fijo">Inactivo</span>' : '') + '</td>' +
       TIPOS.map(function (tp) { return celda(ps.filter(function (p) { return p.tipo === tp[0]; })[0]); }).join('') +
-      '<td><button type="button" class="adm-btn" data-prabrir="' + t.id + '">' + (t.virtual ? 'Definir precios' : 'Abrir') + '</button></td></tr>';
+      '<td class="pr-acc"><button type="button" class="adm-btn pr-abrir" data-prabrir="' + t.id + '" title="' + (t.virtual ? 'Definir precios de ' : 'Abrir precios de ') + esc(t.nombre) + '">' + (t.virtual ? 'Definir' : 'Abrir') + '</button></td></tr>';
   }
 
   // ---------- Ficha del procedimiento ----------
