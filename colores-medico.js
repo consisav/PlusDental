@@ -8,7 +8,7 @@
   // Paleta de colores bien distintos entre sí (y legibles sobre fondo blanco)
   var PALETA = [['#2563EB', 'Azul'], ['#059669', 'Verde'], ['#D97706', 'Ámbar'], ['#DC2626', 'Rojo'], ['#7C3AED', 'Violeta'], ['#DB2777', 'Rosa'],
     ['#0891B2', 'Turquesa'], ['#65A30D', 'Lima'], ['#EA580C', 'Naranja'], ['#4F46E5', 'Índigo'], ['#0D9488', 'Verde azulado'], ['#A16207', 'Mostaza'],
-    ['#475569', 'Pizarra'], ['#9F1239', 'Vino'], ['#0369A1', 'Azul océano'], ['#15803D', 'Verde bosque']];
+    ['#475569', 'Pizarra'], ['#9F1239', 'Vino'], ['#0369A1', 'Azul océano'], ['#15803D', 'Verde bosque'], ['#FFFFFF', 'Blanco']];
   var colores = {}, nombres = {}, disponible = null, cargando = null;
 
   function cargar(forzar) {
@@ -22,18 +22,21 @@
     return cargando;
   }
   function color(id) { return id ? colores[id] || null : null; }
+  // Colores muy claros (p. ej. blanco): borde y texto en gris para que se vean sobre fondo blanco
+  function claro(c) { var m = /^#?([0-9a-f]{6})$/i.exec(c || ''); if (!m) return false; var n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; return (0.299 * r + 0.587 * g + 0.114 * b) > 225; }
+  function linea(c) { return claro(c) ? '#94A6B2' : c; }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function punto(id, titulo) {
     var c = color(id);
-    return c ? '<span class="med-punto" style="--med:' + c + '" title="' + esc(titulo || nombres[id] || '') + '" aria-hidden="true"></span>' : '';
+    return c ? '<span class="med-punto" style="--med:' + c + ';--med-linea:' + linea(c) + '" title="' + esc(titulo || nombres[id] || '') + '" aria-hidden="true"></span>' : '';
   }
-  function estilo(id) { var c = color(id); return c ? ' style="--med:' + c + '"' : ''; }
+  function estilo(id) { var c = color(id); return c ? ' style="--med:' + c + ';--med-linea:' + linea(c) + '"' : ''; }
   // Odontólogos que usan un color (para avisar si se repite)
   function quienUsa(c, exceptoId) {
     return Object.keys(colores).filter(function (id) { return +id !== exceptoId && String(colores[id]).toUpperCase() === String(c).toUpperCase(); }).map(function (id) { return nombres[id]; });
   }
   function nombrePaleta(c) { var p = PALETA.filter(function (x) { return x[0].toUpperCase() === String(c).toUpperCase(); })[0]; return p ? p[1] : 'Personalizado'; }
 
-  window.PD_COLOR = { PALETA: PALETA, cargar: cargar, color: color, punto: punto, estilo: estilo, quienUsa: quienUsa, nombrePaleta: nombrePaleta,
+  window.PD_COLOR = { linea: linea, claro: claro, PALETA: PALETA, cargar: cargar, color: color, punto: punto, estilo: estilo, quienUsa: quienUsa, nombrePaleta: nombrePaleta,
     disponible: function () { return disponible; }, todos: function () { return Object.keys(colores).map(function (id) { return { id: +id, nombre: nombres[id], color: colores[id] }; }); } };
 })();

@@ -1109,11 +1109,12 @@ table.citas-tabla th.c-acc-th{text-align:right}
 @media (max-width:560px){.geo-dlg-campos,.geo-ficha-grid{grid-template-columns:1fr}.geo-panel{padding:14px 12px}}
 
 /* Color del odontólogo */
-.med-punto{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--med);margin-right:7px;vertical-align:-1px;box-shadow:0 0 0 2px #FFFFFF,0 0 0 3px var(--med);flex:0 0 auto}
+.med-punto{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--med);margin-right:7px;vertical-align:-1px;box-shadow:0 0 0 2px #FFFFFF,0 0 0 3px var(--med-linea,var(--med));flex:0 0 auto}
 .de-colores{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
-.de-color{width:34px;height:34px;border-radius:50%;border:3px solid #FFFFFF;box-shadow:0 0 0 1px #C4D4DF;background:var(--c);cursor:pointer;position:relative;padding:0}
+.de-color{width:34px;height:34px;border-radius:50%;border:3px solid #FFFFFF;box-shadow:0 0 0 1px #94A6B2;background:var(--c);cursor:pointer;position:relative;padding:0}
 .de-color[aria-checked=true]{box-shadow:0 0 0 3px var(--c)}
 .de-color[aria-checked=true]::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:15px}
+.de-color[data-color="#FFFFFF"][aria-checked=true]::after{color:#0B2B40}
 .de-color.usado::before{content:"";position:absolute;right:-3px;top:-3px;width:10px;height:10px;border-radius:50%;background:#FFFFFF;border:2px solid #5A6D7A}
 .de-color:focus-visible{outline:2px solid #0B2B40;outline-offset:3px}
 .de-color:disabled{cursor:default;opacity:.85}
@@ -1121,8 +1122,8 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .de-color-otro input{width:28px;height:28px;border:0;padding:0;background:none;cursor:pointer}
 .de-color-campo .pos-lbl small{font-weight:400;color:#5A6D7A}
 /* Cita pintada con el color de su médico (fondo suave, borde y nombre del paciente); el estado queda como un punto */
-#administracion .ag-celda.cita[style*="--med"],#administracion .ag-mini.cita[style*="--med"]{position:relative;background:color-mix(in srgb,var(--med) 14%,#FFFFFF);border-color:color-mix(in srgb,var(--med) 40%,#FFFFFF);border-left:5px solid var(--med);color:#0B2B40;padding-right:18px}
-#administracion .ag-celda.cita[style*="--med"] b,#administracion .ag-mini.cita[style*="--med"] b,#administracion .cita[style*="--med"] .ag-pac{color:color-mix(in srgb,var(--med) 78%,#000000)}
+#administracion .ag-celda.cita[style*="--med"],#administracion .ag-mini.cita[style*="--med"]{position:relative;background:color-mix(in srgb,var(--med) 14%,#FFFFFF);border-color:color-mix(in srgb,var(--med-linea,var(--med)) 40%,#FFFFFF);border-left:5px solid var(--med-linea,var(--med));color:#0B2B40;padding-right:18px}
+#administracion .ag-celda.cita[style*="--med"] b,#administracion .ag-mini.cita[style*="--med"] b,#administracion .cita[style*="--med"] .ag-pac{color:color-mix(in srgb,var(--med-linea,var(--med)) 78%,#000000)}
 #administracion .cita[style*="--med"].urgente{box-shadow:inset 0 0 0 1.5px #C0263A}
 #administracion .cita[style*="--med"]::after{content:"";position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#94A6B2;box-shadow:0 0 0 2px #FFFFFF}
 #administracion .cita[style*="--med"].pendiente::after{background:#B45309}
@@ -1131,7 +1132,8 @@ table.citas-tabla th.c-acc-th{text-align:right}
 #administracion .cita[style*="--med"].atendida::after{background:#2F78C4}
 /* Paciente con el color de su médico */
 .avatar[style*="--med"],.avatar.grande[style*="--med"]{box-shadow:0 0 0 3px #FFFFFF,0 0 0 6px var(--med)!important}
-.pac-chip.pac-med{display:inline-flex;align-items:center;background:color-mix(in srgb,var(--med) 16%,#FFFFFF);color:#0B2B40;border:1px solid color-mix(in srgb,var(--med) 45%,#FFFFFF)}
+.avatar[style*="--med-linea"]{box-shadow:0 0 0 3px #FFFFFF,0 0 0 6px var(--med),0 0 0 7px var(--med-linea)!important}
+.pac-chip.pac-med{display:inline-flex;align-items:center;background:color-mix(in srgb,var(--med) 16%,#FFFFFF);color:#0B2B40;border:1px solid color-mix(in srgb,var(--med-linea,var(--med)) 45%,#FFFFFF)}
 .ag-ley-med{display:inline-flex;align-items:center;gap:4px}
 </style>
 

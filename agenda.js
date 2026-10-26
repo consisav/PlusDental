@@ -505,7 +505,7 @@
       return '<span title="Punto de estado en la esquina de cada cita"><i style="background:' + COLOR_ESTADO[e] + '"></i>' + ESTADOS_CITA[e] + ' · <b>' + n + '</b></span>';
     }).join('') + '<span class="ag-ley-urg">Urgente = borde rojo' + (urg ? ' · <b>' + urg + '</b>' : '') + '</span>' +
       (window.PD_COLOR ? dentistas.filter(function (d) { return window.PD_COLOR.color(d.id) && enRango.some(function (c) { return c.dentista_id === d.id; }); }).map(function (d) {
-        return '<span class="ag-ley-med"><i style="background:' + window.PD_COLOR.color(d.id) + '"></i>' + esc(d.nombre) + ' · <b>' + enRango.filter(function (c) { return c.dentista_id === d.id; }).length + '</b></span>';
+        return '<span class="ag-ley-med"><i style="background:' + window.PD_COLOR.color(d.id) + ';box-shadow:0 0 0 1px ' + window.PD_COLOR.linea(window.PD_COLOR.color(d.id)) + '"></i>' + esc(d.nombre) + ' · <b>' + enRango.filter(function (c) { return c.dentista_id === d.id; }).length + '</b></span>';
       }).join('') : '');
   }
 

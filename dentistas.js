@@ -185,7 +185,7 @@
     }
     $('denBody').innerHTML = lista.map(function (d) {
       var url = fotos[d.foto];
-      return '<tr><td><div class="pac-nombre"><span class="avatar">' + (url ? '<img src="' + esc(url) + '" alt="">' : esc(iniciales(d.nombre))) + '</span><strong>' + (d.color ? '<span class="med-punto" style="--med:' + esc(d.color) + '" aria-hidden="true"></span>' : '') + esc(d.nombre) + '</strong></div></td>' +
+      return '<tr><td><div class="pac-nombre"><span class="avatar">' + (url ? '<img src="' + esc(url) + '" alt="">' : esc(iniciales(d.nombre))) + '</span><strong>' + (d.color ? '<span class="med-punto" style="--med:' + esc(d.color) + ';--med-linea:' + (window.PD_COLOR ? window.PD_COLOR.linea(d.color) : esc(d.color)) + '" aria-hidden="true"></span>' : '') + esc(d.nombre) + '</strong></div></td>' +
         '<td class="fecha">' + esc(d.codigo) + '</td><td>' + esc((d.especialidades || []).join(', ') || '—') + '</td>' +
         '<td>' + esc(d.posicion_id ? nombrePosicion(d.posicion_id) : '—') + '</td>' +
         '<td>' + (d.posicion_id ? '<span class="estado rol-' + (d.rol_sala || 'principal') + '">' + (d.rol_sala === 'alterno' ? 'Alterno' : 'Principal') + '</span>' : '—') + '</td>' +

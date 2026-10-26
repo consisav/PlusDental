@@ -281,7 +281,8 @@
     $('pPerfilNombre').textContent = actual ? actual.nombre : ($('pNombre').value.trim() || 'Nuevo paciente');
     // Anillo del color de su médico alrededor de la foto del paciente
     var colorMed = actual && window.PD_COLOR ? window.PD_COLOR.color(actual.dentista_id) : null;
-    if (colorMed) $('pFotoVista').style.setProperty('--med', colorMed); else $('pFotoVista').style.removeProperty('--med');
+    if (colorMed) { $('pFotoVista').style.setProperty('--med', colorMed); $('pFotoVista').style.setProperty('--med-linea', window.PD_COLOR.linea(colorMed)); }
+    else { $('pFotoVista').style.removeProperty('--med'); $('pFotoVista').style.removeProperty('--med-linea'); }
     $('pPerfilChips').innerHTML = actual ? [
       '<span class="pac-chip est-' + est + '">' + ESTADOS_PAC[est] + '</span>',
       actual.fecha_nacimiento ? '<span class="pac-chip">' + edad(actual.fecha_nacimiento) + '</span>' : '',
