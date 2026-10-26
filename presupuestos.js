@@ -123,7 +123,8 @@
     catalogo = r.data;
     var tp = await sb.from('tipos_procedimiento').select('id,codigo,nombre,estado,orden,sugeridos').order('orden').order('codigo');
     tiposCat = tp.error ? [] : tp.data;
-    var p = await sb.from('precios').select('tratamiento_id,tipo,valor,descuento_max').eq('estado', 'activo');
+    var p = await sb.from('precios').select('tratamiento_id,tipo,valor,descuento_max,localidad_id').eq('estado', 'activo');
+    if (!p.error && window.PD_SEDES) { await window.PD_SEDES.cargar(); p.data = window.PD_SEDES.deSede(p.data); }
     preciosAct = {};
     if (!p.error) p.data.forEach(function (x) { (preciosAct[x.tratamiento_id] = preciosAct[x.tratamiento_id] || {})[x.tipo] = { valor: Number(x.valor), max: Number(x.descuento_max) }; });
     // Sugerencias al escribir: el catálogo activo y los procedimientos sugeridos de cada tipo

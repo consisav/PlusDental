@@ -228,6 +228,7 @@
         p_estado: $('agEstado').value
       });
       if (r.error) { fallo = textoFecha(o.fecha) + ' · ' + o.hora + ': ' + traducir(r.error); break; }
+      await sedeCita(r.data);
       hechas.push(o);
     }
     boton.disabled = false;
@@ -352,6 +353,9 @@
   }
 
   // Guardar en el horario elegido: si hay médico elegido se usa; si no, el asistente elige el más adecuado para ese horario
+
+  // Sede elegida en el paso 4 (si no, Supabase usa la del usuario o la del odontólogo)
+  async function sedeCita(id) { if (!id || !window.PD_SEDES || $('agLoc').options.length <= 1 || !$('agLoc').value) return; await sb.from('citas').update(window.PD_SEDES.valores($('agOrg'), $('agLoc'))).eq('id', id); }
   async function guardarDirecto(boton) {
     var f = $('agFechaM').value, h = $('agHoraM').value;
     if (!$('agPaciente').value) { aviso('agMsgM', 'Elige el paciente arriba.', true); return; }
@@ -402,6 +406,7 @@
     });
     boton.disabled = false;
     if (r.error) { aviso('agFormMsg', traducir(r.error), true); await cargarCitas(); return; }
+    await sedeCita(r.data);
     var nombre = p ? p.nombre : $('agNombre').value.trim(), tel = p ? p.telefono : $('agTelefono').value.trim();
     var correo = (p && p.correo) || $('agCorreo').value.trim();
     if (p && !p.correo && correo) {
@@ -812,6 +817,7 @@
     $('agDesde').value = man; $('agFranja').value = '';
     $('agFechaM').value = man; $('agSalaM').value = '';
     $('agEstado').value = 'pendiente'; $('agPrioridad').value = 'normal'; $('agNotas').value = '';
+    if (window.PD_SEDES) window.PD_SEDES.llenar($('agOrg'), $('agLoc'), null);
     ['agAvPac', 'agAvMed', 'agAvMail'].forEach(function (id) { $(id).checked = true; });
     fijo = null; serie = null; sugerencias = [];
     $('agSugerencias').innerHTML = '';
@@ -909,7 +915,10 @@
   if ($('tabVerCitas')) $('tabVerCitas').addEventListener('click', cargar);
 
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
-    cargar: function () { if (!$('admAgenda').hidden || ($('admVerCitas') && !$('admVerCitas').hidden)) cargar(); },
+    cargar: function () {
+      if (window.PD_SEDES && $('agLoc').options.length <= 1) window.PD_SEDES.llenar($('agOrg'), $('agLoc'), null);
+      if (!$('admAgenda').hidden || ($('admVerCitas') && !$('admVerCitas').hidden)) cargar();
+    },
     limpiar: function () {
       dentistas = []; salas = []; pacientes = []; citas = []; bloqueos = []; sugerencias = []; fijo = null;
       ['agSugerencias', 'agBody', 'agHead'].forEach(function (id) { $(id).innerHTML = ''; });

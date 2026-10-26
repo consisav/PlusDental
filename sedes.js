@@ -50,5 +50,12 @@
   // Valores para grabar (la organización la completa Supabase a partir de la localidad)
   function valores(selOrg, selLoc) { return { organizacion_id: +selOrg.value || null, localidad_id: +selLoc.value || null }; }
 
-  window.PD_SEDES = { cargar: cargar, llenar: llenar, valores: valores, texto: texto, lista: function () { return locs; }, codigoLoc: codigoLoc, nombreLoc: nombreLoc };
+  // De una lista con localidad_id, deja los registros de la sede indicada (o la del usuario); si no hay ninguno, la lista completa
+  function deSede(lista, locId) {
+    var l = locId || miLoc;
+    if (!l || !lista) return lista;
+    var f = lista.filter(function (x) { return x.localidad_id === l; });
+    return f.length ? f : lista.filter(function (x) { return !x.localidad_id; }).length ? lista.filter(function (x) { return !x.localidad_id; }) : lista;
+  }
+  window.PD_SEDES = { deSede: deSede, miLocalidad: function () { return miLoc; }, cargar: cargar, llenar: llenar, valores: valores, texto: texto, lista: function () { return locs; }, codigoLoc: codigoLoc, nombreLoc: nombreLoc };
 })();

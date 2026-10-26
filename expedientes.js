@@ -507,10 +507,11 @@
     if (Date.now() - catalogoOdgCargado < 120000) return;
     var r = await Promise.all([
       sb.from('tratamientos').select('id,nombre,precio,activo,tipo_id').order('nombre'),
-      sb.from('precios').select('tratamiento_id,tipo,valor,estado'),
+      sb.from('precios').select('tratamiento_id,tipo,valor,estado,localidad_id'),
       sb.from('tipos_procedimiento').select('id,nombre,estado,orden,sugeridos').order('orden')
     ]);
     if (r[0].error) return;
+    if (window.PD_SEDES && r[1].data) { await window.PD_SEDES.cargar(); r[1].data = window.PD_SEDES.deSede(r[1].data, actual ? actual.localidad_id : null); }
     var tipos = r[2].error ? [] : r[2].data.filter(function (t) { return t.estado === 'activo'; });
     var nombreTipo = {}, ordenTipo = {};
     tipos.forEach(function (t, i) { nombreTipo[t.id] = t.nombre; ordenTipo[t.id] = i; });

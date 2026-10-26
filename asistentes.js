@@ -63,6 +63,7 @@
     '<div class="exp-campo"><span class="pos-lbl">Antigüedad</span><div id="asAntig" class="exp-calc">—</div></div>' +
     '<label>Tipo<select id="asRol"><option value="auxiliar">Asistente dental</option><option value="higienista">Higienista dental</option></select></label>' +
     '<label>Estado<select id="asEstado" class="ac-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></label>' +
+    '<label>Organización<select id="asOrg"><option value="">—</option></select></label><label>Localidad / Empresa<select id="asLoc"><option value="">—</option></select></label>' +
     '<div class="full as-fun"><span class="pos-lbl">Funciones</span><textarea id="asFunciones" rows="5" placeholder="Una función por línea"></textarea>' +
     '<div class="as-sug"><small>Toca para agregar:</small><span id="asSug"></span></div></div>' +
     '</div></fieldset>' +
@@ -121,6 +122,7 @@
     $('asInicio').value = a ? a.fecha_inicio || '' : hoy();
     $('asRol').value = a ? a.rol : 'auxiliar';
     $('asEstado').value = !a || a.activo ? 'activo' : 'inactivo'; $('asEstado').dataset.estado = $('asEstado').value;
+    if (window.PD_SEDES) window.PD_SEDES.llenar($('asOrg'), $('asLoc'), a ? a.localidad_id : null);
     $('asFunciones').value = a ? (a.funciones || []).join('\n') : '';
     pintarAntig(); pintarSug();
   }
@@ -169,6 +171,7 @@
     $('asFunciones').value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (s) { if (!fun.some(function (x) { return norm(x) === norm(s); })) fun.push(s.slice(0, 200)); });
     var datos = { nombre: nombre, telefono: $('asTelefono').value.trim() || null, dpi: dpi || null, direccion: $('asDireccion').value.trim() || null,
       fecha_inicio: $('asInicio').value || null, rol: $('asRol').value, activo: $('asEstado').value === 'activo', funciones: fun };
+    if (window.PD_SEDES && $('asLoc').options.length > 1) Object.assign(datos, window.PD_SEDES.valores($('asOrg'), $('asLoc')));
     $('asGrabar').disabled = true;
     aviso('asFormMsg', 'Grabando…');
     var r = actual

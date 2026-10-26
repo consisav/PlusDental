@@ -47,7 +47,9 @@
     '<div id="prLista" class="adm-pane">' +
     '<div class="adm-pane-head"><h3 class="adm-h">Precios por procedimiento</h3></div>' +
     '<p class="dlg-msg">Los procedimientos salen del catálogo de <b>Tipos de procedimientos</b> (y de tu catálogo de tratamientos). Elige un tipo, pulsa «Definir precios» o «Abrir» y graba un precio por cada tipo de precio: Cliente directo, Institucional, VIP, Referido, Paquete y Especial. Al grabar el primer precio de un procedimiento sugerido, se agrega solo a tu catálogo de tratamientos.</p>' +
-    '<div class="pr-barra"><label class="pr-tipo-proc">Tipo de procedimiento<select id="prTipoProc" class="adm-input"><option value="">Todos los tipos</option></select></label></div>' +
+    '<div class="pr-barra"><label class="pr-tipo-proc">Tipo de procedimiento<select id="prTipoProc" class="adm-input"><option value="">Todos los tipos</option></select></label>' +
+    '<label class="pr-tipo-proc">Organización<select id="prOrg" class="adm-input"><option value="">—</option></select></label>' +
+    '<label class="pr-tipo-proc">Localidad / Empresa<select id="prLoc" class="adm-input"><option value="">—</option></select></label></div>' +
     '<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">' +
     '<div id="prFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar por estado">' +
     [['todos', 'Todos'], ['activo', 'Activos'], ['suspendido', 'Suspendidos'], ['baja', 'Baja']].map(function (f) { return '<button type="button" class="adm-btn" data-prfiltro="' + f[0] + '" aria-pressed="' + (f[0] === 'todos') + '">' + f[1] + '</button>'; }).join('') +
@@ -75,7 +77,9 @@
     '<p id="prFormMsg" class="dlg-msg" role="status"></p></form></div>';
 
   function ver(id) { ['prLista', 'prFicha'].forEach(function (v) { $(v).hidden = v !== id; }); }
-  function preciosDe(id) { return precios.filter(function (p) { return p.tratamiento_id === id; }); }
+  // Precios de la sede elegida arriba (Organización / Localidad); cada sede tiene su propia lista
+  function sedePrecios() { return $('prLoc') ? (+$('prLoc').value || null) : null; }
+  function preciosDe(id) { var l = sedePrecios(); return precios.filter(function (p) { return p.tratamiento_id === id && (!l || p.localidad_id === l); }); }
 
   async function cargar() {
     aviso('prMsg', '');
@@ -88,6 +92,7 @@
     if (r[0].error && /tipo_id/.test(r[0].error.message || '')) r[0] = await sb.from('tratamientos').select('id,nombre,precio,activo').order('nombre');
     if (r[0].error || r[1].error) { $('prBody').innerHTML = ''; aviso('prMsg', traducir(r[0].error || r[1].error), true); return; }
     tratamientos = r[0].data || []; precios = r[1].data || [];
+    if (window.PD_SEDES && !$('prLoc').dataset.listo) { $('prLoc').dataset.listo = '1'; await window.PD_SEDES.llenar($('prOrg'), $('prLoc'), null); }
     tiposProc = r[2].error ? [] : (r[2].data || []).filter(function (t) { return t.estado === 'activo'; });
     pintarTiposProc();
     pintarLista();
@@ -248,6 +253,10 @@
     $('prValor').focus();
   }
 
+  function cambioSede() { pintarLista(); if (actual && !$('prFicha').hidden) { pintarFicha(); if (typeof limpiarForm === 'function' && !actual.virtual) limpiarForm(); } }
+  $('prOrg').addEventListener('change', function () { setTimeout(cambioSede, 0); });
+  $('prLoc').addEventListener('change', cambioSede);
+
   async function grabar(e) {
     e.preventDefault();
     if (!puedeEditar()) { aviso('prFormMsg', 'Solo el Super Administrador puede crear o modificar precios.', true); return; }
@@ -274,7 +283,7 @@
     }
     var r;
     if (editandoId) r = await sb.from('precios').update(datos).eq('id', editandoId).select('*').single();
-    else { datos.tratamiento_id = actual.id; datos.tipo = $('prTipo').value; r = await sb.from('precios').insert(datos).select('*').single(); }
+    else { datos.tratamiento_id = actual.id; datos.tipo = $('prTipo').value; if (sedePrecios()) datos.localidad_id = sedePrecios(); r = await sb.from('precios').insert(datos).select('*').single(); }
     $('prGrabar').disabled = false;
     if (r.error) { aviso('prFormMsg', traducir(r.error), true); return; }
     var nuevo = !editandoId;

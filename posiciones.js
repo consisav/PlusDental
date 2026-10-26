@@ -188,6 +188,7 @@
     $('poNotas').value = (p && p.notas) || '';
     $('poEstadoReg').value = (p && p.estado_registro) || (p && !p.activa ? 'inactivo' : 'activo');
     $('poEstadoReg').dataset.estado = $('poEstadoReg').value;
+    if (window.PD_SEDES) window.PD_SEDES.llenar($('poOrg'), $('poLoc'), p ? p.localidad_id : null);
     var dSel = p ? p.dentista_id : dentistaPrincipal();
     $('poDentista').innerHTML = '<option value="">Sin asignar</option>' + dentistasLista.filter(function (d) { return d.estado === 'activo' || d.id === dSel; }).map(function (d) {
       return '<option value="' + d.id + '"' + (d.id === dSel ? ' selected' : '') + '>' + esc(d.nombre) + (d.rol_sala === 'principal' ? ' · principal' : '') + ((d.especialidades || []).length ? ' · ' + esc(d.especialidades.join(', ')) : '') + '</option>';
@@ -202,7 +203,7 @@
   function aplicarModo() {
     var puede = !actual || esSuper(), ed = editando && puede;
     $('pDatos').querySelectorAll('fieldset.pos-sec').forEach(function (f) { f.disabled = !ed; });
-    ['poNotas', 'poEstadoReg'].forEach(function (id) { $(id).disabled = !ed; });
+    ['poNotas', 'poEstadoReg', 'poOrg', 'poLoc'].forEach(function (id) { $(id).disabled = !ed; });
     $('poGrabar').hidden = !ed;
     $('poGrabar').textContent = actual ? 'Guardar cambios' : 'Grabar';
     $('poModificar').hidden = ed || !actual || !esSuper();
@@ -257,6 +258,7 @@
     var boton = form.querySelector('[type=submit]');
     boton.disabled = true;
     aviso('poMsg', 'Guardando…');
+    if (window.PD_SEDES && $('poLoc').options.length > 1) Object.assign(datos, window.PD_SEDES.valores($('poOrg'), $('poLoc')));
     var r = actual
       ? await sb.from('posiciones').update(datos).eq('id', actual.id).select('*').single()
       : await sb.from('posiciones').insert(Object.assign({ codigo: 'nuevo' }, datos)).select('*').single();

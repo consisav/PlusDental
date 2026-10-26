@@ -4420,6 +4420,97 @@ do $$ declare v_loc bigint; begin
   alter table public.tipos_dentista enable trigger tipos_dentista_auditoria;
 end $$;
 
+-- ===== Sedes (2): asistentes, posiciones y clínicas, precios, paquetes y citas (agendas) =====
+-- Misma regla que pacientes y odontólogos: organización + localidad, separación por sede y datos existentes a 2-01.
+-- Las citas sin sede toman la del usuario que agenda, o la del odontólogo / sala (citas pedidas desde la página o el asistente).
+-- Precios: un precio por procedimiento, tipo y sede (cada sede puede tener su propia lista de precios).
+do $$ declare t text; begin
+  foreach t in array array['personal', 'posiciones', 'precios', 'paquetes', 'citas'] loop
+    execute format('alter table public.%I add column if not exists organizacion_id bigint references public.organizaciones (id) on delete set null', t);
+    execute format('alter table public.%I add column if not exists localidad_id bigint references public.org_localidades (id) on delete set null', t);
+    execute format('create index if not exists %I on public.%I (localidad_id)', t || '_localidad', t);
+    if not exists (select 1 from pg_trigger where tgname = t || '_sede' and tgrelid = ('public.' || t)::regclass) then
+      execute format('create trigger %I before insert or update of organizacion_id, localidad_id on public.%I for each row execute function public.sede_registro()', t || '_sede', t);
+    end if;
+  end loop;
+end $$;
+
+-- Citas: si no hay sede del usuario, la del odontólogo o la de la sala
+create or replace function public.cita_sede()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.localidad_id is null then
+    new.localidad_id := coalesce(public.mi_localidad(),
+      (select localidad_id from public.dentistas where id = new.dentista_id),
+      (select localidad_id from public.posiciones where id = new.posicion_id));
+    if new.localidad_id is not null then
+      new.organizacion_id := (select organizacion_id from public.org_localidades where id = new.localidad_id);
+    end if;
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'citas_sede_defecto' and tgrelid = 'public.citas'::regclass) then
+    create trigger citas_sede_defecto before insert on public.citas for each row execute function public.cita_sede();
+  end if;
+end $$;
+
+-- Precios: único por procedimiento, tipo y sede
+drop index if exists public.precios_tratamiento_tipo;
+create unique index if not exists precios_tratamiento_tipo_sede on public.precios (tratamiento_id, tipo, coalesce(localidad_id, 0));
+
+-- Permisos por sede
+drop policy if exists "personal ve el personal" on public.personal;
+create policy "personal ve el personal" on public.personal for select using (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal edita personal" on public.personal;
+create policy "personal edita personal" on public.personal for update using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal agrega personal" on public.personal;
+create policy "personal agrega personal" on public.personal for insert with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal ve posiciones" on public.posiciones;
+create policy "personal ve posiciones" on public.posiciones for select using (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal edita posiciones" on public.posiciones;
+create policy "personal edita posiciones" on public.posiciones for update using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal crea posiciones" on public.posiciones;
+create policy "personal crea posiciones" on public.posiciones for insert with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal ve precios" on public.precios;
+create policy "personal ve precios" on public.precios for select using (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal ve paquetes" on public.paquetes;
+create policy "personal ve paquetes" on public.paquetes for select using (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal ve citas" on public.citas;
+create policy "personal ve citas" on public.citas for select using (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal actualiza citas" on public.citas;
+create policy "personal actualiza citas" on public.citas for update using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id));
+
+-- Datos existentes a 2 · GRUPO PLUS DENTAL / 2-01 (sin alterar su registro de cambios)
+do $$ declare v_loc bigint; begin
+  select l.id into v_loc from public.org_localidades l join public.organizaciones o on o.id = l.organizacion_id where o.codigo = '2' and l.codigo = '1';
+  if v_loc is null then return; end if;
+  alter table public.personal disable trigger personal_registro;
+  alter table public.posiciones disable trigger posiciones_datos_admin;
+  alter table public.posiciones disable trigger posiciones_guardar;
+  alter table public.precios disable trigger precios_auditoria;
+  alter table public.paquetes disable trigger paquetes_auditoria;
+  alter table public.citas disable trigger citas_registro;
+  update public.personal set localidad_id = v_loc where localidad_id is null;
+  update public.posiciones set localidad_id = v_loc where localidad_id is null;
+  update public.precios set localidad_id = v_loc where localidad_id is null;
+  update public.paquetes set localidad_id = v_loc where localidad_id is null;
+  update public.citas set localidad_id = v_loc where localidad_id is null;
+  -- Pacientes, odontólogos y tipos (por si quedó alguno sin sede)
+  alter table public.pacientes disable trigger pacientes_actualizado;
+  alter table public.pacientes disable trigger pacientes_firma;
+  update public.pacientes set localidad_id = v_loc where localidad_id is null;
+  alter table public.pacientes enable trigger pacientes_actualizado;
+  alter table public.pacientes enable trigger pacientes_firma;
+  alter table public.personal enable trigger personal_registro;
+  alter table public.posiciones enable trigger posiciones_datos_admin;
+  alter table public.posiciones enable trigger posiciones_guardar;
+  alter table public.precios enable trigger precios_auditoria;
+  alter table public.paquetes enable trigger paquetes_auditoria;
+  alter table public.citas enable trigger citas_registro;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

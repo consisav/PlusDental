@@ -97,6 +97,7 @@
     '<fieldset id="paCampos" class="campos pos-sec"><legend>Datos del paquete</legend><div class="exp-form">' +
     '<div class="exp-campo"><span class="pos-lbl">Código (automático)</span><div id="paCodigo" class="exp-calc">—</div></div>' +
     '<label>Estado<select id="paEstado" class="ac-estado"><option value="activo">Activo</option><option value="suspendido">Suspendido</option><option value="baja">Baja</option></select></label>' +
+    '<label>Organización<select id="paOrg"><option value="">—</option></select></label><label>Localidad / Empresa<select id="paLoc"><option value="">—</option></select></label>' +
     '<label class="full">Nombre del paquete *<input id="paNombre" type="text" maxlength="120" required></label>' +
     '<label class="full">Descripción<textarea id="paDesc" rows="2" maxlength="500" placeholder="Se muestra en la página pública"></textarea></label>' +
     '<label>Vigente desde *<input id="paDesde" type="date" required></label>' +
@@ -122,10 +123,11 @@
       sb.from('paquetes').select('*').order('creado', { ascending: false }),
       sb.from('paquete_items').select('paquete_id,tratamiento_id,cantidad'),
       sb.from('tratamientos').select('id,nombre,precio,activo').order('nombre'),
-      sb.from('precios').select('tratamiento_id,valor').eq('tipo', 'directo').eq('estado', 'activo'),
+      sb.from('precios').select('tratamiento_id,valor,localidad_id').eq('tipo', 'directo').eq('estado', 'activo'),
       sb.from('tipos_procedimiento').select('id,nombre,estado,orden,sugeridos').order('orden').order('codigo')
     ]);
     var err = r.slice(0, 4).map(function (x) { return x.error; }).filter(Boolean)[0];
+    if (window.PD_SEDES && r[3].data) { await window.PD_SEDES.cargar(); r[3].data = window.PD_SEDES.deSede(r[3].data); }
     if (err) { $('paGrid').innerHTML = ''; aviso('paMsg', traducir(err), true); return; }
     paquetes = r[0].data; catalogo = r[2].data; items = {}; precioDirecto = {};
     tiposProc = r[4].error ? [] : r[4].data.filter(function (t) { return t.estado === 'activo'; });
@@ -197,6 +199,7 @@
   function rellenar(p) {
     $('paCodigo').textContent = p ? p.codigo : 'Se asigna al grabar';
     $('paEstado').value = p ? p.estado : 'activo'; pintarEstadoSelect();
+    if (window.PD_SEDES) window.PD_SEDES.llenar($('paOrg'), $('paLoc'), p ? p.localidad_id : null);
     $('paPrecioUsd').value = p && p.precio_usd != null ? Number(p.precio_usd) : '';
     $('paFecha').value = p ? (p.fecha || hoy()) : hoy();
     $('paNombre').value = p ? p.nombre : '';
@@ -259,6 +262,7 @@
     });
     if (r.error) { $('paGrabar').disabled = false; aviso('paFormMsg', traducir(r.error), true); return; }
     var nuevo = !actual, id = r.data;
+    if (window.PD_SEDES && $('paLoc').options.length > 1 && id) await sb.from('paquetes').update(window.PD_SEDES.valores($('paOrg'), $('paLoc'))).eq('id', id);
     await cargar();
     actual = paquetes.filter(function (p) { return p.id === id; })[0] || null;
     editando = false;
