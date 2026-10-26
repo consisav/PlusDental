@@ -312,7 +312,22 @@
         { k: 'sede', tipo: 'sede' },
         { k: 'generico', label: '¿Es genérico?', tipo: 'check' }, { k: 'control_minimo', label: 'Administrar punto mínimo', tipo: 'check' },
         { k: 'foto_archivo', label: p && p.foto ? 'Cambiar imagen' : 'Imagen', tipo: 'file', accept: 'image/png,image/jpeg,image/webp', ayuda: 'PNG, JPG o WEBP de hasta 2 MB.', ancho: 'full' }],
-      alAbrir: function () { if (!p) $('geoF_numero').textContent = 'Se asigna al grabar'; },
+      alAbrir: function () {
+        if (!p) $('geoF_numero').textContent = 'Se asigna al grabar';
+        // Imagen actual del producto al final del formulario; si no tiene foto, se pide subir el archivo
+        var campo = $('geoF_foto_archivo').closest('label'), caja = document.createElement('div');
+        caja.className = 'full inv-dlg-img';
+        var pintar = function (html, nota, aviso) { caja.innerHTML = '<div class="inv-dlg-img-vista">' + html + '</div><div class="inv-dlg-img-txt"><b>' + (p && p.foto ? 'Imagen actual' : 'Sin foto del producto') + '</b><span' + (aviso ? ' class="inv-dlg-img-aviso"' : '') + '>' + nota + '</span></div>'; };
+        if (p && p.foto) pintar(imagenProducto(p, 120), esc(p.foto_credito || 'Foto subida para este producto.') + ' Para cambiarla, elige otro archivo abajo.');
+        else pintar(ilustracion(p || {}, 120), 'Este producto aún no tiene foto: se muestra una ilustración según su presentación. <b>Sube el archivo de imagen</b> del producto (PNG, JPG o WEBP de hasta 2 MB).', true);
+        campo.parentNode.insertBefore(caja, campo);
+        $('geoF_foto_archivo').addEventListener('change', function () {
+          var f = this.files && this.files[0];
+          if (!f) return;
+          if (['image/png', 'image/jpeg', 'image/webp'].indexOf(f.type) < 0 || f.size > 2 * 1024 * 1024) { pintar(caja.querySelector('.inv-dlg-img-vista').innerHTML, 'El archivo debe ser PNG, JPG o WEBP de hasta 2 MB.', true); return; }
+          pintar('<img class="inv-foto" src="' + URL.createObjectURL(f) + '" alt="Vista previa" width="120" height="120">', 'Vista previa de <b>' + esc(f.name) + '</b>. Se guardará al pulsar «Grabar».');
+        });
+      },
       guardar: async function (d) {
         var archivo = d.foto_archivo; delete d.foto_archivo;
         ['proveedor_id', 'bodega_id'].forEach(function (k) { d[k] = d[k] ? +d[k] : null; });
