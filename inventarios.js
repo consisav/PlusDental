@@ -226,6 +226,30 @@
     '<div id="iaFicha" class="geo-ficha" hidden></div></section><p id="iaMsg" class="dlg-msg" role="status"></p></div>';
   function nombreProv(id) { var p = proveedores.filter(function (x) { return x.id === id; })[0]; return p ? p.nombre_comercial : null; }
   function fotoUrl(ruta) { return ruta ? sb.storage.from('publico').getPublicUrl(ruta).data.publicUrl : ''; }
+  // Ilustración del producto según su presentación (cartucho, frasco, tubo, blíster…), con el color de su tipo.
+  // Se usa mientras el producto no tenga foto propia (las fotos comerciales tienen derechos de cada marca).
+  var COLORES_TIPO = ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED', '#DB2777', '#0891B2', '#65A30D', '#EA580C', '#4F46E5', '#0D9488', '#A16207'];
+  function colorTipo(t) { var h = 0; String(t || '').split('').forEach(function (c) { h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return COLORES_TIPO[h % COLORES_TIPO.length]; }
+  function ilustracion(p, tam) {
+    var c = colorTipo(p.tipo_producto || p.clasificacion), pr = norm(p.presentacion), k = '#0B2B40', g = '#E3EBF1', b = '#FFFFFF';
+    var d;
+    if (/cartucho/.test(pr)) d = '<rect x="24" y="8" width="16" height="6" rx="2" fill="#94A6B2"/><rect x="22" y="14" width="20" height="40" rx="4" fill="' + b + '" stroke="' + k + '" stroke-width="2"/><rect x="22" y="26" width="20" height="16" fill="' + c + '"/><rect x="26" y="54" width="12" height="4" rx="1" fill="#94A6B2"/>';
+    else if (/ampolla/.test(pr)) d = '<path d="M28 6h8v8l-2 4v2l4 6v28a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V26l4-6v-2l-2-4z" fill="' + b + '" stroke="' + k + '" stroke-width="2"/><rect x="25" y="34" width="14" height="12" fill="' + c + '"/>';
+    else if (/blister/.test(pr)) d = '<rect x="10" y="12" width="44" height="40" rx="5" fill="' + g + '" stroke="' + k + '" stroke-width="2"/>' + [20, 32, 44].map(function (x) { return '<ellipse cx="' + x + '" cy="24" rx="5" ry="7" fill="' + c + '"/><ellipse cx="' + x + '" cy="40" rx="5" ry="7" fill="' + c + '"/>'; }).join('');
+    else if (/jeringa/.test(pr)) d = '<rect x="10" y="28" width="34" height="10" rx="2" fill="' + b + '" stroke="' + k + '" stroke-width="2"/><rect x="12" y="30" width="18" height="6" fill="' + c + '"/><rect x="44" y="31" width="10" height="4" fill="#94A6B2"/><rect x="4" y="25" width="6" height="16" rx="1" fill="' + k + '"/><path d="M54 33h6" stroke="' + k + '" stroke-width="2"/>';
+    else if (/tubo/.test(pr)) d = '<path d="M16 14h32l-4 38H20z" fill="' + b + '" stroke="' + k + '" stroke-width="2"/><rect x="18" y="22" width="28" height="14" fill="' + c + '"/><rect x="26" y="52" width="12" height="8" rx="2" fill="' + k + '"/><path d="M16 14h32" stroke="' + k + '" stroke-width="4"/>';
+    else if (/galon/.test(pr)) d = '<path d="M14 18h28v-6h8v6a6 6 0 0 1 6 6v28a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4V22a4 4 0 0 1 2-4z" fill="' + b + '" stroke="' + k + '" stroke-width="2"/><path d="M20 18v-6a4 4 0 0 1 8 0v6" fill="none" stroke="' + k + '" stroke-width="2"/><rect x="16" y="30" width="36" height="16" fill="' + c + '"/>';
+    else if (/frasco|inhalador/.test(pr)) d = (/inhalador/.test(pr) ? '<rect x="18" y="8" width="16" height="34" rx="5" fill="' + c + '"/><path d="M14 40h30v10a6 6 0 0 1-6 6H20a6 6 0 0 1-6-6z" fill="' + b + '" stroke="' + k + '" stroke-width="2"/>'
+      : '<rect x="24" y="6" width="16" height="8" rx="2" fill="' + k + '"/><path d="M22 14h20v6l4 4v32a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V24l4-4z" fill="' + b + '" stroke="' + k + '" stroke-width="2"/><rect x="18" y="30" width="28" height="18" fill="' + c + '"/>');
+    else if (/bolsa/.test(pr)) d = '<path d="M14 18l4-8h28l4 8v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4z" fill="' + b + '" stroke="' + k + '" stroke-width="2"/><path d="M14 18h36" stroke="' + k + '" stroke-width="2"/><rect x="18" y="28" width="28" height="16" fill="' + c + '"/>';
+    else if (/rollo/.test(pr)) d = '<circle cx="32" cy="32" r="22" fill="' + c + '" stroke="' + k + '" stroke-width="2"/><circle cx="32" cy="32" r="8" fill="' + b + '" stroke="' + k + '" stroke-width="2"/>';
+    else if (/kit/.test(pr)) d = '<rect x="8" y="16" width="48" height="38" rx="5" fill="' + g + '" stroke="' + k + '" stroke-width="2"/><rect x="24" y="10" width="16" height="6" rx="2" fill="' + k + '"/><rect x="14" y="24" width="14" height="24" rx="3" fill="' + c + '"/><rect x="34" y="28" width="16" height="20" rx="3" fill="' + b + '" stroke="' + c + '" stroke-width="2"/>';
+    else if (/paquete/.test(pr)) d = '<path d="M12 14l4-4 4 4 4-4 4 4 4-4 4 4 4-4 4 4 4-4 4 4v38a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4z" fill="' + b + '" stroke="' + k + '" stroke-width="2"/><rect x="16" y="26" width="32" height="18" fill="' + c + '"/>';
+    else if (/unidad/.test(pr)) d = '<circle cx="22" cy="20" r="11" fill="' + g + '" stroke="' + k + '" stroke-width="2"/><circle cx="22" cy="20" r="6" fill="' + c + '"/><path d="M30 28l22 24" stroke="' + k + '" stroke-width="5" stroke-linecap="round"/>';
+    else d = '<path d="M10 22l22-10 22 10v26L32 58 10 48z" fill="' + b + '" stroke="' + k + '" stroke-width="2"/><path d="M10 22l22 10 22-10M32 32v26" fill="none" stroke="' + k + '" stroke-width="2"/><path d="M10 22l22 10v26L10 48z" fill="' + c + '" opacity=".85"/>';
+    return '<svg class="inv-ilus" viewBox="0 0 64 64" width="' + (tam || 40) + '" height="' + (tam || 40) + '" role="img" aria-label="' + esc((p.presentacion || 'Producto') + ' · ' + (p.tipo_producto || '')) + '">' + d + '</svg>';
+  }
+  function imagenProducto(p, tam) { return p.foto ? '<img class="inv-foto" src="' + esc(fotoUrl(p.foto)) + '" alt="Foto de ' + esc(p.nombre) + '" width="' + (tam || 40) + '" height="' + (tam || 40) + '">' : ilustracion(p, tam); }
   function pintarProductos() {
     var t = norm($('iaBuscar').value), c = $('iaClasif').value;
     var clases = productos.map(function (p) { return p.clasificacion; }).filter(Boolean).filter(function (x, i, a) { return a.indexOf(x) === i; }).sort();
@@ -235,7 +259,7 @@
     var l = productos.filter(function (p) { return pasaFiltro('prod', p) && (!c || p.clasificacion === c) && (!t || norm([p.nombre, p.codigo, p.marca, p.principio_activo].join(' ')).indexOf(t) >= 0); });
     $('iaLista').innerHTML = l.length ? l.map(function (p) {
       var bajo = p.control_minimo && p.minimo != null;
-      return fila('prod', p.id, p.id === prodSel, [p.numero || '—', esc(p.codigo || '—'), '<b>' + esc(p.nombre) + '</b>' + (p.principio_activo ? '<small class="inv-sub">' + esc(p.principio_activo) + '</small>' : ''), esc(p.clasificacion || '—'),
+      return fila('prod', p.id, p.id === prodSel, [p.numero || '—', esc(p.codigo || '—'), '<div class="inv-prod">' + imagenProducto(p, 40) + '<div><b>' + esc(p.nombre) + '</b>' + (p.principio_activo ? '<small class="inv-sub">' + esc(p.principio_activo) + '</small>' : '') + (p.tipo_producto ? '<small class="inv-sub">' + esc(p.tipo_producto) + '</small>' : '') + '</div></div>', esc(p.clasificacion || '—'),
         esc([p.presentacion, p.unidad].filter(Boolean).join(' · ') || '—'), (p.minimo != null || p.maximo != null ? (p.minimo != null ? Number(p.minimo) : '—') + ' / ' + (p.maximo != null ? Number(p.maximo) : '—') : '—') + (bajo ? ' <span class="inv-alerta" title="Control de punto mínimo activo">mín.</span>' : ''), q(p.costo), pill(p.estado)]);
     }).join('') : vacia(9, productos.length ? 'Ningún producto coincide.' : 'Aún no hay productos. Agrega el primero con «+ Producto».');
     var p = productos.filter(function (x) { return x.id === prodSel; })[0];
@@ -249,7 +273,7 @@
         dato('Precio de costo', q(p.costo)) + dato('Ubicación', ['Estante ' + (p.estante || '—'), 'Fila ' + (p.fila || '—'), 'Bloque ' + (p.bloque || '—')].join(' · '), 1) +
         '<div class="geo-info full"><span>Otros proveedores</span><div class="inv-chips">' + (otros.length ? otros.map(function (o) { return '<span class="geo-chip">' + esc(nombreProv(o.proveedor_id) || 'Proveedor') + ' <button type="button" data-quitar-prov="' + o.proveedor_id + '" aria-label="Quitar">×</button></span>'; }).join('') : '<span class="inv-sub">Ninguno</span>') +
         '<select id="iaOtroProv" class="adm-input inv-mini-sel" aria-label="Agregar proveedor"><option value="">+ Agregar proveedor…</option>' + proveedores.filter(function (x) { return x.estado === 'activo' && x.id !== p.proveedor_id && !otros.some(function (o) { return o.proveedor_id === x.id; }); }).map(function (x) { return '<option value="' + x.id + '">' + esc(x.nombre_comercial) + '</option>'; }).join('') + '</select></div></div>' +
-        '</div><div class="org-logo">' + (p.foto ? '<img src="' + esc(fotoUrl(p.foto)) + '" alt="Foto de ' + esc(p.nombre) + '">' : '<span>Sin imagen</span>') + '</div></div>';
+        '</div><div class="org-logo inv-logo">' + imagenProducto(p, 110) + (p.foto ? '' : '<small>Ilustración · ' + esc(p.presentacion || 'producto') + '</small>') + '</div></div>';
     }
   }
   async function cargarProductos() {
@@ -315,7 +339,7 @@
     var t = norm($('ivBuscar').value);
     var l = productos.filter(function (p) { return p.estado !== 'baja' && (!t || norm([p.nombre, p.codigo].join(' ')).indexOf(t) >= 0); });
     $('ivLista').innerHTML = l.length ? l.map(function (p) {
-      return '<tr><td><b>' + esc(p.nombre) + '</b><small class="inv-sub">' + esc([p.codigo, p.presentacion].filter(Boolean).join(' · ')) + (p.costo != null ? ' · costo ' + q(p.costo) : '') + '</small></td>' + TIPOS.map(function (tp) {
+      return '<tr><td><div class="inv-prod">' + imagenProducto(p, 34) + '<div><b>' + esc(p.nombre) + '</b><small class="inv-sub">' + esc([p.codigo, p.presentacion].filter(Boolean).join(' · ')) + (p.costo != null ? ' · costo ' + q(p.costo) : '') + '</small></div></div></td>' + TIPOS.map(function (tp) {
         var x = precios.filter(function (y) { return y.producto_id === p.id && y.tipo === tp[0]; })[0];
         if (!x) return '<td class="num"><button type="button" class="inv-precio vacio" data-precio="' + p.id + ':' + tp[0] + '">Definir</button></td>';
         return '<td class="num"><button type="button" class="inv-precio' + (x.vigente ? '' : ' no-vigente') + '" data-precio="' + p.id + ':' + tp[0] + '" title="' + esc('Fecha ' + fecha(x.fecha) + ' · grabado por ' + (x.modificado_por || x.creado_por || '')) + '"><b>' + q(x.precio) + '</b>' +
