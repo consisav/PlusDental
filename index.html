@@ -993,9 +993,11 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .mp-aviso{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:18px;padding:22px;font-size:15px;color:#22394A;line-height:1.6}
 .mp-link{font-weight:700;color:#005A87}
 .mp-solo{font-size:13px!important;color:#5A6D7A!important;margin-top:2px!important}
-.mp-tabs{display:flex;flex-wrap:wrap;gap:8px}.mp-tabs:empty{display:none}
-.mp-tabs button{font:inherit;font-size:14.5px;font-weight:600;padding:9px 16px;min-height:42px;border-radius:999px;border:1px solid #C4D4DF;background:#FFFFFF;color:#0B2B40;cursor:pointer}
+.mp-tabs{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}.mp-tabs button{flex:1 0 auto;white-space:nowrap}.mp-tabs:empty{display:none}
+.mp-tabs button{font:inherit;font-size:13.5px;font-weight:600;padding:8px 12px;min-height:40px;border-radius:999px;border:1px solid #C4D4DF;background:#FFFFFF;color:#0B2B40;cursor:pointer}
 .mp-tabs button[aria-selected=true]{background:#0B2B40;border-color:#0B2B40;color:#FFFFFF}
+#fichaTabs{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
+#fichaTabs .adm-btn{flex:1 0 auto;white-space:nowrap;padding:8px 12px;min-height:40px;font-size:13.5px}
 .mp-scroll{overflow-x:auto}.mp-atendida{background:#E3EAF0;color:#22394A}
 .mp-tabs .mp-volver{border-style:dashed;color:#005A87}
 .mp-buscar{font:inherit;font-size:15px;width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid #C4D4DF;border-radius:12px;min-height:44px}
@@ -1238,15 +1240,15 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="expNombre" class="adm-h"></h3><p id="expSub" class="dlg-msg"></p></div>
 <span id="expEstado" class="estado" hidden></span>
 </div>
-<div id="fichaTabs" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Partes del expediente">
+<div id="fichaTabs" aria-label="Partes del expediente">
 <button type="button" class="adm-btn" data-ficha="fDatos" aria-pressed="true">Datos</button>
 <button type="button" class="adm-btn" data-ficha="fHistoria" aria-pressed="false">Historia médica</button>
 <button type="button" class="adm-btn" data-ficha="fOdonto" aria-pressed="false">Odontograma</button>
 <button type="button" class="adm-btn" data-ficha="fTrat" aria-pressed="false">Tratamientos</button>
-<button type="button" class="adm-btn" data-ficha="fNotas" aria-pressed="false">Notas de visita</button>
+<button type="button" class="adm-btn" data-ficha="fNotas" aria-pressed="false">Notas</button>
 <button type="button" class="adm-btn" data-ficha="fRx" aria-pressed="false">Radiografías</button>
 <button type="button" class="adm-btn" data-ficha="fRecetas" aria-pressed="false">Recetas</button>
-<button type="button" class="adm-btn" data-ficha="fLab" aria-pressed="false">Órdenes de laboratorio</button>
+<button type="button" class="adm-btn" data-ficha="fLab" aria-pressed="false">Órdenes Laboratorio</button>
 </div>
 
 <form id="fDatos" class="exp-form">

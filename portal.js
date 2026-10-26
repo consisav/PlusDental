@@ -9,7 +9,7 @@
 
   var BUCKET = 'expedientes';
   var PESTANAS = [['datos', 'Datos'], ['historia', 'Historia médica'], ['odontograma', 'Odontograma'], ['tratamientos', 'Tratamientos'],
-    ['notas', 'Notas de visita'], ['radiografias', 'Radiografías'], ['recetas', 'Recetas'], ['lab', 'Órdenes de laboratorio'], ['reportes', 'Reportes']];
+    ['notas', 'Notas'], ['radiografias', 'Radiografías'], ['recetas', 'Recetas'], ['lab', 'Órdenes Laboratorio'], ['reportes', 'Reportes']];
   var ESTADOS_CITA = { pendiente: 'Programado', confirmada: 'Confirmado', reprogramada: 'Reprogramado', atendida: 'Atendido' };
   var ESTADOS_TRAT = { pendiente: 'Pendiente', proceso: 'En proceso', finalizado: 'Finalizado' };
   var ESTADOS_LAB = { enviada: 'Enviada', proceso: 'En proceso', prueba: 'En prueba', recibida: 'Recibida', colocada: 'Colocada', devuelta: 'Devuelta', cancelada: 'Cancelada' };
