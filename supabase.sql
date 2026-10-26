@@ -3601,6 +3601,58 @@ $$;
 revoke execute on function public.mi_portal() from public, anon;
 grant execute on function public.mi_portal() to authenticated;
 
+-- Portal del paciente: resto del expediente (historia médica, odontograma, notas de visita, radiografías,
+-- órdenes de laboratorio, presupuestos y comprobantes), siempre de solo lectura y solo del paciente del usuario conectado.
+create or replace function public.mi_paciente_id()
+returns bigint language sql stable security definer set search_path = public as $$
+  select pa.id from public.pacientes pa join public.perfiles pf on pf.usuario = pa.usuario where pf.id = auth.uid() limit 1;
+$$;
+revoke execute on function public.mi_paciente_id() from public, anon;
+grant execute on function public.mi_paciente_id() to authenticated;
+
+create or replace function public.mi_portal_detalle()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_id bigint := public.mi_paciente_id(); p record;
+begin
+  if v_id is null then return jsonb_build_object('ok', false); end if;
+  select * into p from public.pacientes where id = v_id;
+  return jsonb_build_object('ok', true,
+    'foto', p.foto, 'odontograma', p.odontograma, 'fecha_nacimiento', p.fecha_nacimiento,
+    'historias', coalesce((select jsonb_agg(jsonb_build_object('fecha', h.fecha, 'cita_numero', h.cita_numero, 'alergias', h.alergias, 'enfermedades', h.enfermedades,
+        'medicamentos', h.medicamentos) order by h.fecha desc) from public.historias_medicas h where h.paciente_id = v_id), '[]'::jsonb),
+    'odontograma_cambios', coalesce((select jsonb_agg(jsonb_build_object('pieza', c.pieza, 'descripcion', c.descripcion, 'fecha', c.fecha_cambio,
+        'observaciones', c.observaciones) order by c.fecha_cambio desc) from public.odontograma_cambios c where c.paciente_id = v_id), '[]'::jsonb),
+    'notas', coalesce((select jsonb_agg(jsonb_build_object('fecha', n.fecha, 'texto', n.texto, 'autor', n.autor_usuario) order by n.fecha desc, n.id desc)
+      from public.notas_visita n where n.paciente_id = v_id), '[]'::jsonb),
+    'ordenes_lab', coalesce((select jsonb_agg(jsonb_build_object('numero', o.numero, 'trabajo', o.trabajo, 'piezas', o.piezas, 'material', o.material, 'color', o.color,
+        'estado', o.estado, 'fecha_envio', o.fecha_envio, 'fecha_entrega', o.fecha_entrega, 'fecha_recibida', o.fecha_recibida, 'laboratorio', l.nombre, 'dentista', d.nombre,
+        'creada', o.creada) order by o.creada desc)
+      from public.ordenes_lab o left join public.laboratorios l on l.id = o.laboratorio_id left join public.dentistas d on d.id = o.dentista_id
+     where o.paciente_id = v_id and o.estado <> 'borrador'), '[]'::jsonb),
+    'presupuestos', coalesce((select jsonb_agg(jsonb_build_object('id', pr.id, 'codigo', pr.codigo, 'fecha', pr.fecha, 'estado', pr.estado, 'descuento_pct', pr.descuento_pct,
+        'forma_pago', pr.forma_pago, 'cuotas', pr.cuotas, 'recargo_pct', pr.recargo_pct, 'sin_recargo', pr.sin_recargo, 'notas', pr.notas, 'aprobado_en', pr.aprobado_en,
+        'items', coalesce((select jsonb_agg(jsonb_build_object('tratamiento', i.tratamiento, 'pieza', i.pieza, 'cantidad', i.cantidad, 'precio', i.precio, 'estado', i.estado) order by i.orden, i.id)
+          from public.presupuesto_items i where i.presupuesto_id = pr.id and i.estado <> 'eliminado'), '[]'::jsonb)) order by pr.fecha desc, pr.id desc)
+      from public.presupuestos pr where pr.paciente_id = v_id and pr.estado <> 'borrador'), '[]'::jsonb),
+    'comprobantes', coalesce((select jsonb_agg(jsonb_build_object('id', g.id, 'correlativo', g.correlativo, 'tipo_documento', g.tipo_documento, 'serie', g.serie,
+        'numero_factura', g.numero_factura, 'fecha', g.fecha, 'monto', g.monto, 'metodo', g.metodo, 'referencia', g.referencia, 'concepto', g.concepto,
+        'nit', g.nit, 'numero_cuota', g.numero_cuota) order by g.fecha desc, g.id desc)
+      from public.pagos g where g.paciente_id = v_id and not g.anulado), '[]'::jsonb));
+end;
+$$;
+revoke execute on function public.mi_portal_detalle() from public, anon;
+grant execute on function public.mi_portal_detalle() to authenticated;
+
+-- Archivos: el paciente ve sus radiografías (carpeta con su número), su foto y las firmas y sellos de los médicos
+do $$ begin
+  drop policy if exists "paciente ve sus archivos" on storage.objects;
+  create policy "paciente ve sus archivos" on storage.objects for select to authenticated
+    using (bucket_id = 'expedientes' and public.mi_paciente_id() is not null and (
+      split_part(name, '/', 1) = public.mi_paciente_id()::text
+      or name = 'fotos/' || public.mi_paciente_id()::text || '.jpg'
+      or name like 'fotos/firma-dentista-%' or name like 'fotos/sello-dentista-%'));
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

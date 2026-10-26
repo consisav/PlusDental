@@ -992,6 +992,20 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .mp-tabla td{padding:8px;border-bottom:1px solid #EEF3F7;color:#0B2B40;vertical-align:top}.mp-tabla small{color:#5A6D7A}.mp-num{text-align:right;white-space:nowrap}
 .mp-aviso{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:18px;padding:22px;font-size:15px;color:#22394A;line-height:1.6}
 .mp-link{font-weight:700;color:#005A87}
+.mp-solo{font-size:13px!important;color:#5A6D7A!important;margin-top:2px!important}
+.mp-tabs{display:flex;flex-wrap:wrap;gap:8px}.mp-tabs:empty{display:none}
+.mp-tabs button{font:inherit;font-size:14.5px;font-weight:600;padding:9px 16px;min-height:42px;border-radius:999px;border:1px solid #C4D4DF;background:#FFFFFF;color:#0B2B40;cursor:pointer}
+.mp-tabs button[aria-selected=true]{background:#0B2B40;border-color:#0B2B40;color:#FFFFFF}
+.mp-tabs button:focus-visible{outline:2px solid #005A87;outline-offset:2px}
+.mp-lista li.mp-bloque{flex-direction:column;align-items:stretch;gap:8px}.mp-texto{margin:0;font-size:14.5px;line-height:1.6;color:#22394A;white-space:pre-wrap}
+.mp-acciones{display:flex;flex-wrap:wrap;gap:8px}.mp-acciones .adm-btn{min-height:38px;padding:6px 14px;font-size:13.5px}
+.mp-odg{overflow-x:auto}.mp-odg .odg-imagen{min-width:640px}
+.mp-rx{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.mp-rx-item{display:flex;flex-direction:column;gap:6px;text-decoration:none;color:#0B2B40;border:1px solid #D9E4EC;border-radius:12px;padding:8px;min-width:0}
+.mp-rx-item img,.mp-rx-pdf{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;background:#0B2B40}
+.mp-rx-pdf{display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;letter-spacing:.1em}
+.mp-rx-item span{font-size:13px;font-weight:600;overflow-wrap:anywhere}.mp-rx-item small{display:block;font-weight:400;color:#5A6D7A}
+.mp-t-pendiente,.mp-l-enviada{background:#DBEAFE;color:#1E40AF}.mp-l-proceso,.mp-l-prueba{background:#FEF3C7;color:#92400E}.mp-l-recibida,.mp-l-colocada{background:#DCF2EC;color:#08504C}.mp-l-devuelta,.mp-l-cancelada{background:#FDE2E4;color:#9F1239}
 @media (max-width:860px){.mp-grid{grid-template-columns:1fr}.mp-datos{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.mp-wrap{padding:32px 16px}.mp-head h2{font-size:34px}.mp-datos,.mp-saldo{grid-template-columns:1fr}.mp-lista li{flex-wrap:wrap}.mp-tabla{font-size:13px}.mp-tabla th,.mp-tabla td{padding:6px 4px}}
 </style>
@@ -1100,9 +1114,10 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="mp-head">
 <div style="min-width:0"><span style="font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:600;color:#005A87">Mi expediente</span>
 <h2 id="mpNombre">Mi expediente</h2>
-<p>Tu información en Plus Dental: solo puedes consultarla. Para cualquier cambio, comunícate con la clínica.</p></div>
+<p id="mpSub"></p><p class="mp-solo">Solo consulta · para cualquier cambio, comunícate con la clínica.</p></div>
 <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" id="mpActualizar" class="adm-btn">Actualizar</button><button type="button" id="mpCerrar" class="adm-btn">Cerrar</button></div>
 </div>
+<div id="mpTabs" class="mp-tabs" role="tablist" aria-label="Secciones de mi expediente"></div>
 <div id="mpCuerpo" class="mp-grid"></div>
 </div>
 </section>
