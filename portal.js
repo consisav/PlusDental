@@ -2,6 +2,7 @@
 // El paciente se enlaza con su usuario en el expediente (campo «Usuario del portal»). Las funciones mi_portal() y
 // mi_portal_detalle() de Supabase devuelven únicamente la información del paciente asignado al usuario conectado.
 // Pestañas iguales a las del expediente (sin poder modificar nada) y una pestaña «Reportes» para imprimir o guardar en PDF.
+// Si el usuario está asignado a un dentista, ve «Mis pacientes»: solo sus pacientes (dentista_pacientes) y el expediente de cada uno.
 (function () {
   var sb = window.PD_SB;
   if (!sb) return;
@@ -9,14 +10,14 @@
   var BUCKET = 'expedientes';
   var PESTANAS = [['datos', 'Datos'], ['historia', 'Historia médica'], ['odontograma', 'Odontograma'], ['tratamientos', 'Tratamientos'],
     ['notas', 'Notas de visita'], ['radiografias', 'Radiografías'], ['recetas', 'Recetas'], ['lab', 'Órdenes de laboratorio'], ['reportes', 'Reportes']];
-  var ESTADOS_CITA = { pendiente: 'Programado', confirmada: 'Confirmado', reprogramada: 'Reprogramado' };
+  var ESTADOS_CITA = { pendiente: 'Programado', confirmada: 'Confirmado', reprogramada: 'Reprogramado', atendida: 'Atendido' };
   var ESTADOS_TRAT = { pendiente: 'Pendiente', proceso: 'En proceso', finalizado: 'Finalizado' };
   var ESTADOS_LAB = { enviada: 'Enviada', proceso: 'En proceso', prueba: 'En prueba', recibida: 'Recibida', colocada: 'Colocada', devuelta: 'Devuelta', cancelada: 'Cancelada' };
   var ESTADOS_PRE = { enviado: 'Enviado', aprobado: 'Aprobado', rechazado: 'No aprobado' };
   var METODOS = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', deposito: 'Depósito' };
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
   var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-  var datos = null, detalle = null, pestana = 'datos', firmas = {};
+  var datos = null, detalle = null, pestana = 'datos', firmas = {}, dent = null, filtro = '';
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -43,6 +44,9 @@
     $('mpNombre').textContent = 'Cargando…'; $('mpSub').textContent = '';
     $('mpTabs').innerHTML = ''; $('mpCuerpo').innerHTML = '';
     $('miPortal').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var dr = await sb.rpc('dentista_pacientes');
+    if (!dr.error && dr.data && dr.data.ok) { dent = dr.data; datos = detalle = null; listaDentista(); return; }
+    dent = null;
     var r = await Promise.all([sb.rpc('mi_portal'), sb.rpc('mi_portal_detalle')]);
     if (r[0].error) {
       datos = null; $('mpNombre').textContent = 'Mi expediente';
@@ -58,13 +62,49 @@
         : 'Inicia sesión para ver tu expediente.');
       return;
     }
+    mostrarExpediente();
+  }
+
+  // Encabezado y pestañas del expediente abierto (del paciente conectado, o del paciente elegido por el dentista)
+  function mostrarExpediente() {
     var p = datos.paciente, c = datos.citas[0];
+    $('mpEyebrow').textContent = dent ? 'Portal del dentista · expediente' : 'Mi expediente';
     $('mpNombre').textContent = p.nombre;
     $('mpSub').textContent = [p.dpi ? 'DPI ' + p.dpi : '', edad(p.fecha_nacimiento), c ? 'Próxima cita: ' + fechaLarga(c.fecha) + ', ' + c.hora : ''].filter(Boolean).join(' · ');
-    $('mpTabs').innerHTML = PESTANAS.map(function (t) { return '<button type="button" role="tab" data-mp-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('');
+    $('mpTabs').innerHTML = (dent ? '<button type="button" class="mp-volver" data-mp-volver>← Mis pacientes</button>' : '') +
+      PESTANAS.map(function (t) { return '<button type="button" role="tab" data-mp-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('');
     ver(pestana);
   }
-  function cerrar() { $('miPortal').hidden = true; $('mpTabs').innerHTML = ''; $('mpCuerpo').innerHTML = ''; datos = detalle = null; firmas = {}; pestana = 'datos'; }
+
+  // ---------- Dentista: «Mis pacientes» ----------
+  function listaDentista() {
+    $('mpEyebrow').textContent = 'Portal del dentista';
+    $('mpNombre').textContent = 'Mis pacientes';
+    $('mpSub').textContent = 'Dr(a). ' + dent.dentista.nombre + (dent.dentista.colegiado ? ' · Colegiado ' + dent.dentista.colegiado : '') + ' · ' + dent.pacientes.length + (dent.pacientes.length === 1 ? ' paciente' : ' pacientes');
+    $('mpTabs').innerHTML = '';
+    $('mpCuerpo').innerHTML = tarjeta('Pacientes asignados o atendidos', '<input id="mpBuscar" class="mp-buscar" type="search" placeholder="Buscar por nombre, DPI o teléfono" value="' + esc(filtro) + '" aria-label="Buscar paciente">' +
+      '<div id="mpPacientes"></div>', ' mp-dos');
+    pintarPacientes();
+  }
+  function sinTildes(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+  function pintarPacientes() {
+    var t = sinTildes(filtro).trim();
+    var l = dent.pacientes.filter(function (p) { return !t || sinTildes(p.nombre + ' ' + (p.dpi || '') + ' ' + (p.telefono || '')).indexOf(t) >= 0; });
+    $('mpPacientes').innerHTML = l.length ? lista(l.map(function (p) {
+      var info = [p.dpi ? 'DPI ' + p.dpi : '', p.ultima ? 'Última cita ' + fecha(p.ultima) : '', p.proxima ? 'Próxima ' + fecha(p.proxima) : ''].filter(Boolean).join(' · ');
+      return '<li><div class="mp-txt"><b>' + esc(p.nombre) + '</b><span>' + esc(info || 'Sin citas registradas') + '</span></div>' + (p.asignado ? pill('t-finalizado', 'Asignado') : '') +
+        '<button type="button" class="adm-btn" data-mp-paciente="' + p.id + '">Ver expediente</button></li>';
+    })) : vacio(dent.pacientes.length ? 'Ningún paciente coincide con la búsqueda.' : 'Aún no tienes pacientes asignados ni atendidos.');
+  }
+  async function abrirPaciente(id) {
+    $('mpCuerpo').innerHTML = vacio('Cargando expediente…');
+    var r = await sb.rpc('dentista_expediente', { p_paciente: id });
+    if (r.error || !r.data || !r.data.ok || !r.data.datos.ok) { listaDentista(); return; }
+    datos = r.data.datos; detalle = r.data.detalle && r.data.detalle.ok ? r.data.detalle : null; firmas = {}; pestana = 'datos';
+    mostrarExpediente();
+    $('miPortal').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function cerrar() { $('miPortal').hidden = true; $('mpTabs').innerHTML = ''; $('mpCuerpo').innerHTML = ''; datos = detalle = dent = null; firmas = {}; pestana = 'datos'; filtro = ''; }
 
   function ver(id) {
     pestana = id;
@@ -77,14 +117,14 @@
     datos: function () {
       var p = datos.paciente;
       var dato = function (k, v) { return '<div><span>' + k + '</span><b>' + (v ? esc(v) : '—') + '</b></div>'; };
-      return tarjeta('Mis datos', '<div class="mp-datos">' + dato('DPI', p.dpi) + dato('NIT', p.nit) + dato('Fecha de nacimiento', p.fecha_nacimiento && fecha(p.fecha_nacimiento) + ' · ' + edad(p.fecha_nacimiento)) +
+      return tarjeta(dent ? 'Datos del paciente' : 'Mis datos', '<div class="mp-datos">' + dato('DPI', p.dpi) + dato('NIT', p.nit) + dato('Fecha de nacimiento', p.fecha_nacimiento && fecha(p.fecha_nacimiento) + ' · ' + edad(p.fecha_nacimiento)) +
         dato('Teléfono', p.telefono) + dato('Correo', p.correo) + dato('Médico tratante', p.medico) + '<div class="mp-ancho"><span>Dirección</span><b>' + esc(p.direccion || '—') + '</b></div></div>' +
         (p.alergias ? '<p class="mp-alerta"><b>Alergias:</b> ' + esc(p.alergias) + '</p>' : '') +
-        '<p class="mp-nota">¿Algún dato no es correcto? Avísanos en recepción para actualizarlo.</p>') +
+        (dent ? '' : '<p class="mp-nota">¿Algún dato no es correcto? Avísanos en recepción para actualizarlo.</p>')) +
       tarjeta('Próximas citas', datos.citas.length ? lista(datos.citas.map(function (c) {
         return '<li><div class="mp-fecha"><b>' + esc(c.hora) + '</b><span>' + fechaLarga(c.fecha) + '</span></div><div class="mp-txt"><b>' + esc(c.servicio) + '</b><span>' + esc(c.dentista ? 'Dr(a). ' + c.dentista : 'Plus Dental') + '</span></div>' +
           pill(c.estado, ESTADOS_CITA[c.estado] || c.estado) + '</li>';
-      })) : vacio('No tienes citas programadas.') + '<a class="mp-link" href="#agenda" data-mp-cerrar>Reservar una cita</a>');
+      })) : vacio(dent ? 'No tiene citas programadas.' : 'No tienes citas programadas.') + (dent ? '' : '<a class="mp-link" href="#agenda" data-mp-cerrar>Reservar una cita</a>'));
     },
     historia: function () {
       if (!detalle) return tarjeta('Historia médica', faltaDetalle(), ' mp-dos');
@@ -131,10 +171,21 @@
     reportes: function () {
       var s = datos.saldo || { cargos: 0, abonos: 0, saldo: 0 };
       var grupo = function (titulo, filas, tVacio) { return '<h4 class="mp-sub">' + titulo + '</h4>' + (filas.length ? lista(filas) : vacio(tVacio)); };
+      var movs = movimientos(), ct = citasHist();
+      var filaCita = function (c) {
+        return '<li><div class="mp-fecha"><b>' + esc(c.hora) + '</b><span>' + fecha(c.fecha) + '</span></div><div class="mp-txt"><b>' + esc(c.servicio) + '</b><span>' + esc(c.dentista ? 'Dr(a). ' + c.dentista : 'Plus Dental') +
+          (c.reprogramada_de ? ' · antes ' + esc(c.reprogramada_de) : '') + '</span></div>' + pill(c.estado, ESTADOS_CITA[c.estado] || c.estado) + '</li>';
+      };
       return tarjeta('Estado de cuenta', '<div class="mp-saldo">' +
           '<div><span>Tratamientos</span><b>' + q(s.cargos) + '</b></div><div><span>Pagado</span><b>' + q(s.abonos) + '</b></div>' +
           '<div class="' + (s.saldo > 0.004 ? 'mp-debe' : 'mp-ok') + '"><span>' + (s.saldo < -0.004 ? 'Saldo a favor' : 'Saldo pendiente') + '</span><b>' + q(Math.abs(s.saldo)) + '</b></div></div>' +
-          '<div class="mp-acciones">' + imp('cuenta', 0, 'Imprimir estado de cuenta') + imp('trat', 0, 'Imprimir tratamientos') + '</div>') +
+          (movs.length ? '<div class="mp-scroll"><table class="mp-tabla"><thead><tr><th>Fecha</th><th>Concepto</th><th class="mp-num">Cargo</th><th class="mp-num">Abono</th><th class="mp-num">Saldo</th></tr></thead><tbody>' +
+            movs.map(function (m) { return '<tr><td>' + fecha(m.fecha) + '</td><td>' + esc(m.concepto) + '</td><td class="mp-num">' + (m.cargo ? q(m.cargo) : '—') + '</td><td class="mp-num">' + (m.abono ? q(m.abono) : '—') + '</td><td class="mp-num"><b>' + saldoTxt(m.saldo) + '</b></td></tr>'; }).join('') +
+            '</tbody></table></div>' : vacio('Aún no hay movimientos en tu cuenta.')) +
+          '<div class="mp-acciones">' + imp('cuenta', 0, 'Imprimir estado de cuenta') + imp('trat', 0, 'Imprimir tratamientos') + '</div>', ' mp-dos') +
+        tarjeta('Citas', '<h4 class="mp-sub">Agendadas (' + ct.agendadas.length + ')</h4>' + (ct.agendadas.length ? lista(ct.agendadas.map(filaCita)) : vacio('No hay citas agendadas.')) +
+          '<h4 class="mp-sub">Atendidas (' + ct.atendidas.length + ')</h4>' + (ct.atendidas.length ? lista(ct.atendidas.map(filaCita)) : vacio('Aún no hay citas atendidas.')) +
+          ((ct.agendadas.length || ct.atendidas.length) ? '<div class="mp-acciones">' + imp('citas', 0, 'Imprimir citas') + '</div>' : '')) +
         tarjeta('Documentos',
           grupo('Presupuestos', detalle ? detalle.presupuestos.map(function (p, i) {
             return '<li><div class="mp-txt"><b>' + esc(p.codigo || 'Presupuesto ' + p.id) + ' · ' + fecha(p.fecha) + '</b><span>' + q(totalPre(p)) + ' · ' + (ESTADOS_PRE[p.estado] || p.estado) + '</span></div>' + imp('pre', i) + '</li>';
@@ -156,6 +207,23 @@
       return '<tr><td>' + fecha(t.fecha) + '</td><td>' + esc(t.tratamiento) + (t.pieza ? ' <small>· pieza ' + esc(t.pieza) + '</small>' : '') + '</td><td>' + pill('t-' + t.estado, ESTADOS_TRAT[t.estado] || t.estado) + '</td><td class="mp-num">' + q(t.total) + '</td></tr>';
     }).join('') + '</tbody></table>';
   }
+  // Movimientos de la cuenta: tratamientos finalizados (cargo) y pagos (abono), con el saldo acumulado
+  function movimientos() {
+    var saldo = 0;
+    return datos.tratamientos.filter(function (t) { return t.estado === 'finalizado'; }).map(function (t) { return { fecha: t.fecha, concepto: t.tratamiento + (t.pieza ? ' (pieza ' + t.pieza + ')' : ''), cargo: Number(t.total), abono: 0 }; })
+      .concat(datos.pagos.map(function (g) { return { fecha: g.fecha, concepto: 'Pago · ' + (METODOS[g.metodo] || g.metodo) + (g.concepto ? ' · ' + g.concepto : ''), cargo: 0, abono: Number(g.monto) }; }))
+      .sort(function (a, b) { return String(a.fecha).localeCompare(String(b.fecha)); })
+      .map(function (m) { saldo += m.cargo - m.abono; m.saldo = saldo; return m; });
+  }
+  // Citas agendadas (próximas primero) y atendidas (más recientes primero)
+  function citasHist() {
+    var h = datos.historial_citas || datos.citas || [];
+    return {
+      agendadas: h.filter(function (c) { return c.estado !== 'atendida'; }).sort(function (a, b) { return (a.fecha + a.hora).localeCompare(b.fecha + b.hora); }),
+      atendidas: h.filter(function (c) { return c.estado === 'atendida'; })
+    };
+  }
+  function saldoTxt(n) { return n < -0.004 ? q(-n) + ' a favor' : q(n); }
   function totalPre(p) {
     var sub = p.items.reduce(function (a, i) { return a + i.cantidad * i.precio; }, 0);
     return sub * (1 - (Number(p.descuento_pct) || 0) / 100);
@@ -230,17 +298,24 @@
         pie('Constancia ' + esc(c.numero) + '. Para verificarla comuníquese con Plus Dental al +502 3756-5739.');
     },
     cuenta: async function () {
-      var s = datos.saldo || { cargos: 0, abonos: 0, saldo: 0 };
-      var movs = datos.tratamientos.filter(function (t) { return t.estado === 'finalizado'; }).map(function (t) { return { fecha: t.fecha, concepto: t.tratamiento + (t.pieza ? ' (pieza ' + t.pieza + ')' : ''), cargo: t.total, abono: 0 }; })
-        .concat(datos.pagos.map(function (g) { return { fecha: g.fecha, concepto: 'Pago · ' + (METODOS[g.metodo] || g.metodo) + (g.concepto ? ' · ' + g.concepto : ''), cargo: 0, abono: g.monto }; }))
-        .sort(function (a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });
-      var saldo = 0;
+      var s = datos.saldo || { cargos: 0, abonos: 0, saldo: 0 }, movs = movimientos();
       return encabezado('Estado de cuenta') + cajaPaciente(datoImp('Saldo', q(s.saldo))) +
         tabla([th('Fecha'), th('Concepto'), th('Cargo', 1), th('Abono', 1), th('Saldo', 1)], movs.length ? movs.map(function (m) {
-          saldo += m.cargo - m.abono;
-          return '<tr>' + td(fecha(m.fecha)) + td(esc(m.concepto)) + td(m.cargo ? q(m.cargo) : '—', 1) + td(m.abono ? q(m.abono) : '—', 1) + td(q(saldo), 1) + '</tr>';
+          return '<tr>' + td(fecha(m.fecha)) + td(esc(m.concepto)) + td(m.cargo ? q(m.cargo) : '—', 1) + td(m.abono ? q(m.abono) : '—', 1) + td(saldoTxt(m.saldo), 1) + '</tr>';
         }) : ['<tr>' + td('—') + td('Sin movimientos') + td('', 1) + td('', 1) + td('', 1) + '</tr>'],
         totalFila('Tratamientos ' + q(s.cargos) + ' · Pagado ' + q(s.abonos) + ' · ' + (s.saldo < -0.004 ? 'Saldo a favor' : 'Saldo pendiente'), q(Math.abs(s.saldo)))) + pie();
+    },
+    citas: async function () {
+      var ct = citasHist();
+      var cab = [th('Fecha'), th('Hora'), th('Tratamiento'), th('Dentista'), th('Estado')];
+      var filas = function (l) {
+        return l.length ? l.map(function (c) { return '<tr>' + td(fechaLarga(c.fecha)) + td(esc(c.hora)) + td(esc(c.servicio) + (c.reprogramada_de ? '<br><small style="color:#5A6D7A">Reprogramada de ' + esc(c.reprogramada_de) + '</small>' : '')) + td(esc(c.dentista ? 'Dr(a). ' + c.dentista : '—')) + td(ESTADOS_CITA[c.estado] || 'Atendido') + '</tr>'; })
+          : ['<tr>' + td('—') + td('') + td('Sin citas') + td('') + td('') + '</tr>'];
+      };
+      var sec = function (t) { return '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#005A87;font-weight:800;margin:20px 0 8px">' + t + '</div>'; };
+      return encabezado('Citas del paciente') + cajaPaciente(datoImp('Médico tratante', esc(datos.paciente.medico || '—'))) +
+        sec('Citas agendadas (' + ct.agendadas.length + ')') + tabla(cab, filas(ct.agendadas)) +
+        sec('Citas atendidas (' + ct.atendidas.length + ')') + tabla(cab, filas(ct.atendidas)) + pie();
     },
     trat: async function () {
       var total = datos.tratamientos.reduce(function (a, t) { return a + Number(t.total); }, 0);
@@ -276,8 +351,14 @@
     window.PD_IMPRESION.imprimir(await IMPRIMIR[tipo](obj));
   }
 
-  $('mpTabs').addEventListener('click', function (e) { var b = e.target.closest('[data-mp-tab]'); if (b && datos) ver(b.dataset.mpTab); });
+  $('mpTabs').addEventListener('click', function (e) {
+    if (e.target.closest('[data-mp-volver]') && dent) { datos = detalle = null; listaDentista(); return; }
+    var b = e.target.closest('[data-mp-tab]'); if (b && datos) ver(b.dataset.mpTab);
+  });
+  $('mpCuerpo').addEventListener('input', function (e) { if (e.target.id === 'mpBuscar') { filtro = e.target.value; pintarPacientes(); } });
   $('mpCuerpo').addEventListener('click', function (e) {
+    var dp = e.target.closest('[data-mp-paciente]');
+    if (dp && dent) { abrirPaciente(+dp.dataset.mpPaciente); return; }
     var b = e.target.closest('[data-mp-imp],[data-mp-cerrar]');
     if (!b || !datos) return;
     if (b.dataset.mpImp) imprimir(b.dataset.mpImp, +b.dataset.i);

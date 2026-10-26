@@ -996,6 +996,9 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .mp-tabs{display:flex;flex-wrap:wrap;gap:8px}.mp-tabs:empty{display:none}
 .mp-tabs button{font:inherit;font-size:14.5px;font-weight:600;padding:9px 16px;min-height:42px;border-radius:999px;border:1px solid #C4D4DF;background:#FFFFFF;color:#0B2B40;cursor:pointer}
 .mp-tabs button[aria-selected=true]{background:#0B2B40;border-color:#0B2B40;color:#FFFFFF}
+.mp-scroll{overflow-x:auto}.mp-atendida{background:#E3EAF0;color:#22394A}
+.mp-tabs .mp-volver{border-style:dashed;color:#005A87}
+.mp-buscar{font:inherit;font-size:15px;width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid #C4D4DF;border-radius:12px;min-height:44px}
 .mp-tabs button:focus-visible{outline:2px solid #005A87;outline-offset:2px}
 .mp-lista li.mp-bloque{flex-direction:column;align-items:stretch;gap:8px}.mp-texto{margin:0;font-size:14.5px;line-height:1.6;color:#22394A;white-space:pre-wrap}
 .mp-acciones{display:flex;flex-wrap:wrap;gap:8px}.mp-acciones .adm-btn{min-height:38px;padding:6px 14px;font-size:13.5px}
@@ -1112,7 +1115,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <section id="miPortal" hidden aria-labelledby="mpNombre">
 <div class="mp-wrap">
 <div class="mp-head">
-<div style="min-width:0"><span style="font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:600;color:#005A87">Mi expediente</span>
+<div style="min-width:0"><span id="mpEyebrow" style="font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:600;color:#005A87">Mi expediente</span>
 <h2 id="mpNombre">Mi expediente</h2>
 <p id="mpSub"></p><p class="mp-solo">Solo consulta · para cualquier cambio, comunícate con la clínica.</p></div>
 <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" id="mpActualizar" class="adm-btn">Actualizar</button><button type="button" id="mpCerrar" class="adm-btn">Cerrar</button></div>
@@ -2029,7 +2032,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>Correo electrónico<input id="deCorreo" type="email" maxlength="120"></label>
 <label>Código de colegiado activo (opcional)<input id="deColegiado" type="text" maxlength="30"></label>
 <label>Tipo de médico<select id="deTipo"><option value="">Sin asignar</option></select></label>
-<label class="full">Dirección<input id="deDireccion" type="text" maxlength="250"></label>
+<label>Dirección<input id="deDireccion" type="text" maxlength="250"></label>
+<label>Usuario del sistema<select id="deUsuario" title="Usuario tipo Cliente con el que el dentista ve solo sus pacientes («Mis pacientes»)."><option value="">Sin usuario</option></select></label>
 <div class="full de-firmas"><div class="de-firma-card"><div class="de-firma-cab"><span class="pos-lbl">Firma electrónica</span><small>Aparece sobre la línea de firma</small></div><div id="deFirmaVista" class="de-firma-vista de-firma">Sin firma</div><div class="de-firma-acc"><button type="button" id="deFirmaBtn" class="adm-btn">Subir</button><button type="button" id="deFirmaQuitar" class="adm-btn hm-eliminar" hidden>Quitar</button></div><input id="deFirmaArchivo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><div class="de-firma-card"><div class="de-firma-cab"><span class="pos-lbl">Sello profesional</span><small>Se coloca junto a la firma</small></div><div id="deSelloVista" class="de-firma-vista de-sello">Sin sello</div><div class="de-firma-acc"><button type="button" id="deSelloBtn" class="adm-btn">Subir</button><button type="button" id="deSelloQuitar" class="adm-btn hm-eliminar" hidden>Quitar</button></div><input id="deSelloArchivo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><p id="deFirmaMsg" class="dlg-msg">Sube una imagen PNG con fondo transparente o una foto clara sobre papel blanco: el fondo blanco se quita solo. Se usan en recetas, presupuestos, tratamientos y estados de cuenta.</p></div>
 </div>
 </fieldset>
@@ -2469,7 +2473,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 <p id="adminNote" class="dlg-msg" hidden></p>
 <button type="button" id="goAdminBtn" class="dlg-submit" hidden>Ver usuarios</button>
-<button type="button" id="goPortalBtn" class="dlg-submit" hidden>Ver mi expediente</button>
+<button type="button" id="goPortalBtn" class="dlg-submit" hidden>Abrir mi portal</button>
 <div style="display: flex; gap: 8px 24px; flex-wrap: wrap">
 <button type="button" id="myPassBtn" class="dlg-link">Cambiar mi clave</button>
 <button type="button" id="logoutBtn" class="dlg-link">Cerrar sesión</button>

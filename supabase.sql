@@ -3653,6 +3653,156 @@ do $$ begin
       or name like 'fotos/firma-dentista-%' or name like 'fotos/sello-dentista-%'));
 end $$;
 
+-- ===== Portal del dentista («Mis pacientes») =====
+-- Cada dentista puede tener un usuario (de los usuarios tipo Cliente, para que no vea el panel de la clínica).
+-- Al conectarse ve solo sus pacientes (médico asignado o con alguna cita no cancelada con él) con todo su expediente,
+-- de solo lectura. El paciente y el dentista reutilizan las mismas consultas (portal_datos y portal_detalle).
+alter table public.dentistas add column if not exists usuario text;
+create unique index if not exists dentistas_usuario_unico on public.dentistas (usuario) where usuario is not null;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'dentistas_usuario_fk') then
+    alter table public.dentistas add constraint dentistas_usuario_fk foreign key (usuario)
+      references public.perfiles (usuario) on update cascade on delete set null;
+  end if;
+end $$;
+
+-- Datos generales del expediente de un paciente (uso interno)
+create or replace function public.portal_datos(v_id bigint)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare p record;
+begin
+  select pa.*, d.nombre as medico into p from public.pacientes pa left join public.dentistas d on d.id = pa.dentista_id where pa.id = v_id;
+  if p.id is null then return jsonb_build_object('ok', false, 'motivo', 'sin_paciente'); end if;
+  return jsonb_build_object('ok', true,
+    'paciente', jsonb_build_object('id', p.id, 'nombre', p.nombre, 'dpi', p.dpi, 'nit', p.nit, 'fecha_nacimiento', p.fecha_nacimiento,
+      'telefono', p.telefono, 'correo', p.correo, 'direccion', p.direccion, 'medico', p.medico, 'alergias', p.alergias),
+    'citas', coalesce((select jsonb_agg(jsonb_build_object('fecha', c.fecha, 'hora', to_char(c.hora, 'HH24:MI'), 'servicio', c.servicio, 'estado', c.estado, 'dentista', d.nombre) order by c.fecha, c.hora)
+      from public.citas c left join public.dentistas d on d.id = c.dentista_id
+     where c.paciente_id = p.id and c.fecha >= (now() at time zone 'America/Guatemala')::date and c.estado in ('pendiente', 'confirmada', 'reprogramada')), '[]'::jsonb),
+    'historial_citas', coalesce((select jsonb_agg(jsonb_build_object('fecha', c.fecha, 'hora', to_char(c.hora, 'HH24:MI'), 'servicio', c.servicio, 'estado', c.estado, 'dentista', d.nombre,
+        'reprogramada_de', c.reprogramada_de) order by c.fecha desc, c.hora desc)
+      from public.citas c left join public.dentistas d on d.id = c.dentista_id
+     where c.paciente_id = p.id and c.estado in ('pendiente', 'confirmada', 'reprogramada', 'atendida')), '[]'::jsonb),
+    'recetas', coalesce((select jsonb_agg(jsonb_build_object('numero', r.numero, 'fecha', r.fecha, 'indicaciones', r.indicaciones, 'proxima_cita', r.proxima_cita, 'proxima_hora', r.proxima_hora,
+        'dentista', d.nombre, 'colegiado', d.colegiado, 'dentista_id', r.dentista_id,
+        'items', coalesce((select jsonb_agg(jsonb_build_object('medicamento', i.medicamento, 'dosis', i.dosis, 'frecuencia', i.frecuencia, 'duracion', i.duracion) order by i.orden) from public.receta_items i where i.receta_id = r.id), '[]'::jsonb))
+        order by r.fecha desc, r.id desc)
+      from public.recetas r left join public.dentistas d on d.id = r.dentista_id where r.paciente_id = p.id), '[]'::jsonb),
+    'tratamientos', coalesce((select jsonb_agg(jsonb_build_object('tratamiento', i.tratamiento, 'pieza', i.pieza, 'estado', coalesce(i.estado, case when i.realizado then 'finalizado' else 'pendiente' end),
+        'fecha', coalesce(i.estado_fecha::date, i.realizado_en), 'total', round(i.cantidad * i.precio * (1 - coalesce(pr.descuento_pct, 0) / 100), 2)) order by coalesce(i.estado_fecha::date, i.realizado_en) desc nulls last)
+      from public.presupuesto_items i join public.presupuestos pr on pr.id = i.presupuesto_id
+     where pr.paciente_id = p.id and pr.estado = 'aprobado' and coalesce(i.estado, case when i.realizado then 'finalizado' else 'pendiente' end) in ('proceso', 'finalizado')), '[]'::jsonb),
+    'saldo', (select jsonb_build_object('cargos', s.cargos, 'abonos', s.abonos, 'saldo', s.saldo) from public.saldos_pacientes s where s.paciente_id = p.id),
+    'pagos', coalesce((select jsonb_agg(jsonb_build_object('fecha', g.fecha, 'monto', g.monto, 'metodo', g.metodo, 'concepto', g.concepto) order by g.fecha desc, g.id desc)
+      from public.pagos g where g.paciente_id = p.id and not g.anulado), '[]'::jsonb),
+    'constancias', coalesce((select jsonb_agg(jsonb_build_object('numero', c.numero, 'fecha', c.fecha, 'dirigida', c.dirigida, 'texto', c.texto, 'creada', c.creada, 'dentista', d.nombre, 'colegiado', d.colegiado, 'dentista_id', c.dentista_id) order by c.creada desc)
+      from public.constancias c left join public.dentistas d on d.id = c.dentista_id where c.paciente_id = p.id), '[]'::jsonb));
+end;
+$$;
+
+-- Resto del expediente de un paciente (uso interno)
+create or replace function public.portal_detalle(v_id bigint)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare p record;
+begin
+  select * into p from public.pacientes where id = v_id;
+  if p.id is null then return jsonb_build_object('ok', false); end if;
+  return jsonb_build_object('ok', true,
+    'foto', p.foto, 'odontograma', p.odontograma, 'fecha_nacimiento', p.fecha_nacimiento,
+    'historias', coalesce((select jsonb_agg(jsonb_build_object('fecha', h.fecha, 'cita_numero', h.cita_numero, 'alergias', h.alergias, 'enfermedades', h.enfermedades,
+        'medicamentos', h.medicamentos) order by h.fecha desc) from public.historias_medicas h where h.paciente_id = v_id), '[]'::jsonb),
+    'odontograma_cambios', coalesce((select jsonb_agg(jsonb_build_object('pieza', c.pieza, 'descripcion', c.descripcion, 'fecha', c.fecha_cambio,
+        'observaciones', c.observaciones) order by c.fecha_cambio desc) from public.odontograma_cambios c where c.paciente_id = v_id), '[]'::jsonb),
+    'notas', coalesce((select jsonb_agg(jsonb_build_object('fecha', n.fecha, 'texto', n.texto, 'autor', n.autor_usuario) order by n.fecha desc, n.id desc)
+      from public.notas_visita n where n.paciente_id = v_id), '[]'::jsonb),
+    'ordenes_lab', coalesce((select jsonb_agg(jsonb_build_object('numero', o.numero, 'trabajo', o.trabajo, 'piezas', o.piezas, 'material', o.material, 'color', o.color,
+        'estado', o.estado, 'fecha_envio', o.fecha_envio, 'fecha_entrega', o.fecha_entrega, 'fecha_recibida', o.fecha_recibida, 'laboratorio', l.nombre, 'dentista', d.nombre,
+        'creada', o.creada) order by o.creada desc)
+      from public.ordenes_lab o left join public.laboratorios l on l.id = o.laboratorio_id left join public.dentistas d on d.id = o.dentista_id
+     where o.paciente_id = v_id and o.estado <> 'borrador'), '[]'::jsonb),
+    'presupuestos', coalesce((select jsonb_agg(jsonb_build_object('id', pr.id, 'codigo', pr.codigo, 'fecha', pr.fecha, 'estado', pr.estado, 'descuento_pct', pr.descuento_pct,
+        'forma_pago', pr.forma_pago, 'cuotas', pr.cuotas, 'recargo_pct', pr.recargo_pct, 'sin_recargo', pr.sin_recargo, 'notas', pr.notas, 'aprobado_en', pr.aprobado_en,
+        'items', coalesce((select jsonb_agg(jsonb_build_object('tratamiento', i.tratamiento, 'pieza', i.pieza, 'cantidad', i.cantidad, 'precio', i.precio, 'estado', i.estado) order by i.orden, i.id)
+          from public.presupuesto_items i where i.presupuesto_id = pr.id and i.estado <> 'eliminado'), '[]'::jsonb)) order by pr.fecha desc, pr.id desc)
+      from public.presupuestos pr where pr.paciente_id = v_id and pr.estado <> 'borrador'), '[]'::jsonb),
+    'comprobantes', coalesce((select jsonb_agg(jsonb_build_object('id', g.id, 'correlativo', g.correlativo, 'tipo_documento', g.tipo_documento, 'serie', g.serie,
+        'numero_factura', g.numero_factura, 'fecha', g.fecha, 'monto', g.monto, 'metodo', g.metodo, 'referencia', g.referencia, 'concepto', g.concepto,
+        'nit', g.nit, 'numero_cuota', g.numero_cuota) order by g.fecha desc, g.id desc)
+      from public.pagos g where g.paciente_id = v_id and not g.anulado), '[]'::jsonb));
+end;
+$$;
+revoke execute on function public.portal_datos(bigint) from public, anon, authenticated;
+revoke execute on function public.portal_detalle(bigint) from public, anon, authenticated;
+
+-- Paciente conectado: su propio expediente
+create or replace function public.mi_portal()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_usuario text := (select usuario from public.perfiles where id = auth.uid()); v_id bigint := public.mi_paciente_id();
+begin
+  if v_usuario is null then return jsonb_build_object('ok', false, 'motivo', 'sesion'); end if;
+  if v_id is null then return jsonb_build_object('ok', false, 'motivo', 'sin_paciente', 'usuario', v_usuario); end if;
+  return public.portal_datos(v_id);
+end;
+$$;
+create or replace function public.mi_portal_detalle()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_id bigint := public.mi_paciente_id();
+begin
+  if v_id is null then return jsonb_build_object('ok', false); end if;
+  return public.portal_detalle(v_id);
+end;
+$$;
+
+-- Dentista conectado
+create or replace function public.mi_dentista_id()
+returns bigint language sql stable security definer set search_path = public as $$
+  select d.id from public.dentistas d join public.perfiles pf on pf.usuario = d.usuario where pf.id = auth.uid() limit 1;
+$$;
+create or replace function public.es_paciente_de_dentista(p_paciente bigint, p_dentista bigint)
+returns boolean language sql stable security definer set search_path = public as $$
+  select p_dentista is not null and (
+    exists (select 1 from public.pacientes where id = p_paciente and dentista_id = p_dentista)
+    or exists (select 1 from public.citas where paciente_id = p_paciente and dentista_id = p_dentista and estado <> 'cancelada'));
+$$;
+revoke execute on function public.mi_dentista_id() from public, anon;
+revoke execute on function public.es_paciente_de_dentista(bigint, bigint) from public, anon;
+grant execute on function public.mi_dentista_id() to authenticated;
+grant execute on function public.es_paciente_de_dentista(bigint, bigint) to authenticated;
+
+create or replace function public.dentista_pacientes()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_den bigint := public.mi_dentista_id(); v_hoy date := (now() at time zone 'America/Guatemala')::date;
+begin
+  if v_den is null then return jsonb_build_object('ok', false, 'motivo', 'no_dentista'); end if;
+  return jsonb_build_object('ok', true,
+    'dentista', (select jsonb_build_object('id', d.id, 'nombre', d.nombre, 'colegiado', d.colegiado) from public.dentistas d where d.id = v_den),
+    'pacientes', coalesce((select jsonb_agg(x order by x->>'nombre') from (
+      select jsonb_build_object('id', pa.id, 'nombre', pa.nombre, 'dpi', pa.dpi, 'telefono', pa.telefono, 'asignado', pa.dentista_id = v_den,
+        'ultima', (select max(c.fecha) from public.citas c where c.paciente_id = pa.id and c.dentista_id = v_den and c.fecha < v_hoy and c.estado <> 'cancelada'),
+        'proxima', (select min(c.fecha) from public.citas c where c.paciente_id = pa.id and c.dentista_id = v_den and c.fecha >= v_hoy and c.estado in ('pendiente', 'confirmada', 'reprogramada'))) x
+        from public.pacientes pa where public.es_paciente_de_dentista(pa.id, v_den)) t), '[]'::jsonb));
+end;
+$$;
+create or replace function public.dentista_expediente(p_paciente bigint)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.es_paciente_de_dentista(p_paciente, public.mi_dentista_id()) then return jsonb_build_object('ok', false, 'motivo', 'permiso'); end if;
+  return jsonb_build_object('ok', true, 'datos', public.portal_datos(p_paciente), 'detalle', public.portal_detalle(p_paciente));
+end;
+$$;
+revoke execute on function public.dentista_pacientes() from public, anon;
+revoke execute on function public.dentista_expediente(bigint) from public, anon;
+grant execute on function public.dentista_pacientes() to authenticated;
+grant execute on function public.dentista_expediente(bigint) to authenticated;
+
+-- Archivos: el dentista ve las radiografías y fotos de sus pacientes, y las firmas y sellos
+drop policy if exists "dentista ve archivos de sus pacientes" on storage.objects;
+create policy "dentista ve archivos de sus pacientes" on storage.objects for select to authenticated
+  using (bucket_id = 'expedientes' and public.mi_dentista_id() is not null and (
+    (split_part(name, '/', 1) ~ '^[0-9]+$' and public.es_paciente_de_dentista(split_part(name, '/', 1)::bigint, public.mi_dentista_id()))
+    or (name ~ '^fotos/[0-9]+\.jpg$' and public.es_paciente_de_dentista(substring(name from '^fotos/([0-9]+)\.jpg$')::bigint, public.mi_dentista_id()))
+    or name like 'fotos/firma-dentista-%' or name like 'fotos/sello-dentista-%'));
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

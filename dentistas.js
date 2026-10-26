@@ -5,6 +5,7 @@
   if (!sb) return;
 
   var BUCKET = 'expedientes';
+  var clientes = [], usuariosTomados = {}, hayUsuario = false;   // usuario del sistema del dentista («Mis pacientes»)
   var ESTADOS = { activo: 'Activo', inactivo: 'Inactivo', baja: 'Baja' };
   var EST_POS = { libre: 'Libre', ocupado: 'Ocupado', limpieza: 'En limpieza', mantenimiento: 'Fuera de servicio' };
   var DIAS = [['1', 'Lunes'], ['2', 'Martes'], ['3', 'Miércoles'], ['4', 'Jueves'], ['5', 'Viernes'], ['6', 'Sábado'], ['7', 'Domingo']];
@@ -66,6 +67,8 @@
   function traducir(err) {
     var m = (err && err.message) || '';
     if (/(dentistas|dentista_titulos).*(does not exist|could not find)|could not find the table/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los dentistas.';
+    if (/dentistas_usuario_unico/i.test(m)) return 'Ese usuario ya está asignado a otro dentista.';
+    if (/dentistas_usuario_fk/i.test(m)) return 'Ese usuario ya no existe. Elige otro de la lista.';
     if (/dentistas_codigo_unico|duplicate key/i.test(m)) return 'Ya existe un dentista con ese código.';
     if (/dentistas_fechas/i.test(m)) return 'La fecha final en la clínica no puede ser anterior a la de inicio.';
     if (/row-level security|permission denied/i.test(m)) return 'No tienes permiso para esta acción.';
@@ -82,7 +85,7 @@
     var r = await sb.from('dentistas').select('*').order('nombre');
     if (r.error) { $('denBody').innerHTML = ''; aviso('denMsg', traducir(r.error), true); return; }
     dentistas = r.data;
-    await cargarCatalogos();
+    await Promise.all([cargarCatalogos(), cargarUsuarios()]);
     pintarLista();
     var rutas = dentistas.filter(function (d) { return d.foto; }).map(function (d) { return d.foto; });
     if (rutas.length) {
@@ -105,6 +108,31 @@
           ESPECIALIDADES.push([t.especialidad, sinTildes(t.nombre + ' ' + (t.atiende || []).join(' '))]);
       });
     }
+  }
+
+  // Usuario del sistema: usuarios tipo Cliente que no estén asignados a un paciente ni a otro dentista.
+  // Con ese usuario el dentista ve solo sus pacientes y su expediente (portal «Mis pacientes»).
+  async function cargarUsuarios() {
+    var r = await Promise.all([
+      sb.from('perfiles').select('usuario,nombre').eq('rol', 'cliente').order('usuario'),
+      sb.from('pacientes').select('usuario').not('usuario', 'is', null)
+    ]);
+    hayUsuario = dentistas.length ? Object.prototype.hasOwnProperty.call(dentistas[0], 'usuario') : !r[1].error;
+    clientes = r[0].error ? [] : (r[0].data || []);
+    usuariosTomados = {};
+    (r[1].data || []).forEach(function (p) { usuariosTomados[p.usuario] = 'paciente'; });
+    dentistas.forEach(function (d) { if (d.usuario) usuariosTomados[d.usuario] = d.id; });
+  }
+  function opcionesUsuario(d) {
+    var sel = $('deUsuario'), elegido = (d && d.usuario) || '';
+    if (!hayUsuario) { sel.innerHTML = '<option value="">Falta ejecutar supabase.sql</option>'; sel.disabled = true; return; }
+    sel.disabled = false;
+    var lista = clientes.filter(function (c) { var t = usuariosTomados[c.usuario]; return !t || (d && t === d.id); });
+    if (elegido && !lista.some(function (c) { return c.usuario === elegido; })) lista.unshift({ usuario: elegido });
+    sel.innerHTML = '<option value="">Sin usuario</option>' + lista.map(function (c) {
+      return '<option value="' + esc(c.usuario) + '"' + (c.nombre && c.nombre !== c.usuario ? ' title="' + esc(c.nombre) + '"' : '') + '>' + esc(c.usuario) + '</option>';
+    }).join('') + (lista.length ? '' : '<option value="" disabled>— No hay usuarios Cliente disponibles —</option>');
+    sel.value = elegido;
   }
 
   // Tipo de médico: lista del catálogo «Tipos de dentistas» (los inactivos solo si ya estaban asignados)
@@ -210,6 +238,7 @@
     $('deDireccion').value = (d && d.direccion) || '';
     $('deColegiado').value = (d && d.colegiado) || '';
     opcionesTipo(d ? d.tipo_id || null : null);
+    opcionesUsuario(d);
     $('deInicioProf').value = (d && d.inicio_profesion) || '';
     $('deIngreso').value = d ? d.fecha_ingreso : hoy();
     $('deSalida').value = (d && d.fecha_salida) || '';
@@ -321,6 +350,7 @@
       mostrar_en_web: $('deWeb').checked,
       notas: $('deNotas').value.trim() || null
     };
+    if (hayUsuario) datos.usuario = $('deUsuario').value || null;
     if (!datos.codigo || !datos.nombre) { aviso('deMsg', 'El código y el nombre son obligatorios.', true); return; }
     if (datos.fecha_salida && datos.fecha_salida < datos.fecha_ingreso) { aviso('deMsg', 'La fecha final en la clínica no puede ser anterior a la de inicio.', true); return; }
     var boton = form.querySelector('[type=submit]');
@@ -335,6 +365,7 @@
     actual = r.data;
     var todos = await sb.from('dentistas').select('*').order('nombre');
     dentistas = !todos.error ? todos.data : eraNuevo ? dentistas.concat([r.data]) : dentistas.map(function (d) { return d.id === r.data.id ? r.data : d; });
+    await cargarUsuarios();
     editando = false;
     rellenar(actual);
     aplicarModo();

@@ -140,12 +140,14 @@
   async function cargarUsuarios() {
     var r = await Promise.all([
       sb.from('perfiles').select('usuario,nombre').eq('rol', 'cliente').order('usuario'),
-      sb.from('pacientes').select('id,usuario').not('usuario', 'is', null)
+      sb.from('pacientes').select('id,usuario').not('usuario', 'is', null),
+      sb.from('dentistas').select('usuario').not('usuario', 'is', null)
     ]);
     hayUsuario = !r[1].error;
     clientes = r[0].error ? [] : (r[0].data || []);
     usuariosTomados = {};
     (r[1].data || []).forEach(function (p) { usuariosTomados[p.usuario] = p.id; });
+    (r[2].error ? [] : r[2].data || []).forEach(function (d) { usuariosTomados[d.usuario] = 'dentista'; });
   }
   function opcionesUsuarios(p) {
     var sel = $('pUsuario'), elegido = (p && p.usuario) || '';
