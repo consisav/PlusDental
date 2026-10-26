@@ -4296,6 +4296,48 @@ select p.id, e.id, m.codigo, m.nombre, '502'
 ) m (depto, codigo, nombre) where p.codigo = '1' and e.codigo = m.depto
 on conflict (estado_id, codigo) do nothing;
 
+-- Organizaciones y localidades: código automático, estado (activo / inactivo / baja) y registro de quién graba y modifica
+do $$ declare t text; begin
+  foreach t in array array['organizaciones', 'org_localidades'] loop
+    execute format('alter table public.%I add column if not exists estado text not null default ''activo''', t);
+    execute format('alter table public.%I add column if not exists creado_por text', t);
+    execute format('alter table public.%I add column if not exists modificado timestamptz', t);
+    execute format('alter table public.%I add column if not exists modificado_por text', t);
+    if not exists (select 1 from pg_constraint where conname = t || '_estado_valido') then
+      execute format('alter table public.%I add constraint %I check (estado in (''activo'', ''inactivo'', ''baja''))', t, t || '_estado_valido');
+    end if;
+  end loop;
+end $$;
+
+create or replace function public.org_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+begin
+  if tg_op = 'INSERT' then
+    if tg_table_name = 'organizaciones' then
+      perform pg_advisory_xact_lock(hashtext('organizaciones_codigo'));
+      new.codigo := (select coalesce(max(codigo::int), 0) + 1 from public.organizaciones where codigo ~ '^[0-9]+$')::text;
+    else
+      perform pg_advisory_xact_lock(hashtext('org_localidades_codigo_' || new.organizacion_id));
+      new.codigo := (select coalesce(max(codigo::int), 0) + 1 from public.org_localidades where organizacion_id = new.organizacion_id and codigo ~ '^[0-9]+$')::text;
+    end if;
+    new.creado := now(); new.creado_por := v_usuario; new.modificado := null; new.modificado_por := null;
+  else
+    new.codigo := old.codigo; new.creado := old.creado; new.creado_por := old.creado_por;
+    new.modificado := now(); new.modificado_por := v_usuario;
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'organizaciones_registro' and tgrelid = 'public.organizaciones'::regclass) then
+    create trigger organizaciones_registro before insert or update on public.organizaciones for each row execute function public.org_registro();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'org_localidades_registro' and tgrelid = 'public.org_localidades'::regclass) then
+    create trigger org_localidades_registro before insert or update on public.org_localidades for each row execute function public.org_registro();
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
