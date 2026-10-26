@@ -503,11 +503,15 @@
     $('agLeyenda').innerHTML = Object.keys(COLOR_ESTADO).map(function (e) {
       var n = enRango.filter(function (c) { return c.estado === e; }).length;
       return '<span><i style="background:' + COLOR_ESTADO[e] + '"></i>' + ESTADOS_CITA[e] + ' · <b>' + n + '</b></span>';
-    }).join('') + '<span class="ag-ley-urg">Urgente = borde rojo' + (urg ? ' · <b>' + urg + '</b>' : '') + '</span>';
+    }).join('') + '<span class="ag-ley-urg">Urgente = borde rojo' + (urg ? ' · <b>' + urg + '</b>' : '') + '</span>' +
+      (window.PD_COLOR ? dentistas.filter(function (d) { return window.PD_COLOR.color(d.id) && enRango.some(function (c) { return c.dentista_id === d.id; }); }).map(function (d) {
+        return '<span class="ag-ley-med"><i style="background:' + window.PD_COLOR.color(d.id) + '"></i>' + esc(d.nombre) + ' · <b>' + enRango.filter(function (c) { return c.dentista_id === d.id; }).length + '</b></span>';
+      }).join('') : '');
   }
 
   // Vista de semana: lunes a sábado, todas las salas en cada casilla
   // En pantallas angostas la semana se muestra como lista por día (sin desplazamiento lateral)
+  function medEstilo(id) { return window.PD_COLOR ? window.PD_COLOR.estilo(id) : ''; }
   function semanaAngosta() { return window.innerWidth < 760; }
   function pintarSemanaLista(dias) {
     var g = document.querySelector('.ag-grid'); g.classList.remove('semana'); g.classList.add('semana-lista');
@@ -515,7 +519,7 @@
     $('agBody').innerHTML = dias.map(function (f) {
       var cs = citas.filter(function (c) { return c.fecha === f; }).sort(function (a, b) { return hhmm(a.hora) < hhmm(b.hora) ? -1 : 1; });
       var cuerpo = cs.length ? '<div class="ag-lista-citas">' + cs.map(function (x) {
-        return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '"><b class="ag-h">' + hhmm(x.hora) + '</b>' + nombrePaciente(x) + '<small class="ag-trat">' + esc(x.servicio || '') + '</small></button>';
+        return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '"' + medEstilo(x.dentista_id) + '><b class="ag-h">' + hhmm(x.hora) + '</b>' + nombrePaciente(x) + '<small class="ag-trat">' + esc(x.servicio || '') + '</small></button>';
       }).join('') + '</div>' : '<span class="ag-lista-vacia">' + (turnos(f).length ? 'Sin citas' : 'Cerrado') + '</span>';
       return '<tr class="' + (f === hoy() ? 'hoy' : '') + '"><td><button type="button" class="ag-dia-btn' + (f === hoy() ? ' hoy' : '') + '" data-ir-dia="' + f + '">' + textoFecha(f) + '</button></td><td>' + cuerpo + '</td></tr>';
     }).join('');
@@ -538,7 +542,7 @@
         var cs = citasEn(f, h);
         var html = cs.map(function (x) {
           var sala = salas.filter(function (s) { return s.id === x.posicion_id; })[0];
-          return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '" title="' + esc(hhmm(x.hora) + ' · ' + x.nombre + ' · ' + x.servicio + ' · ' + nombreDentista(x.dentista_id) + ' · ' + (ESTADOS_CITA[x.estado] || '')) + '">' +
+          return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '"' + medEstilo(x.dentista_id) + ' title="' + esc(hhmm(x.hora) + ' · ' + x.nombre + ' · ' + x.servicio + ' · ' + nombreDentista(x.dentista_id) + ' · ' + (ESTADOS_CITA[x.estado] || '')) + '">' +
             (sala ? '<b>' + esc(sala.codigo) + '</b> · ' : '') + nombrePaciente(x) + '<small class="ag-trat">' + esc(x.servicio || '') + '</small></button>';
         }).join('');
         var pasado = f < hoy() || (f === hoy() && h <= hAhora);
@@ -568,7 +572,7 @@
         var cs = citas.filter(function (c) { return c.fecha === d; }).sort(function (a, b) { return hhmm(a.hora).localeCompare(hhmm(b.hora)); });
         var fuera = d < rv.mesDesde || d > rv.mesHasta;
         var lista = cs.slice(0, 3).map(function (x) {
-          return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '" title="' + esc(hhmm(x.hora) + ' · ' + x.nombre + ' · ' + x.servicio) + '"><b>' + hhmm(x.hora) + '</b> ' + nombrePaciente(x) + '<small class="ag-trat">' + esc(x.servicio || '') + '</small></button>';
+          return '<button type="button" class="ag-mini cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '"' + medEstilo(x.dentista_id) + ' title="' + esc(hhmm(x.hora) + ' · ' + x.nombre + ' · ' + x.servicio) + '"><b>' + hhmm(x.hora) + '</b> ' + nombrePaciente(x) + '<small class="ag-trat">' + esc(x.servicio || '') + '</small></button>';
         }).join('') + (cs.length > 3 ? '<button type="button" class="mas ag-mini" data-ir-dia="' + d + '" style="border:0;background:none;padding:0">+ ' + (cs.length - 3) + ' más</button>' : '');
         return '<td class="' + (fuera ? 'fuera' : '') + (d === hoy() ? ' hoy' : '') + '"><button type="button" class="ag-mes-dia" data-ir-dia="' + d + '">' + fecha(d).getDate() +
           (cs.length ? '<small>' + cs.length + (cs.length === 1 ? ' cita' : ' citas') + '</small>' : '') + '</button>' + lista + '</td>';
@@ -628,7 +632,7 @@
       return '<tr><td class="hora">' + h + '</td>' + cols.map(function (c) {
         var cs = citasEn(f, h).filter(function (x) { return (x.posicion_id || null) === c.id; });
         if (cs.length) return '<td>' + cs.map(function (x) {
-          return '<button type="button" class="ag-celda cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '"><b>' + nombrePaciente(x) + '</b>' + (x.prioridad === 'urgente' ? '<span class="ag-urg">Urgente</span>' : '') +
+          return '<button type="button" class="ag-celda cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '"' + medEstilo(x.dentista_id) + '><b>' + nombrePaciente(x) + '</b>' + (x.prioridad === 'urgente' ? '<span class="ag-urg">Urgente</span>' : '') +
             '<br>' + esc(x.servicio) + '<br><span style="color:#5A6D7A">' + esc(nombreDentista(x.dentista_id)) + (x.estado === 'pendiente' ? ' · sin confirmar' : x.estado === 'reprogramada' ? ' · reprogramada' : x.estado === 'atendida' ? ' · atendida' : '') + '</span></button>';
         }).join('') + '</td>';
         var pasado = f < hoy() || (esHoy && h <= hAhora);
@@ -686,6 +690,7 @@
       sb.from('tratamientos').select('nombre,activo').eq('activo', true).order('nombre'),
       sb.from('bloqueos').select('fecha,hora').gte('fecha', hoyF)
     ]);
+    if (window.PD_COLOR) await window.PD_COLOR.cargar(true);
     if (rs[0].error && /correo/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono').eq('estado', 'activo').order('nombre');
     if (rs[2].error && /correo/.test(rs[2].error.message)) rs[2] = await sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado').order('nombre');
     dentistas = rs[0].error ? [] : rs[0].data;

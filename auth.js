@@ -149,6 +149,7 @@
   }
 
   async function cargarCitas() {
+    if (window.PD_COLOR) await window.PD_COLOR.cargar(true);
     aviso('citasMsg', '');
     $('citasBody').innerHTML = '<tr><td colspan="5">Cargando…</td></tr>';
     var desde = $('cbDesde').value, hasta = $('cbHasta').value;
@@ -273,7 +274,7 @@
 
   function selectorDentista(c) {
     if (!dentistasCita.length || !('dentista_id' in c)) return '<span style="color:#94A6B2">—</span>';
-    return '<select class="adm-input" data-den-cita="' + c.id + '" aria-label="Odontólogo de la cita de ' + esc(c.nombre) + '" title="Odontólogo"' +
+    return (window.PD_COLOR ? window.PD_COLOR.punto(c.dentista_id) : '') + '<select class="adm-input" data-den-cita="' + c.id + '" aria-label="Odontólogo de la cita de ' + esc(c.nombre) + '" title="Odontólogo"' +
       (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Odontólogo: sin asignar</option>' +
       dentistasCita.map(function (d) { return '<option value="' + d.id + '"' + (d.id === c.dentista_id ? ' selected' : '') + '>' + esc(d.nombre) + '</option>'; }).join('') +
       '</select>';

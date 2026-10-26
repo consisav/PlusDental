@@ -6,6 +6,7 @@
 
   var BUCKET = 'expedientes';
   var clientes = [], usuariosTomados = {}, hayUsuario = false;
+  var colorSel = null;   // color del odontólogo (agenda, pacientes)
   var ROLES_USR = { cliente: 'Cliente', administrador: 'Administrador', super_administrador: 'Super Administrador' };   // usuario del sistema del dentista («Mis pacientes»)
   var ESTADOS = { activo: 'Activo', inactivo: 'Inactivo', baja: 'Baja' };
   var EST_POS = { libre: 'Libre', ocupado: 'Ocupado', limpieza: 'En limpieza', mantenimiento: 'Fuera de servicio' };
@@ -136,6 +137,33 @@
     sel.value = elegido;
   }
 
+  // Color del odontólogo: paleta de colores (y «Otro» personalizado); se marca el que ya usa otro odontólogo
+  function hayColor() { return dentistas.length ? Object.prototype.hasOwnProperty.call(dentistas[0], 'color') : !!(window.PD_COLOR && window.PD_COLOR.disponible()); }
+  function colorLibre(exceptoId) {
+    var usados = dentistas.filter(function (x) { return x.id !== exceptoId && x.color; }).map(function (x) { return x.color.toUpperCase(); });
+    var p = (window.PD_COLOR ? window.PD_COLOR.PALETA : []).filter(function (c) { return usados.indexOf(c[0]) < 0; })[0];
+    return p ? p[0] : null;
+  }
+  function pintarColores(d) {
+    var caja = $('deColores'); if (!caja || !window.PD_COLOR) return;
+    if (!hayColor()) { caja.innerHTML = ''; $('deColorNota').textContent = 'Para guardar el color falta ejecutar en Supabase el script actualizado (supabase.sql).'; return; }
+    colorSel = d ? (d.color || null) : colorLibre(null);
+    var idAct = d ? d.id : null, enPaleta = false;
+    caja.innerHTML = window.PD_COLOR.PALETA.map(function (c) {
+      var sel = colorSel && colorSel.toUpperCase() === c[0]; if (sel) enPaleta = true;
+      var de = dentistas.filter(function (x) { return x.id !== idAct && x.color && x.color.toUpperCase() === c[0]; }).map(function (x) { return x.nombre; });
+      return '<button type="button" class="de-color' + (de.length ? ' usado' : '') + '" role="radio" aria-checked="' + !!sel + '" data-color="' + c[0] + '" style="--c:' + c[0] + '" title="' + esc(c[1] + (de.length ? ' · ya lo usa ' + de.join(', ') : '')) + '" aria-label="' + esc(c[1]) + '"></button>';
+    }).join('') +
+      '<label class="de-color-otro" title="Elegir otro color"><input type="color" id="deColorOtro" value="' + (colorSel && !enPaleta ? colorSel : '#0B2B40') + '">' + (colorSel && !enPaleta ? 'Personalizado' : 'Otro') + '</label>' +
+      '<button type="button" class="dlg-link" data-color="">Sin color</button>';
+    notaColor(idAct);
+  }
+  function notaColor(idAct) {
+    var de = colorSel ? dentistas.filter(function (x) { return x.id !== idAct && x.color && x.color.toUpperCase() === colorSel.toUpperCase(); }).map(function (x) { return x.nombre; }) : [];
+    $('deColorNota').textContent = !colorSel ? 'Sin color: sus citas se verán sin franja de color.' : (window.PD_COLOR.nombrePaleta(colorSel) + (de.length ? ' · Atención: también lo usa ' + de.join(', ') + '. Elige otro para distinguirlos.' : ' · Sus pacientes y sus citas se marcarán con este color.'));
+    $('deColorNota').style.color = de.length ? '#9A3B2E' : '#475B68';
+  }
+
   // Tipo de médico: lista del catálogo «Tipos de dentistas» (los inactivos solo si ya estaban asignados)
   function opcionesTipo(sel) {
     $('deTipo').innerHTML = '<option value="">Sin asignar</option>' + tiposDen.filter(function (t) { return t.estado === 'activo' || t.id === sel; }).map(function (t) {
@@ -157,7 +185,7 @@
     }
     $('denBody').innerHTML = lista.map(function (d) {
       var url = fotos[d.foto];
-      return '<tr><td><div class="pac-nombre"><span class="avatar">' + (url ? '<img src="' + esc(url) + '" alt="">' : esc(iniciales(d.nombre))) + '</span><strong>' + esc(d.nombre) + '</strong></div></td>' +
+      return '<tr><td><div class="pac-nombre"><span class="avatar">' + (url ? '<img src="' + esc(url) + '" alt="">' : esc(iniciales(d.nombre))) + '</span><strong>' + (d.color ? '<span class="med-punto" style="--med:' + esc(d.color) + '" aria-hidden="true"></span>' : '') + esc(d.nombre) + '</strong></div></td>' +
         '<td class="fecha">' + esc(d.codigo) + '</td><td>' + esc((d.especialidades || []).join(', ') || '—') + '</td>' +
         '<td>' + esc(d.posicion_id ? nombrePosicion(d.posicion_id) : '—') + '</td>' +
         '<td>' + (d.posicion_id ? '<span class="estado rol-' + (d.rol_sala || 'principal') + '">' + (d.rol_sala === 'alterno' ? 'Alterno' : 'Principal') + '</span>' : '—') + '</td>' +
@@ -240,6 +268,7 @@
     $('deColegiado').value = (d && d.colegiado) || '';
     opcionesTipo(d ? d.tipo_id || null : null);
     opcionesUsuario(d);
+    pintarColores(d);
     if (window.PD_SEDES) window.PD_SEDES.llenar($('deOrg'), $('deLoc'), d ? d.localidad_id : null);
     $('deInicioProf').value = (d && d.inicio_profesion) || '';
     $('deIngreso').value = d ? d.fecha_ingreso : hoy();
@@ -353,6 +382,7 @@
       notas: $('deNotas').value.trim() || null
     };
     if (hayUsuario) datos.usuario = $('deUsuario').value || null;
+    if (hayColor()) datos.color = colorSel || null;
     if (window.PD_SEDES && $('deLoc').options.length > 1) Object.assign(datos, window.PD_SEDES.valores($('deOrg'), $('deLoc')));
     if (!datos.codigo || !datos.nombre) { aviso('deMsg', 'El código y el nombre son obligatorios.', true); return; }
     if (datos.fecha_salida && datos.fecha_salida < datos.fecha_ingreso) { aviso('deMsg', 'La fecha final en la clínica no puede ser anterior a la de inicio.', true); return; }
@@ -366,6 +396,7 @@
     if (r.error) { aviso('deMsg', traducir(r.error), true); return; }
     var eraNuevo = !actual;
     actual = r.data;
+    if (window.PD_COLOR) window.PD_COLOR.cargar(true);
     var todos = await sb.from('dentistas').select('*').order('nombre');
     dentistas = !todos.error ? todos.data : eraNuevo ? dentistas.concat([r.data]) : dentistas.map(function (d) { return d.id === r.data.id ? r.data : d; });
     await cargarUsuarios();
@@ -631,6 +662,18 @@
   $('denFiltros').addEventListener('click', function (e) {
     var b = e.target.closest('[data-dfiltro]');
     if (b) { filtro = b.dataset.dfiltro; pintarLista(); }
+  });
+  $('deColores').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-color]'); if (!b || b.disabled) return;
+    colorSel = b.dataset.color || null;
+    this.querySelectorAll('.de-color').forEach(function (x) { x.setAttribute('aria-checked', x === b); });
+    notaColor(actual ? actual.id : null);
+  });
+  $('deColores').addEventListener('input', function (e) {
+    if (e.target.id !== 'deColorOtro') return;
+    colorSel = e.target.value.toUpperCase();
+    this.querySelectorAll('.de-color').forEach(function (x) { x.setAttribute('aria-checked', x.dataset.color === colorSel); });
+    notaColor(actual ? actual.id : null);
   });
   $('denBody').addEventListener('click', function (e) {
     var b = e.target.closest('[data-abrir-den]');

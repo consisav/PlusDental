@@ -50,6 +50,7 @@
 
   // ---------- Lista ----------
   async function cargar() {
+    if (window.PD_COLOR) await window.PD_COLOR.cargar(true);
     aviso('expMsg', '');
     $('expBody').innerHTML = '<tr><td colspan="8">Cargando…</td></tr>';
     var r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado,estado,foto,dentista_id,medico:dentistas(nombre)').order('nombre');
@@ -85,7 +86,7 @@
       return '<tr><td><div class="pac-nombre"><span class="avatar">' + avatar(p, fotos[p.foto]) + '</span><strong>' + esc(p.nombre) + '</strong></div></td>' +
         '<td>' + esc(p.dpi || '—') + '</td><td>' + esc(p.telefono || '—') + '</td>' +
         '<td class="fecha">' + edad(p.fecha_nacimiento) + '</td>' +
-        '<td>' + (p.medico ? esc(p.medico.nombre) : '<span style="color:#94A6B2">Sin asignar</span>') + '</td>' +
+        '<td>' + (p.medico ? (window.PD_COLOR ? window.PD_COLOR.punto(p.dentista_id) : '') + esc(p.medico.nombre) : '<span style="color:#94A6B2">Sin asignar</span>') + '</td>' +
         '<td><span class="estado estado-' + est + '">' + ESTADOS_PAC[est] + '</span></td>' +
         '<td class="fecha">' + fechaCorta(p.creado) + '</td>' +
         '<td><button type="button" class="adm-btn" data-abrir="' + p.id + '">Abrir</button></td></tr>';

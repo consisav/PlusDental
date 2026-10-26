@@ -4541,6 +4541,24 @@ begin
 end;
 $$;
 
+-- ===== Color del odontólogo =====
+-- Identifica al odontólogo, a sus pacientes y sus citas en la agenda. Formato #RRGGBB.
+-- A los odontólogos existentes se les asigna un color distinto de la paleta, en orden.
+alter table public.dentistas add column if not exists color text;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'dentistas_color_valido') then
+    alter table public.dentistas add constraint dentistas_color_valido check (color is null or color ~ '^#[0-9A-Fa-f]{6}$');
+  end if;
+end $$;
+do $$ begin
+  alter table public.dentistas disable trigger dentistas_firma;
+  update public.dentistas d set color = p.color
+    from (select id, (array['#2563EB','#059669','#D97706','#DC2626','#7C3AED','#DB2777','#0891B2','#65A30D','#EA580C','#4F46E5','#0D9488','#A16207'])[((row_number() over (order by id) - 1) % 12) + 1] as color
+            from public.dentistas) p
+   where p.id = d.id and d.color is null;
+  alter table public.dentistas enable trigger dentistas_firma;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
