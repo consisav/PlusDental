@@ -16,6 +16,14 @@
   function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function sumar(f, n) { var d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() + n); return iso(d); }
   function fechaTexto(f) { var d = new Date(f + 'T12:00:00'); return DIAS[d.getDay()] + ' ' + d.getDate() + ' de ' + MESES[d.getMonth()]; }
+  // Etiqueta del botón del día: «Hoy, …» y «Mañana, …» para que se reconozcan de un vistazo
+  function etiquetaDia(f) {
+    var hoy = iso(new Date()), t = fechaTexto(f);
+    if (f === hoy) return 'Hoy, ' + t;
+    if (f === sumar(hoy, 1)) return 'Mañana, ' + t;
+    return t.replace(/^\w/, function (c) { return c.toUpperCase(); });
+  }
+  function esUrgencia() { return /urgencia|dolor/i.test(datos.servicio || ''); }
   function wa(texto) { return 'https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(texto); }
 
   // ---------- Interfaz ----------
@@ -88,11 +96,11 @@
     opciones(MENU);
   }
 
-  // Horarios libres reales (próximos 14 días)
+  // Horarios libres reales: hoy (la agenda solo ofrece horas con al menos 1 hora de anticipación) y los próximos 14 días
   async function cargarDisponible() {
     if (!sb) return null;
     var hoy = iso(new Date());
-    var r = await sb.rpc('disponibilidad', { desde: sumar(hoy, 1), hasta: sumar(hoy, 14) });
+    var r = await sb.rpc('disponibilidad', { desde: hoy, hasta: sumar(hoy, 14) });
     if (r.error) return null;
     var porDia = {};
     r.data.forEach(function (x) { if (x.libre) (porDia[x.fecha] = porDia[x.fecha] || []).push(x.hora); });
@@ -105,9 +113,18 @@
       return menu();
     }
     paso = siguiente === 'repro' ? 'repro_dia' : 'agendar_dia';
-    var dias = Object.keys(disponible).sort().slice(0, 8);
-    await responder('Estos días tienen horarios libres. ¿Cuál te queda mejor?');
-    opciones(dias.map(function (f) { return [fechaTexto(f).replace(/^\w/, function (c) { return c.toUpperCase(); }), f]; }).concat([['Volver al menú', 'menu']]));
+    var hoy = iso(new Date()), dias = Object.keys(disponible).sort().slice(0, 8);
+    // Urgencia: si hay espacio hoy se ofrece primero; si no, se avisa y se deja el WhatsApp para atenderla cuanto antes
+    if (siguiente !== 'repro' && esUrgencia()) {
+      if (disponible[hoy]) {
+        await responder('Para tu urgencia hay espacio <b>hoy</b> (' + disponible[hoy].length + (disponible[hoy].length === 1 ? ' horario libre' : ' horarios libres') + '). Elige hoy u otro día:');
+      } else {
+        await responder('Hoy ya no quedan horarios libres en la agenda en línea. Si el dolor es fuerte, escríbenos <b>ahora</b> por WhatsApp y buscamos un espacio hoy mismo. ' + botonWa('Hola Plus Dental, tengo una urgencia dental y necesito cita para hoy.', 'Urgencia por WhatsApp') + '<br>O elige uno de estos días:');
+      }
+    } else {
+      await responder('Estos días tienen horarios libres. ¿Cuál te queda mejor?');
+    }
+    opciones(dias.map(function (f) { return [etiquetaDia(f), f]; }).concat([['Volver al menú', 'menu']]));
   }
   async function elegirHora(f, siguiente) {
     var horas = (disponible && disponible[f]) || [];
@@ -279,6 +296,9 @@
       case 'agendar_servicio': datos.servicio = SERVICIOS.filter(function (s) { return norm(s) === norm(v); })[0] || texto.slice(0, 60); return elegirDia('agendar');
       case 'agendar_dia': case 'repro_dia':
         if (disponible && disponible[v]) return elegirHora(v, paso === 'repro_dia' ? 'repro' : 'agendar');
+        var dicho = /pasado manana/.test(norm(texto)) ? sumar(iso(new Date()), 2) : /\bmanana\b/.test(norm(texto)) ? sumar(iso(new Date()), 1) : /\bhoy\b/.test(norm(texto)) ? iso(new Date()) : null;
+        if (dicho && disponible && disponible[dicho]) return elegirHora(dicho, paso === 'repro_dia' ? 'repro' : 'agendar');
+        if (dicho) { await responder((dicho === iso(new Date()) ? 'Hoy' : 'Ese día') + ' ya no quedan horarios libres en la agenda en línea.' + (esUrgencia() ? ' Para una urgencia escríbenos por WhatsApp. ' + botonWa('Hola Plus Dental, tengo una urgencia dental y necesito cita para hoy.', 'Urgencia por WhatsApp') : '')); return elegirDia(paso === 'repro_dia' ? 'repro' : 'agendar'); }
         await responder('Elige uno de los días de la lista, por favor.'); return elegirDia(paso === 'repro_dia' ? 'repro' : 'agendar');
       case 'agendar_hora': case 'repro_hora':
         var h = ((disponible && disponible[datos.fecha]) || []).filter(function (x) { return x === v || x === texto.trim(); })[0];
