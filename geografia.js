@@ -46,6 +46,11 @@
     if (c.tipo === 'select') return '<label' + cls + '>' + lbl + '<select id="' + id + '"' + req + '>' + (c.opciones || []).map(function (o) {
       return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(v == null ? '' : v) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>' + (c.ayuda ? '<small>' + esc(c.ayuda) + '</small>' : '') + '</label>';
     if (c.tipo === 'textarea') return '<label' + cls + '>' + lbl + '<textarea id="' + id + '" rows="2" maxlength="' + (c.max || 300) + '"' + req + '>' + esc(v || '') + '</textarea></label>';
+    // Casilla de verificación, número, sede (organización + localidad) y texto con sugerencias (lista)
+    if (c.tipo === 'check') return '<label class="geo-check' + (c.ancho === 'full' ? ' full' : '') + '"><input id="' + id + '" type="checkbox"' + (v ? ' checked' : '') + '> ' + esc(c.label) + '</label>';
+    if (c.tipo === 'number') return '<label' + cls + '>' + lbl + '<input id="' + id + '" type="number" inputmode="decimal" step="' + (c.paso || 'any') + '" min="' + (c.min == null ? 0 : c.min) + '"' + (c.maxNum != null ? ' max="' + c.maxNum + '"' : '') + ' value="' + (v == null ? '' : esc(v)) + '"' + req + '>' + (c.ayuda ? '<small>' + esc(c.ayuda) + '</small>' : '') + '</label>';
+    if (c.tipo === 'sede') return '<label>Organización<select id="geoF_organizacion_id"><option value="">—</option></select></label><label>Localidad / Empresa<select id="geoF_localidad_id"><option value="">—</option></select></label>';
+    if (c.lista) return '<label' + cls + '>' + lbl + '<input id="' + id + '" type="text" list="' + id + 'Lista" maxlength="' + (c.max || 80) + '" value="' + esc(v || '') + '"' + req + (c.placeholder ? ' placeholder="' + esc(c.placeholder) + '"' : '') + '><datalist id="' + id + 'Lista">' + c.lista.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist></label>';
     if (c.tipo === 'file') return '<label' + cls + '>' + lbl + '<input id="' + id + '" type="file" accept="' + esc(c.accept || 'image/*') + '">' + (c.ayuda ? '<small>' + esc(c.ayuda) + '</small>' : '') + '</label>';
     return '<label' + cls + '>' + lbl + '<input id="' + id + '" type="text" maxlength="' + (c.max || 80) + '" value="' + esc(v || '') + '"' + req + (c.placeholder ? ' placeholder="' + esc(c.placeholder) + '"' : '') + '></label>';
   }
@@ -57,6 +62,7 @@
     $('geoDlgEliminar').hidden = !cfg.eliminar;
     $('geoDlgEliminar').textContent = 'Eliminar'; $('geoDlgEliminar').dataset.confirmar = '0';
     aviso('geoDlgMsg', '');
+    if (cfg.campos.some(function (c) { return c.tipo === 'sede'; }) && window.PD_SEDES) window.PD_SEDES.llenar($('geoF_organizacion_id'), $('geoF_localidad_id'), (cfg.valores || {}).localidad_id || null);
     if (cfg.alAbrir) cfg.alAbrir();
     if (!dlg.open) dlg.showModal();
     var primero = $('geoDlgCampos').querySelector('input:not([type=file]),select,textarea');
@@ -67,6 +73,9 @@
     dlgCfg.campos.forEach(function (c) {
       if (c.tipo === 'info') return;
       var el = $('geoF_' + c.k);
+      if (c.tipo === 'sede') { if (window.PD_SEDES && $('geoF_localidad_id').options.length > 1) Object.assign(o, window.PD_SEDES.valores($('geoF_organizacion_id'), $('geoF_localidad_id'))); return; }
+      if (c.tipo === 'check') { o[c.k] = el.checked; return; }
+      if (c.tipo === 'number') { o[c.k] = el.value === '' ? null : Number(el.value); return; }
       if (c.tipo === 'file') { o[c.k] = el.files && el.files[0] ? el.files[0] : null; return; }
       var v = el.value.trim(); o[c.k] = v === '' ? null : v;
     });

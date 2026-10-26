@@ -4559,6 +4559,170 @@ do $$ begin
   alter table public.dentistas enable trigger dentistas_firma;
 end $$;
 
+-- ===== Inventarios (fase 1): proveedores, bodegas, productos y precios por tipo de cliente =====
+-- Todo con organización y localidad (la del usuario que graba; solo el Super Administrador la cambia), separación por sede,
+-- número correlativo automático y registro de quién graba y modifica (fecha y hora).
+create table if not exists public.inv_proveedores (
+  id                  bigint generated always as identity primary key,
+  numero              int,
+  padre_id            bigint references public.inv_proveedores (id) on delete cascade,   -- vacío = empresa principal; con valor = sub-empresa
+  nit                 text check (char_length(nit) <= 20),
+  nombre_comercial    text not null check (char_length(nombre_comercial) between 1 and 150),
+  nombre_fiscal       text check (char_length(nombre_fiscal) <= 200),
+  nombre_documentos   text check (char_length(nombre_documentos) <= 200),
+  direccion           text check (char_length(direccion) <= 300),
+  telefonos           text check (char_length(telefonos) <= 120),
+  extension           text check (char_length(extension) <= 20),
+  fax                 text check (char_length(fax) <= 40),
+  correo              text check (char_length(correo) <= 150),
+  contacto            text check (char_length(contacto) <= 120),
+  banco               text check (char_length(banco) <= 80),
+  cuenta_bancaria     text check (char_length(cuenta_bancaria) <= 40),
+  dias_credito        int not null default 0 check (dias_credito between 0 and 365),
+  efectuar_retencion  boolean not null default false,
+  pendiente_revisar   boolean not null default false,
+  estado              text not null default 'activo' check (estado in ('activo', 'inactivo', 'baja')),
+  organizacion_id     bigint references public.organizaciones (id) on delete set null,
+  localidad_id        bigint references public.org_localidades (id) on delete set null,
+  creado              timestamptz not null default now(),
+  creado_por          text,
+  modificado          timestamptz,
+  modificado_por      text
+);
+create index if not exists inv_proveedores_padre on public.inv_proveedores (padre_id);
+
+create table if not exists public.inv_bodegas (
+  id                     bigint generated always as identity primary key,
+  numero                 int,
+  nombre                 text not null check (char_length(nombre) between 1 and 120),
+  tipo                   text not null default 'general' check (tipo in ('general', 'sub')),
+  bodega_mayor_id        bigint references public.inv_bodegas (id) on delete set null,
+  siglas                 text check (char_length(siglas) <= 10),
+  direccion              text check (char_length(direccion) <= 300),
+  encargado              text check (char_length(encargado) <= 120),
+  permite_carga_directa  boolean not null default true,
+  consignacion           boolean not null default false,
+  tipo_precio            text not null default 'directo' check (tipo_precio in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial')),
+  estado                 text not null default 'activo' check (estado in ('activo', 'inactivo', 'baja')),
+  organizacion_id        bigint references public.organizaciones (id) on delete set null,
+  localidad_id           bigint references public.org_localidades (id) on delete set null,
+  creado                 timestamptz not null default now(),
+  creado_por             text,
+  modificado             timestamptz,
+  modificado_por         text
+);
+
+create table if not exists public.inv_productos (
+  id                bigint generated always as identity primary key,
+  numero            int,
+  codigo            text check (char_length(codigo) <= 40),
+  nombre            text not null check (char_length(nombre) between 1 and 200),
+  clasificacion     text check (char_length(clasificacion) <= 80),
+  tipo_producto     text check (char_length(tipo_producto) <= 80),
+  principio_activo  text check (char_length(principio_activo) <= 150),
+  marca             text check (char_length(marca) <= 80),
+  codigo_barras     text check (char_length(codigo_barras) <= 60),
+  presentacion      text check (char_length(presentacion) <= 80),
+  unidad            text check (char_length(unidad) <= 40),
+  proveedor_id      bigint references public.inv_proveedores (id) on delete set null,
+  bodega_id         bigint references public.inv_bodegas (id) on delete set null,
+  generico          boolean not null default false,
+  control_minimo    boolean not null default false,
+  minimo            numeric(12,2) check (minimo >= 0),
+  maximo            numeric(12,2) check (maximo >= 0),
+  costo             numeric(12,2) check (costo >= 0),
+  estante           text check (char_length(estante) <= 20),
+  fila              text check (char_length(fila) <= 20),
+  bloque            text check (char_length(bloque) <= 20),
+  foto              text,
+  estado            text not null default 'activo' check (estado in ('activo', 'inactivo', 'baja')),
+  organizacion_id   bigint references public.organizaciones (id) on delete set null,
+  localidad_id      bigint references public.org_localidades (id) on delete set null,
+  creado            timestamptz not null default now(),
+  creado_por        text,
+  modificado        timestamptz,
+  modificado_por    text
+);
+create unique index if not exists inv_productos_codigo_sede on public.inv_productos (lower(codigo), coalesce(localidad_id, 0)) where codigo is not null;
+
+-- Otros proveedores del producto
+create table if not exists public.inv_producto_proveedores (
+  producto_id   bigint not null references public.inv_productos (id) on delete cascade,
+  proveedor_id  bigint not null references public.inv_proveedores (id) on delete cascade,
+  primary key (producto_id, proveedor_id)
+);
+
+-- Precios por tipo de cliente (como los de procedimientos): uno por producto, tipo y sede
+create table if not exists public.inv_precios (
+  id               bigint generated always as identity primary key,
+  producto_id      bigint not null references public.inv_productos (id) on delete cascade,
+  tipo             text not null check (tipo in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial')),
+  fecha            date not null default current_date,
+  vigente          boolean not null default true,
+  precio           numeric(12,2) not null check (precio >= 0),
+  precio_usd       numeric(12,2) check (precio_usd >= 0),
+  pct_utilidad     numeric(6,2) check (pct_utilidad between 0 and 1000),
+  pct_descuento    numeric(5,2) not null default 0 check (pct_descuento between 0 and 100),
+  organizacion_id  bigint references public.organizaciones (id) on delete set null,
+  localidad_id     bigint references public.org_localidades (id) on delete set null,
+  creado           timestamptz not null default now(),
+  creado_por       text,
+  modificado       timestamptz,
+  modificado_por   text
+);
+create unique index if not exists inv_precios_producto_tipo_sede on public.inv_precios (producto_id, tipo, coalesce(localidad_id, 0));
+
+-- Registro automático: número correlativo (si la tabla lo tiene), quién graba y quién modifica
+create or replace function public.inv_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+begin
+  if tg_op = 'INSERT' then
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos') then
+      perform pg_advisory_xact_lock(hashtext(tg_table_name || '_numero'));
+      execute format('select coalesce(max(numero), 0) + 1 from public.%I', tg_table_name) into new.numero;
+    end if;
+    new.creado := now(); new.creado_por := v_usuario; new.modificado := null; new.modificado_por := null;
+  else
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos') then new.numero := old.numero; end if;
+    new.creado := old.creado; new.creado_por := old.creado_por;
+    new.modificado := now(); new.modificado_por := v_usuario;
+  end if;
+  return new;
+end;
+$$;
+
+do $$ declare t text; begin
+  foreach t in array array['inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_precios'] loop
+    if not exists (select 1 from pg_trigger where tgname = t || '_registro' and tgrelid = ('public.' || t)::regclass) then
+      execute format('create trigger %I before insert or update on public.%I for each row execute function public.inv_registro()', t || '_registro', t);
+    end if;
+    if not exists (select 1 from pg_trigger where tgname = t || '_sede' and tgrelid = ('public.' || t)::regclass) then
+      execute format('create trigger %I before insert or update of organizacion_id, localidad_id on public.%I for each row execute function public.sede_registro()', t || '_sede', t);
+    end if;
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || '_lee', t);
+    execute format('create policy %I on public.%I for select to authenticated using (public.es_personal() and public.ve_sede(localidad_id))', t || '_lee', t);
+    execute format('drop policy if exists %I on public.%I', t || '_crea', t);
+    execute format('create policy %I on public.%I for insert to authenticated with check (public.es_personal() and public.ve_sede(localidad_id))', t || '_crea', t);
+    execute format('drop policy if exists %I on public.%I', t || '_edita', t);
+    execute format('create policy %I on public.%I for update to authenticated using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id))', t || '_edita', t);
+    execute format('drop policy if exists %I on public.%I', t || '_borra', t);
+    execute format('create policy %I on public.%I for delete to authenticated using (public.es_super_administrador())', t || '_borra', t);
+    execute format('grant select, insert, update, delete on public.%I to authenticated', t);
+  end loop;
+end $$;
+alter table public.inv_producto_proveedores enable row level security;
+drop policy if exists inv_producto_proveedores_personal on public.inv_producto_proveedores;
+create policy inv_producto_proveedores_personal on public.inv_producto_proveedores for all to authenticated using (public.es_personal()) with check (public.es_personal());
+grant select, insert, update, delete on public.inv_producto_proveedores to authenticated;
+
+-- Bodega general inicial de cada localidad existente
+insert into public.inv_bodegas (nombre, tipo, siglas, direccion, encargado, localidad_id, organizacion_id)
+select 'Bodega general ' || coalesce(l.nombre_comercial, l.razon_social), 'general', 'GEN', l.direccion, null, l.id, l.organizacion_id
+  from public.org_localidades l
+ where not exists (select 1 from public.inv_bodegas b where b.localidad_id = l.id);
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
