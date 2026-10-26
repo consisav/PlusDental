@@ -1015,6 +1015,16 @@ table.citas-tabla th.c-acc-th{text-align:right}
 @media (max-width:560px){.mp-wrap{padding:32px 16px}.mp-head h2{font-size:34px}.mp-datos,.mp-saldo{grid-template-columns:1fr}.mp-lista li{flex-wrap:wrap}.mp-tabla{font-size:13px}.mp-tabla th,.mp-tabla td{padding:6px 4px}}
 
 /* Geografía y Organizaciones */
+.adm-sg{display:flex;flex-direction:column}
+.adm-menu .adm-subgrupo{display:flex;align-items:center;justify-content:space-between;gap:10px;width:calc(100% - 16px);margin-left:16px;background:transparent;border:0;border-radius:10px;cursor:pointer;font:inherit;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;font-weight:800;color:#005A87;padding:11px 12px;text-align:left}
+.adm-menu .adm-subgrupo:hover{background:#F5F9FC}
+.adm-menu .adm-subgrupo:focus-visible{outline:2px solid #005A87;outline-offset:1px}
+.adm-menu .adm-subgrupo .adm-chev{width:7px;height:7px}
+.adm-g.abierto .adm-sg:not(.abierto)>.adm-subgrupo .adm-chev{transform:rotate(45deg) translate(-2px,-2px)}
+.adm-sg.abierto>.adm-subgrupo .adm-chev{transform:rotate(-135deg) translate(-2px,-2px)}
+.adm-sg-items{display:none;flex-direction:column;gap:2px;padding:0 0 6px}
+.adm-sg.abierto>.adm-sg-items{display:flex}
+.adm-sg+.adm-sg{border-top:1px solid #E3EBF1}
 .adm-sub{display:block;margin:6px 10px 2px 22px;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;font-weight:800;color:#005A87}
 .adm-menu button[data-tab].adm-sub-item{margin-left:30px}
 .geo-panel{display:flex;flex-direction:column;gap:10px;border:1px solid #D9E4EC;border-radius:16px;padding:16px 18px;background:#FFFFFF}
@@ -1213,22 +1223,35 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="adm-g">
 <button type="button" class="adm-grupo" id="grpCatalogos" aria-expanded="false" aria-controls="grpCatalogosItems">Catálogos iniciales<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-g-items" id="grpCatalogosItems" role="presentation">
-<span class="adm-sub" id="subOdontologos">1 · Odontólogos</span>
+<div class="adm-sg">
+<button type="button" class="adm-subgrupo" id="subOdontologos" aria-expanded="false" aria-controls="subOdontologosItems">1 · Odontólogos<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-sg-items" id="subOdontologosItems" role="presentation">
 <button type="button" role="tab" id="tabTiposDen" data-tab="admTiposDen" aria-selected="false" aria-controls="admTiposDen" class="adm-sub-item">Tipos de odontólogos</button>
 <button type="button" role="tab" id="tabDentistas" data-tab="admDentistas" aria-selected="false" aria-controls="admDentistas" class="adm-sub-item">Odontólogos</button>
-<span class="adm-sep" role="separator" aria-hidden="true"></span>
-<span class="adm-sub" id="subAsistentes">2 · Asistentes y posiciones</span>
+</div>
+</div>
+<div class="adm-sg">
+<button type="button" class="adm-subgrupo" id="subAsistentes" aria-expanded="false" aria-controls="subAsistentesItems">2 · Asistentes y posiciones<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-sg-items" id="subAsistentesItems" role="presentation">
 <button type="button" role="tab" id="tabAsistentes" data-tab="admAsistentes" aria-selected="false" aria-controls="admAsistentes" class="adm-sub-item">Asistentes dentales</button>
 <button type="button" role="tab" id="tabPosiciones" data-tab="admPosiciones" aria-selected="false" aria-controls="admPosiciones" class="adm-sub-item">Posiciones y clínicas</button>
-<span class="adm-sep" role="separator" aria-hidden="true"></span>
-<span class="adm-sub" id="subGeoOrg">3 · Geografía</span>
+</div>
+</div>
+<div class="adm-sg">
+<button type="button" class="adm-subgrupo" id="subGeoOrg" aria-expanded="false" aria-controls="subGeoOrgItems">3 · Geografía<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-sg-items" id="subGeoOrgItems" role="presentation">
 <button type="button" role="tab" id="tabGeografia" data-tab="admGeografia" aria-selected="false" aria-controls="admGeografia" class="adm-sub-item">Geografía mundial</button>
 <button type="button" role="tab" id="tabOrganizaciones" data-tab="admOrganizaciones" aria-selected="false" aria-controls="admOrganizaciones" class="adm-sub-item">Organizaciones</button>
-<span class="adm-sep" role="separator" aria-hidden="true"></span>
-<span class="adm-sub" id="subAdmin">4 · Administración</span>
+</div>
+</div>
+<div class="adm-sg">
+<button type="button" class="adm-subgrupo" id="subAdmin" aria-expanded="false" aria-controls="subAdminItems">4 · Administración<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-sg-items" id="subAdminItems" role="presentation">
 <button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios" class="adm-sub-item">Administración de usuarios</button>
 <button type="button" role="tab" id="tabAgentes" data-tab="admAgentes" aria-selected="false" aria-controls="admAgentes" class="adm-sub-item">Agentes comerciales</button>
 <button type="button" role="tab" id="tabRecargos" data-tab="admRecargos" aria-selected="false" aria-controls="admRecargos" class="adm-sub-item">Recargo de tarjetas</button>
+</div>
+</div>
 </div>
 </div>
 <div class="adm-g">

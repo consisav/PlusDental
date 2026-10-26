@@ -114,7 +114,16 @@
       $(b.dataset.tab).hidden = b.dataset.tab !== id;
     });
     var elegido = document.querySelector('.adm-menu [data-tab="' + id + '"]');
-    if (elegido) abrirGrupo(elegido.closest('.adm-g'));
+    if (elegido) { abrirGrupo(elegido.closest('.adm-g')); abrirSubgrupo(elegido.closest('.adm-sg')); }
+  }
+  // Subgrupos dentro de un grupo (p. ej. Catálogos iniciales): solo uno abierto a la vez dentro de su grupo
+  function abrirSubgrupo(s, cerrarGrupo) {
+    var g = s ? s.closest('.adm-g') : cerrarGrupo;
+    if (!g) return;
+    g.querySelectorAll('.adm-sg').forEach(function (x) {
+      x.classList.toggle('abierto', x === s);
+      x.querySelector('.adm-subgrupo').setAttribute('aria-expanded', x === s);
+    });
   }
   // Menú por grupos: solo uno abierto a la vez (null = todos cerrados)
   function abrirGrupo(g) {
@@ -465,9 +474,16 @@
       abrirGrupo(g.classList.contains('abierto') ? null : g);
     });
   });
-  // Al empezar, se abre el grupo de la opción seleccionada
+  // Títulos de subgrupo: muestran sus opciones (y cierran los otros subgrupos); si ya estaba abierto, lo cierran
+  document.querySelectorAll('.adm-menu .adm-subgrupo').forEach(function (t) {
+    t.addEventListener('click', function () {
+      var s = t.closest('.adm-sg');
+      abrirSubgrupo(s.classList.contains('abierto') ? null : s, s.closest('.adm-g'));
+    });
+  });
+  // Al empezar, se abre el grupo (y el subgrupo) de la opción seleccionada
   var inicial = document.querySelector('.adm-menu [data-tab][aria-selected="true"]');
-  if (inicial) abrirGrupo(inicial.closest('.adm-g'));
+  if (inicial) { abrirGrupo(inicial.closest('.adm-g')); abrirSubgrupo(inicial.closest('.adm-sg')); }
   $('citaFiltros').addEventListener('click', function (e) {
     var b = e.target.closest('[data-filtro]');
     if (b) { filtro = b.dataset.filtro; pintarCitas(); }
