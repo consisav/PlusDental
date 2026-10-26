@@ -1298,7 +1298,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="admResumen" style="display: flex; gap: 8px; flex-wrap: wrap"></div>
 <input id="admBuscar" type="search" placeholder="Buscar usuario" aria-label="Buscar usuario" class="adm-input">
 </div>
-<div class="roles-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th><th>Creado</th><th>Clave</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
+<div class="roles-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th><th>Sede (organización / localidad)</th><th>Creado</th><th>Clave</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
 <p id="rolesMsg" class="dlg-msg" role="status"></p>
 </div>
 
@@ -1380,6 +1380,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label class="pg-s2">Médico asignado<select id="pDentista"><option value="">Sin asignar</option></select></label>
 <label>Agente comercial<select id="pAgente"><option value="">0 · NINGUNO</option></select></label>
 <label>Estado del paciente<select id="pEstado" class="pac-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="suspendido">Suspendido</option><option value="baja">Baja</option></select></label>
+<label class="pg-s2">Organización<select id="pOrg"><option value="">—</option></select></label>
+<label class="pg-s2">Localidad / Empresa<select id="pLoc"><option value="">—</option></select></label>
 </div>
 </div></fieldset>
 <div class="full exp-actions">
@@ -2125,6 +2127,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>Correo electrónico<input id="deCorreo" type="email" maxlength="120"></label>
 <label>Código de colegiado activo (opcional)<input id="deColegiado" type="text" maxlength="30"></label>
 <label>Tipo de médico<select id="deTipo"><option value="">Sin asignar</option></select></label>
+<label>Organización<select id="deOrg"><option value="">—</option></select></label>
+<label>Localidad / Empresa<select id="deLoc"><option value="">—</option></select></label>
 <label>Dirección<input id="deDireccion" type="text" maxlength="250"></label>
 <label>Usuario del sistema<select id="deUsuario" title="Usuario con el que el odontólogo abre «Mis pacientes» (solo sus pacientes)."><option value="">Sin usuario</option></select></label>
 <div class="full de-firmas"><div class="de-firma-card"><div class="de-firma-cab"><span class="pos-lbl">Firma electrónica</span><small>Aparece sobre la línea de firma</small></div><div id="deFirmaVista" class="de-firma-vista de-firma">Sin firma</div><div class="de-firma-acc"><button type="button" id="deFirmaBtn" class="adm-btn">Subir</button><button type="button" id="deFirmaQuitar" class="adm-btn hm-eliminar" hidden>Quitar</button></div><input id="deFirmaArchivo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><div class="de-firma-card"><div class="de-firma-cab"><span class="pos-lbl">Sello profesional</span><small>Se coloca junto a la firma</small></div><div id="deSelloVista" class="de-firma-vista de-sello">Sin sello</div><div class="de-firma-acc"><button type="button" id="deSelloBtn" class="adm-btn">Subir</button><button type="button" id="deSelloQuitar" class="adm-btn hm-eliminar" hidden>Quitar</button></div><input id="deSelloArchivo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><p id="deFirmaMsg" class="dlg-msg">Sube una imagen PNG con fondo transparente o una foto clara sobre papel blanco: el fondo blanco se quita solo. Se usan en recetas, presupuestos, tratamientos y estados de cuenta.</p></div>
@@ -2637,6 +2641,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="historias-medicas.js"></script>
 <script src="seguimientos.js"></script>
 <script src="posiciones.js"></script>
+<script src="sedes.js"></script>
 <script src="tipos-dentistas.js"></script>
 <script src="geografia.js"></script>
 <script src="organizaciones.js"></script>

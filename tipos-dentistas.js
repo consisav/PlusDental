@@ -52,6 +52,7 @@
     '<div class="exp-campo"><span class="pos-lbl">Código (automático)</span><div id="tdCodigo" class="exp-calc">—</div></div>' +
     '<label>Estado<select id="tdEstado" class="ac-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></label>' +
     '<label>Nombre del tipo *<input id="tdNombre" type="text" maxlength="120" required placeholder="Ej.: Endodoncista"></label>' +
+    '<label>Organización<select id="tdOrg"><option value="">—</option></select></label><label>Localidad / Empresa<select id="tdLoc"><option value="">—</option></select></label>' +
     '<label>Área de especialidad *<input id="tdEspecialidad" type="text" maxlength="120" required placeholder="Ej.: Endodoncia"></label>' +
     '<label class="full">Descripción<textarea id="tdDesc" rows="2" maxlength="600"></textarea></label>' +
     '<label class="full">Formación habitual<textarea id="tdFormacion" rows="2" maxlength="400" placeholder="Ej.: Cirujano dentista con especialidad en Endodoncia (2 años)"></textarea></label>' +
@@ -101,6 +102,7 @@
     $('tdCodigo').textContent = t ? t.codigo : 'Se asigna al grabar';
     $('tdEstado').value = t ? t.estado : 'activo'; $('tdEstado').dataset.estado = $('tdEstado').value;
     $('tdNombre').value = t ? t.nombre : '';
+    if (window.PD_SEDES) window.PD_SEDES.llenar($('tdOrg'), $('tdLoc'), t ? t.localidad_id : null);
     $('tdEspecialidad').value = t ? t.especialidad : '';
     $('tdDesc').value = t ? t.descripcion || '' : '';
     $('tdFormacion').value = t ? t.formacion || '' : '';
@@ -141,6 +143,7 @@
     var at = [];
     $('tdAtiende').value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (s) { if (!at.some(function (x) { return norm(x) === norm(s); })) at.push(s.slice(0, 150)); });
     var datos = { nombre: nombre, especialidad: esp, descripcion: $('tdDesc').value.trim() || null, formacion: $('tdFormacion').value.trim() || null, estado: $('tdEstado').value, atiende: at };
+    if (window.PD_SEDES && $('tdLoc').options.length > 1) Object.assign(datos, window.PD_SEDES.valores($('tdOrg'), $('tdLoc')));
     if (!actual) datos.orden = tipos.reduce(function (m, t) { return Math.max(m, t.orden || 0); }, 0) + 1;
     $('tdGrabar').disabled = true;
     aviso('tdFormMsg', 'Grabando…');

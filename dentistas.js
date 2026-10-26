@@ -240,6 +240,7 @@
     $('deColegiado').value = (d && d.colegiado) || '';
     opcionesTipo(d ? d.tipo_id || null : null);
     opcionesUsuario(d);
+    if (window.PD_SEDES) window.PD_SEDES.llenar($('deOrg'), $('deLoc'), d ? d.localidad_id : null);
     $('deInicioProf').value = (d && d.inicio_profesion) || '';
     $('deIngreso').value = d ? d.fecha_ingreso : hoy();
     $('deSalida').value = (d && d.fecha_salida) || '';
@@ -352,6 +353,7 @@
       notas: $('deNotas').value.trim() || null
     };
     if (hayUsuario) datos.usuario = $('deUsuario').value || null;
+    if (window.PD_SEDES && $('deLoc').options.length > 1) Object.assign(datos, window.PD_SEDES.valores($('deOrg'), $('deLoc')));
     if (!datos.codigo || !datos.nombre) { aviso('deMsg', 'El código y el nombre son obligatorios.', true); return; }
     if (datos.fecha_salida && datos.fecha_salida < datos.fecha_ingreso) { aviso('deMsg', 'La fecha final en la clínica no puede ser anterior a la de inicio.', true); return; }
     var boton = form.querySelector('[type=submit]');

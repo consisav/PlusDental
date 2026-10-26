@@ -342,8 +342,10 @@
 
   async function cargarUsuarios() {
     aviso('rolesMsg', '');
-    $('rolesBody').innerHTML = '<tr><td colspan="4">Cargando…</td></tr>';
-    var r = await sb.from('perfiles').select('id,usuario,correo,rol,creado').order('creado');
+    $('rolesBody').innerHTML = '<tr><td colspan="5">Cargando…</td></tr>';
+    if (window.PD_SEDES) await window.PD_SEDES.cargar(true);
+    var r = await sb.from('perfiles').select('id,usuario,correo,rol,creado,localidad_id').order('creado');
+    if (r.error && /localidad_id/.test(r.error.message || '')) r = await sb.from('perfiles').select('id,usuario,correo,rol,creado').order('creado');
     if (r.error) { $('rolesBody').innerHTML = ''; aviso('rolesMsg', traducir(r.error), true); return; }
     usuarios = r.data;
     pintarUsuarios();
@@ -357,7 +359,7 @@
 
     var filtro = $('admBuscar').value.trim().toLowerCase();
     var lista = usuarios.filter(function (p) { return !filtro || nombreDe(p).toLowerCase().indexOf(filtro) >= 0; });
-    if (!lista.length) { $('rolesBody').innerHTML = '<tr><td colspan="4">' + (filtro ? 'Ningún usuario coincide con «' + esc(filtro) + '».' : 'Todavía no hay usuarios.') + '</td></tr>'; return; }
+    if (!lista.length) { $('rolesBody').innerHTML = '<tr><td colspan="5">' + (filtro ? 'Ningún usuario coincide con «' + esc(filtro) + '».' : 'Todavía no hay usuarios.') + '</td></tr>'; return; }
 
     $('rolesBody').innerHTML = lista.map(function (p) {
       var yo = p.id === perfil.id;
@@ -369,12 +371,18 @@
       } else {
         tipo = '<span class="role-pill">' + (ROLES[p.rol] || p.rol) + '</span>';
       }
+      // Sede: el Super Administrador la asigna; vacía = ve todas las sedes. Los Clientes no tienen sede.
+      var S = window.PD_SEDES, sede;
+      if (p.rol === 'cliente') sede = '<span style="color:#5A6D7A">—</span>';
+      else if (S && esSuper() && !yo) sede = '<select data-sede-uid="' + p.id + '" aria-label="Sede de ' + esc(nombreDe(p)) + '"><option value="">Todas las sedes</option>' +
+        S.lista().map(function (l) { return '<option value="' + l.id + '"' + (l.id === p.localidad_id ? ' selected' : '') + '>' + esc(S.codigoLoc(l) + ' · ' + S.nombreLoc(l)) + '</option>'; }).join('') + '</select>';
+      else sede = esc(p.localidad_id && S ? S.texto(p.localidad_id) : 'Todas las sedes');
       var fecha = p.creado ? new Date(p.creado).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
       var boton = yo
         ? '<button type="button" class="adm-btn" data-mipass>Cambiar mi clave</button>'
         : '<button type="button" class="adm-btn" data-pass="' + p.id + '"' + (puedeCambiarClave(p) ? '' : ' disabled title="Solo el Super Administrador puede cambiar esta clave"') + '>Cambiar clave</button>';
       return '<tr><td><strong>' + esc(nombreDe(p)) + '</strong>' + (yo ? ' <span style="color:#5A6D7A">(tú)</span>' : '') + '</td>' +
-        '<td>' + tipo + '</td><td class="fecha">' + fecha + '</td><td>' + boton + '</td></tr>';
+        '<td>' + tipo + '</td><td>' + sede + '</td><td class="fecha">' + fecha + '</td><td>' + boton + '</td></tr>';
     }).join('');
   }
 
@@ -575,6 +583,18 @@
     if (p) abrirClave(p);
   });
 
+  // Sede del usuario (organización / localidad): la organización la completa Supabase a partir de la localidad
+  $('rolesBody').addEventListener('change', async function (e) {
+    var s = e.target.closest('select[data-sede-uid]');
+    if (!s) return;
+    var antes = (usuarios.filter(function (u) { return u.id === s.dataset.sedeUid; })[0] || {}).localidad_id || '';
+    s.disabled = true;
+    var r = await sb.from('perfiles').update({ localidad_id: +s.value || null, organizacion_id: null }).eq('id', s.dataset.sedeUid).select('id,localidad_id');
+    s.disabled = false;
+    if (r.error || !r.data || !r.data.length) { s.value = String(antes); aviso('rolesMsg', r.error ? traducir(r.error) : 'Solo el Super Administrador puede cambiar la sede de otro usuario.', true); return; }
+    usuarios.forEach(function (u) { if (u.id === s.dataset.sedeUid) u.localidad_id = r.data[0].localidad_id; });
+    aviso('rolesMsg', 'Sede actualizada: ' + (s.value ? s.options[s.selectedIndex].text : 'Todas las sedes') + '.');
+  });
   $('rolesBody').addEventListener('change', async function (e) {
     var sel = e.target.closest('select[data-uid]');
     if (!sel) return;

@@ -4338,6 +4338,88 @@ do $$ begin
   end if;
 end $$;
 
+-- ===== Sedes: Organización y Localidad / Empresa (separación por sede) =====
+-- Pacientes, odontólogos, tipos de odontólogos y usuarios tienen organización y localidad. Cada usuario del personal ve solo
+-- los registros de su localidad; el Super Administrador y los usuarios sin localidad asignada ven todas las sedes.
+-- Los registros nuevos toman la sede del usuario que los graba. La localidad siempre corresponde a su organización.
+do $$ declare t text; begin
+  foreach t in array array['pacientes', 'dentistas', 'tipos_dentista', 'perfiles'] loop
+    execute format('alter table public.%I add column if not exists organizacion_id bigint references public.organizaciones (id) on delete set null', t);
+    execute format('alter table public.%I add column if not exists localidad_id bigint references public.org_localidades (id) on delete set null', t);
+    execute format('create index if not exists %I on public.%I (localidad_id)', t || '_localidad', t);
+  end loop;
+end $$;
+
+-- Localidad del usuario conectado (null = todas las sedes)
+create or replace function public.mi_localidad()
+returns bigint language sql stable security definer set search_path = public as $$
+  select localidad_id from public.perfiles where id = auth.uid();
+$$;
+-- ¿El usuario conectado puede ver un registro de esta localidad?
+create or replace function public.ve_sede(p_localidad bigint)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.es_super_administrador() or p_localidad is null or public.mi_localidad() is null or p_localidad = public.mi_localidad();
+$$;
+revoke execute on function public.mi_localidad() from public, anon;
+revoke execute on function public.ve_sede(bigint) from public, anon;
+grant execute on function public.mi_localidad() to authenticated;
+grant execute on function public.ve_sede(bigint) to authenticated;
+
+-- Sede coherente: la organización sale de la localidad; en registros nuevos sin sede, la del usuario que graba
+create or replace function public.sede_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' and new.localidad_id is null and new.organizacion_id is null and tg_table_name <> 'perfiles' then
+    new.localidad_id := public.mi_localidad();
+  end if;
+  if new.localidad_id is not null then
+    new.organizacion_id := (select organizacion_id from public.org_localidades where id = new.localidad_id);
+  end if;
+  return new;
+end;
+$$;
+do $$ declare t text; begin
+  foreach t in array array['pacientes', 'dentistas', 'tipos_dentista', 'perfiles'] loop
+    if not exists (select 1 from pg_trigger where tgname = t || '_sede' and tgrelid = ('public.' || t)::regclass) then
+      execute format('create trigger %I before insert or update of organizacion_id, localidad_id on public.%I for each row execute function public.sede_registro()', t || '_sede', t);
+    end if;
+  end loop;
+end $$;
+
+-- Permisos: el personal ve y edita solo su sede
+drop policy if exists "personal ve pacientes" on public.pacientes;
+create policy "personal ve pacientes" on public.pacientes for select using (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal edita pacientes" on public.pacientes;
+create policy "personal edita pacientes" on public.pacientes for update using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal crea pacientes" on public.pacientes;
+create policy "personal crea pacientes" on public.pacientes for insert with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal ve dentistas" on public.dentistas;
+create policy "personal ve dentistas" on public.dentistas for select using (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal edita dentistas" on public.dentistas;
+create policy "personal edita dentistas" on public.dentistas for update using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal crea dentistas" on public.dentistas;
+create policy "personal crea dentistas" on public.dentistas for insert with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal administra tipos de dentista" on public.tipos_dentista;
+create policy "personal administra tipos de dentista" on public.tipos_dentista for all using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id));
+
+-- Datos existentes: todos a 2 · GRUPO PLUS DENTAL / localidad 2-01 (sin alterar «última modificación»)
+do $$ declare v_loc bigint; begin
+  select l.id into v_loc from public.org_localidades l join public.organizaciones o on o.id = l.organizacion_id where o.codigo = '2' and l.codigo = '1';
+  if v_loc is null then return; end if;
+  alter table public.pacientes disable trigger pacientes_actualizado;
+  alter table public.pacientes disable trigger pacientes_firma;
+  alter table public.dentistas disable trigger dentistas_firma;
+  alter table public.tipos_dentista disable trigger tipos_dentista_auditoria;
+  update public.pacientes set localidad_id = v_loc where localidad_id is null;
+  update public.dentistas set localidad_id = v_loc where localidad_id is null;
+  update public.tipos_dentista set localidad_id = v_loc where localidad_id is null;
+  update public.perfiles set localidad_id = v_loc where localidad_id is null and rol <> 'cliente';
+  alter table public.pacientes enable trigger pacientes_actualizado;
+  alter table public.pacientes enable trigger pacientes_firma;
+  alter table public.dentistas enable trigger dentistas_firma;
+  alter table public.tipos_dentista enable trigger tipos_dentista_auditoria;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

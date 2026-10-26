@@ -182,6 +182,7 @@
     if (!p) $('pDentista').value = medicoPorDefecto();
     opcionesAgentes(p ? p.agente_id : null);
     opcionesUsuarios(p);
+    if (window.PD_SEDES) window.PD_SEDES.llenar($('pOrg'), $('pLoc'), p ? p.localidad_id : null);
     pintarDerivados();
   }
 
@@ -333,6 +334,7 @@
       o.dentista_id = $('pDentista').value ? +$('pDentista').value : null;
       o.agente_id = $('pAgente').value ? +$('pAgente').value : null;   // vacío = Supabase pone el agente 0
       if (hayUsuario) o.usuario = $('pUsuario').value || null;
+      if (window.PD_SEDES && $('pLoc').options.length > 1) Object.assign(o, window.PD_SEDES.valores($('pOrg'), $('pLoc')));
     }
     return o;
   }
