@@ -8,7 +8,7 @@
   if (!sb || !document.getElementById('admGeografia')) return;
 
   var paises = [], regiones = [], estados = [], municipios = [];
-  var paisSel = null, estadoSel = null, buscarMun = '';
+  var paisSel = null, estadoSel = null, buscarMun = '', buscarPais = '', buscarEstado = '';
   var cache = { estados: {}, municipios: {}, regiones: {} };
 
   function $(id) { return document.getElementById(id); }
@@ -96,16 +96,20 @@
   $('geoDlgCancelar').addEventListener('click', function () { dlg.close(); });
 
   // ---------- Datos en caché (también para Organizaciones) ----------
+  // Supabase entrega como máximo 1,000 filas por consulta: se piden por páginas hasta traer todas
+  async function todas(armar) {
+    var l = [], desde = 0;
+    for (;;) { var r = await armar().range(desde, desde + 999); if (r.error) throw r.error; l = l.concat(r.data); if (r.data.length < 1000) return l; desde += 1000; }
+  }
   async function cargarPaises(forzar) {
     if (paises.length && !forzar) return paises;
-    var r = await sb.from('geo_paises').select('*').order('codigo');
-    if (r.error) throw r.error;
-    paises = r.data.sort(function (a, b) { return (+a.codigo || 0) - (+b.codigo || 0) || a.codigo.localeCompare(b.codigo); });
+    var data = await todas(function () { return sb.from('geo_paises').select('*').order('codigo'); });
+    paises = data.sort(function (a, b) { return (+a.codigo || 0) - (+b.codigo || 0) || a.codigo.localeCompare(b.codigo); });
     return paises;
   }
   async function estadosDe(pais, forzar) {
     if (!pais) return [];
-    if (!cache.estados[pais] || forzar) { var r = await sb.from('geo_estados').select('*').eq('pais_id', pais).order('codigo'); if (r.error) throw r.error; cache.estados[pais] = r.data; }
+    if (!cache.estados[pais] || forzar) cache.estados[pais] = await todas(function () { return sb.from('geo_estados').select('*').eq('pais_id', pais).order('codigo'); });
     return cache.estados[pais];
   }
   async function regionesDe(pais, forzar) {
@@ -115,7 +119,7 @@
   }
   async function municipiosDe(estado, forzar) {
     if (!estado) return [];
-    if (!cache.municipios[estado] || forzar) { var r = await sb.from('geo_municipios').select('*').eq('estado_id', estado).order('codigo'); if (r.error) throw r.error; cache.municipios[estado] = r.data; }
+    if (!cache.municipios[estado] || forzar) cache.municipios[estado] = await todas(function () { return sb.from('geo_municipios').select('*').eq('estado_id', estado).order('codigo'); });
     return cache.municipios[estado];
   }
   // Listas encadenadas País → Estado → Municipio dentro de la ventana (ids de los <select>: geoF_<k>)
@@ -144,12 +148,15 @@
     '<div class="adm-pane-head"><h3 class="adm-h">Geografía</h3></div>' +
     '<p class="dlg-msg">Países, sus estados o departamentos (con su región) y sus ciudades o municipios. Toca una fila para ver su detalle abajo; con ✎ la modificas.</p>' +
     '<section class="geo-panel"><div class="geo-head"><h4>Países</h4><button type="button" class="adm-btn adm-primary geo-mini" id="geoNuevoPais">+ País</button></div>' +
-    '<div class="roles-wrap"><table class="geo-tabla"><thead><tr><th>Cód.</th><th>País</th><th>Prefijo</th><th>Cód. tel.</th><th>Idioma</th><th>Moneda</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="geoPaises"></tbody></table></div></section>' +
+    '<input id="geoBuscarPais" type="search" class="adm-input geo-buscar" placeholder="Buscar país, prefijo o código" aria-label="Buscar país">' +
+    '<div class="roles-wrap geo-scroll"><table class="geo-tabla"><thead><tr><th>Cód.</th><th>País</th><th>Prefijo</th><th>Cód. tel.</th><th>Idioma</th><th>Moneda</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="geoPaises"></tbody></table></div></section>' +
     '<section class="geo-panel"><div class="geo-head"><h4 id="geoTitEstados">Estados / Departamentos</h4><div class="geo-head-btns"><button type="button" class="adm-btn geo-mini" id="geoRegiones">Regiones</button><button type="button" class="adm-btn adm-primary geo-mini" id="geoNuevoEstado">+ Departamento</button></div></div>' +
+    '<input id="geoBuscarEstado" type="search" class="adm-input geo-buscar" placeholder="Buscar estado o departamento" aria-label="Buscar estado">' +
     '<div class="roles-wrap geo-scroll"><table class="geo-tabla"><thead><tr><th>Cód.</th><th>Estado / Departamento</th><th>Región</th><th>Cód. tel.</th><th>Cód. postal</th><th>Municipios</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="geoEstados"></tbody></table></div></section>' +
     '<section class="geo-panel"><div class="geo-head"><h4 id="geoTitMun">Ciudades / Municipios</h4><div class="geo-head-btns"><input id="geoBuscarMun" type="search" class="adm-input" placeholder="Buscar municipio" aria-label="Buscar municipio"><button type="button" class="adm-btn adm-primary geo-mini" id="geoNuevoMun">+ Municipio</button></div></div>' +
     '<div class="roles-wrap geo-scroll"><table class="geo-tabla"><thead><tr><th>Cód.</th><th>Ciudad / Municipio</th><th>Prefijo</th><th>Cód. tel.</th><th>Prefijo ciudad</th><th>Cód. postal</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="geoMunicipios"></tbody></table></div></section>' +
-    '<p id="geoMsg" class="dlg-msg" role="status"></p></div>';
+    '<p id="geoMsg" class="dlg-msg" role="status"></p>' +
+    '<p class="geo-fuente">Datos mundiales de países, estados y ciudades: <a href="https://github.com/dr5hn/countries-states-cities-database" target="_blank" rel="noopener">countries-states-cities-database</a> (licencia ODbL). Guatemala: división oficial (22 departamentos, 340 municipios).</p></div>';
 
   var EDITAR = '<button type="button" class="geo-editar" aria-label="Modificar" title="Modificar">✎</button>';
   function fila(tipo, id, sel, celdas) {
@@ -160,14 +167,16 @@
   function nombreEstado(id) { var e = estados.filter(function (x) { return x.id === id; })[0]; return e ? e.nombre : ''; }
 
   function pintarPaises() {
-    $('geoPaises').innerHTML = paises.length ? paises.map(function (p) {
+    var tp = norm(buscarPais), lp = paises.filter(function (p) { return !tp || p.id === paisSel || norm(p.codigo + ' ' + p.nombre + ' ' + (p.prefijo || '')).indexOf(tp) >= 0; });
+    $('geoPaises').innerHTML = lp.length ? lp.map(function (p) {
       return fila('pais', p.id, p.id === paisSel, [esc(p.codigo), '<span class="geo-bandera">' + esc(p.bandera || '') + '</span>' + esc(p.nombre), esc(p.prefijo || '—'), esc(p.codigo_tel ? '+' + p.codigo_tel : '—'), esc(p.idioma || '—'), esc(p.moneda || '—')]);
     }).join('') : vacia(7, 'Aún no hay países. Agrega el primero con «+ País».');
   }
   function pintarEstados() {
     var reg = {}; regiones.forEach(function (r) { reg[r.id] = r.nombre; });
     $('geoTitEstados').textContent = paisSel ? 'Estados / Departamentos de ' + nombrePais(paisSel) : 'Estados / Departamentos';
-    $('geoEstados').innerHTML = !paisSel ? vacia(7, 'Elige un país.') : estados.length ? estados.map(function (e) {
+    var te = norm(buscarEstado), le = estados.filter(function (e) { return !te || e.id === estadoSel || norm(e.codigo + ' ' + e.nombre).indexOf(te) >= 0; });
+    $('geoEstados').innerHTML = !paisSel ? vacia(7, 'Elige un país.') : le.length ? le.map(function (e) {
       var n = cache.municipios[e.id] ? cache.municipios[e.id].length : (e.n == null ? '…' : e.n);
       return fila('estado', e.id, e.id === estadoSel, [esc(e.codigo), esc(e.nombre), esc(reg[e.region_id] || '—'), esc(e.codigo_tel ? '+' + e.codigo_tel : '—'), esc(e.codigo_postal || '—'), n]);
     }).join('') : vacia(7, 'Este país aún no tiene departamentos.');
@@ -188,15 +197,16 @@
     await elegirPais(paisSel, true);
   }
   async function elegirPais(id, forzar) {
+    if (!forzar) { buscarEstado = ''; buscarMun = ''; $('geoBuscarEstado').value = ''; $('geoBuscarMun').value = ''; }
     paisSel = id; estadoSel = forzar ? estadoSel : null; pintarPaises();
     try {
       var r = await Promise.all([estadosDe(id, forzar), regionesDe(id, forzar)]);
       estados = r[0]; regiones = r[1];
       // Cantidad de municipios por departamento (una sola consulta)
       if (estados.length) {
-        var c = await sb.from('geo_municipios').select('estado_id').eq('pais_id', id);
-        var cuenta = {}; (c.data || []).forEach(function (x) { cuenta[x.estado_id] = (cuenta[x.estado_id] || 0) + 1; });
-        estados.forEach(function (e) { e.n = cuenta[e.id] || 0; });
+        var c = await sb.from('geo_estados').select('id, geo_municipios(count)').eq('pais_id', id).range(0, 999);
+        var cuenta = {}; (c.data || []).forEach(function (x) { cuenta[x.id] = x.geo_municipios && x.geo_municipios[0] ? x.geo_municipios[0].count : 0; });
+        estados.forEach(function (e) { e.n = c.error ? null : (cuenta[e.id] || 0); });
       }
     } catch (e) { estados = []; regiones = []; aviso('geoMsg', traducir(e), true); }
     if (!estados.some(function (e) { return e.id === estadoSel; })) estadoSel = estados.length ? estados[0].id : null;
@@ -204,6 +214,7 @@
     await elegirEstado(estadoSel, forzar);
   }
   async function elegirEstado(id, forzar) {
+    if (!forzar) { buscarMun = ''; $('geoBuscarMun').value = ''; }
     estadoSel = id; pintarEstados();
     try { municipios = id ? await municipiosDe(id, forzar) : []; } catch (e) { municipios = []; aviso('geoMsg', traducir(e), true); }
     pintarMunicipios();
@@ -304,6 +315,8 @@
   $('geoNuevoMun').addEventListener('click', function () { if (!estadoSel) { aviso('geoMsg', 'Primero elige un departamento.', true); return; } editarMunicipio(null); });
   $('geoRegiones').addEventListener('click', function () { if (!paisSel) { aviso('geoMsg', 'Primero elige un país.', true); return; } editarRegiones(); });
   $('geoBuscarMun').addEventListener('input', function () { buscarMun = this.value; pintarMunicipios(); });
+  $('geoBuscarPais').addEventListener('input', function () { buscarPais = this.value; pintarPaises(); });
+  $('geoBuscarEstado').addEventListener('input', function () { buscarEstado = this.value; pintarEstados(); });
 
   window.PD_GEO = {
     paises: cargarPaises, estados: estadosDe, municipios: municipiosDe, opcionesPaises: opcionesPaises,

@@ -1,0 +1,13 @@
+Geografía mundial para Plus Dental
+
+Cómo cargarla:
+1. Ejecuta primero supabase.sql (crea las tablas de Geografía y Organizaciones).
+2. En Supabase > SQL Editor, abre y ejecuta en orden: geografia-mundial-01.sql, -02.sql y -03.sql.
+   Se pueden repetir sin duplicar datos.
+
+Contenido: 250 países (nombre en español, prefijo ISO, bandera, moneda, código telefónico),
+5,327 estados/departamentos de todo el mundo y 43,167 ciudades/municipios del continente americano.
+Guatemala usa su división oficial: 8 regiones, 22 departamentos y 340 municipios.
+
+Fuente: countries-states-cities-database (https://github.com/dr5hn/countries-states-cities-database),
+licencia ODbL 1.0: se debe citar la fuente al usar o compartir estos datos.
