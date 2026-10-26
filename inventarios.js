@@ -222,7 +222,7 @@
     '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Definición de productos</h3><button type="button" class="adm-btn adm-primary" id="iaNuevo">+ Producto</button></div>' +
     '<p class="dlg-msg">Medicamentos, insumos, materiales e instrumental: clasificación, presentación, unidad, proveedor, bodega, mínimos y máximos.</p>' +
     '<div class="inv-barra">' + filtrosHtml('prod', F_ESTADO) + '<select id="iaClasif" class="adm-input" aria-label="Clasificación"><option value="">Todas las clasificaciones</option></select><input id="iaBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar por nombre, código o marca" aria-label="Buscar producto"></div>' +
-    '<section class="geo-panel"><div class="roles-wrap geo-scroll inv-alto"><table class="geo-tabla"><thead><tr><th>N.º</th><th>Código</th><th>Producto</th><th>Clasificación</th><th>Presentación</th><th>Mín. / Máx.</th><th>Costo</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="iaLista"></tbody></table></div>' +
+    '<section class="geo-panel"><div class="roles-wrap geo-scroll inv-alto"><table class="geo-tabla"><thead><tr><th>N.º</th><th>Código</th><th>Producto</th><th>Clasificación</th><th>Presentación</th><th>Mín. / Máx.</th><th>Costo</th><th title="Precio promedio estimado por IA en Guatemala">Precio ref.</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="iaLista"></tbody></table></div>' +
     '<div id="iaFicha" class="geo-ficha" hidden></div></section><p id="iaMsg" class="dlg-msg" role="status"></p></div>';
   function nombreProv(id) { var p = proveedores.filter(function (x) { return x.id === id; })[0]; return p ? p.nombre_comercial : null; }
   function fotoUrl(ruta) { return ruta ? sb.storage.from('publico').getPublicUrl(ruta).data.publicUrl : ''; }
@@ -260,8 +260,8 @@
     $('iaLista').innerHTML = l.length ? l.map(function (p) {
       var bajo = p.control_minimo && p.minimo != null;
       return fila('prod', p.id, p.id === prodSel, [p.numero || '—', esc(p.codigo || '—'), '<div class="inv-prod">' + imagenProducto(p, 40) + '<div><b>' + esc(p.nombre) + '</b>' + (p.principio_activo ? '<small class="inv-sub">' + esc(p.principio_activo) + '</small>' : '') + (p.tipo_producto ? '<small class="inv-sub">' + esc(p.tipo_producto) + '</small>' : '') + '</div></div>', esc(p.clasificacion || '—'),
-        esc([p.presentacion, p.unidad].filter(Boolean).join(' · ') || '—'), (p.minimo != null || p.maximo != null ? (p.minimo != null ? Number(p.minimo) : '—') + ' / ' + (p.maximo != null ? Number(p.maximo) : '—') : '—') + (bajo ? ' <span class="inv-alerta" title="Control de punto mínimo activo">mín.</span>' : ''), q(p.costo), pill(p.estado)]);
-    }).join('') : vacia(9, productos.length ? 'Ningún producto coincide.' : 'Aún no hay productos. Agrega el primero con «+ Producto».');
+        esc([p.presentacion, p.unidad].filter(Boolean).join(' · ') || '—'), (p.minimo != null || p.maximo != null ? (p.minimo != null ? Number(p.minimo) : '—') + ' / ' + (p.maximo != null ? Number(p.maximo) : '—') : '—') + (bajo ? ' <span class="inv-alerta" title="Control de punto mínimo activo">mín.</span>' : ''), q(p.costo), p.precio_referencia != null ? '<span class="inv-ref" title="' + esc(p.precio_referencia_nota || 'Precio de referencia estimado') + '">' + q(p.precio_referencia) + '</span>' : '—', pill(p.estado)]);
+    }).join('') : vacia(10, productos.length ? 'Ningún producto coincide.' : 'Aún no hay productos. Agrega el primero con «+ Producto».');
     var p = productos.filter(function (x) { return x.id === prodSel; })[0];
     $('iaFicha').hidden = !p;
     if (p) {
@@ -270,10 +270,10 @@
         dato('Clasificación', p.clasificacion) + dato('Tipo de producto', p.tipo_producto) + dato('Principio activo', p.principio_activo) + dato('Marca', p.marca) +
         dato('Código de barras', p.codigo_barras) + dato('Presentación', p.presentacion) + dato('Unidad de medida', p.unidad) + dato('¿Es genérico?', p.generico ? 'Sí' : 'No') +
         dato('Proveedor principal', nombreProv(p.proveedor_id)) + dato('Bodega', p.bodega_id ? nombreBodega(p.bodega_id) : null) + dato('Control de punto mínimo', p.control_minimo ? 'Sí' : 'No') + dato('Mínimo / Máximo', (p.minimo != null ? Number(p.minimo) : '—') + ' / ' + (p.maximo != null ? Number(p.maximo) : '—')) +
-        dato('Precio de costo', q(p.costo)) + dato('Ubicación', ['Estante ' + (p.estante || '—'), 'Fila ' + (p.fila || '—'), 'Bloque ' + (p.bloque || '—')].join(' · '), 1) +
+        dato('Precio de costo', q(p.costo)) + dato('Precio de referencia (estimado)', p.precio_referencia != null ? q(p.precio_referencia) : null) + (p.precio_referencia_nota ? '<div class="geo-info full"><span>Nota del precio de referencia</span><b class="inv-sub">' + esc(p.precio_referencia_nota) + '</b></div>' : '') + dato('Ubicación', ['Estante ' + (p.estante || '—'), 'Fila ' + (p.fila || '—'), 'Bloque ' + (p.bloque || '—')].join(' · '), 1) +
         '<div class="geo-info full"><span>Otros proveedores</span><div class="inv-chips">' + (otros.length ? otros.map(function (o) { return '<span class="geo-chip">' + esc(nombreProv(o.proveedor_id) || 'Proveedor') + ' <button type="button" data-quitar-prov="' + o.proveedor_id + '" aria-label="Quitar">×</button></span>'; }).join('') : '<span class="inv-sub">Ninguno</span>') +
         '<select id="iaOtroProv" class="adm-input inv-mini-sel" aria-label="Agregar proveedor"><option value="">+ Agregar proveedor…</option>' + proveedores.filter(function (x) { return x.estado === 'activo' && x.id !== p.proveedor_id && !otros.some(function (o) { return o.proveedor_id === x.id; }); }).map(function (x) { return '<option value="' + x.id + '">' + esc(x.nombre_comercial) + '</option>'; }).join('') + '</select></div></div>' +
-        '</div><div class="org-logo inv-logo">' + imagenProducto(p, 110) + (p.foto ? '' : '<small>Ilustración · ' + esc(p.presentacion || 'producto') + '</small>') + '</div></div>';
+        '</div><div class="org-logo inv-logo">' + imagenProducto(p, 110) + (p.foto ? (p.foto_credito ? '<small class="inv-credito">' + esc(p.foto_credito) + '</small>' : '') : '<small>Ilustración · ' + esc(p.presentacion || 'producto') + '</small>') + '</div></div>';
     }
   }
   async function cargarProductos() {
@@ -307,7 +307,7 @@
         { k: 'presentacion', label: 'Presentación', max: 80, lista: PRESENTACIONES }, { k: 'unidad', label: 'Unidad de medida', max: 40, lista: UNIDADES },
         { k: 'proveedor_id', label: 'Proveedor principal', tipo: 'select', opciones: [['', '—']].concat(proveedores.filter(function (x) { return x.estado === 'activo' || (p && x.id === p.proveedor_id); }).map(function (x) { return [x.id, x.nombre_comercial]; })) },
         { k: 'bodega_id', label: 'Bodega', tipo: 'select', opciones: [['', '—']].concat(bodegas.filter(function (x) { return x.estado === 'activo' || (p && x.id === p.bodega_id); }).map(function (x) { return [x.id, x.numero + ' · ' + x.nombre]; })) },
-        { k: 'costo', label: 'Precio de costo (Q)', tipo: 'number', paso: '0.01' }, { k: 'minimo', label: 'Mínimo', tipo: 'number', paso: '0.01' }, { k: 'maximo', label: 'Máximo', tipo: 'number', paso: '0.01' },
+        { k: 'costo', label: 'Precio de costo (Q)', tipo: 'number', paso: '0.01' }, { k: 'precio_referencia', label: 'Precio de referencia (Q, estimado)', tipo: 'number', paso: '0.01' }, { k: 'minimo', label: 'Mínimo', tipo: 'number', paso: '0.01' }, { k: 'maximo', label: 'Máximo', tipo: 'number', paso: '0.01' },
         { k: 'estante', label: 'Estante', max: 20 }, { k: 'fila', label: 'Fila', max: 20 }, { k: 'bloque', label: 'Bloque', max: 20 },
         { k: 'sede', tipo: 'sede' },
         { k: 'generico', label: '¿Es genérico?', tipo: 'check' }, { k: 'control_minimo', label: 'Administrar punto mínimo', tipo: 'check' },
@@ -339,7 +339,7 @@
     var t = norm($('ivBuscar').value);
     var l = productos.filter(function (p) { return p.estado !== 'baja' && (!t || norm([p.nombre, p.codigo].join(' ')).indexOf(t) >= 0); });
     $('ivLista').innerHTML = l.length ? l.map(function (p) {
-      return '<tr><td><div class="inv-prod">' + imagenProducto(p, 34) + '<div><b>' + esc(p.nombre) + '</b><small class="inv-sub">' + esc([p.codigo, p.presentacion].filter(Boolean).join(' · ')) + (p.costo != null ? ' · costo ' + q(p.costo) : '') + '</small></div></div></td>' + TIPOS.map(function (tp) {
+      return '<tr><td><div class="inv-prod">' + imagenProducto(p, 34) + '<div><b>' + esc(p.nombre) + '</b><small class="inv-sub">' + esc([p.codigo, p.presentacion].filter(Boolean).join(' · ')) + (p.costo != null ? ' · costo ' + q(p.costo) : '') + (p.precio_referencia != null ? ' · ref. ' + q(p.precio_referencia) : '') + '</small></div></div></td>' + TIPOS.map(function (tp) {
         var x = precios.filter(function (y) { return y.producto_id === p.id && y.tipo === tp[0]; })[0];
         if (!x) return '<td class="num"><button type="button" class="inv-precio vacio" data-precio="' + p.id + ':' + tp[0] + '">Definir</button></td>';
         return '<td class="num"><button type="button" class="inv-precio' + (x.vigente ? '' : ' no-vigente') + '" data-precio="' + p.id + ':' + tp[0] + '" title="' + esc('Fecha ' + fecha(x.fecha) + ' · grabado por ' + (x.modificado_por || x.creado_por || '')) + '"><b>' + q(x.precio) + '</b>' +
