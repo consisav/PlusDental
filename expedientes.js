@@ -83,7 +83,7 @@
     }
     $('expBody').innerHTML = lista.map(function (p) {
       var est = p.estado || 'activo';
-      return '<tr><td><div class="pac-nombre"><span class="avatar">' + avatar(p, fotos[p.foto]) + '</span><strong>' + esc(p.nombre) + '</strong></div></td>' +
+      return '<tr><td><div class="pac-nombre"><span class="avatar"' + (window.PD_COLOR ? window.PD_COLOR.estilo(p.dentista_id) : '') + ' title="' + esc(p.medico ? 'Color de ' + p.medico.nombre : '') + '">' + avatar(p, fotos[p.foto]) + '</span><strong>' + esc(p.nombre) + '</strong></div></td>' +
         '<td>' + esc(p.dpi || '—') + '</td><td>' + esc(p.telefono || '—') + '</td>' +
         '<td class="fecha">' + edad(p.fecha_nacimiento) + '</td>' +
         '<td>' + (p.medico ? (window.PD_COLOR ? window.PD_COLOR.punto(p.dentista_id) : '') + esc(p.medico.nombre) : '<span style="color:#94A6B2">Sin asignar</span>') + '</td>' +
@@ -279,11 +279,16 @@
     if (actual) { $('expEstado').className = 'estado estado-' + est; $('expEstado').textContent = ESTADOS_PAC[est]; }
     // Encabezado de la pestaña Datos: nombre, estado, edad, DPI y NIT
     $('pPerfilNombre').textContent = actual ? actual.nombre : ($('pNombre').value.trim() || 'Nuevo paciente');
+    // Anillo del color de su médico alrededor de la foto del paciente
+    var colorMed = actual && window.PD_COLOR ? window.PD_COLOR.color(actual.dentista_id) : null;
+    if (colorMed) $('pFotoVista').style.setProperty('--med', colorMed); else $('pFotoVista').style.removeProperty('--med');
     $('pPerfilChips').innerHTML = actual ? [
       '<span class="pac-chip est-' + est + '">' + ESTADOS_PAC[est] + '</span>',
       actual.fecha_nacimiento ? '<span class="pac-chip">' + edad(actual.fecha_nacimiento) + '</span>' : '',
       actual.dpi ? '<span class="pac-chip">DPI ' + esc(actual.dpi) + '</span>' : '',
-      actual.nit ? '<span class="pac-chip">NIT ' + esc(actual.nit) + '</span>' : ''].join('') : '';
+      actual.nit ? '<span class="pac-chip">NIT ' + esc(actual.nit) + '</span>' : '',
+      // Color del paciente: el de su médico asignado (se cambia desde la ficha del odontólogo)
+      window.PD_COLOR && window.PD_COLOR.color(actual.dentista_id) ? '<span class="pac-chip pac-med"' + window.PD_COLOR.estilo(actual.dentista_id) + ' title="Se cambia en Catálogos iniciales › Odontólogos">' + window.PD_COLOR.punto(actual.dentista_id) + esc(window.PD_COLOR.nombrePaleta(window.PD_COLOR.color(actual.dentista_id))) + (actual.medico ? ' · ' + esc(actual.medico.nombre) : '') + '</span>' : ''].join('') : '';
     $('pMeta').hidden = !actual;
     if (actual) {
       $('pMeta').innerHTML = '<span>Paciente desde <b>' + fechaHoraCorta(actual.creado) + '</b></span>' +

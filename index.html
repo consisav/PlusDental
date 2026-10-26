@@ -1120,7 +1120,18 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .de-colores .de-color-otro{display:inline-flex;flex-direction:row;align-items:center;gap:6px;font-size:13px;color:#475B68;border:1px dashed #C4D4DF;border-radius:999px;padding:4px 10px 4px 6px}
 .de-color-otro input{width:28px;height:28px;border:0;padding:0;background:none;cursor:pointer}
 .de-color-campo .pos-lbl small{font-weight:400;color:#5A6D7A}
-.cita[style*="--med"]{box-shadow:inset 5px 0 0 var(--med)}
+/* Cita pintada con el color de su médico (fondo suave, borde y nombre del paciente); el estado queda como un punto */
+#administracion .ag-celda.cita[style*="--med"],#administracion .ag-mini.cita[style*="--med"]{position:relative;background:color-mix(in srgb,var(--med) 14%,#FFFFFF);border-color:color-mix(in srgb,var(--med) 40%,#FFFFFF);border-left:5px solid var(--med);color:#0B2B40;padding-right:18px}
+#administracion .ag-celda.cita[style*="--med"] b,#administracion .ag-mini.cita[style*="--med"] b,#administracion .cita[style*="--med"] .ag-pac{color:color-mix(in srgb,var(--med) 78%,#000000)}
+#administracion .cita[style*="--med"].urgente{box-shadow:inset 0 0 0 1.5px #C0263A}
+#administracion .cita[style*="--med"]::after{content:"";position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#94A6B2;box-shadow:0 0 0 2px #FFFFFF}
+#administracion .cita[style*="--med"].pendiente::after{background:#B45309}
+#administracion .cita[style*="--med"].confirmada::after{background:#4D8B1E}
+#administracion .cita[style*="--med"].reprogramada::after{background:#6D5BD0}
+#administracion .cita[style*="--med"].atendida::after{background:#2F78C4}
+/* Paciente con el color de su médico */
+.avatar[style*="--med"],.avatar.grande[style*="--med"]{box-shadow:0 0 0 3px #FFFFFF,0 0 0 6px var(--med)!important}
+.pac-chip.pac-med{display:inline-flex;align-items:center;background:color-mix(in srgb,var(--med) 16%,#FFFFFF);color:#0B2B40;border:1px solid color-mix(in srgb,var(--med) 45%,#FFFFFF)}
 .ag-ley-med{display:inline-flex;align-items:center;gap:4px}
 </style>
 
