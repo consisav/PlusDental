@@ -27,6 +27,8 @@
   }
   // Códigos correlativos en orden numérico ascendente (1, 2, … 10), no alfabético (1, 10, 2)
   function porCodigo(a, b) { return (parseInt(a.codigo, 10) || 0) - (parseInt(b.codigo, 10) || 0) || String(a.codigo).localeCompare(String(b.codigo)); }
+  // Código de la localidad: correlativo de su organización, mostrado como «Organización-Localidad» (1-01, 1-02…)
+  function codigoLoc(l) { var o = orgs.filter(function (x) { return x.id === (l.organizacion_id || orgSel); })[0]; return (o ? o.codigo + '-' : '') + String(l.codigo).padStart(2, '0'); }
   function dato(k, v, ancho) { return '<div class="geo-info' + (ancho ? ' full' : '') + '"><span>' + k + '</span><b>' + (v ? esc(v) : '—') + '</b></div>'; }
 
   $('admOrganizaciones').innerHTML =
@@ -37,7 +39,7 @@
     '<div class="roles-wrap"><table class="geo-tabla"><thead><tr><th>Cód.</th><th>Organización</th><th>Representante legal</th><th>Teléfonos</th><th>Ubicación</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="orgLista"></tbody></table></div>' +
     '<div id="orgFicha" class="geo-ficha" hidden></div></section>' +
     '<section class="geo-panel"><div class="geo-head"><h4 id="orgTitLoc">Localidades</h4><button type="button" class="adm-btn adm-primary geo-mini" id="orgNuevaLoc">+ Localidad</button></div>' +
-    '<div class="roles-wrap"><table class="geo-tabla"><thead><tr><th>Loc.</th><th>Nombre comercial</th><th>Razón social</th><th>NIT</th><th>Municipio</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="orgLocs"></tbody></table></div>' +
+    '<div class="roles-wrap"><table class="geo-tabla"><thead><tr><th>Código</th><th>Nombre comercial</th><th>Razón social</th><th>NIT</th><th>Municipio</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="orgLocs"></tbody></table></div>' +
     '<div id="locFicha" class="geo-ficha" hidden></div></section>' +
     '<p id="orgMsg" class="dlg-msg" role="status"></p></div>';
 
@@ -57,13 +59,13 @@
   }
   function pintarLocs() {
     var o = orgs.filter(function (x) { return x.id === orgSel; })[0];
-    $('orgTitLoc').textContent = o ? 'Localidades de ' + o.nombre : 'Localidades';
+    $('orgTitLoc').textContent = o ? 'Localidades de ' + o.codigo + ' · ' + o.nombre : 'Localidades';
     $('orgLocs').innerHTML = !o ? '<tr><td colspan="7" class="geo-vacia">Elige una organización.</td></tr>' : locs.length ? locs.map(function (l) {
-      return fila('loc', l.id, l.id === locSel, [esc(l.codigo), '<b>' + esc(l.nombre_comercial || '—') + '</b>', esc(l.razon_social), esc(l.nit || '—'), esc(l.municipio ? l.municipio.nombre : '—'), pill(l.estado)]);
+      return fila('loc', l.id, l.id === locSel, ['<b class="org-cod">' + esc(codigoLoc(l)) + '</b>', '<b>' + esc(l.nombre_comercial || '—') + '</b>', esc(l.razon_social), esc(l.nit || '—'), esc(l.municipio ? l.municipio.nombre : '—'), pill(l.estado)]);
     }).join('') : '<tr><td colspan="7" class="geo-vacia">Esta organización aún no tiene localidades.</td></tr>';
     var l = locs.filter(function (x) { return x.id === locSel; })[0];
     $('locFicha').hidden = !l;
-    if (l) $('locFicha').innerHTML = registro(l, 'loc') + '<div class="org-loc"><div class="geo-ficha-grid">' + dato('Localidad', l.codigo) + dato('Razón social', l.razon_social, 1) + dato('Nombre comercial', l.nombre_comercial) +
+    if (l) $('locFicha').innerHTML = registro(l, 'loc') + '<div class="org-loc"><div class="geo-ficha-grid">' + dato('Código de localidad', codigoLoc(l)) + dato('Organización', (orgs.filter(function (x) { return x.id === l.organizacion_id; })[0] || {}).nombre) + dato('Razón social', l.razon_social, 1) + dato('Nombre comercial', l.nombre_comercial) +
       dato('Representante legal', l.representante) + dato('NIT', l.nit) + dato('Código patronal', l.codigo_patrono) + dato('Teléfonos', l.telefonos) + dato('Correos', l.correos) +
       dato('Dirección', l.direccion, 1) + dato('País', l.pais && l.pais.nombre) + dato('Estado / Departamento', l.depto && l.depto.nombre) + dato('Ciudad / Municipio', l.municipio && l.municipio.nombre) + '</div>' +
       '<div class="org-logo">' + (l.logo ? '<img src="' + esc(logoUrl(l.logo)) + '" alt="Logo de ' + esc(l.nombre_comercial || l.razon_social) + '">' : '<span>Sin logo</span>') + '</div></div>';
@@ -133,7 +135,7 @@
     if (!orgSel) { aviso('Primero elige o crea una organización.', true); return; }
     try { window.PD_GEO_PAISES = await G.paises(); } catch (e) { aviso(G.traducir(e), true); return; }
     var o = orgs.filter(function (x) { return x.id === orgSel; })[0];
-    var v = l ? Object.assign({}, l) : { codigo: 'Se asigna al grabar', estado: 'activo', pais_id: o.pais_id || guatemala(), estado_id: o.estado_id, municipio_id: o.municipio_id };
+    var v = l ? Object.assign({}, l, { codigo: codigoLoc(l) }) : { codigo: o.codigo + '-' + String(locs.reduce(function (m, x) { return Math.max(m, parseInt(x.codigo, 10) || 0); }, 0) + 1).padStart(2, '0') + ' (se confirma al grabar)', estado: 'activo', pais_id: o.pais_id || guatemala(), estado_id: o.estado_id, municipio_id: o.municipio_id };
     G.dialogo({
       eyebrow: 'Organizaciones · ' + o.nombre, titulo: l ? (l.nombre_comercial || l.razon_social) : 'Nueva localidad', valores: v,
       campos: [{ k: 'codigo', label: 'Código de localidad (automático)', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
