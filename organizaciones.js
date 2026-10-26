@@ -25,6 +25,8 @@
       '<div class="org-reg-btns"><button type="button" class="adm-btn adm-primary geo-mini" data-org-modificar="' + tipo + '">Modificar</button>' +
       '<button type="button" class="adm-btn geo-mini" data-org-actualizar>Actualizar</button></div></div>';
   }
+  // Códigos correlativos en orden numérico ascendente (1, 2, … 10), no alfabético (1, 10, 2)
+  function porCodigo(a, b) { return (parseInt(a.codigo, 10) || 0) - (parseInt(b.codigo, 10) || 0) || String(a.codigo).localeCompare(String(b.codigo)); }
   function dato(k, v, ancho) { return '<div class="geo-info' + (ancho ? ' full' : '') + '"><span>' + k + '</span><b>' + (v ? esc(v) : '—') + '</b></div>'; }
 
   $('admOrganizaciones').innerHTML =
@@ -71,7 +73,7 @@
     aviso('');
     var r = await sb.from('organizaciones').select(SELECT).order('codigo');
     if (r.error) { $('orgLista').innerHTML = ''; aviso(G.traducir(r.error), true); return; }
-    orgs = r.data;
+    orgs = r.data.sort(porCodigo);
     if (!orgs.some(function (o) { return o.id === orgSel; })) orgSel = orgs.length ? orgs[0].id : null;
     pintarOrgs();
     await cargarLocs();
@@ -81,7 +83,7 @@
     locs = [];
     if (orgSel) {
       var r = await sb.from('org_localidades').select(SELECT).eq('organizacion_id', orgSel).order('codigo');
-      if (r.error) aviso(G.traducir(r.error), true); else locs = r.data;
+      if (r.error) aviso(G.traducir(r.error), true); else locs = r.data.sort(porCodigo);
     }
     if (!locs.some(function (l) { return l.id === locSel; })) locSel = locs.length ? locs[0].id : null;
     pintarLocs();
