@@ -4511,6 +4511,36 @@ do $$ declare v_loc bigint; begin
   alter table public.citas enable trigger citas_registro;
 end $$;
 
+-- ===== Sedes (3): la sede la decide el sistema; solo el Super Administrador la elige o la cambia =====
+-- Un usuario del personal con sede asignada graba siempre en su organización y localidad, y no puede mover registros a
+-- otra sede (si lo intenta, se conserva la sede que tenía). El Super Administrador puede elegir o cambiar la sede.
+-- Las operaciones sin usuario conectado (página pública, asistente, tareas automáticas) siguen las reglas anteriores.
+create or replace function public.sede_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_mi bigint := public.mi_localidad();
+  v_restringido boolean := auth.uid() is not null and not public.es_super_administrador();
+begin
+  if tg_table_name <> 'perfiles' then
+    if tg_op = 'INSERT' then
+      if v_restringido and v_mi is not null then
+        new.localidad_id := v_mi;                       -- siempre su propia sede
+      elsif new.localidad_id is null and new.organizacion_id is null then
+        new.localidad_id := v_mi;                       -- por defecto, la sede de quien graba
+      end if;
+    elsif v_restringido and (new.localidad_id is distinct from old.localidad_id or new.organizacion_id is distinct from old.organizacion_id) then
+      new.localidad_id := old.localidad_id;             -- solo el Super Administrador cambia la sede
+      new.organizacion_id := old.organizacion_id;
+      return new;
+    end if;
+  end if;
+  if new.localidad_id is not null then
+    new.organizacion_id := (select organizacion_id from public.org_localidades where id = new.localidad_id);
+  end if;
+  return new;
+end;
+$$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

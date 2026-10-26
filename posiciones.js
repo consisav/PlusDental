@@ -203,7 +203,8 @@
   function aplicarModo() {
     var puede = !actual || esSuper(), ed = editando && puede;
     $('pDatos').querySelectorAll('fieldset.pos-sec').forEach(function (f) { f.disabled = !ed; });
-    ['poNotas', 'poEstadoReg', 'poOrg', 'poLoc'].forEach(function (id) { $(id).disabled = !ed; });
+    ['poNotas', 'poEstadoReg'].forEach(function (id) { $(id).disabled = !ed; });
+    ['poOrg', 'poLoc'].forEach(function (id) { $(id).disabled = !ed || (window.PD_SEDES && !window.PD_SEDES.esSuper()); });
     $('poGrabar').hidden = !ed;
     $('poGrabar').textContent = actual ? 'Guardar cambios' : 'Grabar';
     $('poModificar').hidden = ed || !actual || !esSuper();

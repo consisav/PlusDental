@@ -46,6 +46,16 @@
     }
     locales(locId);
     if (!selOrg.dataset.sedeEnlazado) { selOrg.dataset.sedeEnlazado = '1'; selOrg.addEventListener('change', function () { locales(null); }); }
+    bloquear(selOrg, selLoc);
+  }
+  // Solo el Super Administrador elige o cambia la sede; los demás graban siempre en la suya (Supabase también lo exige)
+  function esSuper() { return !!(window.PD_SESION && window.PD_SESION.esSuper()); }
+  function bloquear(selOrg, selLoc) {
+    var b = !esSuper();
+    [selOrg, selLoc].forEach(function (x) {
+      x.disabled = b; x.dataset.sedeBloqueada = b ? '1' : '';
+      x.title = b ? 'Solo el Super Administrador puede cambiar la organización y la localidad.' : '';
+    });
   }
   // Valores para grabar (la organización la completa Supabase a partir de la localidad)
   function valores(selOrg, selLoc) { return { organizacion_id: +selOrg.value || null, localidad_id: +selLoc.value || null }; }
@@ -57,5 +67,5 @@
     var f = lista.filter(function (x) { return x.localidad_id === l; });
     return f.length ? f : lista.filter(function (x) { return !x.localidad_id; }).length ? lista.filter(function (x) { return !x.localidad_id; }) : lista;
   }
-  window.PD_SEDES = { deSede: deSede, miLocalidad: function () { return miLoc; }, cargar: cargar, llenar: llenar, valores: valores, texto: texto, lista: function () { return locs; }, codigoLoc: codigoLoc, nombreLoc: nombreLoc };
+  window.PD_SEDES = { bloquear: bloquear, esSuper: esSuper, deSede: deSede, miLocalidad: function () { return miLoc; }, cargar: cargar, llenar: llenar, valores: valores, texto: texto, lista: function () { return locs; }, codigoLoc: codigoLoc, nombreLoc: nombreLoc };
 })();
