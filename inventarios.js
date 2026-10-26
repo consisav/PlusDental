@@ -3,7 +3,7 @@
 // número correlativo y registro de quién graba y modifica. La edición usa la ventana de PD_GEO (geografia.js).
 (function () {
   var sb = window.PD_SB || null;
-  if (!sb || !document.getElementById('admInvProveedores') || !window.PD_GEO) return;
+  if (!sb || !document.getElementById('admInvProveedores') || !document.getElementById('admInvTipos') || !window.PD_GEO) return;
 
   var G = window.PD_GEO, esc = G.esc;
   var ESTADOS = { activo: 'Activo', inactivo: 'Inactivo', baja: 'Baja' };
@@ -13,9 +13,9 @@
   var PRESENTACIONES = ['Caja', 'Frasco', 'Tubo', 'Blíster', 'Ampolla', 'Cartucho', 'Jeringa', 'Paquete', 'Kit', 'Unidad', 'Galón', 'Bolsa'];
   var UNIDADES = ['Unidad', 'Caja', 'Paquete', 'Kit', 'Par', 'Rollo', 'ml', 'Litro', 'g', 'mg', 'kg'];
 
-  var proveedores = [], bodegas = [], productos = [], precios = [], otrosProv = [];
-  var provSel = null, subSel = null, bodSel = null, prodSel = null;
-  var filtros = { prov: 'activo', bod: 'todos', prod: 'activo' };
+  var proveedores = [], bodegas = [], productos = [], precios = [], otrosProv = [], tiposProd = [];
+  var provSel = null, subSel = null, bodSel = null, prodSel = null, tipoSel = null;
+  var filtros = { prov: 'activo', bod: 'todos', prod: 'activo', tipo: 'activo' };
 
   function $(id) { return document.getElementById(id); }
   function q(n) { return n == null || n === '' ? '—' : 'Q' + Number(n).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -173,6 +173,50 @@
     });
   }
 
+  // ================= Tipo de producto (catálogo para clasificar los productos) =================
+  $('admInvTipos').innerHTML =
+    '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Tipo de producto</h3><button type="button" class="adm-btn adm-primary" id="itNuevo">+ Tipo de producto</button></div>' +
+    '<p class="dlg-msg">Tipos de medicamentos e insumos de uso odontológico en Guatemala. Se eligen en el campo «Tipo de producto» de cada producto.</p>' +
+    '<div class="inv-barra">' + filtrosHtml('tipo', F_ESTADO) + '<input id="itBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar tipo o medicamento" aria-label="Buscar tipo de producto"></div>' +
+    '<section class="geo-panel"><div class="roles-wrap geo-scroll inv-alto"><table class="geo-tabla"><thead><tr><th>N.º</th><th>Tipo de producto</th><th>Ejemplos</th><th>Receta</th><th>Productos</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="itLista"></tbody></table></div>' +
+    '<div id="itFicha" class="geo-ficha" hidden></div></section><p id="itMsg" class="dlg-msg" role="status"></p></div>';
+  function pintarTipos() {
+    var t = norm($('itBuscar').value);
+    var l = tiposProd.filter(function (x) { return pasaFiltro('tipo', x) && (!t || norm([x.nombre, x.descripcion, x.ejemplos].join(' ')).indexOf(t) >= 0); });
+    $('itLista').innerHTML = l.length ? l.map(function (x) {
+      var n = productos.filter(function (p) { return norm(p.tipo_producto) === norm(x.nombre); }).length;
+      return fila('tipo', x.id, x.id === tipoSel, [x.numero || '—', '<b>' + esc(x.nombre) + '</b>', '<span class="inv-sub">' + esc(x.ejemplos || '—') + '</span>', x.requiere_receta ? '<span class="inv-alerta">Con receta</span>' : 'Libre', n, pill(x.estado)]);
+    }).join('') : vacia(7, tiposProd.length ? 'Ningún tipo coincide.' : 'Aún no hay tipos de producto. Agrega el primero con «+ Tipo de producto».');
+    var x = tiposProd.filter(function (y) { return y.id === tipoSel; })[0];
+    $('itFicha').hidden = !x;
+    if (x) $('itFicha').innerHTML = registro(x, 'tipo') + '<div class="geo-ficha-grid">' + dato('Descripción', x.descripcion, 1) + dato('Ejemplos de medicamentos', x.ejemplos, 1) + dato('¿Requiere receta?', x.requiere_receta ? 'Sí' : 'No') + '</div>';
+  }
+  async function cargarTipos() {
+    aviso('itMsg', '');
+    try { tiposProd = (await todas(function () { return sb.from('inv_tipos_producto').select('*').order('numero'); })).sort(porNumero); }
+    catch (e) { tiposProd = []; $('itLista').innerHTML = ''; aviso('itMsg', traducir(e), true); return; }
+    if (!tiposProd.some(function (x) { return x.id === tipoSel; })) tipoSel = tiposProd.length ? tiposProd[0].id : null;
+    pintarTipos();
+  }
+  function editarTipo(x) {
+    var v = x ? Object.assign({}, x) : { estado: 'activo' };
+    G.dialogo({
+      eyebrow: 'Inventarios · Tipo de producto', titulo: x ? x.nombre : 'Nuevo tipo de producto', valores: v,
+      campos: [{ k: 'numero', label: 'N.º (automático)', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
+        { k: 'nombre', label: 'Nombre del tipo de producto', req: true, max: 100, ancho: 'full' },
+        { k: 'descripcion', label: 'Descripción (para qué se usa)', tipo: 'textarea', max: 400, ancho: 'full' },
+        { k: 'ejemplos', label: 'Ejemplos de medicamentos o productos', tipo: 'textarea', max: 400, ancho: 'full' },
+        { k: 'sede', tipo: 'sede' }, { k: 'requiere_receta', label: '¿Requiere receta médica?', tipo: 'check' }],
+      alAbrir: function () { if (!x) $('geoF_numero').textContent = 'Se asigna al grabar'; },
+      guardar: async function (d) {
+        var r = x ? await sb.from('inv_tipos_producto').update(d).eq('id', x.id).select('id').single() : await sb.from('inv_tipos_producto').insert(d).select('id').single();
+        if (r.error) return /inv_tipos_producto_nombre_sede/.test(r.error.message || '') ? 'Ya existe un tipo de producto con ese nombre en esta sede.' : traducir(r.error);
+        tipoSel = r.data.id; await cargarTipos(); return null;
+      },
+      eliminar: x ? async function () { var r = await sb.from('inv_tipos_producto').delete().eq('id', x.id); if (r.error) return traducir(r.error); tipoSel = null; await cargarTipos(); return null; } : null
+    });
+  }
+
   // ================= 3. Definición de productos =================
   $('admInvProductos').innerHTML =
     '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Definición de productos</h3><button type="button" class="adm-btn adm-primary" id="iaNuevo">+ Producto</button></div>' +
@@ -234,7 +278,7 @@
       campos: [{ k: 'numero', label: 'N.º de artículo (automático)', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
         { k: 'codigo', label: 'Código de producto', max: 40, placeholder: 'AMX-500' }, { k: 'codigo_barras', label: 'Código de barras', max: 60 },
         { k: 'nombre', label: 'Nombre del producto', req: true, max: 200, ancho: 'full' },
-        { k: 'clasificacion', label: 'Clasificación', max: 80, lista: CLASIFICACIONES }, { k: 'tipo_producto', label: 'Tipo de producto', max: 80, placeholder: 'Ej.: Antibiótico' },
+        { k: 'clasificacion', label: 'Clasificación', max: 80, lista: CLASIFICACIONES }, { k: 'tipo_producto', label: 'Tipo de producto', max: 80, placeholder: 'Ej.: Antibióticos', lista: tiposProd.filter(function (x) { return x.estado === 'activo'; }).map(function (x) { return x.nombre; }) },
         { k: 'principio_activo', label: 'Principio activo (medicamentos)', max: 150 }, { k: 'marca', label: 'Marca', max: 80 },
         { k: 'presentacion', label: 'Presentación', max: 80, lista: PRESENTACIONES }, { k: 'unidad', label: 'Unidad de medida', max: 40, lista: UNIDADES },
         { k: 'proveedor_id', label: 'Proveedor principal', tipo: 'select', opciones: [['', '—']].concat(proveedores.filter(function (x) { return x.estado === 'activo' || (p && x.id === p.proveedor_id); }).map(function (x) { return [x.id, x.nombre_comercial]; })) },
@@ -318,10 +362,10 @@
   }
 
   // ================= Eventos =================
-  document.querySelectorAll('#admInvProveedores, #admInvBodegas, #admInvProductos').forEach(function (pane) {
+  document.querySelectorAll('#admInvProveedores, #admInvBodegas, #admInvTipos, #admInvProductos').forEach(function (pane) {
     pane.addEventListener('click', function (e) {
       var f = e.target.closest('.inv-filtros [data-valor]');
-      if (f) { var clave = f.parentNode.dataset.filtro; filtros[clave] = f.dataset.valor; f.parentNode.querySelectorAll('[data-valor]').forEach(function (b) { b.setAttribute('aria-pressed', b === f); }); ({ prov: pintarProveedores, bod: pintarBodegas, prod: pintarProductos })[clave](); return; }
+      if (f) { var clave = f.parentNode.dataset.filtro; filtros[clave] = f.dataset.valor; f.parentNode.querySelectorAll('[data-valor]').forEach(function (b) { b.setAttribute('aria-pressed', b === f); }); ({ prov: pintarProveedores, bod: pintarBodegas, prod: pintarProductos, tipo: pintarTipos })[clave](); return; }
       var m = e.target.closest('[data-inv-modificar]');
       if (m) {
         var t = m.dataset.invModificar;
@@ -329,6 +373,7 @@
         if (t === 'sub') editarProveedor(proveedores.filter(function (x) { return x.id === subSel; })[0]);
         if (t === 'bod') editarBodega(bodegas.filter(function (x) { return x.id === bodSel; })[0]);
         if (t === 'prod') editarProducto(productos.filter(function (x) { return x.id === prodSel; })[0]);
+        if (t === 'tipo') editarTipo(tiposProd.filter(function (x) { return x.id === tipoSel; })[0]);
         return;
       }
       if (e.target.closest('[data-inv-actualizar]')) { cargarTodo(pane.id); return; }
@@ -340,6 +385,7 @@
       if (tipo === 'prov') { if (ed) editarProveedor(proveedores.filter(function (x) { return x.id === id; })[0]); else { provSel = id; subSel = null; pintarProveedores(); } }
       if (tipo === 'sub') { if (ed) editarProveedor(proveedores.filter(function (x) { return x.id === id; })[0]); else { subSel = id; pintarProveedores(); } }
       if (tipo === 'bod') { if (ed) editarBodega(bodegas.filter(function (x) { return x.id === id; })[0]); else { bodSel = id; pintarBodegas(); } }
+      if (tipo === 'tipo') { if (ed) editarTipo(tiposProd.filter(function (x) { return x.id === id; })[0]); else { tipoSel = id; pintarTipos(); } }
       if (tipo === 'prod') { if (ed) editarProducto(productos.filter(function (x) { return x.id === id; })[0]); else { prodSel = id; pintarProductos(); } }
     });
     pane.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.matches('tr[data-inv]')) e.target.click(); });
@@ -356,24 +402,27 @@
   $('ipNuevaSub').addEventListener('click', function () { var p = proveedores.filter(function (x) { return x.id === provSel; })[0]; if (!p) { aviso('ipMsg', 'Primero elige o crea una empresa principal.', true); return; } editarProveedor(null, p); });
   $('ibNueva').addEventListener('click', function () { editarBodega(null); });
   $('iaNuevo').addEventListener('click', function () { editarProducto(null); });
+  $('itNuevo').addEventListener('click', function () { editarTipo(null); });
+  $('itBuscar').addEventListener('input', pintarTipos);
 
   async function cargarTodo(panel) {
     if (window.PD_SEDES) await window.PD_SEDES.cargar();
     if (panel === 'admInvProveedores') return cargarProveedores();
     if (panel === 'admInvBodegas') return cargarBodegas();
-    if (panel === 'admInvProductos') { await Promise.all([cargarProveedores(), cargarBodegas()]); return cargarProductos(); }
+    if (panel === 'admInvProductos') { await Promise.all([cargarProveedores(), cargarBodegas(), cargarTipos()]); return cargarProductos(); }
+    if (panel === 'admInvTipos') { await cargarTipos(); try { productos = (await todas(function () { return sb.from('inv_productos').select('id,tipo_producto,estado'); })); } catch (e) { productos = []; } return pintarTipos(); }
     if (panel === 'admInvPrecios') { productos = []; return cargarPrecios(); }
   }
-  ['admInvProveedores', 'admInvBodegas', 'admInvProductos', 'admInvPrecios'].forEach(function (id) {
+  ['admInvProveedores', 'admInvBodegas', 'admInvTipos', 'admInvProductos', 'admInvPrecios'].forEach(function (id) {
     var tab = document.querySelector('[data-tab="' + id + '"]');
     if (tab) tab.addEventListener('click', function () { setTimeout(function () { cargarTodo(id); }, 0); });
   });
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
-    cargar: function () { ['admInvProveedores', 'admInvBodegas', 'admInvProductos', 'admInvPrecios'].forEach(function (id) { if (!$(id).hidden) cargarTodo(id); }); },
+    cargar: function () { ['admInvProveedores', 'admInvBodegas', 'admInvTipos', 'admInvProductos', 'admInvPrecios'].forEach(function (id) { if (!$(id).hidden) cargarTodo(id); }); },
     limpiar: function () {
-      proveedores = []; bodegas = []; productos = []; precios = []; otrosProv = []; provSel = subSel = bodSel = prodSel = null;
-      ['ipLista', 'ipSubs', 'ibLista', 'iaLista', 'ivLista'].forEach(function (i) { $(i).innerHTML = ''; });
-      ['ipFicha', 'ipFichaSub', 'ibFicha', 'iaFicha'].forEach(function (i) { $(i).hidden = true; });
+      proveedores = []; bodegas = []; productos = []; precios = []; otrosProv = []; tiposProd = []; provSel = subSel = bodSel = prodSel = tipoSel = null;
+      ['ipLista', 'ipSubs', 'ibLista', 'itLista', 'iaLista', 'ivLista'].forEach(function (i) { $(i).innerHTML = ''; });
+      ['ipFicha', 'ipFichaSub', 'ibFicha', 'itFicha', 'iaFicha'].forEach(function (i) { $(i).hidden = true; });
     }
   });
 })();

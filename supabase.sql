@@ -4723,6 +4723,93 @@ select 'Bodega general ' || coalesce(l.nombre_comercial, l.razon_social), 'gener
   from public.org_localidades l
  where not exists (select 1 from public.inv_bodegas b where b.localidad_id = l.id);
 
+-- ===== Inventarios: Tipos de producto (medicamentos dentales en Guatemala) =====
+-- Catálogo para clasificar los productos (campo «Tipo de producto»). Con número correlativo, sede, estado y registro.
+-- Datos iniciales: tipos de medicamentos de uso odontológico disponibles en Guatemala, en la sede 2-01 (Plus Dental).
+create table if not exists public.inv_tipos_producto (
+  id               bigint generated always as identity primary key,
+  numero           int,
+  nombre           text not null check (char_length(nombre) between 1 and 100),
+  descripcion      text check (char_length(descripcion) <= 400),
+  ejemplos         text check (char_length(ejemplos) <= 400),
+  requiere_receta  boolean not null default false,
+  estado           text not null default 'activo' check (estado in ('activo', 'inactivo', 'baja')),
+  organizacion_id  bigint references public.organizaciones (id) on delete set null,
+  localidad_id     bigint references public.org_localidades (id) on delete set null,
+  creado           timestamptz not null default now(),
+  creado_por       text,
+  modificado       timestamptz,
+  modificado_por   text
+);
+create unique index if not exists inv_tipos_producto_nombre_sede on public.inv_tipos_producto (lower(nombre), coalesce(localidad_id, 0));
+
+-- El registro automático también numera este catálogo
+create or replace function public.inv_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+begin
+  if tg_op = 'INSERT' then
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto') then
+      perform pg_advisory_xact_lock(hashtext(tg_table_name || '_numero'));
+      execute format('select coalesce(max(numero), 0) + 1 from public.%I', tg_table_name) into new.numero;
+    end if;
+    new.creado := now(); new.creado_por := v_usuario; new.modificado := null; new.modificado_por := null;
+  else
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto') then new.numero := old.numero; end if;
+    new.creado := old.creado; new.creado_por := old.creado_por;
+    new.modificado := now(); new.modificado_por := v_usuario;
+  end if;
+  return new;
+end;
+$$;
+
+do $$ declare t text := 'inv_tipos_producto'; begin
+  if not exists (select 1 from pg_trigger where tgname = t || '_registro' and tgrelid = ('public.' || t)::regclass) then
+    execute format('create trigger %I before insert or update on public.%I for each row execute function public.inv_registro()', t || '_registro', t);
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = t || '_sede' and tgrelid = ('public.' || t)::regclass) then
+    execute format('create trigger %I before insert or update of organizacion_id, localidad_id on public.%I for each row execute function public.sede_registro()', t || '_sede', t);
+  end if;
+  execute format('alter table public.%I enable row level security', t);
+  execute format('drop policy if exists %I on public.%I', t || '_lee', t);
+  execute format('create policy %I on public.%I for select to authenticated using (public.es_personal() and public.ve_sede(localidad_id))', t || '_lee', t);
+  execute format('drop policy if exists %I on public.%I', t || '_crea', t);
+  execute format('create policy %I on public.%I for insert to authenticated with check (public.es_personal() and public.ve_sede(localidad_id))', t || '_crea', t);
+  execute format('drop policy if exists %I on public.%I', t || '_edita', t);
+  execute format('create policy %I on public.%I for update to authenticated using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id))', t || '_edita', t);
+  execute format('drop policy if exists %I on public.%I', t || '_borra', t);
+  execute format('create policy %I on public.%I for delete to authenticated using (public.es_super_administrador())', t || '_borra', t);
+  execute format('grant select, insert, update, delete on public.%I to authenticated', t);
+end $$;
+
+-- Datos iniciales (solo los que falten), en la sede 2-01
+insert into public.inv_tipos_producto (nombre, descripcion, ejemplos, requiere_receta, localidad_id, organizacion_id)
+select x.nombre, x.descripcion, x.ejemplos, x.receta, l.id, l.organizacion_id
+  from (values
+  ('Anestésicos locales', 'Bloqueo de la sensibilidad para procedimientos dentales (infiltrativa y troncular).', 'Lidocaína 2% con epinefrina, Mepivacaína 3%, Articaína 4% con epinefrina, Prilocaína 3% con felipresina', true),
+  ('Anestésicos tópicos', 'Anestesia superficial de mucosa antes de la punción o en procedimientos menores.', 'Benzocaína 20% gel, Lidocaína 10% spray, Lidocaína 2% gel', false),
+  ('Antibióticos', 'Tratamiento y profilaxis de infecciones odontogénicas.', 'Amoxicilina, Amoxicilina con ácido clavulánico, Clindamicina, Azitromicina, Metronidazol, Cefalexina', true),
+  ('Analgésicos', 'Control del dolor posoperatorio y de origen dental.', 'Acetaminofén (paracetamol), Tramadol, Acetaminofén con codeína', false),
+  ('Antiinflamatorios no esteroideos (AINE)', 'Dolor e inflamación posteriores a extracciones, endodoncias y cirugías.', 'Ibuprofeno, Naproxeno, Diclofenaco, Ketorolaco, Nimesulida, Celecoxib', false),
+  ('Corticoesteroides', 'Control del edema e inflamación severa posquirúrgica; lesiones de mucosa.', 'Dexametasona, Betametasona, Prednisona, Triamcinolona en orabase', true),
+  ('Antisépticos bucales', 'Control de placa bacteriana y desinfección de la cavidad oral.', 'Clorhexidina 0.12%, Cloruro de cetilpiridinio, Peróxido de hidrógeno, Iodopovidona', false),
+  ('Antifúngicos', 'Tratamiento de candidiasis oral y estomatitis protésica.', 'Nistatina suspensión, Miconazol gel oral, Fluconazol, Clotrimazol', true),
+  ('Antivirales', 'Herpes labial y lesiones herpéticas de la mucosa oral.', 'Aciclovir crema y tabletas, Valaciclovir', true),
+  ('Hemostáticos', 'Control del sangrado durante y después de extracciones y cirugías.', 'Esponja de gelatina (Gelfoam), Celulosa oxidada (Surgicel), Ácido tranexámico, Sulfato férrico, Cloruro de aluminio', false),
+  ('Fluoruros y remineralizantes', 'Prevención de caries y remineralización del esmalte.', 'Barniz de flúor 5%, Flúor gel 1.23% (APF), Fluoruro de sodio en enjuague, CPP-ACP (MI Paste)', false),
+  ('Desensibilizantes', 'Tratamiento de la hipersensibilidad dentinaria.', 'Nitrato de potasio, Barniz desensibilizante, Gluma, Fluoruro de estaño', false),
+  ('Medicación intraconducto y endodóntica', 'Irrigación, desinfección y medicación entre citas en endodoncia.', 'Hidróxido de calcio, Hipoclorito de sodio, EDTA 17%, Paramonoclorofenol alcanforado, Formocresol', false),
+  ('Ansiolíticos y sedantes', 'Manejo de la ansiedad del paciente antes del procedimiento.', 'Diazepam, Midazolam, Alprazolam', true),
+  ('Relajantes musculares', 'Trismus, bruxismo y dolor muscular de la articulación temporomandibular.', 'Ciclobenzaprina, Orfenadrina, Metocarbamol', true),
+  ('Antihistamínicos', 'Reacciones alérgicas leves y premedicación.', 'Loratadina, Cetirizina, Difenhidramina, Clorfeniramina', false),
+  ('Cicatrizantes y protectores de mucosa', 'Aftas, úlceras traumáticas, alveolitis y heridas de la mucosa.', 'Ácido hialurónico gel, Alvogyl, Bencidamina, Sucralfato en suspensión', false),
+  ('Saliva artificial y lubricantes orales', 'Xerostomía (boca seca) por medicamentos o radioterapia.', 'Saliva artificial en spray y gel, Pilocarpina', false),
+  ('Vitaminas y suplementos', 'Apoyo a la cicatrización y deficiencias que afectan la salud oral.', 'Complejo B, Vitamina C, Ácido fólico, Zinc', false),
+  ('Medicamentos de emergencia', 'Botiquín de emergencias médicas en el consultorio dental.', 'Epinefrina 1:1000, Nitroglicerina sublingual, Salbutamol inhalador, Glucosa oral, Oxígeno', true)
+  ) x (nombre, descripcion, ejemplos, receta)
+  cross join (select l.id, l.organizacion_id from public.org_localidades l join public.organizaciones o on o.id = l.organizacion_id where o.codigo = '2' and l.codigo = '1') l
+ where not exists (select 1 from public.inv_tipos_producto t where lower(t.nombre) = lower(x.nombre) and t.localidad_id = l.id);
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
