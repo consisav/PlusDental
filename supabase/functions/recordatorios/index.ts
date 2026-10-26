@@ -47,7 +47,7 @@ function correoHtml(c: any, correoPaciente: string) {
         ${fila('Fecha', fechaLarga(c.fecha))}
         ${fila('Hora', String(c.hora).slice(0, 5))}
         ${fila('Tratamiento', c.servicio)}
-        ${fila('Dentista', c.dentista?.nombre)}
+        ${fila('Odontólogo', c.dentista?.nombre)}
         ${fila('Sala', c.sala ? `${c.sala.codigo} · ${c.sala.nombre}` : '')}
       </table>
       <p style="margin:0 0 8px"><b>Dirección:</b> ${esc(CLINICA.direccion)}</p>
@@ -62,7 +62,7 @@ function correoHtml(c: any, correoPaciente: string) {
 function correoTexto(c: any) {
   return `Hola ${c.nombre}:\n\nLe recordamos su cita de mañana en Plus Dental:\n\n` +
     `- Fecha: ${fechaLarga(c.fecha)}\n- Hora: ${String(c.hora).slice(0, 5)}\n- Tratamiento: ${c.servicio}\n` +
-    (c.dentista?.nombre ? `- Dentista: ${c.dentista.nombre}\n` : '') +
+    (c.dentista?.nombre ? `- Odontólogo: ${c.dentista.nombre}\n` : '') +
     (c.sala ? `- Sala: ${c.sala.codigo} · ${c.sala.nombre}\n` : '') +
     `\nDirección: ${CLINICA.direccion}\nSi necesita cambiar o cancelar su cita, comuníquese al ${CLINICA.telefono}.\n\n${CLINICA.nombre} · ${CLINICA.eslogan}`;
 }

@@ -68,7 +68,7 @@
   // Encabezado y pestañas del expediente abierto (del paciente conectado, o del paciente elegido por el dentista)
   function mostrarExpediente() {
     var p = datos.paciente, c = datos.citas[0];
-    $('mpEyebrow').textContent = dent ? 'Portal del dentista · expediente' : 'Mi expediente';
+    $('mpEyebrow').textContent = dent ? 'Portal del odontólogo · expediente' : 'Mi expediente';
     $('mpNombre').textContent = p.nombre;
     $('mpSub').textContent = [p.dpi ? 'DPI ' + p.dpi : '', edad(p.fecha_nacimiento), c ? 'Próxima cita: ' + fechaLarga(c.fecha) + ', ' + c.hora : ''].filter(Boolean).join(' · ');
     $('mpTabs').innerHTML = (dent ? '<button type="button" class="mp-volver" data-mp-volver>← Mis pacientes</button>' : '') +
@@ -78,7 +78,7 @@
 
   // ---------- Dentista: «Mis pacientes» ----------
   function listaDentista() {
-    $('mpEyebrow').textContent = 'Portal del dentista';
+    $('mpEyebrow').textContent = 'Portal del odontólogo';
     $('mpNombre').textContent = 'Mis pacientes';
     $('mpSub').textContent = 'Dr(a). ' + dent.dentista.nombre + (dent.dentista.colegiado ? ' · Colegiado ' + dent.dentista.colegiado : '') + ' · ' + dent.pacientes.length + (dent.pacientes.length === 1 ? ' paciente' : ' pacientes');
     $('mpTabs').innerHTML = '';
@@ -307,7 +307,7 @@
     },
     citas: async function () {
       var ct = citasHist();
-      var cab = [th('Fecha'), th('Hora'), th('Tratamiento'), th('Dentista'), th('Estado')];
+      var cab = [th('Fecha'), th('Hora'), th('Tratamiento'), th('Odontólogo'), th('Estado')];
       var filas = function (l) {
         return l.length ? l.map(function (c) { return '<tr>' + td(fechaLarga(c.fecha)) + td(esc(c.hora)) + td(esc(c.servicio) + (c.reprogramada_de ? '<br><small style="color:#5A6D7A">Reprogramada de ' + esc(c.reprogramada_de) + '</small>' : '')) + td(esc(c.dentista ? 'Dr(a). ' + c.dentista : '—')) + td(ESTADOS_CITA[c.estado] || 'Atendido') + '</tr>'; })
           : ['<tr>' + td('—') + td('') + td('Sin citas') + td('') + td('') + '</tr>'];

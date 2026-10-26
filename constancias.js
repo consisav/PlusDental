@@ -32,7 +32,7 @@
     '<fieldset class="pos-sec"><legend>Datos de la atención</legend><div class="exp-form rc-g4">' +
     '<label class="rc-span2">Paciente *<select id="cmPaciente"><option value="">Cargando pacientes…</option></select></label>' +
     '<label>Fecha de atención *<input id="cmFecha" type="date"></label>' +
-    '<label>Dentista que firma<select id="cmDentista"><option value="">Sin asignar</option></select></label>' +
+    '<label>Odontólogo que firma<select id="cmDentista"><option value="">Sin asignar</option></select></label>' +
     '<label>Hora de entrada<input id="cmEntrada" type="time" step="300"></label>' +
     '<label>Hora de salida<input id="cmSalida" type="time" step="300"></label>' +
     '<label>Días de reposo<input id="cmReposo" type="number" min="0" max="60" step="1" value="0" inputmode="numeric"></label>' +

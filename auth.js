@@ -264,8 +264,8 @@
 
   function selectorDentista(c) {
     if (!dentistasCita.length || !('dentista_id' in c)) return '<span style="color:#94A6B2">—</span>';
-    return '<select class="adm-input" data-den-cita="' + c.id + '" aria-label="Dentista de la cita de ' + esc(c.nombre) + '" title="Dentista"' +
-      (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Dentista: sin asignar</option>' +
+    return '<select class="adm-input" data-den-cita="' + c.id + '" aria-label="Odontólogo de la cita de ' + esc(c.nombre) + '" title="Odontólogo"' +
+      (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Odontólogo: sin asignar</option>' +
       dentistasCita.map(function (d) { return '<option value="' + d.id + '"' + (d.id === c.dentista_id ? ' selected' : '') + '>' + esc(d.nombre) + '</option>'; }).join('') +
       '</select>';
   }
@@ -282,7 +282,7 @@
     sel.disabled = false;
     if (r.error || !r.data || !r.data.length) { aviso('citasMsg', r.error ? traducir(r.error) : 'No tienes permiso para cambiar esta cita.', true); return; }
     if (cita) { cita.dentista_id = valor; if (cambios.posicion_id) cita.posicion_id = cambios.posicion_id; }
-    aviso('citasMsg', d ? 'Cita asignada a ' + d.nombre + (cambios.posicion_id ? ' y a su sala.' : '.') : 'La cita quedó sin dentista asignado.');
+    aviso('citasMsg', d ? 'Cita asignada a ' + d.nombre + (cambios.posicion_id ? ' y a su sala.' : '.') : 'La cita quedó sin odontólogo asignado.');
     if (cambios.posicion_id) pintarCitas();
   }
 

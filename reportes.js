@@ -108,7 +108,7 @@
         ['Paciente', function (f) { return f.nombre; }],
         ['Teléfono', function (f) { return f.telefono || '—'; }],
         ['Servicio', function (f) { return f.servicio; }],
-        ['Dentista', function (f) { return f.dentista ? f.dentista.nombre : '—'; }],
+        ['Odontólogo', function (f) { return f.dentista ? f.dentista.nombre : '—'; }],
         ['Sala', function (f) { return f.sala ? f.sala.codigo + ' · ' + f.sala.nombre : '—'; }]
       ],
       cargar: async function (d, h) {

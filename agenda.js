@@ -153,7 +153,7 @@
   function pintarSugerencias(res) {
     sugerencias = res.opciones;
     if (!sugerencias.length) {
-      $('agSugerencias').innerHTML = '<p class="dlg-msg">No encontré horarios con esas condiciones en los próximos ' + DIAS_BUSQUEDA + ' días. Prueba con otro médico, otra preferencia de horario u otra fecha de inicio. Revisa también que los dentistas tengan su horario cargado, o guarda la cita abajo en un horario específico.</p>';
+      $('agSugerencias').innerHTML = '<p class="dlg-msg">No encontré horarios con esas condiciones en los próximos ' + DIAS_BUSQUEDA + ' días. Prueba con otro médico, otra preferencia de horario u otra fecha de inicio. Revisa también que los odontólogos tengan su horario cargado, o guarda la cita abajo en un horario específico.</p>';
       return;
     }
     var max = sugerencias[0].puntos, min = sugerencias[sugerencias.length - 1].puntos;
@@ -162,7 +162,7 @@
       return '<div class="ag-sug' + (i === 0 ? ' mejor' : '') + '">' +
         (i === 0 ? '<span class="estado rol-principal" style="align-self:flex-start">Mejor opción</span>' : '') +
         '<span class="cuando">' + textoFecha(o.fecha) + ' · ' + o.hora + '</span>' +
-        '<span class="quien">' + esc(o.dentista ? o.dentista.nombre : 'Dentista por asignar') + '<br>' + esc(o.sala ? o.sala.codigo + ' · ' + o.sala.nombre : 'Sin sala asignada') + '</span>' +
+        '<span class="quien">' + esc(o.dentista ? o.dentista.nombre : 'Odontólogo por asignar') + '<br>' + esc(o.sala ? o.sala.codigo + ' · ' + o.sala.nombre : 'Sin sala asignada') + '</span>' +
         '<div class="barra-puntos" title="Qué tan adecuada es"><i style="width:' + pct + '%"></i></div>' +
         (o.razones.length ? '<div class="ag-razones">' + o.razones.map(function (r) { return '<span>' + esc(r) + '</span>'; }).join('') + '</div>' : '') +
         (cantidadCitas() > 1 ? '<button type="button" class="adm-btn adm-primary" data-serie="' + i + '">Programar serie de ' + cantidadCitas() + ' citas desde aquí</button>'
@@ -203,7 +203,7 @@
     var ok = serie.filter(function (o) { return !o.falta; }).length;
     $('agSugerencias').innerHTML = '<div class="ag-serie"><b>Serie de ' + serie.length + ' citas · cada ' + esc(textoCada()) + '</b>' +
       '<p class="dlg-msg" style="margin:0">Revisa las fechas propuestas. Se buscó la misma hora y el mismo médico; si no había espacio, el horario más cercano.</p>' +
-      '<table><thead><tr><th>#</th><th>Fecha y hora</th><th>Dentista</th><th>Sala</th></tr></thead><tbody>' +
+      '<table><thead><tr><th>#</th><th>Fecha y hora</th><th>Odontólogo</th><th>Sala</th></tr></thead><tbody>' +
       serie.map(function (o, i) {
         return o.falta ? '<tr><td>' + (i + 1) + '</td><td class="falta" colspan="3">' + textoFecha(o.fecha) + ': sin horario disponible cerca de esa fecha (no se agendará)</td></tr>'
           : '<tr><td>' + (i + 1) + '</td><td><b>' + textoFecha(o.fecha) + ' · ' + o.hora + '</b></td><td>' + esc(o.dentista ? o.dentista.nombre : 'Por asignar') + '</td><td>' + esc(o.sala ? o.sala.codigo + ' · ' + o.sala.nombre : 'Sin sala') + '</td></tr>';
@@ -311,7 +311,7 @@
       var correo = c.correo || '';
       var asunto = 'Recordatorio de su cita en Plus Dental · ' + a.cuando;
       var cuerpo = 'Hola ' + c.nombre + ':\n\nLe recordamos su cita en Plus Dental:\n\n' +
-        '• Fecha y hora: ' + a.cuando + '\n• Tratamiento: ' + c.servicio + (a.dentista ? '\n• Dentista: ' + a.dentista.nombre : '') + (a.sala ? '\n• Sala: ' + a.sala : '') +
+        '• Fecha y hora: ' + a.cuando + '\n• Tratamiento: ' + c.servicio + (a.dentista ? '\n• Odontólogo: ' + a.dentista.nombre : '') + (a.sala ? '\n• Sala: ' + a.sala : '') +
         '\n\nDirección: ' + CLINICA + '.\nSi necesita cambiar su cita, escríbanos o llame al ' + TEL_CLINICA + '.\n\nPlus Dental · La tranquilidad también es parte del tratamiento.';
       b.push(correo ? '<a class="adm-btn" href="mailto:' + encodeURIComponent(correo) + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo) + '">Recordatorio por correo</a>'
         : '<span class="dlg-msg">El paciente no tiene correo registrado.</span>');
@@ -598,7 +598,7 @@
       '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:12px;padding:10px 14px;margin-bottom:14px">' +
       '<div><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Periodo</span><b style="font-size:15px">' + esc(periodo) + '</b></div>' +
       '<div style="text-align:right"><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Citas</span><b style="font-size:15px">' + lista.length + '</b></div></div>' +
-      '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="' + th + '">Hora</th><th style="' + th + '">Paciente</th><th style="' + th + '">Tratamiento</th><th style="' + th + '">Dentista</th><th style="' + th + '">Sala</th><th style="' + th + '">Estado</th></tr></thead><tbody>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="' + th + '">Hora</th><th style="' + th + '">Paciente</th><th style="' + th + '">Tratamiento</th><th style="' + th + '">Odontólogo</th><th style="' + th + '">Sala</th><th style="' + th + '">Estado</th></tr></thead><tbody>' +
       (cuerpo || '<tr><td colspan="6" style="' + celda + '">No hay citas en este periodo.</td></tr>') + '</tbody></table></div>');
   }
 
@@ -650,7 +650,7 @@
       '<div class="ag-det-der"><span class="estado estado-' + c.estado + '">' + (ESTADOS_CITA[c.estado] || c.estado) + '</span>' +
       '<button type="button" class="ag-det-x" data-det-cerrar aria-label="Cerrar">×</button></div></div>' +
       '<dl class="ag-det-grid">' +
-      campo('Dentista', esc(nombreDentista(c.dentista_id))) +
+      campo('Odontólogo', esc(nombreDentista(c.dentista_id))) +
       campo('Sala', esc(c.posicion_id ? nombreSala(c.posicion_id) : 'Sin sala')) +
       campo('WhatsApp', c.telefono ? esc(c.telefono) : '—') +
       campo('Fecha y hora de grabación', fechaHoraGrab(c.creada)) +
@@ -707,7 +707,7 @@
     $('agUsuarioGraba').textContent = usuarioSesion();
     opcionesHorario();
     alCambiarPaciente();
-    if (!dentistas.length) aviso('agFormMsg', 'Aún no hay dentistas activos con horario: registra a los dentistas para que el asistente pueda asignarlos.', true);
+    if (!dentistas.length) aviso('agFormMsg', 'Aún no hay odontólogos activos con horario: registra a los odontólogos para que el asistente pueda asignarlos.', true);
     await cargarCitas();
   }
 
@@ -878,7 +878,7 @@
       if ($('admAgenda').hidden && $('tabAgenda')) $('tabAgenda').click();
       pintarFijo();
       $('agForm').scrollIntoView({ block: 'start' });
-      aviso('agFormMsg', 'Completa el paciente y el tratamiento y pulsa «Sugerir horarios» para elegir el dentista de ese horario.');
+      aviso('agFormMsg', 'Completa el paciente y el tratamiento y pulsa «Sugerir horarios» para elegir el odontólogo de ese horario.');
       return;
     }
     var c = e.target.closest('[data-cita]');

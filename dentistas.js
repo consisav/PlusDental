@@ -70,7 +70,7 @@
     if (/(dentistas|dentista_titulos).*(does not exist|could not find)|could not find the table/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los dentistas.';
     if (/dentistas_usuario_unico/i.test(m)) return 'Ese usuario ya está asignado a otro dentista.';
     if (/dentistas_usuario_fk/i.test(m)) return 'Ese usuario ya no existe. Elige otro de la lista.';
-    if (/dentistas_codigo_unico|duplicate key/i.test(m)) return 'Ya existe un dentista con ese código.';
+    if (/dentistas_codigo_unico|duplicate key/i.test(m)) return 'Ya existe un odontólogo con ese código.';
     if (/dentistas_fechas/i.test(m)) return 'La fecha final en la clínica no puede ser anterior a la de inicio.';
     if (/row-level security|permission denied/i.test(m)) return 'No tienes permiso para esta acción.';
     if (/exceeded the maximum allowed size|too large/i.test(m)) return 'El archivo pesa más de 10 MB.';
@@ -152,7 +152,7 @@
         (!q || [d.nombre, d.codigo, (d.especialidades || []).join(' ')].some(function (v) { return sinTildes(v).indexOf(q) >= 0; }));
     });
     if (!lista.length) {
-      $('denBody').innerHTML = '<tr><td colspan="8">' + (q ? 'Ningún dentista coincide.' : dentistas.length ? 'No hay dentistas con este estado.' : 'Todavía no hay dentistas registrados. Agrega el primero con «Nuevo dentista».') + '</td></tr>';
+      $('denBody').innerHTML = '<tr><td colspan="8">' + (q ? 'Ningún odontólogo coincide.' : dentistas.length ? 'No hay odontólogos con este estado.' : 'Todavía no hay odontólogos registrados. Agrega el primero con «Nuevo odontólogo».') + '</td></tr>';
       return;
     }
     $('denBody').innerHTML = lista.map(function (d) {
@@ -220,12 +220,12 @@
   function notaRol() {
     var posId = $('dePosicion').value ? +$('dePosicion').value : null;
     $('deRolSala').disabled = !posId;
-    if (!posId) { $('deRolNota').textContent = 'El rol de principal o alterno aplica cuando el dentista tiene una sala asignada.'; return; }
+    if (!posId) { $('deRolNota').textContent = 'El rol de principal o alterno aplica cuando el odontólogo tiene una sala asignada.'; return; }
     var p = principalDe(posId);
     $('deRolNota').textContent = !p
-      ? 'Esta sala no tiene dentista principal: este dentista queda como principal.'
+      ? 'Esta sala no tiene odontólogo principal: este odontólogo queda como principal.'
       : $('deRolSala').value === 'principal'
-        ? 'Al guardar, este dentista será el principal de la sala y ' + p.nombre + ' pasará a alterno.'
+        ? 'Al guardar, este odontólogo será el principal de la sala y ' + p.nombre + ' pasará a alterno.'
         : 'Principal actual de esta sala: ' + p.nombre + '.';
   }
 
@@ -257,7 +257,7 @@
   }
 
   function pintarCabecera() {
-    $('denTitulo').textContent = actual ? actual.nombre : 'Nuevo dentista';
+    $('denTitulo').textContent = actual ? actual.nombre : 'Nuevo odontólogo';
     $('denSub').textContent = actual
       ? [actual.codigo, actual.posicion_id ? (actual.rol_sala === 'alterno' ? 'Alterno' : 'Principal') + ' en ' + nombrePosicion(actual.posicion_id) : '', (actual.especialidades || []).join(', '), actual.colegiado ? 'Colegiado ' + actual.colegiado : ''].filter(Boolean).join(' · ')
       : 'Llena los datos y guarda. Después podrás agregar la foto y los títulos.';
@@ -375,7 +375,7 @@
     if (eraNuevo) cargarTitulos();
     var aviso_salida = actual.estado === 'activo' && actual.fecha_salida && actual.fecha_salida <= hoy()
       ? ' Ojo: tiene «Fecha final en la clínica» ' + fechaCorta(actual.fecha_salida) + ', así que ya no aparecerá en la agenda. Si sigue trabajando, deja esa fecha vacía.' : '';
-    aviso('deMsg', (eraNuevo ? 'Dentista registrado. Ya puedes agregar su foto y sus títulos.' : 'Cambios guardados.') + aviso_salida, !!aviso_salida);
+    aviso('deMsg', (eraNuevo ? 'Odontólogo registrado. Ya puedes agregar su foto y sus títulos.' : 'Cambios guardados.') + aviso_salida, !!aviso_salida);
     sincronizarFotoPublica();
   }
 

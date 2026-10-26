@@ -1214,8 +1214,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-grupo" id="grpCatalogos" aria-expanded="false" aria-controls="grpCatalogosItems">Catálogos iniciales<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-g-items" id="grpCatalogosItems" role="presentation">
 <span class="adm-sub" id="subOdontologos">1 · Odontólogos</span>
-<button type="button" role="tab" id="tabTiposDen" data-tab="admTiposDen" aria-selected="false" aria-controls="admTiposDen" class="adm-sub-item">Tipos de dentistas</button>
-<button type="button" role="tab" id="tabDentistas" data-tab="admDentistas" aria-selected="false" aria-controls="admDentistas" class="adm-sub-item">Dentistas</button>
+<button type="button" role="tab" id="tabTiposDen" data-tab="admTiposDen" aria-selected="false" aria-controls="admTiposDen" class="adm-sub-item">Tipos de odontólogos</button>
+<button type="button" role="tab" id="tabDentistas" data-tab="admDentistas" aria-selected="false" aria-controls="admDentistas" class="adm-sub-item">Odontólogos</button>
 <span class="adm-sep" role="separator" aria-hidden="true"></span>
 <span class="adm-sub" id="subAsistentes">2 · Asistentes y posiciones</span>
 <button type="button" role="tab" id="tabAsistentes" data-tab="admAsistentes" aria-selected="false" aria-controls="admAsistentes" class="adm-sub-item">Asistentes dentales</button>
@@ -1501,7 +1501,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="cita-buscar-acc"><button type="button" id="cbBuscar" class="adm-btn adm-primary">Buscar</button><button type="button" id="cbLimpiar" class="adm-btn">Limpiar</button></div>
 </div>
 <p id="cbResumen" class="dlg-msg" hidden></p>
-<div class="roles-wrap"><table class="citas-tabla"><colgroup><col class="c-fecha"><col><col class="c-asig"><col class="c-estado"><col class="c-acc"></colgroup><thead><tr><th>Fecha y hora</th><th>Paciente · servicio</th><th>Dentista · posición</th><th>Estado</th><th class="c-acc-th">Acciones</th></tr></thead><tbody id="citasBody"></tbody></table></div>
+<div class="roles-wrap"><table class="citas-tabla"><colgroup><col class="c-fecha"><col><col class="c-asig"><col class="c-estado"><col class="c-acc"></colgroup><thead><tr><th>Fecha y hora</th><th>Paciente · servicio</th><th>Odontólogo · posición</th><th>Estado</th><th class="c-acc-th">Acciones</th></tr></thead><tbody id="citasBody"></tbody></table></div>
 <p id="citasMsg" class="dlg-msg" role="status"></p>
 
 <div class="adm-box">
@@ -1528,7 +1528,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="ag-form-head">
 <div class="ag-form-tit">
 <h3>Nueva cita</h3>
-<p class="dlg-msg">Completa los pasos. El asistente propone los mejores horarios según la especialidad, el médico del paciente, la disponibilidad de dentistas y salas, y la prioridad.</p>
+<p class="dlg-msg">Completa los pasos. El asistente propone los mejores horarios según la especialidad, el médico del paciente, la disponibilidad de odontólogos y salas, y la prioridad.</p>
 </div>
 <div class="ag-form-der">
 <button type="button" id="agNuevaCita" class="adm-btn">+ Nueva cita</button>
@@ -2058,7 +2058,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 
 <!-- Lista de dentistas -->
 <div id="denLista" class="adm-pane">
-<div class="adm-pane-head"><h3 class="adm-h">Dentistas</h3><button type="button" id="denNuevo" class="adm-btn adm-primary">Nuevo dentista</button></div>
+<div class="adm-pane-head"><h3 class="adm-h">Odontólogos</h3><button type="button" id="denNuevo" class="adm-btn adm-primary">Nuevo odontólogo</button></div>
 <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">
 <div id="denFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar por estado">
 <button type="button" class="adm-btn" data-dfiltro="activo" aria-pressed="true">Activos</button>
@@ -2066,15 +2066,15 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-btn" data-dfiltro="baja" aria-pressed="false">Baja</button>
 <button type="button" class="adm-btn" data-dfiltro="todos" aria-pressed="false">Todos</button>
 </div>
-<input id="denBuscar" type="search" class="adm-input" placeholder="Buscar por nombre, código o especialidad" aria-label="Buscar dentista" style="width: 100%; max-width: 360px">
+<input id="denBuscar" type="search" class="adm-input" placeholder="Buscar por nombre, código o especialidad" aria-label="Buscar odontólogo" style="width: 100%; max-width: 360px">
 </div>
-<div class="roles-wrap"><table><thead><tr><th>Dentista</th><th>Código</th><th>Especialidad</th><th>Sala</th><th>Rol</th><th>Experiencia</th><th>Estado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="denBody"></tbody></table></div>
+<div class="roles-wrap"><table><thead><tr><th>Odontólogo</th><th>Código</th><th>Especialidad</th><th>Sala</th><th>Rol</th><th>Experiencia</th><th>Estado</th><th><span class="sr-only">Abrir</span></th></tr></thead><tbody id="denBody"></tbody></table></div>
 <p id="denMsg" class="dlg-msg" role="status"></p>
 </div>
 
 <!-- Ficha del dentista -->
 <div id="denFicha" class="adm-pane" hidden>
-<button type="button" id="denVolver" class="dlg-link">← Todos los dentistas</button>
+<button type="button" id="denVolver" class="dlg-link">← Todos los odontólogos</button>
 <div class="adm-pane-head">
 <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="denTitulo" class="adm-h"></h3><p id="denSub" class="dlg-msg"></p></div>
 <span id="denEstadoPill" class="estado" hidden></span>
@@ -2102,7 +2102,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>Código de colegiado activo (opcional)<input id="deColegiado" type="text" maxlength="30"></label>
 <label>Tipo de médico<select id="deTipo"><option value="">Sin asignar</option></select></label>
 <label>Dirección<input id="deDireccion" type="text" maxlength="250"></label>
-<label>Usuario del sistema<select id="deUsuario" title="Usuario con el que el dentista abre «Mis pacientes» (solo sus pacientes)."><option value="">Sin usuario</option></select></label>
+<label>Usuario del sistema<select id="deUsuario" title="Usuario con el que el odontólogo abre «Mis pacientes» (solo sus pacientes)."><option value="">Sin usuario</option></select></label>
 <div class="full de-firmas"><div class="de-firma-card"><div class="de-firma-cab"><span class="pos-lbl">Firma electrónica</span><small>Aparece sobre la línea de firma</small></div><div id="deFirmaVista" class="de-firma-vista de-firma">Sin firma</div><div class="de-firma-acc"><button type="button" id="deFirmaBtn" class="adm-btn">Subir</button><button type="button" id="deFirmaQuitar" class="adm-btn hm-eliminar" hidden>Quitar</button></div><input id="deFirmaArchivo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><div class="de-firma-card"><div class="de-firma-cab"><span class="pos-lbl">Sello profesional</span><small>Se coloca junto a la firma</small></div><div id="deSelloVista" class="de-firma-vista de-sello">Sin sello</div><div class="de-firma-acc"><button type="button" id="deSelloBtn" class="adm-btn">Subir</button><button type="button" id="deSelloQuitar" class="adm-btn hm-eliminar" hidden>Quitar</button></div><input id="deSelloArchivo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><p id="deFirmaMsg" class="dlg-msg">Sube una imagen PNG con fondo transparente o una foto clara sobre papel blanco: el fondo blanco se quita solo. Se usan en recetas, presupuestos, tratamientos y estados de cuenta.</p></div>
 </div>
 </fieldset>
@@ -2155,7 +2155,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="deCitasSec" class="adm-pane" hidden>
 <h3 style="margin: 0; font-size: 19px; font-weight: 700">Próximas citas · 7 días</h3>
 <div class="roles-wrap"><table><thead><tr><th>Fecha y hora</th><th>Paciente</th><th>Servicio</th><th>Sala</th><th>Estado</th></tr></thead><tbody id="deCitasBody"></tbody></table></div>
-<p class="dlg-msg">Las citas nuevas se asignan solas al dentista que atiende a esa hora. Se pueden cambiar en «Historial de citas».</p>
+<p class="dlg-msg">Las citas nuevas se asignan solas al odontólogo que atiende a esa hora. Se pueden cambiar en «Historial de citas».</p>
 </div>
 
 <!-- Títulos -->

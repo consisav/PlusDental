@@ -37,18 +37,18 @@
 
   $('admTiposDen').innerHTML =
     '<div id="tdLista" class="adm-pane">' +
-    '<div class="adm-pane-head"><h3 class="adm-h">Tipos de dentistas</h3><button type="button" id="tdNuevo" class="adm-btn adm-primary">Nuevo tipo</button></div>' +
-    '<p class="dlg-msg">Tipos de odontólogos que ejercen en Guatemala (preparado con IA): odontólogo general y especialistas, con la formación habitual y los casos que atienden. El área de especialidad se usa en la ficha de cada dentista y en el asistente de la agenda.</p>' +
+    '<div class="adm-pane-head"><h3 class="adm-h">Tipos de odontólogos</h3><button type="button" id="tdNuevo" class="adm-btn adm-primary">Nuevo tipo</button></div>' +
+    '<p class="dlg-msg">Tipos de odontólogos que ejercen en Guatemala (preparado con IA): odontólogo general y especialistas, con la formación habitual y los casos que atienden. El área de especialidad se usa en la ficha de cada odontólogo y en el asistente de la agenda.</p>' +
     '<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center">' +
     '<div id="tdFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar por estado">' +
     [['todos', 'Todos'], ['activo', 'Activos'], ['inactivo', 'Inactivos']].map(function (f) { return '<button type="button" class="adm-btn" data-tdfiltro="' + f[0] + '" aria-pressed="' + (f[0] === 'todos') + '">' + f[1] + '</button>'; }).join('') +
-    '</div><input id="tdBuscar" type="search" class="adm-input" placeholder="Buscar tipo o caso que atiende" aria-label="Buscar tipo de dentista" style="width: 100%; max-width: 320px"></div>' +
+    '</div><input id="tdBuscar" type="search" class="adm-input" placeholder="Buscar tipo o caso que atiende" aria-label="Buscar tipo de odontólogo" style="width: 100%; max-width: 320px"></div>' +
     '<div id="tdGrid" class="tp-grid"></div><p id="tdMsg" class="dlg-msg" role="status"></p></div>' +
 
     '<div id="tdFicha" class="adm-pane" hidden>' +
     '<button type="button" id="tdVolver" class="dlg-link">← Todos los tipos</button>' +
     '<div class="adm-pane-head"><div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><h3 id="tdTitulo" class="adm-h"></h3><p id="tdSub" class="dlg-msg"></p></div><span id="tdPill" class="estado" hidden></span></div>' +
-    '<form id="tdForm" class="adm-pane" novalidate><fieldset id="tdCampos" class="campos pos-sec"><legend>Datos del tipo de dentista</legend><div class="exp-form">' +
+    '<form id="tdForm" class="adm-pane" novalidate><fieldset id="tdCampos" class="campos pos-sec"><legend>Datos del tipo de odontólogo</legend><div class="exp-form">' +
     '<div class="exp-campo"><span class="pos-lbl">Código (automático)</span><div id="tdCodigo" class="exp-calc">—</div></div>' +
     '<label>Estado<select id="tdEstado" class="ac-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></label>' +
     '<label>Nombre del tipo *<input id="tdNombre" type="text" maxlength="120" required placeholder="Ej.: Endodoncista"></label>' +
@@ -59,7 +59,7 @@
     '</div></fieldset>' +
     '<div class="exp-actions ac-acciones"><button type="submit" id="tdGrabar" class="dlg-submit">Grabar</button><button type="button" id="tdModificar" class="adm-btn adm-primary">Modificar</button><button type="button" id="tdEliminar" class="adm-btn">Eliminar</button><button type="button" id="tdCancelar" class="adm-btn">Cancelar</button></div>' +
     '<p id="tdFormMsg" class="dlg-msg" role="status"></p></form>' +
-    '<div id="tdDenSec" class="pos-sec"><h4 class="pr-form-t">Dentistas de este tipo</h4><div id="tdDen" class="td-den"></div></div></div>';
+    '<div id="tdDenSec" class="pos-sec"><h4 class="pr-form-t">Odontólogos de este tipo</h4><div id="tdDen" class="td-den"></div></div></div>';
 
   function ver(id) { ['tdLista', 'tdFicha'].forEach(function (v) { $(v).hidden = v !== id; }); }
 
@@ -92,7 +92,7 @@
           '<b>' + esc(t.nombre) + '</b><span class="td-area">' + esc(t.especialidad) + '</span>' +
           (t.descripcion ? '<span class="tp-desc">' + esc(t.descripcion) + '</span>' : '') +
           '<span class="tp-chips">' + (t.atiende || []).map(function (s) { return '<span>' + esc(s) + '</span>'; }).join('') + '</span>' +
-          '<small>' + (n ? n + (n === 1 ? ' dentista de la clínica' : ' dentistas de la clínica') : 'Ningún dentista de la clínica con esta especialidad') + '</small></button>';
+          '<small>' + (n ? n + (n === 1 ? ' odontólogo de la clínica' : ' odontólogos de la clínica') : 'Ningún odontólogo de la clínica con esta especialidad') + '</small></button>';
       }).join('');
   }
 
@@ -107,7 +107,7 @@
     $('tdAtiende').value = t ? (t.atiende || []).join('\n') : '';
   }
   function pintarCabecera() {
-    $('tdTitulo').textContent = actual ? actual.nombre : 'Nuevo tipo de dentista';
+    $('tdTitulo').textContent = actual ? actual.nombre : 'Nuevo tipo de odontólogo';
     $('tdSub').textContent = actual ? actual.codigo + ' · registrado por ' + (actual.registrado_por || '—') + ' · última modificación por ' + (actual.actualizado_por || '—') : 'Llena los datos y pulsa «Grabar».';
     $('tdPill').hidden = !actual;
     if (actual) { $('tdPill').className = 'estado estado-' + actual.estado; $('tdPill').textContent = ESTADOS[actual.estado]; }
@@ -123,7 +123,7 @@
     if (!actual) return;
     var lista = dentistasDe(actual);
     $('tdDen').innerHTML = lista.length ? lista.map(function (d) { return '<span class="td-chip' + (d.estado === 'activo' ? '' : ' inactivo') + '">' + esc(d.nombre) + (d.estado === 'activo' ? '' : ' · ' + esc(d.estado)) + '</span>'; }).join('')
-      : '<p class="dlg-msg">Ningún dentista de la clínica tiene «' + esc(actual.especialidad) + '» en sus especialidades. Agrégala desde la ficha del dentista.</p>';
+      : '<p class="dlg-msg">Ningún odontólogo de la clínica tiene «' + esc(actual.especialidad) + '» en sus especialidades. Agrégala desde la ficha del dentista.</p>';
   }
   function abrir(t) {
     actual = t || null; editando = !t;
@@ -152,7 +152,7 @@
     actual = r.data; editando = false;
     tipos = nuevo ? tipos.concat([actual]) : tipos.map(function (t) { return t.id === actual.id ? actual : t; });
     rellenar(actual); pintarCabecera(); aplicarModo(); pintarDentistas(); pintarLista();
-    aviso('tdFormMsg', nuevo ? 'Tipo de dentista grabado.' : 'Cambios guardados.');
+    aviso('tdFormMsg', nuevo ? 'Tipo de odontólogo grabado.' : 'Cambios guardados.');
   }
 
   // ---------- Eventos ----------
@@ -183,7 +183,7 @@
     actual = null;
     await cargar();
     ver('tdLista');
-    aviso('tdMsg', 'Tipo «' + nombre + '» eliminado. Las especialidades de los dentistas no cambian.');
+    aviso('tdMsg', 'Tipo «' + nombre + '» eliminado. Las especialidades de los odontólogos no cambian.');
   });
 
   // Áreas de especialidad activas para otras pantallas (ficha del dentista, agenda)

@@ -128,7 +128,7 @@
       campo('Material · color', esc([o.material, o.color].filter(Boolean).join(' · ') || '—')) +
       campo('Impresión', esc(o.impresion || '—')) + campo('Enviada', fechaCorta(o.fecha_envio)) +
       campo('Entrega prometida', fechaCorta(o.fecha_entrega)) + campo('Recibida', fechaCorta(o.fecha_recibida)) +
-      campo('Costo laboratorio', q(o.costo)) + campo('Dentista', esc(d ? d.nombre : '—')) +
+      campo('Costo laboratorio', q(o.costo)) + campo('Odontólogo', esc(d ? d.nombre : '—')) +
       campo('Cita de colocación', cita ? fechaCorta(cita.fecha) + ' · ' + String(cita.hora).slice(0, 5) : '—') + '</div>' +
       ((o.envia || []).length ? '<div class="ol-envia"><span class="pos-lbl">Se envía al laboratorio</span>' + o.envia.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '</div>' : '') +
       (o.indicaciones ? '<p class="rc-ind"><b>Indicaciones:</b> ' + esc(o.indicaciones) + '</p>' : '') +
@@ -150,7 +150,7 @@
       datosPaciente() +
       '<fieldset class="pos-sec"><legend>Laboratorio y trabajo</legend><div class="exp-form rc-g4">' +
       '<label class="rc-span2">Laboratorio<select id="olLab"><option value="">Elegir laboratorio…</option>' + labs.filter(function (l) { return l.activo || (o && l.id === o.laboratorio_id); }).map(function (l) { return '<option value="' + l.id + '"' + (o && l.id === o.laboratorio_id ? ' selected' : '') + '>' + esc(l.nombre) + '</option>'; }).join('') + '<option value="nuevo">+ Nuevo laboratorio…</option></select></label>' +
-      '<label class="rc-span2">Dentista que solicita<select id="olDent"><option value="">Sin asignar</option>' + dentistas.filter(function (d) { return d.estado === 'activo' || d.id === med; }).map(function (d) { return '<option value="' + d.id + '"' + (d.id === med ? ' selected' : '') + '>' + esc(d.nombre) + '</option>'; }).join('') + '</select></label>' +
+      '<label class="rc-span2">Odontólogo que solicita<select id="olDent"><option value="">Sin asignar</option>' + dentistas.filter(function (d) { return d.estado === 'activo' || d.id === med; }).map(function (d) { return '<option value="' + d.id + '"' + (d.id === med ? ' selected' : '') + '>' + esc(d.nombre) + '</option>'; }).join('') + '</select></label>' +
       '<div id="olLabNuevo" class="full ol-labnuevo" hidden><span class="pos-lbl">Nuevo laboratorio</span><div class="exp-form rc-g4"><label class="rc-span2">Nombre *<input id="olLabNombre" maxlength="120"></label><label>Teléfono / WhatsApp<input id="olLabTel" maxlength="40"></label><label>Correo<input id="olLabCorreo" type="email" maxlength="120"></label><label class="rc-span2">Persona de contacto<input id="olLabContacto" maxlength="120"></label><label class="rc-span2">Dirección<input id="olLabDir" maxlength="200"></label></div></div>' +
       '<label class="rc-span2">Tipo de trabajo *<input id="olTrabajo" list="olListaTrabajos" maxlength="120" required value="' + esc(o ? o.trabajo : '') + '" placeholder="Ej.: Corona unitaria"></label>' +
       '<label class="rc-span2">Piezas (FDI)<input id="olPiezas" maxlength="120" value="' + esc(o ? o.piezas || '' : '') + '" placeholder="Ej.: 36 o 14 a 16"></label>' +
@@ -244,7 +244,7 @@
     var d = dentDe(o.dentista_id), p = paciente;
     return 'Plus Dental · Orden de laboratorio ' + (o.numero || '') + '\n' +
       'Paciente: ' + p.nombre + (p.fecha_nacimiento ? ' (' + edad(p.fecha_nacimiento) + ')' : '') + ' · Código ' + String(p.id).padStart(4, '0') + '\n' +
-      'Dentista: ' + (d ? d.nombre : '—') + '\n' +
+      'Odontólogo: ' + (d ? d.nombre : '—') + '\n' +
       'Trabajo: ' + o.trabajo + (o.piezas ? ' · Piezas: ' + o.piezas : '') + '\n' +
       (o.material || o.color ? 'Material: ' + (o.material || '—') + ' · Color: ' + (o.color || '—') + '\n' : '') +
       (o.impresion ? 'Impresión: ' + o.impresion + '\n' : '') +
@@ -267,7 +267,7 @@
       '<div style="' + caja + '"><div style="font-size:10.5px;letter-spacing:.12em;font-weight:800;color:#005A87;margin-bottom:6px">LABORATORIO</div><b style="font-size:15px">' + esc(l ? l.nombre : '—') + '</b>' +
       (l ? '<div style="font-size:12.5px;color:#475B68;margin-top:3px;line-height:1.55">' + [l.contacto ? 'Contacto: ' + esc(l.contacto) : '', l.telefono ? 'Tel. ' + esc(l.telefono) : '', l.correo ? esc(l.correo) : '', l.direccion ? esc(l.direccion) : ''].filter(Boolean).join('<br>') + '</div>' : '') + '</div>' +
       '<div style="' + caja + '"><div style="font-size:10.5px;letter-spacing:.12em;font-weight:800;color:#005A87;margin-bottom:6px">PACIENTE</div><b style="font-size:15px">' + esc(p.nombre) + '</b>' +
-      '<div style="font-size:12.5px;color:#475B68;margin-top:3px;line-height:1.55">Código ' + String(p.id).padStart(4, '0') + (p.fecha_nacimiento ? ' · ' + edad(p.fecha_nacimiento) : '') + '<br>Dentista: ' + esc(d ? d.nombre : '—') + (d && d.colegiado ? ' · Col. ' + esc(d.colegiado) : '') + '</div></div></div>' +
+      '<div style="font-size:12.5px;color:#475B68;margin-top:3px;line-height:1.55">Código ' + String(p.id).padStart(4, '0') + (p.fecha_nacimiento ? ' · ' + edad(p.fecha_nacimiento) : '') + '<br>Odontólogo: ' + esc(d ? d.nombre : '—') + (d && d.colegiado ? ' · Col. ' + esc(d.colegiado) : '') + '</div></div></div>' +
       sec('Trabajo solicitado') +
       '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#0B2B40;color:#FFFFFF">' + ['Trabajo', 'Piezas (FDI)', 'Material', 'Color', 'Impresión'].map(function (h) { return '<th style="' + celda + ';border-bottom:0;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em">' + h + '</th>'; }).join('') + '</tr></thead>' +
       '<tbody><tr><td style="' + celda + '"><b>' + esc(o.trabajo) + '</b></td><td style="' + celda + '">' + esc(o.piezas || '—') + '</td><td style="' + celda + '">' + esc(o.material || '—') + '</td><td style="' + celda + '">' + esc(o.color || '—') + '</td><td style="' + celda + '">' + esc(o.impresion || '—') + '</td></tr></tbody></table>' +
@@ -275,7 +275,7 @@
       (o.indicaciones ? sec('Indicaciones') + '<div style="font-size:13.5px;line-height:1.6;white-space:pre-line">' + esc(o.indicaciones) + '</div>' : '') +
       sec('Fechas') + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' + dato('Fecha de envío', fechaCorta(o.fecha_envio)) + dato('Entrega solicitada', fechaCorta(o.fecha_entrega)) + dato('Estado', ESTADOS[o.estado]) + dato('Costo acordado', q(o.costo)) + '</div>' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:40px;margin-top:34px;flex-wrap:wrap">' +
-      (firma ? window.PD_FIRMA.bloque(firma, { etiqueta: 'Firma y sello del dentista solicitante' }) : '<div style="width:260px;border-top:1.5px solid #0B2B40;padding-top:6px;text-align:center;font-size:12.5px">' + esc(d ? 'Dr(a). ' + d.nombre : 'Dentista solicitante') + '</div>') +
+      (firma ? window.PD_FIRMA.bloque(firma, { etiqueta: 'Firma y sello del odontólogo solicitante' }) : '<div style="width:260px;border-top:1.5px solid #0B2B40;padding-top:6px;text-align:center;font-size:12.5px">' + esc(d ? 'Dr(a). ' + d.nombre : 'Odontólogo solicitante') + '</div>') +
       '<div style="width:240px;text-align:center"><div style="border-top:1.5px solid #0B2B40;padding-top:7px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:#475B68">Recibido por el laboratorio<br><span style="font-weight:600;letter-spacing:0;text-transform:none">Fecha: ____ / ____ / ______</span></div></div></div>' +
       '<p style="margin-top:20px;font-size:11px;color:#5A6D7A">Orden ' + esc(o.numero || '') + ' registrada por ' + esc(o.creada_por || '') + ' el ' + fechaHora(o.creada) + '. Ante dudas, comuníquese con Plus Dental: +502 3756-5739.</p></div>');
   }

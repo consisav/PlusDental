@@ -132,7 +132,7 @@
   function pintarCabecera() {
     $('asTitulo').textContent = actual ? actual.nombre : 'Nuevo asistente dental';
     var den = actual ? asignadoA(actual) : [];
-    $('asSub').textContent = actual ? [actual.codigo, ROLES[actual.rol], den.length ? 'Asiste a ' + den.map(function (d) { return d.nombre; }).join(', ') : 'Sin dentista asignado'].filter(Boolean).join(' · ') : 'Llena los datos y pulsa «Grabar». Después podrás agregar la fotografía.';
+    $('asSub').textContent = actual ? [actual.codigo, ROLES[actual.rol], den.length ? 'Asiste a ' + den.map(function (d) { return d.nombre; }).join(', ') : 'Sin odontólogo asignado'].filter(Boolean).join(' · ') : 'Llena los datos y pulsa «Grabar». Después podrás agregar la fotografía.';
     $('asPill').hidden = !actual;
     if (actual) { $('asPill').className = 'estado estado-' + (actual.activo ? 'activo' : 'inactivo'); $('asPill').textContent = actual.activo ? 'Activo' : 'Inactivo'; }
     $('asReg').innerHTML = actual ? 'Registrado <b>' + fechaHora(actual.creado) + '</b> por <b>' + esc(actual.registrado_por || '—') + '</b>' + (actual.actualizado ? ' · Última modificación <b>' + fechaHora(actual.actualizado) + '</b> por <b>' + esc(actual.actualizado_por || '—') + '</b>' : '') : '';
