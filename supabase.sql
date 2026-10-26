@@ -4810,6 +4810,325 @@ select x.nombre, x.descripcion, x.ejemplos, x.receta, l.id, l.organizacion_id
   cross join (select l.id, l.organizacion_id from public.org_localidades l join public.organizaciones o on o.id = l.organizacion_id where o.codigo = '2' and l.codigo = '1') l
  where not exists (select 1 from public.inv_tipos_producto t where lower(t.nombre) = lower(x.nombre) and t.localidad_id = l.id);
 
+-- ===== Inventarios (fase 2): compras, movimiento kardex y despacho por ventas =====
+-- Compras: ingresan productos a una bodega (entrada en el kardex) y actualizan el último costo del producto.
+-- Ventas: una línea de Cobros y pagos puede ser un procedimiento o un producto; el producto sale de la bodega
+-- general de la sede (salida en el kardex). Si falta existencia se avisa en pantalla pero se permite registrar.
+-- Al anular una compra o un pago, el kardex registra el movimiento contrario. Todo con sede, número y registro.
+create table if not exists public.inv_compras (
+  id                bigint generated always as identity primary key,
+  numero            int,
+  proveedor_id      bigint references public.inv_proveedores (id) on delete set null,
+  bodega_id         bigint not null references public.inv_bodegas (id),
+  fecha             date not null default current_date,
+  tipo_documento    text not null default 'factura' check (tipo_documento in ('factura', 'recibo', 'nota_envio', 'otro')),
+  serie             text check (char_length(serie) <= 20),
+  numero_documento  text check (char_length(numero_documento) <= 40),
+  dias_credito      int not null default 0 check (dias_credito between 0 and 365),
+  observaciones     text check (char_length(observaciones) <= 500),
+  total             numeric(12,2) not null default 0 check (total >= 0),
+  estado            text not null default 'registrada' check (estado in ('registrada', 'anulada')),
+  anulado_motivo    text check (char_length(anulado_motivo) <= 300),
+  anulado_en        timestamptz,
+  anulado_por       text,
+  organizacion_id   bigint references public.organizaciones (id) on delete set null,
+  localidad_id      bigint references public.org_localidades (id) on delete set null,
+  creado            timestamptz not null default now(),
+  creado_por        text,
+  modificado        timestamptz,
+  modificado_por    text
+);
+
+create table if not exists public.inv_compra_items (
+  id              bigint generated always as identity primary key,
+  compra_id       bigint not null references public.inv_compras (id) on delete cascade,
+  linea           int not null check (linea >= 1),
+  producto_id     bigint not null references public.inv_productos (id),
+  cantidad        numeric(12,2) not null check (cantidad > 0),
+  costo_unitario  numeric(12,4) not null default 0 check (costo_unitario >= 0),
+  subtotal        numeric(12,2) not null default 0 check (subtotal >= 0),
+  lote            text check (char_length(lote) <= 40),
+  vencimiento     date
+);
+create unique index if not exists inv_compra_items_linea on public.inv_compra_items (compra_id, linea);
+
+-- Kardex: cada entrada o salida de un producto en una bodega
+create table if not exists public.inv_movimientos (
+  id               bigint generated always as identity primary key,
+  fecha            timestamptz not null default now(),
+  producto_id      bigint not null references public.inv_productos (id),
+  bodega_id        bigint not null references public.inv_bodegas (id),
+  tipo             text not null check (tipo in ('entrada', 'salida')),
+  origen           text not null check (origen in ('compra', 'venta', 'ajuste', 'anulacion_compra', 'anulacion_venta')),
+  compra_id        bigint references public.inv_compras (id) on delete set null,
+  pago_id          bigint references public.pagos (id) on delete set null,
+  documento        text check (char_length(documento) <= 120),
+  cantidad         numeric(12,2) not null check (cantidad > 0),
+  costo_unitario   numeric(12,4) not null default 0 check (costo_unitario >= 0),
+  observaciones    text check (char_length(observaciones) <= 300),
+  usuario          text,
+  organizacion_id  bigint references public.organizaciones (id) on delete set null,
+  localidad_id     bigint references public.org_localidades (id) on delete set null
+);
+create index if not exists inv_movimientos_producto on public.inv_movimientos (producto_id, bodega_id, fecha, id);
+create index if not exists inv_movimientos_pago on public.inv_movimientos (pago_id) where pago_id is not null;
+
+-- Línea de cobro con producto: cantidad y bodega de donde sale
+alter table public.pago_detalle add column if not exists producto_id bigint references public.inv_productos (id) on delete set null;
+alter table public.pago_detalle add column if not exists cantidad numeric(12,2) check (cantidad > 0);
+alter table public.pago_detalle add column if not exists bodega_id bigint references public.inv_bodegas (id) on delete set null;
+
+-- El registro automático también numera las compras
+create or replace function public.inv_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+begin
+  if tg_op = 'INSERT' then
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto', 'inv_compras') then
+      perform pg_advisory_xact_lock(hashtext(tg_table_name || '_numero'));
+      execute format('select coalesce(max(numero), 0) + 1 from public.%I', tg_table_name) into new.numero;
+    end if;
+    new.creado := now(); new.creado_por := v_usuario; new.modificado := null; new.modificado_por := null;
+  else
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto', 'inv_compras') then new.numero := old.numero; end if;
+    new.creado := old.creado; new.creado_por := old.creado_por;
+    new.modificado := now(); new.modificado_por := v_usuario;
+  end if;
+  return new;
+end;
+$$;
+
+do $$ declare t text := 'inv_compras'; begin
+  if not exists (select 1 from pg_trigger where tgname = t || '_registro' and tgrelid = ('public.' || t)::regclass) then
+    execute format('create trigger %I before insert or update on public.%I for each row execute function public.inv_registro()', t || '_registro', t);
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = t || '_sede' and tgrelid = ('public.' || t)::regclass) then
+    execute format('create trigger %I before insert or update of organizacion_id, localidad_id on public.%I for each row execute function public.sede_registro()', t || '_sede', t);
+  end if;
+end $$;
+
+-- Lectura para el personal de su sede; compras, ventas y ajustes se graban solo con las funciones de abajo
+alter table public.inv_compras enable row level security;
+drop policy if exists inv_compras_lee on public.inv_compras;
+create policy inv_compras_lee on public.inv_compras for select to authenticated using (public.es_personal() and public.ve_sede(localidad_id));
+grant select on public.inv_compras to authenticated;
+alter table public.inv_compra_items enable row level security;
+drop policy if exists inv_compra_items_lee on public.inv_compra_items;
+create policy inv_compra_items_lee on public.inv_compra_items for select to authenticated
+  using (public.es_personal() and exists (select 1 from public.inv_compras c where c.id = compra_id and public.ve_sede(c.localidad_id)));
+grant select on public.inv_compra_items to authenticated;
+alter table public.inv_movimientos enable row level security;
+drop policy if exists inv_movimientos_lee on public.inv_movimientos;
+create policy inv_movimientos_lee on public.inv_movimientos for select to authenticated using (public.es_personal() and public.ve_sede(localidad_id));
+grant select on public.inv_movimientos to authenticated;
+
+-- Existencia por producto y bodega
+create or replace view public.inv_existencias with (security_invoker = true) as
+  select producto_id, bodega_id, localidad_id,
+         sum(case when tipo = 'entrada' then cantidad else -cantidad end) as existencia,
+         max(fecha) as ultimo_movimiento
+    from public.inv_movimientos
+   group by producto_id, bodega_id, localidad_id;
+grant select on public.inv_existencias to authenticated;
+
+-- Kardex con saldo acumulado por producto y bodega
+create or replace view public.inv_kardex with (security_invoker = true) as
+  select m.*,
+         case when m.tipo = 'entrada' then m.cantidad else 0 end as entrada,
+         case when m.tipo = 'salida' then m.cantidad else 0 end as salida,
+         sum(case when m.tipo = 'entrada' then m.cantidad else -m.cantidad end)
+           over (partition by m.producto_id, m.bodega_id order by m.fecha, m.id) as saldo
+    from public.inv_movimientos m;
+grant select on public.inv_kardex to authenticated;
+
+-- Bodega general de la sede del usuario (o la primera general visible)
+create or replace function public.inv_bodega_general(p_localidad bigint default null)
+returns bigint language sql stable security definer set search_path = public as $$
+  select id from public.inv_bodegas
+   where tipo = 'general' and estado = 'activo' and localidad_id is not distinct from coalesce(p_localidad, public.mi_localidad(), localidad_id)
+   order by numero limit 1;
+$$;
+revoke execute on function public.inv_bodega_general(bigint) from public, anon;
+grant execute on function public.inv_bodega_general(bigint) to authenticated;
+
+-- Registrar una compra con sus productos: crea la entrada al kardex y actualiza el último costo
+create or replace function public.registrar_compra(p_datos jsonb, p_items jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint;
+  v_bodega public.inv_bodegas;
+  v_doc text;
+  v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+  v_total numeric := 0;
+  e jsonb;
+  n int := 0;
+  v_cant numeric; v_costo numeric;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if jsonb_array_length(coalesce(p_items, '[]'::jsonb)) = 0 then raise exception 'Agrega al menos un producto a la compra'; end if;
+  select * into v_bodega from public.inv_bodegas where id = nullif(p_datos ->> 'bodega_id', '')::bigint;
+  if v_bodega.id is null or not public.ve_sede(v_bodega.localidad_id) then raise exception 'Elige una bodega de tu sede'; end if;
+  insert into public.inv_compras (proveedor_id, bodega_id, fecha, tipo_documento, serie, numero_documento, dias_credito, observaciones, localidad_id, organizacion_id)
+  values (nullif(p_datos ->> 'proveedor_id', '')::bigint, v_bodega.id, coalesce(nullif(p_datos ->> 'fecha', '')::date, current_date),
+          coalesce(nullif(p_datos ->> 'tipo_documento', ''), 'factura'), nullif(trim(p_datos ->> 'serie'), ''), nullif(trim(p_datos ->> 'numero_documento'), ''),
+          coalesce(nullif(p_datos ->> 'dias_credito', '')::int, 0), nullif(trim(p_datos ->> 'observaciones'), ''), v_bodega.localidad_id, v_bodega.organizacion_id)
+  returning id into v_id;
+  select 'Compra N.º ' || numero || coalesce(' · ' || nullif(concat_ws(' ', serie, numero_documento), ''), '') into v_doc from public.inv_compras where id = v_id;
+  for e in select * from jsonb_array_elements(p_items) loop
+    v_cant := coalesce(nullif(e ->> 'cantidad', '')::numeric, 0);
+    v_costo := greatest(coalesce(nullif(e ->> 'costo_unitario', '')::numeric, 0), 0);
+    if v_cant <= 0 then raise exception 'La cantidad de cada producto debe ser mayor que cero'; end if;
+    if not exists (select 1 from public.inv_productos where id = (e ->> 'producto_id')::bigint) then raise exception 'Producto no válido en la línea %', n + 1; end if;
+    n := n + 1;
+    insert into public.inv_compra_items (compra_id, linea, producto_id, cantidad, costo_unitario, subtotal, lote, vencimiento)
+    values (v_id, n, (e ->> 'producto_id')::bigint, v_cant, v_costo, round(v_cant * v_costo, 2), nullif(trim(e ->> 'lote'), ''), nullif(e ->> 'vencimiento', '')::date);
+    insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, compra_id, documento, cantidad, costo_unitario, usuario, localidad_id, organizacion_id)
+    values (now(), (e ->> 'producto_id')::bigint, v_bodega.id, 'entrada', 'compra', v_id, v_doc, v_cant, v_costo, v_usuario, v_bodega.localidad_id, v_bodega.organizacion_id);
+    if v_costo > 0 then update public.inv_productos set costo = round(v_costo, 2) where id = (e ->> 'producto_id')::bigint; end if;
+    v_total := v_total + round(v_cant * v_costo, 2);
+  end loop;
+  update public.inv_compras set total = v_total where id = v_id;
+  return v_id;
+end;
+$$;
+revoke execute on function public.registrar_compra(jsonb, jsonb) from public, anon;
+grant execute on function public.registrar_compra(jsonb, jsonb) to authenticated;
+
+-- Anular una compra (Super Administrador): saca del kardex lo que había ingresado
+create or replace function public.anular_compra(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_super_administrador() then raise exception 'Solo el Super Administrador puede anular compras'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escribe el motivo de la anulación'; end if;
+  update public.inv_compras set estado = 'anulada', anulado_motivo = trim(p_motivo), anulado_en = now(), anulado_por = v_usuario
+   where id = p_id and estado = 'registrada';
+  if not found then raise exception 'La compra no existe o ya estaba anulada'; end if;
+  insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, compra_id, documento, cantidad, costo_unitario, observaciones, usuario, localidad_id, organizacion_id)
+  select now(), producto_id, bodega_id, 'salida', 'anulacion_compra', compra_id, 'Anulación · ' || documento, cantidad, costo_unitario, trim(p_motivo), v_usuario, localidad_id, organizacion_id
+    from public.inv_movimientos where compra_id = p_id and origen = 'compra';
+end;
+$$;
+revoke execute on function public.anular_compra(bigint, text) from public, anon;
+grant execute on function public.anular_compra(bigint, text) to authenticated;
+
+-- Ajuste de inventario (inventario inicial, conteo físico, vencidos, merma): entrada o salida con motivo
+create or replace function public.registrar_ajuste_inventario(p_producto bigint, p_bodega bigint, p_tipo text, p_cantidad numeric, p_motivo text)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_bodega public.inv_bodegas; v_id bigint;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if p_tipo not in ('entrada', 'salida') then raise exception 'El ajuste debe ser entrada o salida'; end if;
+  if coalesce(p_cantidad, 0) <= 0 then raise exception 'La cantidad debe ser mayor que cero'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escribe el motivo del ajuste'; end if;
+  select * into v_bodega from public.inv_bodegas where id = p_bodega;
+  if v_bodega.id is null or not public.ve_sede(v_bodega.localidad_id) then raise exception 'Elige una bodega de tu sede'; end if;
+  insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, documento, cantidad, costo_unitario, observaciones, usuario, localidad_id, organizacion_id)
+  values (now(), p_producto, v_bodega.id, p_tipo, 'ajuste', 'Ajuste de inventario', p_cantidad,
+          coalesce((select costo from public.inv_productos where id = p_producto), 0), trim(p_motivo),
+          (select usuario from public.perfiles where id = auth.uid()), v_bodega.localidad_id, v_bodega.organizacion_id)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+revoke execute on function public.registrar_ajuste_inventario(bigint, bigint, text, numeric, text) from public, anon;
+grant execute on function public.registrar_ajuste_inventario(bigint, bigint, text, numeric, text) to authenticated;
+
+-- Registra el pago y su detalle en un solo paso. Los montos del pago son la suma de las líneas.
+-- Cada línea es un tipo de procedimiento o un producto (con cantidad); el producto sale de la bodega indicada
+-- o de la bodega general de la sede.
+create or replace function public.registrar_pago(p_datos jsonb, p_lineas jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint;
+  v_q numeric := 0;
+  v_usd numeric := 0;
+  v_estado text := coalesce(nullif(p_datos ->> 'estado_doc', ''), 'emitido');
+  v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+  v_doc text;
+  v_bodega public.inv_bodegas;
+  v_prod bigint; v_cant numeric;
+  e jsonb;
+  n int := 0;
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if jsonb_array_length(coalesce(p_lineas, '[]'::jsonb)) = 0 then
+    raise exception 'Agrega al menos una línea al detalle del pago';
+  end if;
+  if v_estado not in ('emitido', 'aplicado', 'certificado') then
+    raise exception 'Un pago nuevo no puede registrarse como anulado';
+  end if;
+  select coalesce(sum(greatest(coalesce((l ->> 'monto')::numeric, 0), 0)), 0),
+         coalesce(sum(greatest(coalesce((l ->> 'monto_usd')::numeric, 0), 0)), 0)
+    into v_q, v_usd
+    from jsonb_array_elements(p_lineas) l;
+  if v_q <= 0 then
+    raise exception 'El total en quetzales del detalle debe ser mayor que cero';
+  end if;
+  insert into public.pagos (paciente_id, presupuesto_id, fecha, monto, monto_usd, metodo, referencia, concepto,
+                            nit, tipo_documento, serie, numero_factura, numero_dte, numero_cuota, estado_doc, observaciones)
+  values ((p_datos ->> 'paciente_id')::bigint, nullif(p_datos ->> 'presupuesto_id', '')::bigint,
+          coalesce(nullif(p_datos ->> 'fecha', '')::date, current_date), round(v_q, 2), round(v_usd, 2),
+          (p_datos ->> 'metodo')::public.metodo_pago, nullif(trim(p_datos ->> 'referencia'), ''), nullif(trim(p_datos ->> 'concepto'), ''),
+          nullif(trim(p_datos ->> 'nit'), ''), coalesce(nullif(p_datos ->> 'tipo_documento', ''), 'recibo'), nullif(trim(p_datos ->> 'serie'), ''),
+          nullif(trim(p_datos ->> 'numero_factura'), ''), nullif(trim(p_datos ->> 'numero_dte'), ''),
+          nullif(p_datos ->> 'numero_cuota', '')::int, v_estado, nullif(trim(p_datos ->> 'observaciones'), ''))
+  returning id into v_id;
+  select case when tipo_documento = 'factura' and numero_factura is not null then 'Factura ' || concat_ws('-', serie, numero_factura)
+              else 'Recibo ' || coalesce(correlativo, id::text) end
+    into v_doc from public.pagos where id = v_id;
+  for e in select * from jsonb_array_elements(p_lineas) loop
+    n := n + 1;
+    v_prod := nullif(e ->> 'producto_id', '')::bigint;
+    v_cant := case when v_prod is null then null else coalesce(nullif(e ->> 'cantidad', '')::numeric, 1) end;
+    if v_prod is null and nullif(e ->> 'tipo_procedimiento_id', '') is null then
+      raise exception 'Elige el procedimiento o el producto de la línea %', n;
+    end if;
+    v_bodega := null;
+    if v_prod is not null then
+      if v_cant <= 0 then raise exception 'La cantidad del producto de la línea % debe ser mayor que cero', n; end if;
+      select * into v_bodega from public.inv_bodegas where id = coalesce(nullif(e ->> 'bodega_id', '')::bigint, public.inv_bodega_general());
+      if v_bodega.id is null or not public.ve_sede(v_bodega.localidad_id) then
+        raise exception 'No hay una bodega general activa en tu sede para despachar el producto de la línea %', n;
+      end if;
+    end if;
+    insert into public.pago_detalle (pago_id, linea, tipo_procedimiento_id, producto_id, cantidad, bodega_id, clasificacion, monto, monto_usd)
+    values (v_id, n, case when v_prod is null then nullif(e ->> 'tipo_procedimiento_id', '')::bigint end, v_prod, v_cant, v_bodega.id,
+            coalesce(nullif(e ->> 'clasificacion', ''), 'bien'),
+            round(greatest(coalesce((e ->> 'monto')::numeric, 0), 0), 2), round(greatest(coalesce((e ->> 'monto_usd')::numeric, 0), 0), 2));
+    if v_prod is not null then
+      insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, pago_id, documento, cantidad, costo_unitario, usuario, localidad_id, organizacion_id)
+      values (now(), v_prod, v_bodega.id, 'salida', 'venta', v_id, v_doc, v_cant,
+              coalesce((select costo from public.inv_productos where id = v_prod), 0), v_usuario, v_bodega.localidad_id, v_bodega.organizacion_id);
+    end if;
+  end loop;
+  return v_id;
+end;
+$$;
+revoke execute on function public.registrar_pago(jsonb, jsonb) from public, anon;
+grant execute on function public.registrar_pago(jsonb, jsonb) to authenticated;
+
+-- Al anular un pago, los productos vendidos regresan a la bodega (entrada en el kardex)
+create or replace function public.inv_pago_anulado()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.anulado and not coalesce(old.anulado, false) then
+    insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, pago_id, documento, cantidad, costo_unitario, observaciones, usuario, localidad_id, organizacion_id)
+    select now(), producto_id, bodega_id, 'entrada', 'anulacion_venta', pago_id, 'Anulación · ' || documento, cantidad, costo_unitario, new.anulado_motivo,
+           (select usuario from public.perfiles where id = auth.uid()), localidad_id, organizacion_id
+      from public.inv_movimientos where pago_id = new.id and origen = 'venta';
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'pagos_inventario' and tgrelid = 'public.pagos'::regclass) then
+    create trigger pagos_inventario after update of anulado on public.pagos for each row execute function public.inv_pago_anulado();
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

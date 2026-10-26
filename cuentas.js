@@ -13,6 +13,8 @@
   var ESTADOS_DOC = { emitido: 'Emitido', aplicado: 'Aplicado', certificado: 'Certificado', anulado: 'Anulado' };
   var CLASIF = { bien: 'Bien', servicio: 'Servicio' };
   var tiposProc = [], lineas = [], ultimoPago = null;
+  // Productos de inventario que se venden en el detalle (salen de la bodega general de la sede)
+  var invProductos = [], invPrecio = {}, invExist = {}, invBodega = null;
   function usd(n) { return 'US$' + (Number(n) || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function redondear(n) { return Math.round((Number(n) || 0) * 100) / 100; }
 
@@ -113,10 +115,10 @@
       // Detalle
       sec('Detalle') +
       '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>' +
-      ['Línea', 'Tipo de procedimiento', 'Clasificación', 'Monto Q', 'Monto US$'].map(function (h, i) { return '<th style="' + th + ';text-align:' + (i > 2 ? 'right' : 'left') + '">' + h + '</th>'; }).join('') +
+      ['Línea', 'Procedimiento o producto', 'Clasificación', 'Monto Q', 'Monto US$'].map(function (h, i) { return '<th style="' + th + ';text-align:' + (i > 2 ? 'right' : 'left') + '">' + h + '</th>'; }).join('') +
       '</tr></thead><tbody>' +
       (lineas.length ? lineas.map(function (d) {
-        return '<tr><td style="' + td + '">' + d.linea + '</td><td style="' + td + '">' + esc(d.tipo ? d.tipo.nombre : '—') + '</td><td style="' + td + '">' + (CLASIF[d.clasificacion] || '') + '</td>' +
+        return '<tr><td style="' + td + '">' + d.linea + '</td><td style="' + td + '">' + (d.producto ? esc(d.producto.nombre + (d.producto.presentacion ? ' (' + d.producto.presentacion + ')' : '')) + ' × ' + Number(d.cantidad || 1) : esc(d.tipo ? d.tipo.nombre : '—')) + '</td><td style="' + td + '">' + (CLASIF[d.clasificacion] || '') + '</td>' +
           '<td style="' + td + ';text-align:right">' + q(d.monto) + '</td><td style="' + td + ';text-align:right">' + usd(d.monto_usd) + '</td></tr>';
       }).join('') : '<tr><td colspan="5" style="' + td + ';color:#5A6D7A">' + esc(p.concepto || 'Pago') + '</td></tr>') +
       '</tbody><tfoot><tr><td style="' + tf + '"></td><td style="' + tf + '">TOTALES</td><td style="' + tf + '"></td>' +
@@ -139,7 +141,8 @@
       if (r.error || !r.data) return;
       p = r.data;
     }
-    var det = await sb.from('pago_detalle').select('linea,clasificacion,monto,monto_usd,tipo:tipos_procedimiento(nombre)').eq('pago_id', p.id).order('linea');
+    var det = await sb.from('pago_detalle').select('linea,clasificacion,monto,monto_usd,cantidad,tipo:tipos_procedimiento(nombre),producto:inv_productos(codigo,nombre,presentacion)').eq('pago_id', p.id).order('linea');
+    if (det.error) det = await sb.from('pago_detalle').select('linea,clasificacion,monto,monto_usd,tipo:tipos_procedimiento(nombre)').eq('pago_id', p.id).order('linea');
     imprimir(htmlRecibo(p, det.error ? [] : det.data));
   }
 
@@ -351,19 +354,50 @@
     tiposProc = r.error ? [] : r.data.filter(function (t) { return t.estado === 'activo'; });
     pintarDetalle();
   }
-  function lineaNueva(monto) { return { tipo_procedimiento_id: '', clasificacion: 'bien', monto: monto || '', monto_usd: '' }; }
+  async function cargarProductosInv() {
+    var r = await sb.from('inv_productos').select('id,codigo,nombre,presentacion,estado,localidad_id').eq('estado', 'activo').order('nombre').range(0, 4999);
+    if (r.error) { invProductos = []; return; }
+    invProductos = window.PD_SEDES ? window.PD_SEDES.deSede(r.data) : r.data;
+    var pr = await sb.from('inv_precios').select('producto_id,precio,precio_usd,vigente,localidad_id').eq('tipo', 'directo').eq('vigente', true).range(0, 4999);
+    invPrecio = {};
+    (pr.error ? [] : (window.PD_SEDES ? window.PD_SEDES.deSede(pr.data) : pr.data)).forEach(function (x) { invPrecio[x.producto_id] = x; });
+    await cargarExistenciasInv();
+    pintarDetalle();
+  }
+  async function cargarExistenciasInv() {
+    var b = await sb.rpc('inv_bodega_general');
+    invBodega = b.error ? null : b.data;
+    invExist = {};
+    if (!invBodega) return;
+    var e = await sb.from('inv_existencias').select('producto_id,existencia').eq('bodega_id', invBodega).range(0, 4999);
+    (e.error ? [] : e.data).forEach(function (x) { invExist[x.producto_id] = Number(x.existencia); });
+  }
+  function etiquetaProd(p) { return (p.codigo ? p.codigo + ' · ' : '') + p.nombre + (p.presentacion ? ' (' + p.presentacion + ')' : ''); }
+  // Cantidad pedida de un producto en todas las líneas (para avisar si no alcanza la existencia)
+  function pedido(prodId) { return lineas.reduce(function (t, l) { return t + (l.tipo === 'producto' && String(l.producto_id) === String(prodId) ? Number(l.cantidad) || 0 : 0); }, 0); }
+  function textoExistencia(l) {
+    if (!l.producto_id) return '';
+    var ex = invExist[l.producto_id] || 0, falta = pedido(l.producto_id) > ex;
+    return '<span class="pg-stock' + (falta ? ' falta' : '') + '">Existencia: ' + ex + (falta ? ' · no alcanza (se registrará igual)' : '') + '</span>';
+  }
+  function lineaNueva(monto) { return { tipo: 'procedimiento', tipo_procedimiento_id: '', producto_id: '', producto_texto: '', cantidad: '1', clasificacion: 'bien', monto: monto || '', monto_usd: '' }; }
   function pintarDetalle() {
     if (!lineas.length) lineas.push(lineaNueva());
     $('pgDetalle').innerHTML = lineas.map(function (l, k) {
       return '<tr data-linea="' + k + '"><td class="pg-linea">' + (k + 1) + '</td>' +
-        '<td><select data-pl="tipo_procedimiento_id" aria-label="Tipo de procedimiento de la línea ' + (k + 1) + '"><option value="">Elige un tipo…</option>' +
-        tiposProc.map(function (t) { return '<option value="' + t.id + '"' + (String(l.tipo_procedimiento_id) === String(t.id) ? ' selected' : '') + '>' + esc(t.nombre) + '</option>'; }).join('') + '</select></td>' +
+        '<td><div class="pg-tipo-linea">' + (invProductos.length ? '<select data-pl="tipo" aria-label="Procedimiento o producto en la línea ' + (k + 1) + '"><option value="procedimiento"' + (l.tipo !== 'producto' ? ' selected' : '') + '>Procedimiento</option><option value="producto"' + (l.tipo === 'producto' ? ' selected' : '') + '>Producto</option></select>' : '') +
+        (l.tipo === 'producto'
+          ? '<input data-pl="producto_texto" list="pgProdOpciones" value="' + esc(l.producto_texto) + '" placeholder="Código o nombre del producto" aria-label="Producto de la línea ' + (k + 1) + '">'
+          : '<select data-pl="tipo_procedimiento_id" aria-label="Tipo de procedimiento de la línea ' + (k + 1) + '"><option value="">Elige un tipo…</option>' +
+            tiposProc.map(function (t) { return '<option value="' + t.id + '"' + (String(l.tipo_procedimiento_id) === String(t.id) ? ' selected' : '') + '>' + esc(t.nombre) + '</option>'; }).join('') + '</select>') + '</div>' +
+        (l.tipo === 'producto' ? '<div class="pg-prod-extra"><label>Cantidad <input data-pl="cantidad" type="number" min="0.01" step="0.01" inputmode="decimal" value="' + esc(l.cantidad) + '" aria-label="Cantidad del producto de la línea ' + (k + 1) + '"></label><span data-stock>' + textoExistencia(l) + '</span></div>' : '') + '</td>' +
         '<td><select data-pl="clasificacion" aria-label="Clasificación de la línea ' + (k + 1) + '">' +
         Object.keys(CLASIF).map(function (c) { return '<option value="' + c + '"' + (l.clasificacion === c ? ' selected' : '') + '>' + CLASIF[c] + '</option>'; }).join('') + '</select></td>' +
         '<td class="num"><input data-pl="monto" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(l.monto) + '" placeholder="0.00" aria-label="Monto en quetzales de la línea ' + (k + 1) + '"></td>' +
         '<td class="num"><input data-pl="monto_usd" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(l.monto_usd) + '" placeholder="0.00" aria-label="Monto en dólares de la línea ' + (k + 1) + '"></td>' +
         '<td>' + (lineas.length > 1 ? '<button type="button" class="adm-btn" data-quitar-linea="' + k + '">Quitar</button>' : '') + '</td></tr>';
     }).join('');
+    $('pgProdOpciones').innerHTML = invProductos.map(function (p) { return '<option value="' + esc(etiquetaProd(p)) + '"></option>'; }).join('');
     pintarTotalesDetalle();
   }
   function pintarTotalesDetalle() {
@@ -395,6 +429,7 @@
   async function cargarTodo() {
     $('pgUsuario').textContent = (window.PD_SESION && window.PD_SESION.usuario()) || '—';
     if (!tiposProc.length) cargarTiposProc();
+    cargarProductosInv();
     cargarCorrelativo();
     if (await cargarSaldos()) { pintarSaldos(); pintarSelectorPacientes(); }
     cargarResumen();
@@ -441,12 +476,29 @@
   $('pgDetalle').addEventListener('input', function (e) {
     var c = e.target.closest('[data-pl]');
     if (!c) return;
-    lineas[+c.closest('tr').dataset.linea][c.dataset.pl] = c.value;
+    var tr = c.closest('tr'), l = lineas[+tr.dataset.linea];
+    l[c.dataset.pl] = c.value;
+    if (c.dataset.pl === 'producto_texto' || c.dataset.pl === 'cantidad') {
+      if (c.dataset.pl === 'producto_texto') {
+        var p = invProductos.filter(function (x) { return etiquetaProd(x) === c.value; })[0];
+        l.producto_id = p ? p.id : '';
+      }
+      // Precio de venta «Cliente directo» × cantidad, si el producto lo tiene
+      var pr = l.producto_id && invPrecio[l.producto_id];
+      if (pr) {
+        var n = Number(l.cantidad) || 1;
+        l.monto = redondear(pr.precio * n).toFixed(2); tr.querySelector('[data-pl="monto"]').value = l.monto;
+        if (pr.precio_usd != null) { l.monto_usd = redondear(pr.precio_usd * n).toFixed(2); tr.querySelector('[data-pl="monto_usd"]').value = l.monto_usd; }
+      }
+      $('pgDetalle').querySelectorAll('tr[data-linea]').forEach(function (fila) { var st = fila.querySelector('[data-stock]'); if (st) st.innerHTML = textoExistencia(lineas[+fila.dataset.linea]); });
+    }
     pintarTotalesDetalle();
   });
   $('pgDetalle').addEventListener('change', function (e) {
     var c = e.target.closest('select[data-pl]');
-    if (c) lineas[+c.closest('tr').dataset.linea][c.dataset.pl] = c.value;
+    if (!c) return;
+    lineas[+c.closest('tr').dataset.linea][c.dataset.pl] = c.value;
+    if (c.dataset.pl === 'tipo') pintarDetalle();
   });
   $('pgDetalle').addEventListener('click', function (e) {
     var b = e.target.closest('[data-quitar-linea]');
@@ -464,9 +516,13 @@
   $('pagoForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     if (!$('pgPaciente').value) { aviso('pgMsg', 'Elige un paciente.', true); $('pgPaciente').focus(); return; }
-    var usadas = lineas.filter(function (l) { return Number(l.monto) > 0 || Number(l.monto_usd) > 0 || l.tipo_procedimiento_id; });
+    var usadas = lineas.filter(function (l) { return Number(l.monto) > 0 || Number(l.monto_usd) > 0 || l.tipo_procedimiento_id || l.producto_id || l.producto_texto; });
     if (!usadas.length) { aviso('pgMsg', 'Agrega al menos una línea al detalle del pago.', true); return; }
-    if (usadas.some(function (l) { return !l.tipo_procedimiento_id; })) { aviso('pgMsg', 'Elige el tipo de procedimiento en cada línea del detalle.', true); return; }
+    if (usadas.some(function (l) { return l.tipo !== 'producto' && !l.tipo_procedimiento_id; })) { aviso('pgMsg', 'Elige el tipo de procedimiento en cada línea del detalle.', true); return; }
+    if (usadas.some(function (l) { return l.tipo === 'producto' && !l.producto_id; })) { aviso('pgMsg', 'Elige cada producto de la lista (escribe el código o el nombre y selecciónalo).', true); return; }
+    if (usadas.some(function (l) { return l.tipo === 'producto' && !(Number(l.cantidad) > 0); })) { aviso('pgMsg', 'La cantidad de cada producto debe ser mayor que cero.', true); return; }
+    var faltan = usadas.filter(function (l) { return l.tipo === 'producto' && pedido(l.producto_id) > (invExist[l.producto_id] || 0); });
+    if (faltan.length && !window.confirm('La existencia en bodega no alcanza para: ' + faltan.map(function (l) { return l.producto_texto; }).join(', ') + '.\n¿Registrar el pago de todos modos? El kardex quedará con saldo negativo hasta que ingrese la compra.')) return;
     var tot = pintarTotalesDetalle();
     if (!(tot.q > 0)) { aviso('pgMsg', 'El total en quetzales del detalle debe ser mayor que cero.', true); return; }
     var datos = {
@@ -482,6 +538,7 @@
       observaciones: $('pgObservaciones').value.trim()
     };
     var detalle = usadas.map(function (l) {
+      if (l.tipo === 'producto') return { producto_id: +l.producto_id, cantidad: Number(l.cantidad), bodega_id: invBodega, clasificacion: l.clasificacion, monto: redondear(l.monto), monto_usd: redondear(l.monto_usd) };
       return { tipo_procedimiento_id: +l.tipo_procedimiento_id, clasificacion: l.clasificacion, monto: redondear(l.monto), monto_usd: redondear(l.monto_usd) };
     });
     var boton = this.querySelector('[type=submit]');
@@ -491,6 +548,7 @@
     boton.disabled = false;
     if (r.error) { aviso('pgMsg', /registrar_pago|could not find the function/i.test(r.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los cobros con factura.' : traducir(r.error), true); return; }
     var pid = datos.paciente_id;
+    if (detalle.some(function (l) { return l.producto_id; })) cargarExistenciasInv();
     limpiarFormulario();
     ultimoPago = r.data; $('pgImprimir').disabled = false; $('pgImprimir').title = '';
     var c = await sb.from('pagos').select('correlativo').eq('id', r.data).maybeSingle();

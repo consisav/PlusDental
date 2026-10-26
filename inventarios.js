@@ -456,6 +456,7 @@
     var tab = document.querySelector('[data-tab="' + id + '"]');
     if (tab) tab.addEventListener('click', function () { setTimeout(function () { cargarTodo(id); }, 0); });
   });
+  window.PD_INV = { imagenProducto: imagenProducto };
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { ['admInvProveedores', 'admInvBodegas', 'admInvTipos', 'admInvProductos', 'admInvPrecios'].forEach(function (id) { if (!$(id).hidden) cargarTodo(id); }); },
     limpiar: function () {
