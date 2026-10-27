@@ -289,7 +289,7 @@
       actual.dpi ? '<span class="pac-chip">DPI ' + esc(actual.dpi) + '</span>' : '',
       actual.nit ? '<span class="pac-chip">NIT ' + esc(actual.nit) + '</span>' : '',
       // Color del paciente: el de su médico asignado (se cambia desde la ficha del odontólogo)
-      window.PD_COLOR && window.PD_COLOR.color(actual.dentista_id) ? '<span class="pac-chip pac-med"' + window.PD_COLOR.estilo(actual.dentista_id) + ' title="Se cambia en Catálogos iniciales › Odontólogos">' + window.PD_COLOR.punto(actual.dentista_id) + esc(window.PD_COLOR.nombrePaleta(window.PD_COLOR.color(actual.dentista_id))) + (actual.medico ? ' · ' + esc(actual.medico.nombre) : '') + '</span>' : ''].join('') : '';
+      window.PD_COLOR && window.PD_COLOR.color(actual.dentista_id) ? '<span class="pac-chip pac-med"' + window.PD_COLOR.estilo(actual.dentista_id) + ' title="Se cambia en Catálogos › Odontólogos">' + window.PD_COLOR.punto(actual.dentista_id) + esc(window.PD_COLOR.nombrePaleta(window.PD_COLOR.color(actual.dentista_id))) + (actual.medico ? ' · ' + esc(actual.medico.nombre) : '') + '</span>' : ''].join('') : '';
     $('pMeta').hidden = !actual;
     if (actual) {
       $('pMeta').innerHTML = '<span>Paciente desde <b>' + fechaHoraCorta(actual.creado) + '</b></span>' +
