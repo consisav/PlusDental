@@ -67,7 +67,7 @@
   var TRANSACCIONES = [['1011', 'COMPRA DE MEDICAMENTO'], ['1012', 'COMPRA DE MATERIAL DENTAL'], ['1013', 'COMPRA DE INSUMOS DESCARTABLES'], ['1014', 'COMPRA DE INSTRUMENTAL Y EQUIPO'], ['1015', 'COMPRA DE PRODUCTOS DE LIMPIEZA'], ['1016', 'MUESTRAS MÉDICAS / DONACIÓN']];
   var REGIMENES = [['PC', 'Pequeño contribuyente'], ['RU', 'Régimen sobre las utilidades'], ['ROS', 'Régimen opcional simplificado sobre ingresos']];
   var ESTADOS_C = { grabada: ['Grabada', 'inactivo'], operada: ['Operada', 'activo'], anulada: ['Anulada', 'baja'] };
-  var abonos = [], pestanaCompra = 'articulos', compraForm = null;
+  var abonos = [], pestanaCompra = 'articulos', compraForm = null, ordenesC = [], ordenItems = [];
   function opts(l, sel) { return l.map(function (o) { return '<option value="' + o[0] + '"' + (String(o[0]) === String(sel) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join(''); }
   function campo(etq, html, cls) { return '<label class="ic-campo' + (cls ? ' ' + cls : '') + '"><span>' + etq + '</span>' + html + '</label>'; }
 
@@ -100,7 +100,7 @@
         campo('Tipo docto', '<select id="icTipoDoc">' + opts(DOCS) + '</select>') + campo('Fecha', '<input id="icFecha" type="date">') +
         campo('Serie docto', '<input id="icSerie" maxlength="20">') + campo('# Documento', '<input id="icNumDoc" maxlength="40">') +
         campo('No interno factura', '<input id="icNoInterno" class="ic-auto" readonly tabindex="-1" placeholder="Automático al grabar" title="Correlativo automático de la compra en la sede; no se puede modificar">') +
-        campo('Aplica orden?', '<span class="ic-par"><select id="icAplicaOrden" class="ic-corto"><option value="no">No</option><option value="si">Sí</option></select><input id="icOrden" maxlength="40" placeholder="N.º de orden" hidden></span>') +
+        campo('Aplica orden de compra?', '<span class="ic-par"><select id="icAplicaOrden" class="ic-corto"><option value="no">No</option><option value="si">Sí</option></select><select id="icOrden" hidden aria-label="Orden de compra"></select></span>', 'ic-full') +
       '</div></section>' +
       '<section class="ic-tarjeta ic-fila3"><h4><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>Proveedor y destino</h4><div class="ic-g2">' +
         campo('Proveedor', '<span class="ic-par"><select id="icProv"></select><button type="button" id="icProvNuevo" class="ic-mas" title="Crear proveedor" aria-label="Crear proveedor">+</button></span>', 'ic-full') +
@@ -229,6 +229,27 @@
     }).join('') : '<tr><td colspan="8" class="geo-vacia">' + (ed ? 'Aún no hay artículos. Digítalos en la barra de arriba y presiona Enter.' : 'Sin artículos.') + '</td></tr>';
     totales();
   }
+  function etiquetaOrden(o) { return (o.numero_orden || 'Folio ' + o.numero) + ' · ' + nombreProv(o.proveedor_id) + ' · ' + q(o.total); }
+  function llenarOrdenes(c) {
+    var libres = ordenesC.filter(function (o) { return o.id === c.orden_id || (o.estado === 'autorizada' && !compras.some(function (x) { return x.orden_id === o.id && x.estado !== 'anulada' && x.id !== c.id; })); });
+    $('icOrden').innerHTML = '<option value="">Elige la orden autorizada…</option>' + libres.map(function (o) { return '<option value="' + o.id + '"' + (o.id === c.orden_id ? ' selected' : '') + '>' + esc(etiquetaOrden(o)) + '</option>'; }).join('') +
+      (c.orden_compra && !c.orden_id ? '<option value="" selected>' + esc(c.orden_compra) + ' (escrita a mano)</option>' : '');
+  }
+  // Al elegir la orden: datos del proveedor y, si se confirma, sus productos aprobados como artículos de la compra
+  function aplicarOrden(o) {
+    if (!o) return;
+    if (o.proveedor_id) $('icProv').value = String(o.proveedor_id);
+    if (o.bodega_id && [].some.call($('icBodega').options, function (x) { return x.value === String(o.bodega_id); })) $('icBodega').value = String(o.bodega_id);
+    $('icMoneda').value = o.moneda || 'GTQ'; $('icCambio').value = o.tipo_cambio || 1; $('icCredito').value = o.forma_pago === 'contado' ? 0 : o.dias_credito || 0;
+    $('icTipoCompra').value = o.tipo_proveedor === 'exterior' ? 'importacion' : 'local';
+    var det = ordenItems.filter(function (i) { return i.orden_id === o.id && Number(i.cantidad_aprueba) > 0; }).sort(function (a, b) { return a.linea - b.linea; });
+    var hay = lineas.some(function (l) { return l.nombre || l.producto_id; });
+    if (det.length && (!hay || window.confirm('¿Reemplazar los artículos de la compra por los ' + det.length + ' producto(s) aprobados en la orden ' + (o.numero_orden || o.numero) + '?'))) {
+      lineas = det.map(function (i) { var p = porId(productos, i.producto_id) || {};
+        return { producto_id: i.producto_id, codigo: p.codigo || '', nombre: p.nombre || '', lote: '', fecha_fabricacion: '', vencimiento: '', cantidad: Number(i.cantidad_aprueba), costo_unitario: Number(i.precio_unitario), descuento: '', afecta_inventario: true, controla_fecha: false }; });
+    }
+    pintarLineas(); estadoBotones();
+  }
   function pintarEncabezado() {
     var c = compraForm || {}, S = window.PD_SEDES, loc = c.localidad_id || (S && S.miLocalidad());
     var o = S && loc ? S.organizacion(loc) : null, l = S && loc ? S.localidad(loc) : null;
@@ -243,12 +264,13 @@
       return '<option value="' + p.id + '"' + (p.id === c.proveedor_id ? ' selected' : '') + '>' + esc((p.numero ? p.numero + ' · ' : '') + (p.padre_id ? '› ' : '') + p.nombre_comercial) + '</option>'; }).join('');
     $('icBodega').innerHTML = opcionesBodega(c.bodega_id || bodegaGeneral());
     var v = { icMoneda: c.moneda || 'GTQ', icTipoCompra: c.tipo_compra || 'local', icNotaCredito: c.nota_credito ? c.nota_credito : '', icDescuentos: c.descuentos ? c.descuentos : '', icRetencion: c.valor_retencion ? c.valor_retencion : '',
-      icSerie: c.serie || '', icNumDoc: c.numero_documento || '', icFecha: c.fecha || hoy(), icCambio: c.tipo_cambio || 1, icNoInterno: c.numero ? String(c.numero) : '', icOrden: c.orden_compra || '',
+      icSerie: c.serie || '', icNumDoc: c.numero_documento || '', icFecha: c.fecha || hoy(), icCambio: c.tipo_cambio || 1, icNoInterno: c.numero ? String(c.numero) : '',
       icFormRet: c.formulario_retencion || '', icRegimen: c.regimen_isr || '', icRegimenDesc: c.regimen_isr_desc || '', icTipoDoc: c.tipo_documento || 'factura',
       icTransaccion: c.transaccion || '1011', icCredito: c.dias_credito || 0, icObs: c.observaciones || '' };
     Object.keys(v).forEach(function (k) { $(k).value = v[k]; });
     $('icNumero').parentNode.firstChild.textContent = c.numero ? 'N.º ' : '';
-    $('icAplicaOrden').value = c.orden_compra ? 'si' : 'no'; $('icOrden').hidden = !c.orden_compra;
+    llenarOrdenes(c);
+    $('icAplicaOrden').value = c.orden_id || c.orden_compra ? 'si' : 'no'; $('icOrden').hidden = $('icAplicaOrden').value !== 'si';
     $('icAplicaRet').checked = !!c.aplica_retencion; $('icMuestras').checked = !!c.documento_muestras;
     var ed = editable();
     $('icForm').querySelectorAll('.ic-tarjetas input, .ic-tarjetas select, .ic-desc input, #icProvNuevo').forEach(function (x) { x.disabled = !ed; });
@@ -343,6 +365,8 @@
       compras = await todas(function () { return sb.from('inv_compras').select('*').order('numero', { ascending: false }); });
       items = await todas(function () { return sb.from('inv_compra_items').select('*'); });
       abonos = await todas(function () { return sb.from('inv_compra_abonos').select('*').order('fecha_pago').order('id'); });
+      try { ordenesC = await todas(function () { return sb.from('inv_ordenes_compra').select('id,numero,numero_orden,estado,proveedor_id,bodega_id,forma_pago,dias_credito,moneda,tipo_cambio,tipo_proveedor,total').neq('estado', 'anulada').order('numero', { ascending: false }); });
+        ordenItems = await todas(function () { return sb.from('inv_orden_items').select('orden_id,linea,producto_id,cantidad_aprueba,precio_unitario'); }); } catch (e2) { ordenesC = []; ordenItems = []; }
     } catch (e) { compras = []; items = []; abonos = []; pintarCompras(); cargarEnFormulario(null); aviso('icMsg', traducir(e), true); return; }
     pintarCompras();
     cargarEnFormulario(mantener ? porId(compras, mantener) : null);
@@ -387,13 +411,15 @@
     return { proveedor_id: $('icProv').value, bodega_id: $('icBodega').value, fecha: $('icFecha').value || hoy(), tipo_documento: $('icTipoDoc').value,
       serie: $('icSerie').value, numero_documento: $('icNumDoc').value, dias_credito: $('icCredito').value || 0, observaciones: $('icObs').value,
       moneda: $('icMoneda').value, tipo_compra: $('icTipoCompra').value, tipo_cambio: cambio(), no_interno: compraForm && compraForm.numero ? String(compraForm.numero) : '',
-      orden_compra: $('icAplicaOrden').value === 'si' ? $('icOrden').value : '', nota_credito: $('icNotaCredito').value || 0, descuentos: $('icDescuentos').value || 0,
+      orden_id: $('icAplicaOrden').value === 'si' ? +$('icOrden').value || null : null,
+      orden_compra: $('icAplicaOrden').value === 'si' ? ((porId(ordenesC, +$('icOrden').value) || {}).numero_orden || (compraForm && !compraForm.orden_id ? compraForm.orden_compra : '') || '') : '', nota_credito: $('icNotaCredito').value || 0, descuentos: $('icDescuentos').value || 0,
       aplica_retencion: $('icAplicaRet').checked, valor_retencion: $('icAplicaRet').checked ? $('icRetencion').value || 0 : 0, formulario_retencion: $('icAplicaRet').checked ? $('icFormRet').value : '',
       regimen_isr: $('icRegimen').value, regimen_isr_desc: $('icRegimenDesc').value, transaccion: $('icTransaccion').value, documento_muestras: $('icMuestras').checked };
   }
   async function grabar() {
     var usadas = lineas.filter(function (l) { return l.nombre || l.codigo || l.cantidad || l.costo_unitario; });
     if (!$('icBodega').value) { aviso('icMsg', 'Elige la bodega.', true); return null; }
+    if ($('icAplicaOrden').value === 'si' && !+$('icOrden').value && !(compraForm && compraForm.orden_compra && !compraForm.orden_id)) { aviso('icMsg', 'Elige la orden de compra autorizada (o marca «Aplica orden de compra?» en No).', true); return null; }
     if (!usadas.length) { aviso('icMsg', 'Agrega al menos un artículo.', true); return null; }
     if (usadas.some(function (l) { return !l.nombre && !l.producto_id; })) { aviso('icMsg', 'Escribe el nombre del producto en cada línea.', true); return null; }
     if (usadas.some(function (l) { return !(Number(l.cantidad) > 0); })) { aviso('icMsg', 'La cantidad de cada artículo debe ser mayor que cero.', true); return null; }
@@ -446,6 +472,7 @@
   $('icCancelar').addEventListener('click', function () { cargarEnFormulario(compraForm); aviso('icMsg', 'Cambios descartados.'); });
   $('icForm').addEventListener('click', function (e) { var t = e.target.closest('[data-ictab]'); if (t) verPestana(t.dataset.ictab); });
   $('icAplicaOrden').addEventListener('change', function () { $('icOrden').hidden = this.value !== 'si'; if (!$('icOrden').hidden) $('icOrden').focus(); });
+  $('icOrden').addEventListener('change', function () { aplicarOrden(porId(ordenesC, +this.value)); });
   $('icAplicaRet').addEventListener('change', function () { $('icRetencion').disabled = $('icFormRet').disabled = !this.checked; if (!this.checked) $('icRetencion').value = ''; totales(); });
   $('icProv').addEventListener('change', function () { var p = porId(proveedores, +this.value); $('icCredito').value = p ? p.dias_credito || 0 : 0; totales(); });
   $('icRegimen').addEventListener('input', function () { var r = REGIMENES.filter(function (x) { return x[0] === this.value.trim().toUpperCase(); }, this)[0]; if (r) $('icRegimenDesc').value = r[1]; totales(); });

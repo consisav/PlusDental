@@ -1287,6 +1287,12 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .itr-c-lote{width:110px}.itr-c-vence{width:100px}.itr-c-exist{width:96px}
 .ik-op-traslado{background:#E0F2F1;color:#0F6E56}
 @media (max-width:980px){.itr-g{grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr)}.itr-g .itr-conta{grid-column:1/-1}.itr-cap{grid-template-columns:repeat(2,minmax(0,1fr))}.itr-cap .ic-cap-prod{grid-column:1/-1}}
+.ioc-tarjetas textarea{font:inherit;font-size:13.5px;border:1px solid #C9D6E0;border-radius:8px;padding:8px 10px;width:100%;box-sizing:border-box;resize:vertical;color:#0B2B40}.ioc-tarjetas textarea:disabled{background:#F4F7F9;color:#5A6D7A}
+.ioc-cap{display:grid;grid-template-columns:minmax(0,3fr) repeat(3,minmax(0,1fr)) minmax(0,1fr) auto;gap:8px 10px;align-items:end}.ioc-cap2{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.6fr);gap:8px 14px;align-items:end}
+.ioc-marcar{display:flex;gap:8px;justify-content:flex-end;margin:0 0 8px}.ioc-c-ex{width:96px}.ioc-c-cant{width:92px}
+.ioc-aprueba{display:inline-block;background:#FFF8E6;border-radius:6px;padding:1px 6px}.ioc-aprueba.ioc-pend{background:transparent;color:#8A9AA6;font-weight:600}
+#icOrden{flex:1;min-width:0}
+@media (max-width:980px){.ioc-cap{grid-template-columns:repeat(2,minmax(0,1fr))}.ioc-cap .ic-cap-prod{grid-column:1/-1}.ioc-cap2{grid-template-columns:minmax(0,1fr)}}
 .ic-det-pie{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 12px;background:#F8FBFD;font-size:13px;color:#475B68}.ic-det-pie b{color:#0B2B40;font-variant-numeric:tabular-nums}
 @media (max-width:980px){.ic-cap-f1{grid-template-columns:repeat(2,minmax(0,1fr))}.ic-cap-f1 .ic-cap-prod{grid-column:1/-1}.ic-cap-f2{grid-template-columns:repeat(3,minmax(0,1fr))}.ic-cons-filtros{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.ic-det{min-width:680px}.ic-cons-t{min-width:620px}}
@@ -1551,6 +1557,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="adm-sg">
 <button type="button" class="adm-subgrupo" id="subInvMovimientos" aria-expanded="false" aria-controls="subInvMovimientosItems">4 · Compras y ventas<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-sg-items" id="subInvMovimientosItems" role="presentation">
+<button type="button" role="tab" id="tabInvOrdenes" data-tab="admInvOrdenes" aria-selected="false" aria-controls="admInvOrdenes" class="adm-sub-item">Órdenes de compra</button>
 <button type="button" role="tab" id="tabInvCompras" data-tab="admInvCompras" aria-selected="false" aria-controls="admInvCompras" class="adm-sub-item">Compras</button>
 <button type="button" role="tab" id="tabInvVentas" data-tab="admInvVentas" aria-selected="false" aria-controls="admInvVentas" class="adm-sub-item">Ventas</button>
 <button type="button" role="tab" id="tabInvAjustes" data-tab="admInvAjustes" aria-selected="false" aria-controls="admInvAjustes" class="adm-sub-item">Ajustes</button>
@@ -2384,6 +2391,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="admInvTipos" role="tabpanel" aria-labelledby="tabInvTipos" hidden class="adm-pane"></div>
 <div id="admInvProductos" role="tabpanel" aria-labelledby="tabInvProductos" hidden class="adm-pane"></div>
 <div id="admInvPrecios" role="tabpanel" aria-labelledby="tabInvPrecios" hidden class="adm-pane"></div>
+<div id="admInvOrdenes" role="tabpanel" aria-labelledby="tabInvOrdenes" hidden class="adm-pane"></div>
 <div id="admInvCompras" role="tabpanel" aria-labelledby="tabInvCompras" hidden class="adm-pane"></div>
 <div id="admInvKardex" role="tabpanel" aria-labelledby="tabInvKardex" hidden class="adm-pane"></div>
 <div id="admInvTraslados" role="tabpanel" aria-labelledby="tabInvTraslados" hidden class="adm-pane"></div>
@@ -2958,8 +2966,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="geografia.js?v=20261026b"></script>
 <script src="organizaciones.js?v=20261026"></script>
 <script src="inventarios.js?v=20261027c"></script>
-<script src="inventarios-movimientos.js?v=20261027g"></script>
+<script src="inventarios-movimientos.js?v=20261027h"></script>
 <script src="inventarios-traslados.js?v=20261027"></script>
+<script src="inventarios-ordenes.js?v=20261027"></script>
 <script src="asistentes.js"></script>
 <script src="dentistas.js"></script>
 <script src="agenda.js"></script>

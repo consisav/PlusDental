@@ -5622,6 +5622,257 @@ $$;
 revoke execute on function public.revertir_traslado(bigint, text) from public, anon;
 grant execute on function public.revertir_traslado(bigint, text) to authenticated;
 
+-- ===== Inventarios: órdenes de compra =====
+-- Flujo: Grabar (estado «Solicitada») → Autorizar (estado «Autorizada», con la cantidad que se aprueba por producto)
+-- → la compra la asocia en «Aplica orden» (lista de valores). Revertir autorización (si ninguna compra la usa) / Anular.
+create table if not exists public.inv_ordenes_compra (
+  id                 bigint generated always as identity primary key,
+  numero             bigint,
+  numero_orden       text check (char_length(numero_orden) <= 40),
+  fecha              date not null default current_date,
+  estado             text not null default 'solicitada' check (estado in ('solicitada', 'autorizada', 'anulada')),
+  proveedor_id       bigint references public.inv_proveedores (id) on delete set null,
+  bodega_id          bigint references public.inv_bodegas (id) on delete set null,
+  forma_pago         text not null default 'credito' check (forma_pago in ('contado', 'credito')),
+  dias_credito       int not null default 0 check (dias_credito between 0 and 365),
+  moneda             text not null default 'GTQ' check (moneda in ('GTQ', 'USD')),
+  tipo_cambio        numeric(12,4) not null default 1 check (tipo_cambio > 0),
+  tipo_proveedor     text not null default 'local' check (tipo_proveedor in ('local', 'exterior')),
+  obs_internas       text check (char_length(obs_internas) <= 500),
+  obs_proveedor      text check (char_length(obs_proveedor) <= 500),
+  total              numeric(14,2) not null default 0,
+  total_mi           numeric(14,2) not null default 0,
+  aprobado_en        timestamptz,
+  aprobado_por       text,
+  anulado_en         timestamptz,
+  anulado_por        text,
+  anulado_motivo     text check (char_length(anulado_motivo) <= 300),
+  creado             timestamptz not null default now(),
+  creado_por         text,
+  modificado         timestamptz,
+  modificado_por     text,
+  organizacion_id    bigint references public.organizaciones (id) on delete set null,
+  localidad_id       bigint references public.org_localidades (id) on delete set null
+);
+create table if not exists public.inv_orden_items (
+  id                 bigint generated always as identity primary key,
+  orden_id           bigint not null references public.inv_ordenes_compra (id) on delete cascade,
+  linea              int not null default 1,
+  producto_id        bigint not null references public.inv_productos (id),
+  cantidad_solicita  numeric(12,2) not null check (cantidad_solicita > 0),
+  cantidad_aprueba   numeric(12,2) check (cantidad_aprueba >= 0),
+  precio_unitario    numeric(12,4) not null default 0 check (precio_unitario >= 0),
+  observaciones      text check (char_length(observaciones) <= 300)
+);
+create index if not exists inv_orden_items_orden on public.inv_orden_items (orden_id, linea);
+
+-- La compra guarda de qué orden viene
+alter table public.inv_compras add column if not exists orden_id bigint references public.inv_ordenes_compra (id) on delete set null;
+create index if not exists inv_compras_orden on public.inv_compras (orden_id) where orden_id is not null;
+
+-- El registro automático también numera las órdenes (folio)
+create or replace function public.inv_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+begin
+  if tg_op = 'INSERT' then
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto', 'inv_compras', 'inv_traslados', 'inv_ordenes_compra') then
+      perform pg_advisory_xact_lock(hashtext(tg_table_name || '_numero'));
+      execute format('select coalesce(max(numero), 0) + 1 from public.%I', tg_table_name) into new.numero;
+    end if;
+    new.creado := now(); new.creado_por := v_usuario; new.modificado := null; new.modificado_por := null;
+  else
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto', 'inv_compras', 'inv_traslados', 'inv_ordenes_compra') then new.numero := old.numero; end if;
+    new.creado := old.creado; new.creado_por := old.creado_por;
+    new.modificado := now(); new.modificado_por := v_usuario;
+  end if;
+  return new;
+end;
+$$;
+do $$ declare t text := 'inv_ordenes_compra'; begin
+  if not exists (select 1 from pg_trigger where tgname = t || '_registro' and tgrelid = ('public.' || t)::regclass) then
+    execute format('create trigger %I before insert or update on public.%I for each row execute function public.inv_registro()', t || '_registro', t);
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = t || '_sede' and tgrelid = ('public.' || t)::regclass) then
+    execute format('create trigger %I before insert or update of organizacion_id, localidad_id on public.%I for each row execute function public.sede_registro()', t || '_sede', t);
+  end if;
+end $$;
+
+alter table public.inv_ordenes_compra enable row level security;
+drop policy if exists inv_ordenes_compra_lee on public.inv_ordenes_compra;
+create policy inv_ordenes_compra_lee on public.inv_ordenes_compra for select to authenticated using (public.es_personal() and public.ve_sede(localidad_id));
+grant select on public.inv_ordenes_compra to authenticated;
+alter table public.inv_orden_items enable row level security;
+drop policy if exists inv_orden_items_lee on public.inv_orden_items;
+create policy inv_orden_items_lee on public.inv_orden_items for select to authenticated
+  using (public.es_personal() and exists (select 1 from public.inv_ordenes_compra o where o.id = orden_id and public.ve_sede(o.localidad_id)));
+grant select on public.inv_orden_items to authenticated;
+
+-- Grabar (nueva o modificar) una orden en estado «Solicitada», con su detalle
+create or replace function public.guardar_orden_compra(p_id bigint, p_datos jsonb, p_items jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint := p_id; v_bod public.inv_bodegas; e jsonb; n int := 0; v_total numeric := 0;
+  v_cambio numeric := greatest(coalesce(nullif(p_datos ->> 'tipo_cambio', '')::numeric, 1), 0.0001);
+  v_moneda text := coalesce(nullif(p_datos ->> 'moneda', ''), 'GTQ'); v_num bigint;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if jsonb_array_length(coalesce(p_items, '[]'::jsonb)) = 0 then raise exception 'Agrega al menos un producto a la orden'; end if;
+  select * into v_bod from public.inv_bodegas where id = nullif(p_datos ->> 'bodega_id', '')::bigint;
+  if v_bod.id is null or not public.ve_sede(v_bod.localidad_id) then raise exception 'Elige una bodega de tu sede'; end if;
+  if nullif(p_datos ->> 'proveedor_id', '') is null then raise exception 'Elige el proveedor'; end if;
+  if v_id is not null and not exists (select 1 from public.inv_ordenes_compra where id = v_id and estado = 'solicitada' and public.ve_sede(localidad_id)) then
+    raise exception 'Solo se puede modificar una orden en estado Solicitada (revierte la autorización primero)';
+  end if;
+  if v_id is null then
+    insert into public.inv_ordenes_compra (bodega_id, localidad_id, organizacion_id) values (v_bod.id, v_bod.localidad_id, v_bod.organizacion_id) returning id, numero into v_id, v_num;
+  end if;
+  update public.inv_ordenes_compra set
+    numero_orden = coalesce(nullif(trim(p_datos ->> 'numero_orden'), ''), numero_orden, 'OC-' || lpad(numero::text, 3, '0') || '-' || to_char(current_date, 'MM-YYYY')),
+    fecha = coalesce(nullif(p_datos ->> 'fecha', '')::date, current_date), proveedor_id = (p_datos ->> 'proveedor_id')::bigint, bodega_id = v_bod.id,
+    forma_pago = coalesce(nullif(p_datos ->> 'forma_pago', ''), 'credito'), dias_credito = coalesce(nullif(p_datos ->> 'dias_credito', '')::int, 0),
+    moneda = v_moneda, tipo_cambio = v_cambio, tipo_proveedor = coalesce(nullif(p_datos ->> 'tipo_proveedor', ''), 'local'),
+    obs_internas = nullif(trim(p_datos ->> 'obs_internas'), ''), obs_proveedor = nullif(trim(p_datos ->> 'obs_proveedor'), '')
+   where id = v_id;
+  delete from public.inv_orden_items where orden_id = v_id;
+  for e in select * from jsonb_array_elements(p_items) loop
+    if nullif(e ->> 'producto_id', '') is null then raise exception 'Cada línea necesita un producto del inventario'; end if;
+    if coalesce(nullif(e ->> 'cantidad_solicita', '')::numeric, 0) <= 0 then raise exception 'La cantidad solicitada debe ser mayor que cero'; end if;
+    n := n + 1;
+    insert into public.inv_orden_items (orden_id, linea, producto_id, cantidad_solicita, cantidad_aprueba, precio_unitario, observaciones)
+    values (v_id, n, (e ->> 'producto_id')::bigint, (e ->> 'cantidad_solicita')::numeric, nullif(e ->> 'cantidad_aprueba', '')::numeric,
+            greatest(coalesce(nullif(e ->> 'precio_unitario', '')::numeric, 0), 0), nullif(trim(e ->> 'observaciones'), ''));
+    v_total := v_total + coalesce(nullif(e ->> 'cantidad_aprueba', '')::numeric, (e ->> 'cantidad_solicita')::numeric) * greatest(coalesce(nullif(e ->> 'precio_unitario', '')::numeric, 0), 0);
+  end loop;
+  -- Totales en quetzales y en moneda internacional (el precio se digita en la moneda de la orden)
+  update public.inv_ordenes_compra set total = round(case when v_moneda = 'USD' then v_total * v_cambio else v_total end, 2),
+                                       total_mi = round(case when v_moneda = 'USD' then v_total else v_total / v_cambio end, 2) where id = v_id;
+  return v_id;
+end;
+$$;
+revoke execute on function public.guardar_orden_compra(bigint, jsonb, jsonb) from public, anon;
+grant execute on function public.guardar_orden_compra(bigint, jsonb, jsonb) to authenticated;
+
+-- Autorizar: lo no aprobado explícitamente se aprueba por lo solicitado
+create or replace function public.autorizar_orden_compra(p_id bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare o public.inv_ordenes_compra; v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select * into o from public.inv_ordenes_compra where id = p_id for update;
+  if o.id is null or not public.ve_sede(o.localidad_id) then raise exception 'La orden no existe'; end if;
+  if o.estado <> 'solicitada' then raise exception 'La orden ya está autorizada o anulada'; end if;
+  update public.inv_orden_items set cantidad_aprueba = cantidad_solicita where orden_id = p_id and cantidad_aprueba is null;
+  if not exists (select 1 from public.inv_orden_items where orden_id = p_id and cantidad_aprueba > 0) then raise exception 'Aprueba al menos un producto (cantidad mayor que cero)'; end if;
+  update public.inv_ordenes_compra set estado = 'autorizada', aprobado_en = now(), aprobado_por = v_usuario,
+    total = round((select sum(cantidad_aprueba * precio_unitario) from public.inv_orden_items where orden_id = p_id) * case when o.moneda = 'USD' then o.tipo_cambio else 1 end, 2),
+    total_mi = round((select sum(cantidad_aprueba * precio_unitario) from public.inv_orden_items where orden_id = p_id) / case when o.moneda = 'USD' then 1 else o.tipo_cambio end, 2)
+   where id = p_id;
+end;
+$$;
+revoke execute on function public.autorizar_orden_compra(bigint) from public, anon;
+grant execute on function public.autorizar_orden_compra(bigint) to authenticated;
+
+-- Revertir la autorización (vuelve a «Solicitada»), solo si ninguna compra vigente la usa
+create or replace function public.revertir_orden_compra(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+declare o public.inv_ordenes_compra;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escribe el motivo'; end if;
+  select * into o from public.inv_ordenes_compra where id = p_id for update;
+  if o.id is null or not public.ve_sede(o.localidad_id) then raise exception 'La orden no existe'; end if;
+  if o.estado <> 'autorizada' then raise exception 'Solo se revierte una orden Autorizada'; end if;
+  if exists (select 1 from public.inv_compras where orden_id = p_id and estado <> 'anulada') then raise exception 'La orden ya está asociada a una compra: desasóciala o anula la compra primero'; end if;
+  update public.inv_ordenes_compra set estado = 'solicitada', aprobado_en = null, aprobado_por = null,
+    obs_internas = left(concat_ws(' · ', obs_internas, 'Autorización revertida: ' || trim(p_motivo)), 500) where id = p_id;
+end;
+$$;
+revoke execute on function public.revertir_orden_compra(bigint, text) from public, anon;
+grant execute on function public.revertir_orden_compra(bigint, text) to authenticated;
+
+-- Anular (Super Administrador), si ninguna compra vigente la usa
+create or replace function public.anular_orden_compra(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+declare o public.inv_ordenes_compra; v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_super_administrador() then raise exception 'Solo el Super Administrador puede anular órdenes de compra'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escribe el motivo de la anulación'; end if;
+  select * into o from public.inv_ordenes_compra where id = p_id for update;
+  if o.id is null or o.estado = 'anulada' then raise exception 'La orden no existe o ya estaba anulada'; end if;
+  if exists (select 1 from public.inv_compras where orden_id = p_id and estado <> 'anulada') then raise exception 'La orden está asociada a una compra vigente'; end if;
+  update public.inv_ordenes_compra set estado = 'anulada', anulado_en = now(), anulado_por = v_usuario, anulado_motivo = trim(p_motivo) where id = p_id;
+end;
+$$;
+revoke execute on function public.anular_orden_compra(bigint, text) from public, anon;
+grant execute on function public.anular_orden_compra(bigint, text) to authenticated;
+
+-- Grabar compra: guarda también la orden de compra asociada (debe estar Autorizada)
+create or replace function public.guardar_compra(p_id bigint, p_datos jsonb, p_items jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint := p_id;
+  v_bodega public.inv_bodegas;
+  v_cambio numeric := greatest(coalesce(nullif(p_datos ->> 'tipo_cambio', '')::numeric, 1), 0.0001);
+  v_moneda text := coalesce(nullif(p_datos ->> 'moneda', ''), 'GTQ');
+  v_total numeric := 0;
+  e jsonb; n int := 0;
+  v_cant numeric; v_costo numeric; v_desc numeric; v_sub numeric; v_q numeric;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if jsonb_array_length(coalesce(p_items, '[]'::jsonb)) = 0 then raise exception 'Agrega al menos un artículo a la compra'; end if;
+  select * into v_bodega from public.inv_bodegas where id = nullif(p_datos ->> 'bodega_id', '')::bigint;
+  if v_bodega.id is null or not public.ve_sede(v_bodega.localidad_id) then raise exception 'Elige una bodega de tu sede'; end if;
+  if nullif(p_datos ->> 'orden_id', '') is not null and not exists (select 1 from public.inv_ordenes_compra where id = (p_datos ->> 'orden_id')::bigint and estado = 'autorizada' and public.ve_sede(localidad_id)) then
+    raise exception 'La orden de compra debe estar Autorizada y ser de tu sede';
+  end if;
+  if v_id is not null and not exists (select 1 from public.inv_compras where id = v_id and estado = 'grabada' and public.ve_sede(localidad_id)) then
+    raise exception 'Solo se puede modificar una compra en estado Grabada (revierte la carga primero)';
+  end if;
+  if v_id is null then
+    insert into public.inv_compras (bodega_id, localidad_id, organizacion_id, estado) values (v_bodega.id, v_bodega.localidad_id, v_bodega.organizacion_id, 'grabada') returning id into v_id;
+  end if;
+  update public.inv_compras set
+    proveedor_id = nullif(p_datos ->> 'proveedor_id', '')::bigint, bodega_id = v_bodega.id,
+    fecha = coalesce(nullif(p_datos ->> 'fecha', '')::date, current_date),
+    tipo_documento = coalesce(nullif(p_datos ->> 'tipo_documento', ''), 'factura'),
+    serie = nullif(trim(p_datos ->> 'serie'), ''), numero_documento = nullif(trim(p_datos ->> 'numero_documento'), ''),
+    dias_credito = coalesce(nullif(p_datos ->> 'dias_credito', '')::int, 0), observaciones = nullif(trim(p_datos ->> 'observaciones'), ''),
+    moneda = v_moneda, tipo_compra = coalesce(nullif(p_datos ->> 'tipo_compra', ''), 'local'), tipo_cambio = v_cambio,
+    no_interno = nullif(trim(p_datos ->> 'no_interno'), ''), orden_compra = nullif(trim(p_datos ->> 'orden_compra'), ''), orden_id = nullif(p_datos ->> 'orden_id', '')::bigint,
+    nota_credito = greatest(coalesce(nullif(p_datos ->> 'nota_credito', '')::numeric, 0), 0),
+    descuentos = greatest(coalesce(nullif(p_datos ->> 'descuentos', '')::numeric, 0), 0),
+    aplica_retencion = coalesce((p_datos ->> 'aplica_retencion')::boolean, false),
+    valor_retencion = greatest(coalesce(nullif(p_datos ->> 'valor_retencion', '')::numeric, 0), 0),
+    formulario_retencion = nullif(trim(p_datos ->> 'formulario_retencion'), ''),
+    regimen_isr = nullif(trim(p_datos ->> 'regimen_isr'), ''), regimen_isr_desc = nullif(trim(p_datos ->> 'regimen_isr_desc'), ''),
+    transaccion = nullif(trim(p_datos ->> 'transaccion'), ''), documento_muestras = coalesce((p_datos ->> 'documento_muestras')::boolean, false)
+   where id = v_id;
+  delete from public.inv_compra_items where compra_id = v_id;
+  for e in select * from jsonb_array_elements(p_items) loop
+    v_cant := coalesce(nullif(e ->> 'cantidad', '')::numeric, 0);
+    v_costo := greatest(coalesce(nullif(e ->> 'costo_unitario', '')::numeric, 0), 0);
+    v_desc := greatest(coalesce(nullif(e ->> 'descuento', '')::numeric, 0), 0);
+    if v_cant <= 0 then raise exception 'La cantidad de cada artículo debe ser mayor que cero'; end if;
+    if nullif(e ->> 'producto_id', '') is null and coalesce(trim(e ->> 'nombre'), '') = '' then raise exception 'Escribe el producto de la línea %', n + 1; end if;
+    n := n + 1;
+    v_sub := greatest(round(v_cant * v_costo - v_desc, 2), 0);       -- en la moneda de la compra
+    v_q := case when v_moneda = 'USD' then round(v_sub * v_cambio, 2) else v_sub end;
+    insert into public.inv_compra_items (compra_id, linea, producto_id, codigo, nombre, cantidad, costo_unitario, descuento, subtotal, costo_unitario_mi, subtotal_mi,
+                                         lote, fecha_fabricacion, vencimiento, afecta_inventario, controla_fecha)
+    values (v_id, n, nullif(e ->> 'producto_id', '')::bigint, nullif(trim(e ->> 'codigo'), ''), nullif(trim(e ->> 'nombre'), ''), v_cant,
+            case when v_moneda = 'USD' then round(v_costo * v_cambio, 4) else v_costo end, case when v_moneda = 'USD' then round(v_desc * v_cambio, 2) else v_desc end, v_q,
+            case when v_moneda = 'USD' then v_costo else round(v_costo / v_cambio, 4) end, round(v_q / v_cambio, 2),
+            nullif(trim(e ->> 'lote'), ''), nullif(e ->> 'fecha_fabricacion', '')::date, nullif(e ->> 'vencimiento', '')::date,
+            coalesce((e ->> 'afecta_inventario')::boolean, true), coalesce((e ->> 'controla_fecha')::boolean, false));
+    v_total := v_total + v_q;
+  end loop;
+  v_total := greatest(v_total - (select descuentos + nota_credito from public.inv_compras where id = v_id), 0);
+  update public.inv_compras set total = round(v_total, 2), total_usd = round(v_total / v_cambio, 2) where id = v_id;
+  return v_id;
+end;
+$$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
