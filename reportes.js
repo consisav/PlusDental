@@ -31,6 +31,8 @@
     return m || 'No se pudo generar el reporte.';
   }
 
+  function bancario(f) { return f.metodo === 'transferencia' || f.metodo === 'deposito'; }
+
   // ---------- Definición de los reportes ----------
   var REPORTES = {
     pacientes: {
@@ -121,26 +123,36 @@
     },
 
     cobros: {
-      panel: 'admRepCobros', titulo: 'Cobros por paciente', cliente: true,
-      nota: 'Pagos con fecha entre las dos fechas, de un cliente o de todos, agrupados por paciente. Los recibos anulados no suman al total.',
+      panel: 'admRepCobros', titulo: 'Cobros por paciente', cliente: true, tipoBanco: true,
+      nota: 'Pagos con fecha entre las dos fechas, de un cliente o de todos (institucionales o privados) y de un banco o de todos, agrupados por paciente. Los recibos anulados no suman al total.',
       estados: { valido: ['Válido', 'verde'], anulado: ['Anulado', 'rojo'] },
       columnas: [
         ['Paciente', function (f) { return f.paciente; }],
         ['Recibo', function (f) { return 'N.º ' + f.id; }],
         ['Fecha', function (f) { return fechaCorta(f.fecha); }],
         ['Forma de pago', function (f) { return METODOS[f.metodo] || f.metodo; }],
+        ['Banco', function (f) { return bancario(f) ? f.banco || '—' : '—'; }],
+        ['Documento', function (f) { return bancario(f) ? f.documento_banco || '—' : '—'; }],
         ['Concepto', function (f) { return f.anulado ? 'ANULADO: ' + (f.anulado_motivo || '') : (f.concepto || '—'); }],
         ['Monto', function (f) { return Number(f.monto); }, 'q']
       ],
       grupo: function (f) { return f.paciente; },
       cuenta: function (f) { return f.estado === 'valido'; },
       cargar: async function (d, h, x) {
-        var c = sb.from('pagos').select('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,pac:pacientes(nombre)')
-          .gte('fecha', d).lte('fecha', h);
-        if (x && x.cliente) c = c.eq('paciente_id', +x.cliente);
-        var r = await c.order('fecha');
+        function consulta(campos) {
+          var c = sb.from('pagos').select(campos).gte('fecha', d).lte('fecha', h);
+          if (x && x.cliente) c = c.eq('paciente_id', +x.cliente);
+          if (x && x.banco) c = c.eq('banco', x.banco);
+          return c.order('fecha');
+        }
+        var r = await consulta('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,banco,documento_banco,pac:pacientes(nombre,tipo_cliente)');
+        if (r.error && /banco|tipo_cliente/.test(r.error.message || '')) {
+          if ((x && x.banco) || (x && x.tipo)) throw new Error('Falta ejecutar en Supabase el script actualizado (supabase.sql) para filtrar por banco o tipo de cliente.');
+          r = await consulta('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,pac:pacientes(nombre)');
+        }
         if (r.error) throw r.error;
-        return r.data.map(function (p) { p.paciente = p.pac ? p.pac.nombre : '—'; p.estado = p.anulado ? 'anulado' : 'valido'; return p; })
+        var datos = r.data.filter(function (p) { var ins = p.pac && p.pac.tipo_cliente === 'institucional'; return !(x && x.tipo) || (x.tipo === 'institucional' ? ins : !ins); });
+        return datos.map(function (p) { p.paciente = p.pac ? p.pac.nombre : '—'; p.estado = p.anulado ? 'anulado' : 'valido'; return p; })
           .sort(function (a, b) { return a.paciente.localeCompare(b.paciente) || String(a.fecha).localeCompare(String(b.fecha)) || a.id - b.id; });
       },
       totales: function (filas) {
@@ -218,6 +230,8 @@
       '<label>Fecha inicial<input type="date" name="desde" value="' + inicioMes() + '" required></label>' +
       '<label>Fecha final<input type="date" name="hasta" value="' + hoy() + '" required></label>' +
       (def.cliente ? '<label class="rep-cliente">Cliente<select name="cliente"><option value="">Todos los clientes</option></select></label>' : '') +
+      (def.tipoBanco ? '<label>Tipo de cliente<select name="tipo"><option value="">Todos</option><option value="institucional">Institucional</option><option value="privado">Cliente privado</option></select></label>' +
+        '<label>Banco<select name="banco"><option value="">Todos los bancos</option></select></label>' : '') +
       '<button type="submit" class="dlg-submit">Generar reporte</button></form>' +
       '<div class="rep-params" data-rep-params="' + clave + '"></div>' +
       '<div class="rep-chips" data-rep-chips="' + clave + '" aria-label="Filtrar por estado"></div>' +
@@ -228,6 +242,17 @@
       '<p class="dlg-msg" role="status" data-rep-msg="' + clave + '"></p>';
     estadoRep[clave] = { filas: null, ocultos: {}, generado: false };
     if (def.cliente) llenarClientes(p.querySelector('select[name=cliente]'));
+    if (def.tipoBanco) llenarBancos(p.querySelector('select[name=banco]'));
+  }
+  // Bancos: los del sistema más los que ya tengan pagos registrados
+  async function llenarBancos(sel) {
+    var r = await sb.from('pagos').select('banco').not('banco', 'is', null);
+    if (!sel.isConnected) return;
+    var l = (window.PD_BANCOS_GT || []).slice();
+    (r.error ? [] : r.data || []).forEach(function (x) { if (x.banco && l.indexOf(x.banco) < 0) l.push(x.banco); });
+    var antes = sel.value;
+    sel.innerHTML = '<option value="">Todos los bancos</option>' + l.map(function (b) { return '<option>' + esc(b) + '</option>'; }).join('');
+    sel.value = antes;
   }
   // Lista de clientes (pacientes) para el parámetro «Cliente»
   async function llenarClientes(sel) {
@@ -238,7 +263,7 @@
     sel.value = antes;
   }
   // Parámetros con que se generó el reporte (se muestran en pantalla, en la impresión y en Excel)
-  function parametros(s) { return [['Fecha inicial', fechaCorta(s.desde)], ['Fecha final', fechaCorta(s.hasta)]].concat(s.cliente !== undefined ? [['Cliente', s.clienteNombre || 'Todos los clientes']] : []); }
+  function parametros(s) { return [['Fecha inicial', fechaCorta(s.desde)], ['Fecha final', fechaCorta(s.hasta)]].concat(s.cliente !== undefined ? [['Cliente', s.clienteNombre || 'Todos los clientes']] : [], s.extras || []); }
 
   async function generar(clave) {
     var def = REPORTES[clave], p = $(def.panel), s = estadoRep[clave];
@@ -249,7 +274,9 @@
     msg.textContent = 'Generando…'; msg.style.color = '#475B68';
     form.querySelector('button').disabled = true;
     try {
-      s.filas = await def.cargar(d, h, { cliente: cli });
+      var tipo = form.tipo ? form.tipo.value : '', banco = form.banco ? form.banco.value : '';
+      s.filas = await def.cargar(d, h, { cliente: cli, tipo: tipo, banco: banco });
+      s.extras = def.tipoBanco ? [['Tipo de cliente', form.tipo.selectedOptions[0].textContent], ['Banco', banco || 'Todos los bancos']] : null;
       s.desde = d; s.hasta = h; s.generado = true;
       s.cliente = cli; s.clienteNombre = cli ? form.cliente.selectedOptions[0].textContent : '';
       msg.textContent = '';
@@ -362,6 +389,7 @@
     $(t).addEventListener('click', function () {
       var def = REPORTES[TABS[t]];
       if (def.cliente) llenarClientes($(def.panel).querySelector('select[name=cliente]'));
+      if (def.tipoBanco) llenarBancos($(def.panel).querySelector('select[name=banco]'));
       if (!estadoRep[TABS[t]].generado) generar(TABS[t]);
     });
   });
