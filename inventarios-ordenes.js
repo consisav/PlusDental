@@ -197,8 +197,8 @@
     $('iocAnular').title = esSuper ? '' : 'Solo el Super Administrador anula órdenes de compra.';
     $('iocImprimir').disabled = !guardada;
     var prov = porId(proveedores, o.proveedor_id), mail = correoProv(prov), wa = telWa(prov && prov.telefonos), envia = guardada && o.estado !== 'anulada';
-    $('iocCorreo').disabled = !envia; $('iocCorreo').title = mail ? 'Enviar a ' + mail : 'El proveedor no tiene correo: se pedirá al enviar';
-    $('iocWa').disabled = !envia; $('iocWa').title = wa ? 'Enviar a +' + wa : 'El proveedor no tiene teléfono: se pedirá al enviar';
+    $('iocCorreo').disabled = !envia; $('iocCorreo').title = mail ? 'Enviar el PDF de la orden a ' + mail : 'El proveedor no tiene correo: se pedirá al enviar';
+    $('iocWa').disabled = !envia; $('iocWa').title = wa ? 'Enviar la orden y su PDF a +' + wa : 'El proveedor no tiene teléfono: se pedirá al enviar';
     var modo = '';
     if (guardada) {
       if (o.estado === 'solicitada' && modoEdicion) modo = 'Modificando la orden folio ' + o.numero + '. Presiona «Grabar» para guardar los cambios.';
@@ -270,6 +270,7 @@
     } catch (e) { ordenes = []; items = []; pintarLista(); abrir(null); aviso('iocMsg', traducir(e), true); return; }
     pintarLista();
     abrir(mantener ? porId(ordenes, mantener) : null);
+    libPdf().catch(function () {});
   }
   async function grabar() {
     if (!+$('iocProv').value) { aviso('iocMsg', 'Elige el proveedor.', true); return null; }
@@ -312,19 +313,108 @@
       'Productos:'].concat(lin).concat(['', total].concat(o.obs_proveedor ? ['', 'Observaciones: ' + o.obs_proveedor] : []).concat(['',
       'Por favor confirmar recepción y fecha de entrega.', 'Atentamente, ' + ((window.PD_SESION && window.PD_SESION.usuario && window.PD_SESION.usuario()) ? window.PD_SESION.usuario() + ' · ' : '') + 'Plus Dental'])).join('\n');
   }
-  // Abre el correo o WhatsApp con la orden ya escrita
-  function abrirEnvio(o, medio, destino) {
-    var texto = textoOrden(o, medio === 'correo');
-    if (medio === 'correo') {
-      var asunto = 'Orden de compra ' + (o.numero_orden || o.numero) + ' · Plus Dental';
-      if (texto.length > 1800) texto = texto.slice(0, 1780) + '\n…';
-      window.location.href = 'mailto:' + encodeURIComponent(destino) + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(texto);
-      aviso('iocMsg', 'Se abrió tu programa de correo con la orden lista para ' + destino + '. Para adjuntar el PDF usa «Imprimir» → Guardar como PDF.');
-    } else {
-      window.open('https://wa.me/' + destino + '?text=' + encodeURIComponent(texto), '_blank', 'noopener');
-      aviso('iocMsg', 'Se abrió WhatsApp con la orden lista para +' + destino + '. Solo presiona Enviar.');
-    }
+  // --- PDF de la orden (jsPDF, se carga la primera vez que se necesita) ---
+  var LIB_PDF = ['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'], cargaPdf = null;
+  function cargarScript(src) { return new Promise(function (ok, mal) { var x = document.createElement('script'); x.src = src; x.onload = ok; x.onerror = function () { mal(new Error('No se pudo cargar el generador de PDF.')); }; document.head.appendChild(x); }); }
+  function libPdf() {
+    if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable) return Promise.resolve();
+    return cargaPdf || (cargaPdf = cargarScript(LIB_PDF[0]).then(function () { return cargarScript(LIB_PDF[1]); }).catch(function (e) { cargaPdf = null; throw e; }));
   }
+  function usuarioSes() { return (window.PD_SESION && window.PD_SESION.usuario && window.PD_SESION.usuario()) || ''; }
+  function archivoPdf(o) { return 'Orden-de-compra-' + String(o.numero_orden || o.numero).replace(/[^\w-]+/g, '-') + '.pdf'; }
+  function pdfOrden(o) {
+    var doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'letter' }), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 40, y = 48;
+    var p = porId(proveedores, o.proveedor_id) || {}, usd = o.moneda === 'USD', tc = Number(o.tipo_cambio) || 1, simb = usd ? '$' : 'Q';
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(11, 43, 64); doc.text('Plus Dental', M, y);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90, 109, 122); doc.text('Odontología integral · ' + sede(o), M, y + 15);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(0, 90, 135); doc.text('ORDEN DE COMPRA', W - M, y - 4, { align: 'right' });
+    doc.setFontSize(12); doc.setTextColor(11, 43, 64); doc.text(String(o.numero_orden || ''), W - M, y + 12, { align: 'right' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90, 109, 122); doc.text('Folio ' + o.numero + ' · ' + (ESTADOS[o.estado] || [o.estado])[0], W - M, y + 25, { align: 'right' });
+    y += 40; doc.setDrawColor(201, 214, 224); doc.setLineWidth(1); doc.line(M, y, W - M, y); y += 18;
+    var datos = [['Proveedor', p.nombre_comercial], ['Contacto', p.contacto], ['Fecha', fecha(o.fecha)],
+      ['Entregar en', nombreBod(o.bodega_id)], ['Forma de pago', o.forma_pago === 'contado' ? 'Contado' : 'Crédito a ' + (o.dias_credito || 0) + ' días'], ['Moneda', usd ? 'Dólares · cambio ' + num(tc, 4) : 'Quetzales'],
+      ['Tipo de proveedor', o.tipo_proveedor === 'exterior' ? 'Del exterior' : 'Local'], ['Solicitado por', o.creado_por], ['Autorizado por', o.aprobado_por || 'Pendiente']];
+    var cw = (W - 2 * M) / 3;
+    datos.forEach(function (x, i) {
+      var cx = M + (i % 3) * cw, cy = y + Math.floor(i / 3) * 30;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 109, 122); doc.text(x[0].toUpperCase(), cx, cy);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(11, 43, 64); doc.text(doc.splitTextToSize(String(x[1] || '—'), cw - 10)[0], cx, cy + 12);
+    });
+    y += Math.ceil(datos.length / 3) * 30 + 4;
+    if (o.obs_proveedor) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 109, 122); doc.text('OBSERVACIONES', M, y);
+      var lo = doc.splitTextToSize(o.obs_proveedor, W - 2 * M); doc.setFontSize(10); doc.setTextColor(11, 43, 64); doc.text(lo, M, y + 12); y += 14 + lo.length * 12;
+    }
+    var det = items.filter(function (i) { return i.orden_id === o.id; }).sort(function (a2, b2) { return a2.linea - b2.linea; });
+    doc.autoTable({
+      startY: y + 6, margin: { left: M, right: M },
+      head: [['#', 'Código', 'Producto', 'Solicitado', 'Aprobado', 'Precio unit. ' + simb, 'Total Q', 'Total MI $']],
+      body: det.map(function (i) { var pr = porId(productos, i.producto_id) || {}, ap = i.cantidad_aprueba == null ? Number(i.cantidad_solicita) : Number(i.cantidad_aprueba), pu = Number(i.precio_unitario);
+        return [i.linea, pr.codigo || '', (pr.nombre || '') + (i.observaciones ? '\n' + i.observaciones : ''), cant(i.cantidad_solicita), cant(ap), num(pu, 2), num(ap * pu * (usd ? tc : 1)), num(usd ? ap * pu : ap * pu / tc)]; }),
+      styles: { fontSize: 8.5, cellPadding: 5, textColor: [11, 43, 64], lineColor: [227, 234, 240], lineWidth: 0.5 },
+      headStyles: { fillColor: [11, 43, 64], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [245, 249, 252] },
+      columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 58 }, 3: { halign: 'right', cellWidth: 52 }, 4: { halign: 'right', cellWidth: 52 }, 5: { halign: 'right', cellWidth: 62 }, 6: { halign: 'right', cellWidth: 64 }, 7: { halign: 'right', cellWidth: 60 } }
+    });
+    y = doc.lastAutoTable.finalY + 18;
+    if (y > H - 150) { doc.addPage(); y = 60; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(11, 43, 64); doc.text('Total Q ' + num(o.total), W - M, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(90, 109, 122); doc.text('Total MI $ ' + num(o.total_mi), W - M, y + 14, { align: 'right' });
+    y += 74; doc.setDrawColor(11, 43, 64); doc.setLineWidth(0.8);
+    doc.line(M, y, M + 200, y); doc.line(W - M - 200, y, W - M, y);
+    doc.setFontSize(9); doc.setTextColor(11, 43, 64);
+    doc.text('Solicitado por · ' + (o.creado_por || ''), M + 100, y + 13, { align: 'center' }); doc.text('Autorizado por · ' + (o.aprobado_por || ''), W - M - 100, y + 13, { align: 'center' });
+    for (var pg = 1, n = doc.getNumberOfPages(); pg <= n; pg++) {
+      doc.setPage(pg); doc.setFontSize(7.5); doc.setTextColor(140, 155, 166);
+      doc.text('Generado por ' + (usuarioSes() || 'Plus Dental') + ' · ' + fechaHora(new Date().toISOString()) + ' · Página ' + pg + ' de ' + n, W - M, H - 24, { align: 'right' });
+    }
+    return doc;
+  }
+  function descargar(blob, nombre) { var u = URL.createObjectURL(blob), x = document.createElement('a'); x.href = u; x.download = nombre; document.body.appendChild(x); x.click(); x.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 30000); }
+  async function codigoError(e) { try { var j = e && e.context && e.context.json ? await e.context.json() : null; return (j && (j.error + (j.detalle ? ': ' + j.detalle : ''))) || (e && e.message) || 'error'; } catch (x) { return (e && e.message) || 'error'; } }
+
+  // Correo: se envía solo desde el servidor (Brevo) al correo del proveedor, con el PDF adjunto
+  async function enviarCorreo(o) {
+    $('iocCorreo').disabled = true; aviso('iocMsg', 'Generando el PDF y enviando el correo…');
+    try {
+      await libPdf();
+      var doc = pdfOrden(o), b64 = doc.output('datauristring').split(',')[1];
+      var r = await sb.functions.invoke('enviar-orden-compra', { body: { orden_id: o.id, pdf: b64, archivo: archivoPdf(o), usuario: usuarioSes() } });
+      if (r.error) {
+        var c = await codigoError(r.error);
+        var MSG = { sin_correo: 'El proveedor no tiene un correo válido en su ficha.', sin_configuracion: 'Falta configurar el envío de correos (Brevo) en Supabase.', permiso: 'No tienes permiso para enviar órdenes.', orden: 'No se encontró la orden.', anulada: 'La orden está anulada.' };
+        var clave = String(c).split(':')[0];
+        if (MSG[clave] && clave !== 'sin_configuracion') { aviso('iocMsg', MSG[clave], true); return; }
+        // Sin el envío automático disponible: se descarga el PDF y se abre el programa de correo
+        descargar(doc.output('blob'), archivoPdf(o));
+        var p = porId(proveedores, o.proveedor_id);
+        window.location.href = 'mailto:' + encodeURIComponent(correoProv(p)) + '?subject=' + encodeURIComponent('Orden de compra ' + (o.numero_orden || o.numero) + ' · Plus Dental') + '&body=' + encodeURIComponent(textoOrden(o, true).slice(0, 1700));
+        aviso('iocMsg', 'No se pudo enviar automáticamente (' + (MSG[clave] || c) + '). Se descargó el PDF y se abrió tu correo: adjunta el PDF y envía.', true);
+        return;
+      }
+      aviso('iocMsg', 'Orden enviada por correo a ' + r.data.para + ' con el PDF adjunto' + (r.data.copia ? ' · copia a ' + r.data.copia : '') + '.');
+    } catch (e) { aviso('iocMsg', (e && e.message) || 'No se pudo enviar el correo.', true); }
+    finally { estadoBotones(); }
+  }
+  // WhatsApp: en el celular se comparte el PDF directo a WhatsApp; en la computadora se descarga el PDF y se abre el chat del proveedor
+  async function enviarWa(o, destino) {
+    var texto = textoOrden(o, false) + '\n\nSe adjunta el PDF de la orden.';
+    var doc = null;
+    try { await libPdf(); doc = pdfOrden(o); } catch (e) { doc = null; }
+    if (doc) {
+      var blob = doc.output('blob'), archivo = new File([blob], archivoPdf(o), { type: 'application/pdf' });
+      var movil = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (movil && navigator.canShare && navigator.canShare({ files: [archivo] })) {
+        try { await navigator.share({ files: [archivo], title: 'Orden de compra ' + (o.numero_orden || o.numero), text: texto }); aviso('iocMsg', 'Orden compartida con el PDF. En WhatsApp elige el contacto +' + destino + '.'); return; }
+        catch (e) { if (e && e.name === 'AbortError') { aviso('iocMsg', 'Envío cancelado.'); return; } }
+      }
+      descargar(blob, archivoPdf(o));
+    }
+    window.open('https://wa.me/' + destino + '?text=' + encodeURIComponent(texto), '_blank', 'noopener');
+    aviso('iocMsg', doc ? 'Se abrió WhatsApp con el mensaje para +' + destino + ' y se descargó el PDF (' + archivoPdf(o) + '): arrástralo al chat y presiona Enviar.'
+      : 'Se abrió WhatsApp con la orden lista para +' + destino + ' (no se pudo generar el PDF).');
+  }
+  function abrirEnvio(o, medio, destino) { if (medio === 'correo') enviarCorreo(o); else enviarWa(o, destino); }
   // Si el proveedor no tiene el correo o el teléfono, se piden aquí y se guardan en su ficha
   function enviar(medio) {
     var o = form; if (!o || !o.id) return;
@@ -337,21 +427,21 @@
       campos: [{ k: 'aviso', label: 'Falta un dato', tipo: 'info', ancho: 'full' },
         correo ? { k: 'destino', label: 'Correo del proveedor', req: true, max: 150, placeholder: 'ventas@proveedor.com', ancho: 'full' }
                : { k: 'destino', label: 'Celular (WhatsApp) del proveedor', req: true, max: 30, placeholder: '5555-6666', ayuda: 'Número de Guatemala de 8 dígitos o con código de país', ancho: 'full' },
-        { k: 'contacto', label: 'Persona de contacto', max: 120, ancho: 'full' },
-        { k: 'guardar_ficha', label: 'Guardar en la ficha del proveedor', tipo: 'check' }],
-      alAbrir: function () { $('geoDlgGrabar').textContent = 'Enviar'; $('geoF_aviso').textContent = 'Este proveedor no tiene ' + (correo ? 'correo' : 'teléfono') + ' registrado. Escríbelo para enviar la orden ' + (o.numero_orden || o.numero) + '.'; },
+        { k: 'contacto', label: 'Persona de contacto', max: 120, ancho: 'full' }].concat(correo ? [] : [{ k: 'guardar_ficha', label: 'Guardar en la ficha del proveedor', tipo: 'check' }]),
+      alAbrir: function () { $('geoDlgGrabar').textContent = 'Enviar'; $('geoF_aviso').textContent = 'Este proveedor no tiene ' + (correo ? 'correo' : 'teléfono') + ' registrado. Escríbelo para enviar la orden ' + (o.numero_orden || o.numero) + (correo ? '; quedará guardado en su ficha.' : '.'); },
       guardar: async function (d) {
         var dest = correo ? String(d.destino || '').trim() : telWa(d.destino);
         if (correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(dest)) return 'Escribe un correo válido.';
         if (!correo && !/^\d{10,15}$/.test(dest)) return 'Escribe un número de celular válido (8 dígitos en Guatemala).';
-        abrirEnvio(o, medio, dest);
-        if (d.guardar_ficha) {
+        if (!correo) abrirEnvio(o, medio, dest);
+        if (correo || d.guardar_ficha) {
           var cambios = correo ? { correo: dest } : { telefonos: [p.telefonos, String(d.destino).trim()].filter(Boolean).join(' / ') };
           if (d.contacto && d.contacto !== p.contacto) cambios.contacto = d.contacto;
           var r = await sb.from('inv_proveedores').update(cambios).eq('id', p.id).select('id').single();
-          if (r.error) { aviso('iocMsg', 'La orden se abrió para enviar, pero no se pudo guardar el dato en la ficha: ' + traducir(r.error), true); return null; }
+          if (r.error) return correo ? 'No se pudo guardar el correo en la ficha del proveedor: ' + traducir(r.error) : (aviso('iocMsg', 'Se abrió WhatsApp, pero no se pudo guardar el número en la ficha: ' + traducir(r.error), true), null);
           Object.assign(p, cambios); estadoBotones();
         } else if (d.contacto) p.contacto = d.contacto;
+        if (correo) setTimeout(function () { enviarCorreo(o); }, 0);
         return null;
       }
     });
