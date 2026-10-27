@@ -6261,6 +6261,57 @@ $$;
 revoke execute on function public.guardar_jornada(bigint, jsonb, jsonb) from public, anon;
 grant execute on function public.guardar_jornada(bigint, jsonb, jsonb) to authenticated;
 
+-- ===== Datos: sucursales de INTECAP (directorio oficial «Centros de capacitación y delegaciones», INTECAP 2025) =====
+-- Fuente: https://intecap.edu.gt/informacionpublica/pdf/DIRECCIONES%20INTECAP-unificado25.pdf
+-- Se cargan bajo la institución «INTECAP»; solo las que aún no existan (por nombre). Quedan registradas a nombre de oliver.
+select set_config('request.jwt.claim.sub', (select id::text from public.perfiles where usuario = 'oliver' limit 1), true);
+select set_config('request.jwt.claims', json_build_object('sub', (select id::text from public.perfiles where usuario = 'oliver' limit 1))::text, true);
+insert into public.jor_sucursales (institucion_id, nombre, estado_id, municipio_id, direccion, telefono, correo, observaciones)
+select i.id, x.nombre, e.id, m.id, x.direccion, x.telefono, x.correo, x.obs
+  from (values
+    ('Oficinas Centrales', 'Guatemala', 'Guatemala', 'Calle Doroteo Guamuch Flores 7-51, zona 5, 6.º nivel', '2410-5555', null, 'División Regional Central. Oficinas centrales y Servicios Empresariales (ext. 10615).'),
+    ('Centro de Capacitación en Turismo', 'Guatemala', 'Guatemala', 'Calle Doroteo Guamuch Flores 7-51, zona 5, 2.º nivel', '2410-5555 Exts. 10200 / 10201 / 10202', 'centrodeturismo@intecap.edu.gt', 'División Regional Central.'),
+    ('Centro de Capacitación en Tecnologías de la Información y las Comunicaciones (TICS)', 'Guatemala', 'Guatemala', 'Calle Doroteo Guamuch Flores 8-79, zona 5', '2410-5555 Exts. 10908 / 10909', 'centrotics@intecap.edu.gt', 'División Regional Central.'),
+    ('Unidad de Formación a Distancia (FAD)', 'Guatemala', 'Guatemala', 'Calle Doroteo Guamuch Flores 8-79, zona 5, 5.º nivel', '2410-5555 Exts. 10916 / 10917', 'fad@intecap.edu.gt', 'División Regional Central.'),
+    ('Centro de Capacitación Guatemala 1', 'Guatemala', 'Guatemala', '14 Calle 31-30, Colonia Ciudad de Plata II, zona 7', '2320-0000 Exts. 13002 / 13003', 'centroguatemala1@intecap.edu.gt', 'División Regional Central. Centro Periférico zona 7.'),
+    ('Centro de Capacitación Guatemala 2', 'Guatemala', 'Guatemala', '34 Av. y 11 Calle final, Colonia Justo Rufino Barrios, zona 21', '2320-0200', 'centroguatemala2@intecap.edu.gt', 'División Regional Central.'),
+    ('Centro de Capacitación Guatemala 4', 'Guatemala', 'Guatemala', '19 Calle 25-75, Colonia Santa Elena III, zona 18', '2255-3300 / 2255-3347 / 2255-3874', 'centroguatemala4@intecap.edu.gt', 'División Regional Central.'),
+    ('Centro de Capacitación en Tecnología de la Carne (CETEC)', 'Guatemala', 'Guatemala', '8.ª Av. 20-00, entrada a la Brigada Mariscal Zavala, zona 17', '2258-4272 / 2256-0842 / 2255-5901', 'cetec@intecap.edu.gt', 'División Regional Central.'),
+    ('Centro de Capacitación de Banca, Seguros y Servicios Financieros', 'Guatemala', 'Guatemala', 'Calle Doroteo Guamuch Flores 8-79, zona 5, 5.º nivel', '2410-5555 Exts. 10923 / 10924 / 10922', 'centrodebanca@intecap.edu.gt', 'División Regional Central.'),
+    ('Centro de Capacitación Villa Nueva Enriqueta', 'Guatemala', 'Villa Nueva', '10.ª Calle 5-04, Colonia Enriqueta, zona 5, Villa Nueva', '6635-5774 / 6635-5860 / 6636-7985', 'centrovillanueva@intecap.edu.gt', 'División Regional Central.'),
+    ('Centro de Capacitación Villa Nueva Reformadores', 'Guatemala', 'Villa Nueva', '16 Av. 5-90 lote 2, zona 4, Blvd. Reformadores, Parque Industrial Las Américas, Villa Nueva', '6635-5774 / 6635-5860 / 6636-7985', 'centrovillanueva@intecap.edu.gt', 'División Regional Central.'),
+    ('INTECAP Zona 10', 'Guatemala', 'Guatemala', '17 Calle 15-14, zona 10', '2363-5581 / 2386-4064 / 2386-4067', 'intecapzona10@intecap.edu.gt', 'División Regional Central.'),
+    ('Centro de Capacitación Jutiapa', 'Jutiapa', 'Jutiapa', 'Km 110.4 Ruta Interamericana CA-01 Oriente, Aldea Amayito', '7793-7300', 'centrojutiapa@intecap.edu.gt', 'División Regional Central.'),
+    ('Delegación Sacatepéquez', 'Sacatepéquez', 'Antigua Guatemala', 'Barrio Chajón, Calle de los Nazarenos No. 18, Antigua Guatemala', '5204-8600', 'delegacionsacatepequez@intecap.edu.gt', 'División Regional Central. Delegación departamental.'),
+    ('Delegación Chimaltenango', 'Chimaltenango', 'Chimaltenango', '6.ª Avenida y 1.ª Calle, zona 4, Chimaltenango', '7839-5556 / 7849-4292', 'delegacionchimaltenango@intecap.edu.gt', 'División Regional Central. Delegación departamental.'),
+    ('Centro de Capacitación Santa Rosa', 'Santa Rosa', 'Barberena', 'Camino a Aldea San Juan Arana, Barberena, Santa Rosa', '7887-0710', 'centrosantarosa@intecap.edu.gt', 'División Regional Central.'),
+    ('Centro de Capacitación Cobán', 'Alta Verapaz', 'Cobán', 'Diagonal 1, 5-54, zona 1, Cobán', '7873-3800', 'centrocoban@intecap.edu.gt', 'División Regional Norte. También Servicios Empresariales Norte.'),
+    ('Centro de Capacitación Baja Verapaz', 'Baja Verapaz', 'Salamá', 'Km 144 RN-17, ruta hacia Salamá, atrás del campo de aviación', '7793-5300', 'centrobajaverapaz@intecap.edu.gt', 'División Regional Norte.'),
+    ('Centro de Capacitación Petén', 'Petén', 'San Francisco', 'Km 477, Caserío Santa Cruz, San Francisco', '7740-2100', 'centropeten@intecap.edu.gt', 'División Regional Norte. Sede de las oficinas centrales de la región.'),
+    ('Centro de Capacitación Quetzaltenango', 'Quetzaltenango', 'Quetzaltenango', '6.ª Calle 29-50, zona 3, Quetzaltenango', '7873-4000', 'centroquetzaltenango@intecap.edu.gt', 'División Regional Occidente. Sede de las oficinas centrales y Servicios Empresariales de la región.'),
+    ('Centro de Capacitación Sololá', 'Sololá', 'Sololá', 'Km 137, Aldea El Tablón, Sololá', '7762-4843 / 7762-4845', 'centrosolola@intecap.edu.gt', 'División Regional Occidente.'),
+    ('Centro de Capacitación Huehuetenango', 'Huehuetenango', 'Huehuetenango', '3.ª Calle final, Zaculeu Central, zona 9, Huehuetenango', '7957-5353', 'centrohuehuetenango@intecap.edu.gt', 'División Regional Occidente.'),
+    ('Centro de Capacitación San Marcos', 'San Marcos', null, 'Km 252, Caxaque, San Marcos', '7790-5757', 'centrosanmarcos@intecap.edu.gt', 'División Regional Occidente.'),
+    ('Centro de Capacitación Quiché', 'Quiché', null, 'Km 167, Aldea Chitatul, Quiché', '7790-4500', 'intecapquiche@intecap.edu.gt', 'División Regional Occidente.'),
+    ('Centro de Capacitación Totonicapán', 'Totonicapán', null, 'Km 200, Ruta Nacional 1, Totonicapán', '7766-4166', 'centrototonicapan@intecap.edu.gt', 'División Regional Occidente.'),
+    ('Centro de Capacitación Santa Lucía Cotzumalguapa', 'Escuintla', 'Santa Lucía Cotzumalguapa', 'Km 93 Carretera CA-2 a Mazatenango, Santa Lucía Cotzumalguapa', '7828-0104 / 7828-0100', 'centrosantalucia@intecap.edu.gt', 'División Regional Sur. Sede de las oficinas centrales y Servicios Empresariales de la región (7828-0122).'),
+    ('Centro de Capacitación Retalhuleu', 'Retalhuleu', 'Retalhuleu', 'Km 192 Carretera a Champerico, Retalhuleu', '3375-7398 / 3375-7450 / 3375-7452', 'centroretalhuleu@intecap.edu.gt', 'División Regional Sur.'),
+    ('Centro de Capacitación Escuintla 1', 'Escuintla', 'Escuintla', '4.ª Calle y 16 Av., Colonia Hunapú, zona 5, Escuintla', '7790-3232', 'centroescuintla1@intecap.edu.gt', 'División Regional Sur.'),
+    ('Centro de Capacitación Escuintla 2', 'Escuintla', 'Escuintla', '5.ª Calle 7-115, Colonia Madrid, zona 3, Escuintla', '7889-0179 / 7889-0185', 'centroescuintla2@intecap.edu.gt', 'División Regional Sur.'),
+    ('Centro de Capacitación Coatepeque', 'Quetzaltenango', 'Coatepeque', 'Km 222 Carretera CA-2 Pacífico', '7775-6262', 'centrocoatepeque@intecap.edu.gt', 'División Regional Sur.'),
+    ('Centro de Capacitación Suchitepéquez', 'Suchitepéquez', 'Mazatenango', 'Km 163 Carretera CA-2 Pacífico, Mazatenango', '7728-5200 / 7728-5201 / 7728-5202', 'centrosuchitepequez@intecap.edu.gt', 'División Regional Sur.'),
+    ('Centro de Capacitación Chiquimula', 'Chiquimula', 'Chiquimula', '6.ª Calle final, zona 5, Chiquimula', '7942-0511 / 7942-6118', 'centrochiquimula@intecap.edu.gt', 'División Regional Oriente. Sede de las oficinas centrales y Servicios Empresariales de la región (7942-6130).'),
+    ('Centro de Capacitación Santo Tomás de Castilla', 'Izabal', 'Puerto Barrios', 'Km 293 Carretera de acceso a Santo Tomás de Castilla, Puerto Barrios', '7948-3385 / 7948-3382 / 7948-3012', 'centrosantotomas@intecap.edu.gt', 'División Regional Oriente.'),
+    ('Centro de Capacitación Zacapa', 'Zacapa', 'Zacapa', 'Calzada Instituto Adolfo V. Hall de Oriente', '7941-5961 / 7941-5962', 'centrozacapa@intecap.edu.gt', 'División Regional Oriente.'),
+    ('Centro de Capacitación Jalapa', 'Jalapa', null, 'Km 167.86 Carretera RN-19, Aldea Llano Grande, carretera a Monjas, Jalapa', '7793-5700', 'centrojalapa@intecap.edu.gt', 'División Regional Oriente.'),
+    ('Delegación El Progreso', 'El Progreso', 'Guastatoya', '3.ª Calle 4-22, Barrio El Golfo, zona 1, Guastatoya', '7945-2451 / 7945-2459', 'delegacionelprogreso@intecap.edu.gt', 'División Regional Oriente. Delegación departamental.')
+  ) as x (nombre, depto, muni, direccion, telefono, correo, obs)
+  join public.jor_instituciones i on lower(i.nombre) = 'intecap'
+  left join public.geo_paises p on p.prefijo ilike 'GT' or p.nombre ilike 'guatemala'
+  left join public.geo_estados e on e.pais_id = p.id and e.nombre = x.depto
+  left join public.geo_municipios m on m.estado_id = e.id and m.nombre = x.muni
+ where not exists (select 1 from public.jor_sucursales s where s.institucion_id = i.id and lower(s.nombre) = lower(x.nombre));
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
