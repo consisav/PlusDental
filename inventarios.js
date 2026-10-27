@@ -247,15 +247,23 @@
     if (!bodegas.some(function (b) { return b.id === bodSel; })) bodSel = bodegas.length ? bodegas[0].id : null;
     pintarBodegas();
   }
-  function editarBodega(b) {
+  // Encargado de la bodega: usuarios de tipo Administrador (más el ya asignado, aunque ya no lo sea)
+  async function encargados(actual) {
+    var r = await sb.from('perfiles').select('usuario,correo,rol').eq('rol', 'administrador');
+    var l = (r.error ? [] : r.data).map(function (p) { return p.usuario || (p.correo || '').split('@')[0]; }).filter(Boolean).sort(function (a, b) { return a.localeCompare(b, 'es'); });
+    if (actual && l.indexOf(actual) < 0) l.unshift(actual);
+    return [['', 'Sin encargado']].concat(l.map(function (n) { return [n, n]; }));
+  }
+  async function editarBodega(b) {
     var v = b ? Object.assign({}, b) : { estado: 'activo', tipo: 'general', tipo_precio: 'directo', permite_carga_directa: true };
+    var OPC_ENCARGADO = await encargados(b && b.encargado);
     G.dialogo({
       eyebrow: 'Inventarios · Bodega', titulo: b ? b.nombre : 'Nueva bodega', valores: v,
       campos: [{ k: 'numero', label: 'N.º bodega', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
         { k: 'nombre', label: 'Nombre de la bodega', req: true, max: 120, ancho: 'full' },
         { k: 'tipo', label: 'Tipo', tipo: 'select', opciones: [['general', 'General'], ['sub', 'Sub-bodega']] },
         { k: 'bodega_mayor_id', label: 'Bodega mayor', ayuda: 'Solo para sub-bodegas', tipo: 'select', opciones: [['', '—']].concat(bodegas.filter(function (x) { return !b || x.id !== b.id; }).map(function (x) { return [x.id, x.numero + ' · ' + x.nombre]; })) },
-        { k: 'siglas', label: 'Siglas', max: 10, placeholder: 'GEN' }, { k: 'encargado', label: 'Encargado', max: 120 },
+        { k: 'siglas', label: 'Siglas', max: 10, placeholder: 'GEN' }, { k: 'encargado', label: 'Encargado', tipo: 'select', opciones: OPC_ENCARGADO, ayuda: 'Usuarios de tipo Administrador' },
         { k: 'direccion', label: 'Dirección', tipo: 'textarea', max: 300, ancho: 'full' },
         { k: 'tipo_precio', label: 'Tipo de precio por defecto', tipo: 'select', opciones: TIPOS },
         { k: 'sede', tipo: 'sede' },
