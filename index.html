@@ -497,6 +497,21 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-titulo{display:flex;flex-direction:column;gap:3px;min-width:0}
 .ag-resumen{margin:0;font-size:13.5px;color:#5A6D7A;font-weight:600}.ag-resumen:empty{display:none}.ag-resumen b{color:#0B2B40}
 .ag-grid.semana{min-width:0;width:100%;table-layout:fixed;border-collapse:collapse}
+.ag-grid.semana2{min-width:860px;width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px}
+.ag-grid.semana2 th{padding:0;background:#FFFFFF;border-bottom:1px solid #C9D6E0;border-left:1px solid #E3EAF0;position:sticky;top:0;z-index:3}.ag-grid.semana2 th.ag2-h{width:52px;border-left:0}
+.ag-grid.semana2 .ag2-dia{display:block;width:100%;font:inherit;font-size:13.5px;font-weight:600;color:#0B2B40;background:none;border:0;padding:9px 4px 7px;cursor:pointer;text-align:center}.ag-grid.semana2 .ag2-dia small{display:block;font-size:11px;font-weight:500;color:#5A6D7A}
+.ag-grid.semana2 th.hoy .ag2-dia{color:#005A87;box-shadow:inset 0 -3px 0 #005A87;font-weight:800}
+.ag-grid.semana2 td{height:25px;padding:0;border-bottom:1px solid #EEF2F5;border-left:1px solid #E3EAF0;vertical-align:top}.ag-grid.semana2 tr.ag2-hora td{border-top:1px solid #D9E4EC}
+.ag-grid.semana2 td.ag2-t{width:52px;font-size:11px;color:#5A6D7A;text-align:center;font-variant-numeric:tabular-nums;border-left:0;vertical-align:middle;background:#FFFFFF}
+.ag-grid.semana2 td.ag2-c{position:relative}.ag-grid.semana2 td.libre{background:#E4F2DE}.ag-grid.semana2 td.pasado{background:#F6F8F9}.ag-grid.semana2 td.lleno{background:#FFFFFF}.ag-grid.semana2 td.fuera{background:#FFFFFF}
+.ag-grid.semana2 td.bloq{background:repeating-linear-gradient(135deg,#FFFFFF 0 4px,#B9D2E8 4px 5px)}
+.ag-grid.semana2 .ag2-mas{position:absolute;right:4px;top:4px;width:15px;height:15px;border-radius:50%;border:0;padding:0;background:#3B8B2A;color:#FFFFFF;font:700 13px/15px Manrope,system-ui,sans-serif;cursor:pointer;opacity:.85}.ag-grid.semana2 .ag2-mas:hover{opacity:1;transform:scale(1.15)}
+.ag-grid.semana2 td.libre:hover{background:#D2EAC7}
+#administracion .ag-grid.semana2 .ag2-cita{position:absolute;z-index:2;display:block;text-align:left;font:inherit;font-size:11.5px;line-height:1.25;padding:3px 16px 2px 6px;border-radius:3px;border:1px solid rgba(11,43,64,.12);border-left:3px solid var(--med-linea,var(--med,#2F78C4));background:color-mix(in srgb,var(--med,#2F78C4) 32%,#FFFFFF);color:#0B2B40;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;box-shadow:none}
+#administracion .ag-grid.semana2 .ag2-cita small{display:block;font-size:10.5px;opacity:.75;overflow:hidden;text-overflow:ellipsis}
+#administracion .ag-grid.semana2 .ag2-cita.atendida{background:#E3E5E7;border-left-color:#8A9AA5;color:#3D4A53}
+#administracion .ag-grid.semana2 .ag2-cita.urgente{box-shadow:inset 0 0 0 1.5px #C0263A}#administracion .ag-grid.semana2 .ag2-cita:hover{filter:brightness(.96);z-index:4}
+.ag-grid.semana2 .ag2-punto{position:absolute;right:4px;top:5px;width:8px;height:8px;border-radius:50%;box-shadow:0 0 0 1.5px #FFFFFF}
 .ag-grid.semana th:first-child,.ag-grid.semana td:first-child{width:58px}
 .ag-grid.semana th{padding:10px 6px;background:#F5F9FC;border-bottom:1px solid #D9E4EC;letter-spacing:0;text-transform:none}
 .ag-grid.semana th:first-child{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#5A6D7A}
@@ -2024,7 +2039,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="adm-pane-head">
 <div class="ag-titulo"><h3 id="agTitulo" style="margin: 0; font-size: 19px; font-weight: 700">Agenda del día</h3><p id="agResumen" class="ag-resumen"></p></div>
 <div class="ag-nav">
-<div class="ag-vista" role="group" aria-label="Vista de la agenda"><button type="button" data-vista="dia" aria-pressed="true">Día</button><button type="button" data-vista="semana" aria-pressed="false">Semana</button><button type="button" data-vista="mes" aria-pressed="false">Mes</button></div>
+<div class="ag-vista" role="group" aria-label="Vista de la agenda"><button type="button" data-vista="dia" aria-pressed="false">Día</button><button type="button" data-vista="semana" aria-pressed="true">Semana</button><button type="button" data-vista="mes" aria-pressed="false">Mes</button></div>
 <button type="button" id="agPrev" class="adm-btn" aria-label="Día anterior">←</button>
 <input id="agDia" type="date" class="adm-input" aria-label="Día de la agenda" style="width: auto">
 <button type="button" id="agNext" class="adm-btn" aria-label="Día siguiente">→</button>
@@ -3065,7 +3080,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="inventarios-ordenes.js?v=20261027f"></script>
 <script src="asistentes.js"></script>
 <script src="dentistas.js"></script>
-<script src="agenda.js?v=20261027e"></script>
+<script src="agenda.js?v=20261027f"></script>
 <script src="agentes.js"></script>
 <script src="reportes.js?v=20261027b"></script>
 <script src="constancias.js"></script>
