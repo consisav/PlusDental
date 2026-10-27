@@ -623,8 +623,8 @@
     '</div>' +
     // Maestro
     '<section class="geo-panel ik-maestro"><div class="ik-titulo"><h4>Productos</h4><span id="ikCuenta"></span></div>' +
-      '<div class="roles-wrap ia-wrap"><table class="geo-tabla ik-tabla-m"><colgroup><col class="ik-c-cod"><col><col class="ik-c-fecha"><col class="ik-c-op"><col class="ik-c-doc"><col class="ik-c-num"><col class="ik-c-num"><col class="ik-c-valor"></colgroup>' +
-      '<thead><tr><th>Código</th><th>Producto / principio activo</th><th>Fecha</th><th>Operación</th><th>Documento</th><th class="num">Exist. anterior</th><th class="num">Exist. actual</th><th class="num">Valor / costo</th></tr></thead><tbody id="ikExist"></tbody></table>' +
+      '<div class="roles-wrap ia-wrap"><table class="geo-tabla ik-tabla-m"><colgroup><col class="ik-c-cod"><col class="ik-c-fecha"><col class="ik-c-doc"><col><col class="ik-c-op"><col class="ik-c-num"><col class="ik-c-valor"></colgroup>' +
+      '<thead><tr><th>Código</th><th>Fecha</th><th>Documento</th><th>Producto / principio activo</th><th>Operación</th><th class="num">Exist. actual</th><th class="num">Valor / costo</th></tr></thead><tbody id="ikExist"></tbody></table>' +
       '<div id="ikPaginas" class="ia-paginas"></div></div></section>' +
     // Detalle
     '<section class="geo-panel ik-detalle" id="ikDetalle" hidden></section>' +
@@ -670,17 +670,17 @@
     $('ikExist').innerHTML = vis.length ? vis.map(function (p) {
       var ex = existencia(p.id, bod), bajo = p.minimo != null && ex < Number(p.minimo);
       var m = ultimoMov(p.id, bod), op = m ? operacion(m) : null, doc = m ? documentoMov(m) : null;
-      var antes = m ? ex - (m.tipo === 'entrada' ? 1 : -1) * Number(m.cantidad) : null;
       return '<tr data-prod="' + p.id + '" tabindex="0" class="' + (p.id === prodSel ? 'geo-sel' : '') + '"><td><b class="ik-codigo">' + esc(p.codigo || '—') + '</b><small class="inv-sub">N.º ' + (p.numero || p.id) + '</small></td>' +
+        (m ? '<td>' + fecha(m.fecha) + '<small class="inv-sub">' + fechaHora(m.fecha).slice(12, 17) + '</small></td>' +
+          '<td><span class="ia-corto" title="' + esc(doc[0]) + '">' + esc(doc[0]) + '</span><small class="inv-sub ia-corto" title="' + esc(doc[1]) + '">' + esc(doc[1] || '—') + '</small></td>'
+          : '<td colspan="2" class="ik-sinmov">Sin movimientos</td>') +
         '<td><div class="inv-prod">' + imagen(p, 32) + '<div><b class="ik-nombre">' + esc(p.nombre) + '</b>' + (p.principio_activo ? '<small class="inv-sub ia-corto" title="' + esc(p.principio_activo) + '">' + esc(p.principio_activo) + '</small>' : '') +
           (p.estado !== 'activo' ? '<span class="estado estado-' + p.estado + '">' + (p.estado === 'baja' ? 'Baja' : 'Inactivo') + '</span>' : '') + '</div></div></td>' +
-        (m ? '<td>' + fecha(m.fecha) + '<small class="inv-sub">' + fechaHora(m.fecha).slice(12, 17) + '</small></td><td><span class="ik-op ' + op[1] + '">' + esc(op[0]) + '</span><small class="inv-sub">' + (m.tipo === 'entrada' ? '+' : '−') + cant(m.cantidad) + '</small></td>' +
-          '<td><span class="ia-corto" title="' + esc(doc[0]) + '">' + esc(doc[0]) + '</span><small class="inv-sub ia-corto" title="' + esc(doc[1]) + '">' + esc(doc[1] || '—') + '</small></td><td class="num">' + cant(antes) + '</td>'
-          : '<td colspan="4" class="ik-sinmov">Sin movimientos</td>') +
+        (m ? '<td><span class="ik-op ' + op[1] + '">' + esc(op[0]) + '</span><small class="inv-sub">' + (m.tipo === 'entrada' ? '+' : '−') + cant(m.cantidad) + '</small></td>' : '<td></td>') +
         '<td class="num"><b class="' + (ex < 0 ? 'inv-negativo' : bajo ? 'inv-bajo' : '') + '">' + cant(ex) + '</b>' + (bajo ? '<small class="inv-sub">mín. ' + cant(Number(p.minimo)) + '</small>' : '') + '</td>' +
         '<td class="num"><b>' + q(ex * Number(p.costo || 0)) + '</b><small class="inv-sub">c/u ' + q(p.costo) + '</small></td></tr>';
-    }).join('') + '<tr class="inv-total"><td colspan="7" class="num">Valor del inventario mostrado (' + l.length + ' producto' + (l.length === 1 ? '' : 's') + ')</td><td class="num"><b>' + q(valor) + '</b></td></tr>'
-      : '<tr><td colspan="8" class="geo-vacia">' + (filtroKardex === 'con' ? 'Aún no hay movimientos. Registra una compra o un ajuste de inventario inicial.' : 'Ningún producto coincide.') + '</td></tr>';
+    }).join('') + '<tr class="inv-total"><td colspan="6" class="num">Valor del inventario mostrado (' + l.length + ' producto' + (l.length === 1 ? '' : 's') + ')</td><td class="num"><b>' + q(valor) + '</b></td></tr>'
+      : '<tr><td colspan="7" class="geo-vacia">' + (filtroKardex === 'con' ? 'Aún no hay movimientos. Registra una compra o un ajuste de inventario inicial.' : 'Ningún producto coincide.') + '</td></tr>';
     var botones = [];
     if (paginas > 1) for (var n = 1; n <= paginas; n++) if (n === 1 || n === paginas || Math.abs(n - pagKdx) <= 1) botones.push(n); else if (botones[botones.length - 1] !== '…') botones.push('…');
     $('ikPaginas').hidden = !l.length;
