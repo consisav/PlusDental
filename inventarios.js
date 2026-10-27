@@ -58,6 +58,7 @@
   var BANCOS_GT = ['Banco Industrial', 'Banrural (Banco de Desarrollo Rural)', 'BAC Credomatic (Banco de América Central)', 'Banco G&T Continental', 'BAM (Banco Agromercantil)',
     'Bantrab (Banco de los Trabajadores)', 'Banco Promerica', 'Banco Ficohsa Guatemala', 'Interbanco (Banco Internacional)', 'Crédito Hipotecario Nacional (CHN)',
     'Banco de Antigua', 'Banco Inmobiliario', 'Banco Azteca de Guatemala', 'Vivibanco', 'Banco Nexa', 'Banco INV', 'Citibank, N.A. Sucursal Guatemala'];
+  window.PD_BANCOS_GT = BANCOS_GT;   // también la usa Cobros y pagos
   function pasaFiltro(clave, x) { return filtros[clave] === 'todos' || (x.estado || 'activo') === filtros[clave]; }
   async function todas(armar) {
     var l = [], desde = 0;

@@ -808,7 +808,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .pg-grid label,.pg-cierre label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600;min-width:0}
 .pg-grid input,.pg-grid select,.pg-cierre textarea,.pg-out{font:inherit;font-size:15px;font-weight:500;padding:11px 14px;border:1px solid #C4D4DF;border-radius:12px;background:#FFFFFF;min-height:46px;box-sizing:border-box;width:100%;color:#0B2B40}
 .pg-grid input.pg-auto,.pg-out{background:#EEF5FA;border-style:dashed;color:#00476B;font-weight:700;cursor:default;display:flex;align-items:center}
-.pac-inst[hidden]{display:none!important}.pg-s2{grid-column:span 2}.pg-s4{grid-column:1/-1}
+.pac-inst[hidden]{display:none!important}.cp-comp{display:block;margin-top:3px;border:0;background:none;padding:0;font:inherit;font-size:12px;font-weight:700;color:#2F78C4;text-decoration:underline;cursor:pointer}#pgComprobanteWrap input{padding:8px;background:#fff}.pg-s2{grid-column:span 2}.pg-s4{grid-column:1/-1}
 .pg-saldo{font-size:13px;font-weight:500;color:#5A6D7A;margin:0}
 .pg-cierre{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:end}
 .pg-totales{display:flex;gap:12px;flex-wrap:wrap}
@@ -2183,6 +2183,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>Fecha *<input id="pgFecha" type="date" required></label>
 <label>Método *<select id="pgMetodo"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option><option value="deposito">Depósito</option></select></label>
 <label id="pgRefWrap" hidden>N.º de autorización o boleta<input id="pgReferencia" type="text" maxlength="60"></label>
+<label id="pgBancoWrap" hidden>Banco *<select id="pgBanco"><option value="">Elige el banco…</option></select></label>
+<label id="pgDocBancoWrap" hidden>Número de documento *<input id="pgDocBanco" type="text" maxlength="60" placeholder="N.º de transferencia o boleta"></label>
+<label id="pgComprobanteWrap" class="pg-s2" hidden>Imagen del documento (PDF o imagen, máx. 10 MB)<input id="pgComprobante" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"></label>
 <label>Número de cuota<input id="pgCuota" type="number" min="1" max="999" step="1" inputmode="numeric"></label>
 <div class="pg-imprimir"><button type="button" id="pgImprimir" class="adm-btn" disabled title="Se activa al registrar el pago">Imprimir documento</button></div>
 <label class="pg-s2">Presupuesto (opcional)<select id="pgPresupuesto"><option value="">Sin presupuesto</option></select></label>
@@ -3042,7 +3045,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="odontograma.js"></script>
 <script src="expedientes.js?v=20261027c"></script>
 <script src="presupuestos.js"></script>
-<script src="cuentas.js?v=20261027c"></script>
+<script src="cuentas.js?v=20261027d"></script>
 <script src="tratamientos-paciente.js"></script>
 <script src="recetas.js"></script>
 <script src="laboratorio.js"></script>
@@ -3054,7 +3057,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="tipos-dentistas.js"></script>
 <script src="geografia.js?v=20261027"></script>
 <script src="organizaciones.js?v=20261026"></script>
-<script src="inventarios.js?v=20261027e"></script>
+<script src="inventarios.js?v=20261027f"></script>
 <script src="inventarios-movimientos.js?v=20261027i"></script>
 <script src="inventarios-traslados.js?v=20261027"></script>
 <script src="jornadas.js?v=20261027d"></script>

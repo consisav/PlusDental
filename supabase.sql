@@ -6469,6 +6469,45 @@ drop trigger if exists pacientes_institucion on public.pacientes;
 create trigger pacientes_institucion before insert or update of tipo_cliente, institucion_id, sucursal_id on public.pacientes
   for each row execute function public.paciente_institucion();
 
+-- ===== Pagos por transferencia o depósito: banco, número de documento y comprobante =====
+-- El comprobante (PDF o imagen, máx. 10 MB) se guarda en el almacenamiento privado «comprobantes»; solo el personal lo ve.
+alter table public.pagos add column if not exists banco text check (char_length(banco) <= 80);
+alter table public.pagos add column if not exists documento_banco text check (char_length(documento_banco) <= 60);
+alter table public.pagos add column if not exists comprobante text check (char_length(comprobante) <= 300);
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('comprobantes', 'comprobantes', false, 10485760, array['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+on conflict (id) do nothing;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal ve comprobantes de pago') then
+    create policy "personal ve comprobantes de pago" on storage.objects for select using (bucket_id = 'comprobantes' and public.es_personal());
+  end if;
+end $$;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'personal sube comprobantes de pago') then
+    create policy "personal sube comprobantes de pago" on storage.objects for insert with check (bucket_id = 'comprobantes' and public.es_personal());
+  end if;
+end $$;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'super administrador borra comprobantes de pago') then
+    create policy "super administrador borra comprobantes de pago" on storage.objects for delete using (bucket_id = 'comprobantes' and public.es_super_administrador());
+  end if;
+end $$;
+
+-- Guarda banco, número de documento y comprobante de un pago (después de registrarlo con registrar_pago)
+create or replace function public.datos_bancarios_pago(p_id bigint, p_banco text, p_documento text, p_comprobante text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if not exists (select 1 from public.pagos where id = p_id) then raise exception 'Pago no encontrado'; end if;
+  update public.pagos set banco = nullif(trim(p_banco), ''), documento_banco = nullif(trim(p_documento), ''),
+         comprobante = coalesce(nullif(trim(p_comprobante), ''), comprobante)
+   where id = p_id;
+end;
+$$;
+revoke execute on function public.datos_bancarios_pago(bigint, text, text, text) from public, anon;
+grant execute on function public.datos_bancarios_pago(bigint, text, text, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

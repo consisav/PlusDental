@@ -110,6 +110,7 @@
       // Datos del pago
       sec('Datos del pago') + grilla(
         dato('Fecha', fechaCorta(p.fecha)) + dato('Método', METODOS[p.metodo] || '—') + dato('Autorización', esc(p.referencia || '—')) +
+        (p.banco ? dato('Banco', esc(p.banco)) + dato('N.º de documento', esc(p.documento_banco || '—')) : '') +
         dato('Presupuesto', p.presupuesto_id ? 'N.º ' + p.presupuesto_id : '—') +
         (p.concepto ? dato('Concepto', esc(p.concepto), '1/-1') : '')) +
       // Detalle
@@ -325,7 +326,8 @@
         '<td><b class="ia-corto" title="' + esc(p.pacientes ? p.pacientes.nombre : '') + '">' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</b>' + (p.nit ? '<small>NIT ' + esc(p.nit) + '</small>' : '') + '</td>' +
         '<td><span class="ia-corto" title="' + esc(documento(p)) + '">' + esc(documento(p)) + '</span>' + (doc ? '<small title="' + esc(doc) + '">' + esc(doc) + '</small>' : '') + '</td>' +
         '<td><span class="ia-corto" title="' + esc(p.concepto || '') + '">' + esc(p.concepto || (p.presupuesto_id ? 'Presupuesto N.º ' + p.presupuesto_id : '—')) + '</span>' + (p.anulado && p.anulado_motivo ? '<small title="' + esc(p.anulado_motivo) + '">' + esc(p.anulado_motivo) + '</small>' : '') + '</td>' +
-        '<td>' + METODOS[p.metodo] + (p.referencia ? '<small>' + esc(p.referencia) + '</small>' : '') + '</td>' +
+        '<td>' + METODOS[p.metodo] + (p.referencia ? '<small>' + esc(p.referencia) + '</small>' : '') + (p.banco ? '<small class="ia-corto" title="' + esc(p.banco) + '">' + esc(p.banco) + (p.documento_banco ? ' · ' + esc(p.documento_banco) : '') + '</small>' : '') +
+          (p.comprobante ? '<button type="button" class="cp-comp" data-comprobante="' + esc(p.comprobante) + '">Ver comprobante</button>' : '') + '</td>' +
         '<td class="num"><b>' + q(p.monto) + '</b>' + (Number(p.monto_usd) > 0 ? '<small>' + usd(p.monto_usd) + '</small>' : '') + '</td>' +
         '<td>' + estado + '</td><td><div class="cp-acc">' + acciones + '</div></td></tr>';
     }).join('');
@@ -469,6 +471,31 @@
     $('pgMonto').value = q(tq); $('pgMontoUsd').value = usd(tu);
     return { q: redondear(tq), usd: redondear(tu) };
   }
+  // Transferencia o depósito: banco (lista del sistema), número de documento y comprobante
+  function esBancario() { return $('pgMetodo').value === 'transferencia' || $('pgMetodo').value === 'deposito'; }
+  function pintarBancario() {
+    var b = esBancario();
+    ['pgBancoWrap', 'pgDocBancoWrap', 'pgComprobanteWrap'].forEach(function (id) { $(id).hidden = !b; });
+    if (b && $('pgBanco').options.length <= 1) $('pgBanco').innerHTML = '<option value="">Elige el banco…</option>' +
+      (window.PD_BANCOS_GT || []).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '<option value="Otro">Otro</option>';
+  }
+  function nombreArchivo(n) { return String(n || 'archivo').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.-]+/g, '_').slice(-80); }
+  async function guardarBancario(id) {
+    var f = $('pgComprobante').files[0], ruta = null, aviso2 = '';
+    if (f) {
+      ruta = id + '/' + Date.now() + '-' + nombreArchivo(f.name);
+      var up = await sb.storage.from('comprobantes').upload(ruta, f, { contentType: f.type, upsert: false });
+      if (up.error) { ruta = null; aviso2 = ' No se pudo subir el comprobante: ' + traducir(up.error); }
+    }
+    var r = await sb.rpc('datos_bancarios_pago', { p_id: id, p_banco: $('pgBanco').value, p_documento: $('pgDocBanco').value.trim(), p_comprobante: ruta });
+    if (r.error) aviso2 = /datos_bancarios_pago|could not find/i.test(r.error.message || '') ? ' Falta ejecutar en Supabase el script actualizado (supabase.sql) para guardar banco y comprobante.' : ' No se guardaron el banco y el documento: ' + traducir(r.error);
+    return aviso2;
+  }
+  async function verComprobante(ruta) {
+    var r = await sb.storage.from('comprobantes').createSignedUrl(ruta, 300);
+    if (r.error) { aviso('cpMsg', traducir(r.error), true); return; }
+    window.open(r.data.signedUrl, '_blank', 'noopener');
+  }
   function pintarEstadoNuevo() { $('pgEstado').dataset.estado = $('pgEstado').value; }
   function limpiarFormulario() {
     lineas = [lineaNueva()];
@@ -476,6 +503,7 @@
     ['pgNit', 'pgSerie', 'pgNumFactura', 'pgDte', 'pgReferencia', 'pgCuota', 'pgConcepto', 'pgObservaciones'].forEach(function (id) { $(id).value = ''; });
     $('pgTipoDoc').value = 'factura'; $('pgMetodo').value = 'efectivo'; $('pgEstado').value = 'emitido'; pintarEstadoNuevo();
     $('pgFecha').value = hoy(); $('pgRefWrap').hidden = true;
+    $('pgBanco').value = ''; $('pgDocBanco').value = ''; $('pgComprobante').value = ''; pintarBancario();
     $('pgUsuario').textContent = (window.PD_SESION && window.PD_SESION.usuario()) || '—';
     pintarDetalle();
   }
@@ -535,7 +563,8 @@
 
   $('pgPaciente').addEventListener('change', alElegirPaciente);
   $('pgPresupuesto').addEventListener('change', cargarItemsPresupuesto);
-  $('pgMetodo').addEventListener('change', function () { $('pgRefWrap').hidden = this.value === 'efectivo'; });
+  $('pgMetodo').addEventListener('change', function () { $('pgRefWrap').hidden = this.value === 'efectivo'; pintarBancario(); });
+  $('pgComprobante').addEventListener('change', function () { var f = this.files[0]; if (f && f.size > 10 * 1024 * 1024) { this.value = ''; aviso('pgMsg', 'El comprobante pesa más de 10 MB.', true); } });
   // Detalle: cambios en las líneas, agregar y quitar
   $('pgDetalle').addEventListener('input', function (e) {
     var c = e.target.closest('[data-pl]');
@@ -594,6 +623,8 @@
     if (usadas.some(function (l) { return l.tipo === 'producto' && !(Number(l.cantidad) > 0); })) { aviso('pgMsg', 'La cantidad de cada producto debe ser mayor que cero.', true); return; }
     var faltan = usadas.filter(function (l) { return l.tipo === 'producto' && pedido(l.producto_id) > (invExist[l.producto_id] || 0); });
     if (faltan.length && !window.confirm('La existencia en bodega no alcanza para: ' + faltan.map(function (l) { return l.producto_texto; }).join(', ') + '.\n¿Registrar el pago de todos modos? El kardex quedará con saldo negativo hasta que ingrese la compra.')) return;
+    if (esBancario() && !$('pgBanco').value) { aviso('pgMsg', 'Elige el banco de la ' + ($('pgMetodo').value === 'deposito' ? 'boleta de depósito.' : 'transferencia.'), true); $('pgBanco').focus(); return; }
+    if (esBancario() && !$('pgDocBanco').value.trim()) { aviso('pgMsg', 'Escribe el número de documento del banco.', true); $('pgDocBanco').focus(); return; }
     var tot = pintarTotalesDetalle();
     if (!(tot.q > 0)) { aviso('pgMsg', 'El total en quetzales del detalle debe ser mayor que cero.', true); return; }
     var datos = {
@@ -618,13 +649,14 @@
     var r = await sb.rpc('registrar_pago', { p_datos: datos, p_lineas: detalle });
     boton.disabled = false;
     if (r.error) { aviso('pgMsg', /registrar_pago|could not find the function/i.test(r.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los cobros con factura.' : traducir(r.error), true); return; }
-    var pid = datos.paciente_id;
+    var pid = datos.paciente_id, avisoBanco = '';
+    if (esBancario()) { aviso('pgMsg', 'Guardando el banco y el comprobante…'); avisoBanco = await guardarBancario(r.data); }
     if (detalle.some(function (l) { return l.producto_id; })) cargarExistenciasInv();
     limpiarFormulario();
     ultimoPago = r.data; $('pgImprimir').disabled = false; $('pgImprimir').title = '';
     var c = await sb.from('pagos').select('correlativo').eq('id', r.data).maybeSingle();
     var corr = !c.error && c.data && c.data.correlativo;
-    aviso('pgMsg', (corr ? 'Pago registrado con el correlativo ' + corr + ' (recibo ' + recibo(r.data) + ')' : 'Pago registrado con el recibo ' + recibo(r.data)) + '. Puedes imprimirlo o enviarlo desde la lista.');
+    aviso('pgMsg', (corr ? 'Pago registrado con el correlativo ' + corr + ' (recibo ' + recibo(r.data) + ')' : 'Pago registrado con el recibo ' + recibo(r.data)) + '. Puedes imprimirlo o enviarlo desde la lista.' + avisoBanco, !!avisoBanco);
     await cargarTodo();
     pintarSelectorPacientes(pid);
   });
@@ -645,6 +677,8 @@
     aviso('cpMsg', 'Recibo ' + recibo(s.dataset.estadoPago) + ': estado cambiado a ' + ESTADOS_DOC[s.value] + '.');
   });
   $('cpBody').addEventListener('click', async function (e) {
+    var vc = e.target.closest('[data-comprobante]');
+    if (vc) { verComprobante(vc.dataset.comprobante); return; }
     var rb = e.target.closest('[data-recibo]');
     if (rb) {
       imprimirComprobante(rb.dataset.recibo);
