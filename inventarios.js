@@ -15,6 +15,7 @@
 
   var proveedores = [], bodegas = [], productos = [], precios = [], otrosProv = [], tiposProd = [];
   var provSel = null, subSel = null, bodSel = null, prodSel = null, tipoSel = null;
+  var PAG_PROD = 8, pagProd = 1, irAlProd = false;
   var filtros = { prov: 'activo', bod: 'todos', prod: 'activo', tipo: 'activo' };
 
   function $(id) { return document.getElementById(id); }
@@ -232,7 +233,9 @@
     '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Definición de productos</h3><button type="button" class="adm-btn adm-primary" id="iaNuevo">+ Producto</button></div>' +
     '<p class="dlg-msg">Medicamentos, insumos, materiales e instrumental: clasificación, presentación, unidad, proveedor, bodega, mínimos y máximos.</p>' +
     '<div class="inv-barra">' + filtrosHtml('prod', F_ESTADO) + '<select id="iaClasif" class="adm-input" aria-label="Clasificación"><option value="">Todas las clasificaciones</option></select><input id="iaBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar por nombre, código o marca" aria-label="Buscar producto"></div>' +
-    '<section class="geo-panel"><div class="roles-wrap geo-scroll inv-alto"><table class="geo-tabla"><thead><tr><th>N.º</th><th>Código</th><th>Producto</th><th>Clasificación</th><th>Presentación</th><th>Mín. / Máx.</th><th>Costo</th><th title="Precio promedio estimado por IA en Guatemala">Precio ref.</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="iaLista"></tbody></table></div>' +
+    '<section class="geo-panel"><div class="roles-wrap ia-wrap"><table class="geo-tabla ia-tabla"><colgroup><col class="ia-c-cod"><col><col class="ia-c-clas"><col class="ia-c-min"><col class="ia-c-costo"><col class="ia-c-est"><col class="ia-c-acc"></colgroup>' +
+    '<thead><tr><th>Código</th><th>Producto</th><th>Clasificación / presentación</th><th>Mín. / Máx.</th><th title="Precio de costo y precio de referencia estimado por IA en Guatemala">Costo / Ref.</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="iaLista"></tbody></table>' +
+    '<div id="iaPaginas" class="ia-paginas"></div></div>' +
     '<div id="iaFicha" class="geo-ficha" hidden></div></section><p id="iaMsg" class="dlg-msg" role="status"></p></div>';
   function nombreProv(id) { var p = proveedores.filter(function (x) { return x.id === id; })[0]; return p ? p.nombre_comercial : null; }
   function fotoUrl(ruta) { return ruta ? sb.storage.from('publico').getPublicUrl(ruta).data.publicUrl : ''; }
@@ -267,11 +270,27 @@
     $('iaClasif').innerHTML = '<option value="">Todas las clasificaciones</option>' + clases.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
     $('iaClasif').value = clases.indexOf(antes) >= 0 ? antes : '';
     var l = productos.filter(function (p) { return pasaFiltro('prod', p) && (!c || p.clasificacion === c) && (!t || norm([p.nombre, p.codigo, p.marca, p.principio_activo].join(' ')).indexOf(t) >= 0); });
-    $('iaLista').innerHTML = l.length ? l.map(function (p) {
+    var paginas = Math.max(1, Math.ceil(l.length / PAG_PROD));
+    if (irAlProd) { var ix = l.findIndex(function (p) { return p.id === prodSel; }); if (ix >= 0) pagProd = Math.floor(ix / PAG_PROD) + 1; irAlProd = false; }
+    pagProd = Math.min(Math.max(1, pagProd), paginas);
+    var ini = (pagProd - 1) * PAG_PROD, vis = l.slice(ini, ini + PAG_PROD);
+    $('iaLista').innerHTML = vis.length ? vis.map(function (p) {
       var bajo = p.control_minimo && p.minimo != null;
-      return fila('prod', p.id, p.id === prodSel, [p.numero || '—', esc(p.codigo || '—'), '<div class="inv-prod">' + imagenProducto(p, 40) + '<div><b>' + esc(p.nombre) + '</b>' + (p.principio_activo ? '<small class="inv-sub">' + esc(p.principio_activo) + '</small>' : '') + (p.tipo_producto ? '<small class="inv-sub">' + esc(p.tipo_producto) + '</small>' : '') + (p.no_definido ? '<span class="inv-alerta" title="Creado desde una compra: completa su definición">No definido</span>' : '') + '</div></div>', esc(p.clasificacion || '—'),
-        esc([p.presentacion, p.unidad].filter(Boolean).join(' · ') || '—'), (p.minimo != null || p.maximo != null ? (p.minimo != null ? Number(p.minimo) : '—') + ' / ' + (p.maximo != null ? Number(p.maximo) : '—') : '—') + (bajo ? ' <span class="inv-alerta" title="Control de punto mínimo activo">mín.</span>' : ''), q(p.costo), p.precio_referencia != null ? '<span class="inv-ref" title="' + esc(p.precio_referencia_nota || 'Precio de referencia estimado') + '">' + q(p.precio_referencia) + '</span>' : '—', pill(p.estado)]);
-    }).join('') : vacia(10, productos.length ? 'Ningún producto coincide.' : 'Aún no hay productos. Agrega el primero con «+ Producto».');
+      var minmax = p.minimo != null || p.maximo != null ? (p.minimo != null ? Number(p.minimo) : '—') + ' / ' + (p.maximo != null ? Number(p.maximo) : '—') : '—';
+      var sub = [p.principio_activo, p.tipo_producto].filter(Boolean).map(esc).join(' · ');
+      return fila('prod', p.id, p.id === prodSel, [
+        '<b class="ia-cod">' + esc(p.codigo || '—') + '</b><small class="inv-sub">N.º ' + (p.numero || '—') + '</small>',
+        '<div class="inv-prod">' + imagenProducto(p, 36) + '<div><b class="ia-nom">' + esc(p.nombre) + '</b>' + (sub ? '<small class="inv-sub ia-corto" title="' + sub + '">' + sub + '</small>' : '') + (p.no_definido ? '<span class="inv-alerta" title="Creado desde una compra: completa su definición">No definido</span>' : '') + '</div></div>',
+        '<span class="ia-corto">' + esc(p.clasificacion || '—') + '</span><small class="inv-sub ia-corto">' + (esc([p.presentacion, p.unidad].filter(Boolean).join(' · ')) || '—') + '</small>',
+        minmax + (bajo ? '<small><span class="inv-alerta" title="Control de punto mínimo activo">mín.</span></small>' : ''),
+        q(p.costo) + '<small class="inv-sub">' + (p.precio_referencia != null ? '<span class="inv-ref" title="' + esc(p.precio_referencia_nota || 'Precio de referencia estimado') + '">Ref. ' + q(p.precio_referencia) + '</span>' : 'Ref. —') + '</small>',
+        pill(p.estado)]);
+    }).join('') : vacia(7, productos.length ? 'Ningún producto coincide.' : 'Aún no hay productos. Agrega el primero con «+ Producto».');
+    var botones = [];
+    if (paginas > 1) for (var n = 1; n <= paginas; n++) if (n === 1 || n === paginas || Math.abs(n - pagProd) <= 1) botones.push(n); else if (botones[botones.length - 1] !== '…') botones.push('…');
+    $('iaPaginas').innerHTML = l.length ? '<span>' + (ini + 1) + '–' + (ini + vis.length) + ' de ' + l.length + ' producto' + (l.length === 1 ? '' : 's') + '</span>' + (paginas > 1 ? '<nav aria-label="Páginas de productos"><button type="button" class="ia-pag" data-pag-prod="' + (pagProd - 1) + '"' + (pagProd === 1 ? ' disabled' : '') + ' aria-label="Página anterior">‹</button>' +
+      botones.map(function (n) { return n === '…' ? '<span class="ia-pag-mas">…</span>' : '<button type="button" class="ia-pag" data-pag-prod="' + n + '"' + (n === pagProd ? ' aria-current="page"' : '') + '>' + n + '</button>'; }).join('') +
+      '<button type="button" class="ia-pag" data-pag-prod="' + (pagProd + 1) + '"' + (pagProd === paginas ? ' disabled' : '') + ' aria-label="Página siguiente">›</button></nav>' : '') : '';
     var p = productos.filter(function (x) { return x.id === prodSel; })[0];
     $('iaFicha').hidden = !p;
     if (p) {
@@ -293,7 +312,7 @@
       productos = r[0].sort(porNumero); otrosProv = r[1].error ? [] : r[1].data;
     } catch (e) { productos = []; $('iaLista').innerHTML = ''; aviso('iaMsg', traducir(e), true); return; }
     if (!productos.some(function (p) { return p.id === prodSel; })) prodSel = productos.length ? productos[0].id : null;
-    pintarProductos();
+    irAlProd = true; pintarProductos();
   }
   async function subirFoto(id, archivo) {
     if (!archivo) return null;
@@ -420,7 +439,7 @@
   document.querySelectorAll('#admInvProveedores, #admInvBodegas, #admInvTipos, #admInvProductos').forEach(function (pane) {
     pane.addEventListener('click', function (e) {
       var f = e.target.closest('.inv-filtros [data-valor]');
-      if (f) { var clave = f.parentNode.dataset.filtro; filtros[clave] = f.dataset.valor; f.parentNode.querySelectorAll('[data-valor]').forEach(function (b) { b.setAttribute('aria-pressed', b === f); }); ({ prov: pintarProveedores, bod: pintarBodegas, prod: pintarProductos, tipo: pintarTipos })[clave](); return; }
+      if (f) { var clave = f.parentNode.dataset.filtro; filtros[clave] = f.dataset.valor; if (clave === 'prod') pagProd = 1; f.parentNode.querySelectorAll('[data-valor]').forEach(function (b) { b.setAttribute('aria-pressed', b === f); }); ({ prov: pintarProveedores, bod: pintarBodegas, prod: pintarProductos, tipo: pintarTipos })[clave](); return; }
       var m = e.target.closest('[data-inv-modificar]');
       if (m) {
         var t = m.dataset.invModificar;
@@ -432,6 +451,8 @@
         return;
       }
       if (e.target.closest('[data-inv-actualizar]')) { cargarTodo(pane.id); return; }
+      var pg = e.target.closest('[data-pag-prod]');
+      if (pg) { pagProd = +pg.dataset.pagProd; pintarProductos(); return; }
       var qp = e.target.closest('[data-quitar-prov]');
       if (qp) { sb.from('inv_producto_proveedores').delete().eq('producto_id', prodSel).eq('proveedor_id', +qp.dataset.quitarProv).then(cargarProductos); return; }
       var tr = e.target.closest('tr[data-inv]');
@@ -447,10 +468,10 @@
   });
   $('admInvProductos').addEventListener('change', function (e) {
     if (e.target.id === 'iaOtroProv' && e.target.value) sb.from('inv_producto_proveedores').insert({ producto_id: prodSel, proveedor_id: +e.target.value }).then(cargarProductos);
-    if (e.target.id === 'iaClasif') pintarProductos();
+    if (e.target.id === 'iaClasif') { pagProd = 1; pintarProductos(); }
   });
   $('ipBuscar').addEventListener('input', pintarProveedores);
-  $('iaBuscar').addEventListener('input', pintarProductos);
+  $('iaBuscar').addEventListener('input', function () { pagProd = 1; pintarProductos(); });
   $('ivBuscar').addEventListener('input', pintarPrecios);
   $('ivLista').addEventListener('click', function (e) { var b = e.target.closest('[data-precio]'); if (b) { var k = b.dataset.precio.split(':'); editarPrecio(+k[0], k[1]); } });
   $('ipNuevo').addEventListener('click', function () { editarProveedor(null, null); });
