@@ -681,15 +681,29 @@
     });
     return movs;
   }
-  function filaKardex(m) {
-    var entra = m.tipo === 'entrada';
-    return '<tr class="inv-mov-' + m.tipo + '"><td class="ik-cod">' + m.n + '</td><td class="ik-cod">' + m.mov[0] + '</td><td class="ik-mov">' + esc(m.mov[1]) + (m.observaciones ? '<small class="inv-sub">' + esc(m.observaciones) + '</small>' : '') + '</td>' +
-      '<td class="num">' + esc(m.interno) + '</td><td>' + fechaHora(m.fecha).slice(0, 17) + '</td><td>' + esc(m.fisico || '—') + '</td><td>' + (m.fab ? fecha(m.fab) : '') + '</td><td>' + (m.venc ? fecha(m.venc) : '') + '</td><td>' + esc(m.lote || '') + '</td>' +
-      '<td class="num ik-in">' + (entra ? cant(m.cantidad) : '') + '</td><td class="num ik-out">' + (entra ? '' : '-' + cant(m.cantidad)) + '</td>' +
-      '<td class="num">' + (m.existLote == null ? '' : cant(m.existLote)) + '</td><td class="num ik-exist"><b class="' + (m.existProd < 0 ? 'inv-negativo' : '') + '">' + cant(m.existProd) + '</b></td>' +
-      '<td class="num">' + num(m.costo_unitario, 4) + '</td><td class="num">' + num(m.costoMov, 2) + '</td><td class="num">' + num(m.prom, 4) + '</td><td class="num"><b>' + num(m.costoTotal, 2) + '</b></td></tr>';
+  function prefijoDoc(m) { return /venta/.test(m.origen) ? 'Cobro ' : m.origen === 'ajuste' ? 'Ajuste ' : 'Compra '; }
+  function iniciales(u) { var p = String(u || '').replace(/@.*/, '').split(/[\s._-]+/).filter(Boolean); return ((p[0] || '?')[0] + (p[1] ? p[1][0] : (p[0] || '').slice(1, 2))).toUpperCase(); }
+  // Celdas de un movimiento: [fecha, movimiento, documento, lote, cantidad, existencias, costos, promedio/total, usuario]
+  function celdasKardex(m) {
+    var entra = m.tipo === 'entrada', f = fechaHora(m.fecha);
+    return [
+      fecha(m.fecha) + '<small>' + f.slice(12, 17) + ' · #' + m.n + '</small>',
+      '<span class="ik-chip ' + (entra ? 'ik-chip-in' : 'ik-chip-out') + '">' + m.mov[0] + ' · ' + esc(m.mov[1]) + '</span>' + (m.observaciones ? '<small>' + esc(m.observaciones) + '</small>' : ''),
+      '<b>' + esc(prefijoDoc(m) + m.interno) + '</b><small>' + esc(m.fisico || '—') + '</small>',
+      (m.lote ? esc(m.lote) : '<span class="ik-tenue">—</span>') + (m.fab || m.venc ? '<small>' + [m.fab ? 'fab. ' + fecha(m.fab) : '', m.venc ? 'v. ' + fecha(m.venc) : ''].filter(Boolean).join(' · ') + '</small>' : ''),
+      '<b class="' + (entra ? 'ik-in' : 'ik-out') + '">' + (entra ? '+' : '−') + cant(m.cantidad) + '</b>',
+      '<b class="' + (m.existProd < 0 ? 'inv-negativo' : '') + '">' + cant(m.existProd) + '</b><small>' + (m.existLote == null ? '—' : 'lote ' + cant(m.existLote)) + '</small>',
+      num(m.costo_unitario, 4) + '<small>' + num(m.costoMov, 2) + '</small>',
+      num(m.prom, 4) + '<small><b>' + num(m.costoTotal, 2) + '</b></small>',
+      '<span class="ik-usr"><span class="ik-av" aria-hidden="true">' + esc(iniciales(m.usuario)) + '</span><span class="ia-corto" title="' + esc(m.usuario || 'Sin usuario') + '">' + esc(m.usuario || 'Sin usuario') + '</span></span>'
+    ];
   }
-  var CAB_DETALLE = ['#', 'Mov.', 'Movimiento', 'Docto. interno', 'Fecha movto.', 'Docto. físico', 'Fabricación', 'Vencimiento', 'Lote', 'Cant. ingreso', 'Cant. salida', 'Exist. lote', 'Exist. producto', 'Costo unitario', 'Costo movimiento', 'Costo promedio', 'Costo total'];
+  var CAB_DETALLE = ['Fecha · #', 'Movimiento', 'Docto. interno / físico', 'Lote · fab. · vence', 'Cantidad', 'Exist. producto / lote', 'Costo unit. / movto.', 'Promedio / total', 'Usuario'];
+  var NUM_DETALLE = [4, 5, 6, 7];
+  function cabDetalle() { return '<colgroup><col class="ik-d-fecha"><col class="ik-d-mov"><col class="ik-d-doc"><col class="ik-d-lote"><col class="ik-d-cant"><col class="ik-d-exist"><col class="ik-d-costo"><col class="ik-d-prom"><col class="ik-d-usr"></colgroup><thead><tr>' +
+    CAB_DETALLE.map(function (h, i) { return '<th' + (NUM_DETALLE.indexOf(i) >= 0 ? ' class="num"' : '') + '>' + h + '</th>'; }).join('') + '</tr></thead>'; }
+  function filaKardex(m) { return '<tr class="inv-mov-' + m.tipo + '">' + celdasKardex(m).map(function (c, i) { return '<td' + (NUM_DETALLE.indexOf(i) >= 0 ? ' class="num"' : '') + '>' + c + '</td>'; }).join('') + '</tr>'; }
+  function filaAnterior(k) { return '<tr class="ik-anterior"><td colspan="5">Saldo anterior al ' + fecha(k.desde) + '</td><td class="num"><b>' + cant(k.saldoAnt.existProd) + '</b></td><td></td><td class="num">' + num(k.saldoAnt.prom, 4) + '<small><b>' + num(k.saldoAnt.costoTotal, 2) + '</b></small></td><td></td></tr>'; }
   async function pintarKardex() {
     var p = porId(productos, prodSel);
     $('ikDetalle').hidden = !p;
@@ -708,9 +722,9 @@
     var ultimo = movs.length ? movs[movs.length - 1] : null;
     $('ikDetalle').innerHTML = '<div class="ik-titulo ik-cab"><div class="inv-prod">' + imagen(p, 40) + '<div><h4>' + esc((p.codigo ? p.codigo + ' · ' : '') + p.nombre) + '</h4><small class="inv-sub">' + esc([p.principio_activo, p.presentacion, bod ? nombreBod(bod) : 'Todas las bodegas'].filter(Boolean).join(' · ')) + '</small></div></div>' +
       '<div class="ik-resumen"><div><span>Ingresos</span><b class="ik-in">' + cant(te) + '</b></div><div><span>Salidas</span><b class="ik-out">' + cant(ts) + '</b></div><div><span>Existencia</span><b>' + cant(ultimo ? ultimo.existProd : 0) + '</b></div><div><span>Costo promedio</span><b>' + q(ultimo ? ultimo.prom : 0) + '</b></div><div><span>Costo total</span><b>' + q(ultimo ? ultimo.costoTotal : 0) + '</b></div></div></div>' +
-      '<div class="roles-wrap ik-scroll-d"><table class="pr-tabla ik-tabla-d"><thead><tr>' + CAB_DETALLE.map(function (h, i) { return '<th' + (i > 8 || i === 3 ? ' class="num"' : '') + '>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
-      (vista.length ? vista.slice().reverse().map(filaKardex).join('') : '<tr><td colspan="17" class="geo-vacia">Sin movimientos' + (desde || hasta ? ' en el rango de fechas' : '') + (bod ? ' en esta bodega' : '') + '.</td></tr>') +
-      (saldoAnt ? '<tr class="ik-anterior"><td colspan="12" class="num">Saldo anterior al ' + fecha(desde) + '</td><td class="num"><b>' + cant(saldoAnt.existProd) + '</b></td><td colspan="2"></td><td class="num">' + num(saldoAnt.prom, 4) + '</td><td class="num">' + num(saldoAnt.costoTotal, 2) + '</td></tr>' : '') +
+      '<div class="roles-wrap ia-wrap ik-scroll-d"><table class="geo-tabla ik-det">' + cabDetalle() + '<tbody>' +
+      (vista.length ? vista.slice().reverse().map(filaKardex).join('') : '<tr><td colspan="9" class="geo-vacia">Sin movimientos' + (desde || hasta ? ' en el rango de fechas' : '') + (bod ? ' en esta bodega' : '') + '.</td></tr>') +
+      (saldoAnt ? filaAnterior(kardexVista) : '') +
       '</tbody></table></div>' +
       '<div class="org-reg-btns"><button type="button" class="adm-btn geo-mini" data-ajustar="' + p.id + '">Ajuste de este producto</button><button type="button" class="adm-btn geo-mini" id="ikActualizar">Actualizar</button></div>';
   }
@@ -718,15 +732,18 @@
     var P = window.PD_IMPRESION, k = kardexVista;
     if (!P) return;
     if (!k || !k.p) { aviso('ikMsg', 'Elige un producto para imprimir su kardex.', true); return; }
-    var th = 'padding:4px;border-bottom:2px solid #0B2B40;font-size:9px;text-align:left', td = 'padding:4px;border-bottom:1px solid #E3EAF0;font-size:9.5px';
-    var html = P.encabezado('Kardex · ' + (k.p.codigo ? k.p.codigo + ' · ' : '') + k.p.nombre) +
-      '<p style="font-size:11px;color:#475B68;margin:0 0 8px">' + esc([k.p.principio_activo, k.bod ? nombreBod(k.bod) : 'Todas las bodegas', (k.desde ? 'Del ' + fecha(k.desde) : 'Desde el inicio') + (k.hasta ? ' al ' + fecha(k.hasta) : '')].filter(Boolean).join(' · ')) + '</p>' +
-      '<table style="width:100%;border-collapse:collapse"><thead><tr>' + CAB_DETALLE.map(function (h) { return '<th style="' + th + '">' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
-      k.vista.slice().reverse().map(function (m) {
-        var entra = m.tipo === 'entrada';
-        return '<tr>' + [m.n, m.mov[0], m.mov[1], m.interno, fechaHora(m.fecha).slice(0, 17), m.fisico || '', m.fab ? fecha(m.fab) : '', m.venc ? fecha(m.venc) : '', m.lote || '', entra ? cant(m.cantidad) : '', entra ? '' : '-' + cant(m.cantidad),
-          m.existLote == null ? '' : cant(m.existLote), cant(m.existProd), num(m.costo_unitario, 4), num(m.costoMov), num(m.prom, 4), num(m.costoTotal)].map(function (v, i) { return '<td style="' + td + (i > 8 ? ';text-align:right' : '') + '">' + esc(v) + '</td>'; }).join('') + '</tr>';
-      }).join('') + '</tbody></table><p style="font-size:11px;margin-top:8px">Ingresos ' + cant(k.te) + ' · Salidas ' + cant(k.ts) + '</p></div>';
+    var ult = k.vista.length ? k.vista[k.vista.length - 1] : k.saldoAnt;
+    var css = '<style>.ikr{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9.5px}.ikr th{font-size:8.5px;text-transform:uppercase;letter-spacing:.04em;color:#475B68;text-align:left;padding:5px 4px;border-bottom:2px solid #0B2B40;vertical-align:bottom}' +
+      '.ikr td{padding:5px 4px;border-bottom:1px solid #E3EAF0;vertical-align:top;overflow:hidden}.ikr .num{text-align:right;font-variant-numeric:tabular-nums}.ikr small{display:block;color:#5A6D7A;font-size:8.5px;margin-top:1px}' +
+      '.ikr tr{page-break-inside:avoid}.ik-chip{font-weight:700}.ik-chip-in,.ik-in{color:#047857}.ik-chip-out,.ik-out{color:#B42318}.ik-av{display:none}.ik-anterior td{background:#F1F5F8;font-style:italic}.ik-tenue{color:#94A6B2}' +
+      '.ikr-res{display:flex;gap:8px;margin:0 0 10px}.ikr-res div{flex:1;border:1px solid #D7E3EC;border-radius:6px;padding:5px 8px}.ikr-res span{display:block;font-size:8.5px;color:#5A6D7A;text-transform:uppercase}.ikr-res b{font-size:12px}</style>';
+    var cols = '<colgroup><col style="width:9%"><col style="width:14%"><col style="width:12%"><col><col style="width:7%"><col style="width:9%"><col style="width:10%"><col style="width:10%"><col style="width:11%"></colgroup>';
+    var html = css + P.encabezado('Kardex · ' + (k.p.codigo ? k.p.codigo + ' · ' : '') + k.p.nombre) +
+      '<p style="font-size:11px;color:#475B68;margin:0 0 8px">' + esc([k.p.principio_activo, k.p.presentacion, k.bod ? nombreBod(k.bod) : 'Todas las bodegas', (k.desde ? 'Del ' + fecha(k.desde) : 'Desde el inicio') + (k.hasta ? ' al ' + fecha(k.hasta) : '')].filter(Boolean).join(' · ')) + '</p>' +
+      '<div class="ikr-res"><div><span>Ingresos</span><b>' + cant(k.te) + '</b></div><div><span>Salidas</span><b>' + cant(k.ts) + '</b></div><div><span>Existencia</span><b>' + cant(ult ? ult.existProd : 0) + '</b></div><div><span>Costo promedio</span><b>' + q(ult ? ult.prom : 0) + '</b></div><div><span>Costo total</span><b>' + q(ult ? ult.costoTotal : 0) + '</b></div></div>' +
+      '<table class="ikr">' + cols + '<thead><tr>' + CAB_DETALLE.map(function (h, i) { return '<th' + (NUM_DETALLE.indexOf(i) >= 0 ? ' class="num"' : '') + '>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      (k.vista.length ? k.vista.slice().reverse().map(filaKardex).join('') : '<tr><td colspan="9">Sin movimientos.</td></tr>') + (k.saldoAnt ? filaAnterior(k) : '') + '</tbody></table>' +
+      '<p style="font-size:9px;color:#5A6D7A;margin-top:10px;text-align:right">Impreso por ' + esc((window.PD_SESION && window.PD_SESION.usuario && window.PD_SESION.usuario()) || '—') + ' · ' + fechaHora(new Date().toISOString()) + '</p></div>';
     P.imprimir(html);
   }
   // Movimientos más recientes primero (para el último movimiento de cada producto) y los documentos que los respaldan
