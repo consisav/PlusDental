@@ -83,7 +83,7 @@
   // Citas que empiezan dentro de la fila del calendario (bloque de 90 minutos que inicia en h)
   function citasEn(f, h) { var a = aMin(h); return citas.filter(function (c) { var m = aMin(c.hora); return c.fecha === f && m >= a && m < a + BLOQUE; }); }
   // Citas que se traslapan con [h, h + dur)
-  function ocupan(f, h, dur) { var a = aMin(h), d = dur || MINUTOS.general; return citas.filter(function (c) { return c.fecha === f && choca(a, d, aMin(c.hora), duracion(c)); }); }
+  function ocupan(f, h, dur) { var a = aMin(h), d = dur || MINUTOS.general; return (citasTodas || citas).filter(function (c) { return c.fecha === f && choca(a, d, aMin(c.hora), duracion(c)); }); }
   function dentistaOcupado(id, f, h, dur) { return ocupan(f, h, dur).some(function (c) { return c.dentista_id === id; }); }
   function salaOcupada(id, f, h, dur) { return ocupan(f, h, dur).some(function (c) { return c.posicion_id === id; }); }
   function durNueva() { return esOrtodoncia($('agTratamiento').value, especialidadRequerida()) ? MINUTOS.ortodoncia : MINUTOS.general; }
@@ -562,7 +562,38 @@
     pintar();
   }
 
-  function pintar() {
+  // ---------- Filtros de la agenda: institución y médico ----------
+  // El Super Administrador, el personal que no es médico y los médicos principales ven a todos los médicos;
+  // un médico alterno (con usuario propio) solo ve sus citas.
+  var citaInst = {}, pacInst = {}, citasTodas = null;
+  function miDentista() { var u = window.PD_SESION && window.PD_SESION.usuario && window.PD_SESION.usuario(); return u ? dentistas.filter(function (d) { return d.usuario && d.usuario === u; })[0] || null : null; }
+  function soloMio() { var d = miDentista(); return d && !(window.PD_SESION && window.PD_SESION.esSuper()) && d.rol_sala !== 'principal' ? d : null; }
+  function instDeCita(c) { return citaInst[c.id] || (c.paciente_id && pacInst[c.paciente_id]) || null; }
+  function opcionesFiltros() {
+    var fi = $('agFInst').value, fm = $('agFMed').value, yo = soloMio();
+    $('agFInst').innerHTML = '<option value="">Todas las instituciones</option><option value="0">Sin institución (clínica)</option>' +
+      instCat.map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
+    $('agFInst').value = fi && [].some.call($('agFInst').options, function (o) { return o.value === fi; }) ? fi : '';
+    $('agFMed').innerHTML = (yo ? '' : '<option value="">Todos los médicos</option>') + (yo ? [yo] : dentistas).map(function (d) { return '<option value="' + d.id + '">' + esc(d.nombre) + '</option>'; }).join('');
+    $('agFMed').value = yo ? String(yo.id) : fm && dentistas.some(function (d) { return String(d.id) === fm; }) ? fm : '';
+    $('agFMed').disabled = !!yo;
+    $('agFMed').title = yo ? 'Como médico, solo ves tus citas.' : '';
+  }
+  function pasaFiltro(c) {
+    var fi = $('agFInst').value, yo = soloMio(), fm = yo ? yo.id : +$('agFMed').value || null;
+    if (fm && c.dentista_id !== fm) return false;
+    if (fi === '0') return !instDeCita(c);
+    return !fi || instDeCita(c) === +fi;
+  }
+  function filtrando() { return !!($('agFInst').value || $('agFMed').value || soloMio()); }
+  // Pinta con las citas que pasan los filtros; los espacios libres se calculan con todas
+  function conFiltro(fn) {
+    var todas = citas; citasTodas = todas; citas = todas.filter(pasaFiltro);
+    try { fn(); } finally { citas = todas; citasTodas = null; }
+  }
+
+  function pintar() { conFiltro(pintarFiltrado); }
+  function pintarFiltrado() {
     document.querySelectorAll('.ag-vista [data-vista]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.vista === vista); });
     var fsel = $('agDia').value || hoy();
     $('agTitulo').textContent = vista === 'mes' ? 'Agenda de ' + MESES_LARGO[fecha(fsel).getMonth()] + ' ' + fecha(fsel).getFullYear() : vista === 'semana' ? 'Agenda de la semana' : 'Agenda del día';
@@ -679,7 +710,8 @@
   }
 
   // Imprimir la agenda que se ve (día, semana o mes): lista ordenada por fecha y hora
-  function imprimirAgenda() {
+  function imprimirAgenda() { conFiltro(imprimirFiltrado); }
+  function imprimirFiltrado() {
     var imp = window.PD_IMPRESION;
     if (!imp) return;
     var rv = rangoVista(), desde = vista === 'mes' ? rv.mesDesde : rv.desde, hasta = vista === 'mes' ? rv.mesHasta : rv.hasta;
@@ -704,6 +736,7 @@
     imp.imprimir(imp.encabezado(titulo) +
       '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:12px;padding:10px 14px;margin-bottom:14px">' +
       '<div><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Periodo</span><b style="font-size:15px">' + esc(periodo) + '</b></div>' +
+      '<div><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Institución · médico</span><b style="font-size:13px">' + esc($('agFInst').selectedOptions[0] ? $('agFInst').selectedOptions[0].text : 'Todas') + ' · ' + esc($('agFMed').selectedOptions[0] ? $('agFMed').selectedOptions[0].text : 'Todos') + '</b></div>' +
       '<div style="text-align:right"><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Citas</span><b style="font-size:15px">' + lista.length + '</b></div></div>' +
       '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="' + th + '">Hora</th><th style="' + th + '">Paciente</th><th style="' + th + '">Tratamiento</th><th style="' + th + '">Odontólogo</th><th style="' + th + '">Sala</th><th style="' + th + '">Estado</th></tr></thead><tbody>' +
       (cuerpo || '<tr><td colspan="6" style="' + celda + '">No hay citas en este periodo.</td></tr>') + '</tbody></table></div>');
@@ -737,6 +770,7 @@
         if (bloqueado(f, h)) return '<td><span class="ag-celda cerrado">Bloqueado</span></td>';
         if (c.sala && !salaAbierta(c.sala, f, h)) return '<td><span class="ag-celda cerrado">' + (c.sala.estado === 'mantenimiento' ? 'Fuera de servicio' : 'Cerrada') + '</span></td>';
         if (pasado) return '<td><span class="ag-celda cerrado">—</span></td>';
+        if (citasTodas && (c.sala ? salaOcupada(c.id, f, h) : citasTodas.some(function (x) { var m = aMin(x.hora), a = aMin(h); return x.fecha === f && !x.posicion_id && m >= a && m < a + BLOQUE; }))) return '<td><span class="ag-celda cerrado">Ocupado</span></td>';
         return '<td><button type="button" class="ag-celda libre" data-libre="' + h + '" data-sala="' + (c.id || '') + '">+ Libre</button></td>';
       }).join('') + '</tr>';
     }).join('');
@@ -782,23 +816,30 @@
     if (!$('agDesde').value) $('agDesde').value = sumar(hoyF, 1);
     if (!$('agDia').value) $('agDia').value = hoyF;
     var rs = await Promise.all([
-      sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo').eq('estado', 'activo').order('nombre'),
+      sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo,usuario').eq('estado', 'activo').order('nombre'),
       sb.from('posiciones').select('id,codigo,nombre,especialidad,estado,activa,horario').order('codigo'),
       sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo,tipo_cliente,institucion_id,sucursal_id').order('nombre'),
       sb.from('tratamientos').select('nombre,activo').eq('activo', true).order('nombre'),
       sb.from('bloqueos').select('fecha,hora').gte('fecha', hoyF)
     ]);
     if (window.PD_COLOR) await window.PD_COLOR.cargar(true);
+    if (rs[0].error && /usuario/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo').eq('estado', 'activo').order('nombre');
     if (rs[0].error && /correo/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono').eq('estado', 'activo').order('nombre');
     if (rs[2].error && /tipo_cliente|institucion_id|sucursal_id/.test(rs[2].error.message)) rs[2] = await sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo').order('nombre');
     try {
       var ri = await Promise.all([sb.from('jor_instituciones').select('id,numero,nombre,estado').order('nombre'), sb.from('jor_sucursales').select('id,numero,institucion_id,nombre,estado').order('nombre')]);
       instCat = ri[0].error ? [] : ri[0].data || []; sucCat = ri[1].error ? [] : ri[1].data || [];
+      var rj = await Promise.all([sb.from('jor_pacientes').select('cita_id,jornada_id').not('cita_id', 'is', null), sb.from('jor_jornadas').select('id,institucion_id')]);
+      var jInst = {}; citaInst = {};
+      (rj[1].error ? [] : rj[1].data || []).forEach(function (j) { jInst[j.id] = j.institucion_id; });
+      (rj[0].error ? [] : rj[0].data || []).forEach(function (x) { if (jInst[x.jornada_id]) citaInst[x.cita_id] = jInst[x.jornada_id]; });
     } catch (e) { instCat = []; sucCat = []; }
     if (rs[2].error && /correo/.test(rs[2].error.message)) rs[2] = await sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado').order('nombre');
     dentistas = rs[0].error ? [] : rs[0].data;
     salas = rs[1].error ? [] : rs[1].data;
+    pacInst = {}; (rs[2].error ? [] : rs[2].data).forEach(function (p) { if (p.institucion_id) pacInst[p.id] = p.institucion_id; });
     pacientes = rs[2].error ? [] : rs[2].data.filter(function (p) { return !p.estado || p.estado === 'activo'; });
+    opcionesFiltros();
     var catalogo = rs[3].error ? [] : rs[3].data.map(function (t) { return t.nombre; });
     bloqueos = rs[4].error ? [] : rs[4].data;
 
@@ -974,6 +1015,7 @@
   $('agPrev').addEventListener('click', function () { mover(-1); });
   $('agNext').addEventListener('click', function () { mover(1); });
   $('agImprimir').addEventListener('click', imprimirAgenda);
+  ['agFInst', 'agFMed'].forEach(function (id) { $(id).addEventListener('change', pintar); });
   document.querySelector('.ag-vista').addEventListener('click', function (e) {
     var b = e.target.closest('[data-vista]');
     if (b && b.dataset.vista !== vista) { vista = b.dataset.vista; $('agDetalle').hidden = true; cargarCitas(); }
