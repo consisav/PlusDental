@@ -3,7 +3,7 @@
 // se graban con funciones de Supabase que crean el movimiento del kardex; todo en la sede del usuario.
 (function () {
   var sb = window.PD_SB || null;
-  if (!sb || !document.getElementById('admInvCompras') || !document.getElementById('admInvKardex') || !window.PD_GEO) return;
+  if (!sb || !document.getElementById('admInvCompras') || !document.getElementById('admInvKardex') || !document.getElementById('admInvVentas') || !window.PD_GEO) return;
 
   var G = window.PD_GEO, esc = G.esc;
   var DOCS = [['factura', 'Factura'], ['recibo', 'Recibo'], ['nota_envio', 'Nota de envío'], ['otro', 'Otro']];
@@ -578,7 +578,7 @@
     pintarExistencias();
     if (prodSel) pintarKardex();
   }
-  function ajuste(prodId) {
+  function ajuste(prodId, alGrabar) {
     var opciones = [['', 'Elige un producto…']].concat(productos.filter(function (p) { return p.estado === 'activo' || p.id === prodId; }).map(function (p) { return [p.id, etiquetaProd(p)]; }));
     G.dialogo({
       eyebrow: 'Movimiento Kardex', titulo: 'Ajuste de inventario', valores: { producto_id: prodId || '', bodega_id: bodKardex() || bodegaGeneral(), tipo: 'entrada' },
@@ -591,6 +591,7 @@
         if (!(Number(d.cantidad) > 0)) return 'La cantidad debe ser mayor que cero.';
         var r = await sb.rpc('registrar_ajuste_inventario', { p_producto: +d.producto_id, p_bodega: +d.bodega_id, p_tipo: d.tipo, p_cantidad: Number(d.cantidad), p_motivo: d.motivo });
         if (r.error) return traducir(r.error);
+        if (alGrabar) { await alGrabar(); return null; }
         prodSel = +d.producto_id;
         await cargarKardex(); aviso('ikMsg', 'Ajuste grabado en el kardex.'); return null;
       }
@@ -612,16 +613,124 @@
     var a = e.target.closest('[data-ajustar]'); if (a) ajuste(+a.dataset.ajustar);
   });
 
-  function cargarPanel(id) { return id === 'admInvCompras' ? cargarCompras() : cargarKardex(); }
-  ['admInvCompras', 'admInvKardex'].forEach(function (id) {
+  // ================= 8. Ventas de productos =================
+  // Productos vendidos en Cobros y pagos (cada línea «Producto» del detalle sale de la bodega general de la sede).
+  var ventas = [], periodoVentas = 'mes', ajustes = [], periodoAjustes = 'mes';
+  function desdePeriodo(p) {
+    var d = new Date();
+    if (p === 'hoy') return hoy();
+    if (p === 'mes') return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-01';
+    if (p === 'anio') return d.getFullYear() + '-01-01';
+    return null;
+  }
+  function filtrosPeriodo(id, actual) {
+    return '<div class="inv-filtros" id="' + id + '">' + [['hoy', 'Hoy'], ['mes', 'Este mes'], ['anio', 'Este año'], ['todo', 'Todo']].map(function (o) {
+      return '<button type="button" class="adm-btn geo-mini" data-valor="' + o[0] + '" aria-pressed="' + (o[0] === actual) + '">' + o[1] + '</button>'; }).join('') + '</div>';
+  }
+  $('admInvVentas').innerHTML =
+    '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Ventas de productos</h3>' +
+    '<button type="button" id="ivnNueva" class="adm-btn adm-primary">Registrar venta en Cobros y pagos</button></div>' +
+    '<p class="dlg-msg">Productos cobrados en Cobros y pagos (líneas «Producto» del detalle). Cada venta descuenta la existencia de la bodega general de la sede; si el pago se anula, el producto regresa a la bodega.</p>' +
+    '<div class="inv-barra"><input id="ivnBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar producto, paciente o documento" aria-label="Buscar venta">' + filtrosPeriodo('ivnPeriodo', periodoVentas) + '</div>' +
+    '<div class="inv-resumen" id="ivnResumen"></div>' +
+    '<section class="geo-panel"><div class="roles-wrap"><table class="pr-tabla"><thead><tr><th>Fecha</th><th>Documento</th><th>Paciente</th><th>Producto</th><th class="num">Cantidad</th><th class="num">Venta</th><th class="num">Costo</th><th class="num">Utilidad</th><th>Estado</th></tr></thead><tbody id="ivnLista"></tbody></table></div></section>' +
+    '<p id="ivnMsg" class="dlg-msg" role="status"></p></div>';
+  function docPago(p) { return p ? (p.tipo_documento === 'factura' && p.numero_factura ? 'Factura ' + [p.serie, p.numero_factura].filter(Boolean).join('-') : 'Recibo ' + (p.correlativo || p.id)) : '—'; }
+  function pintarVentas() {
+    var t = norm($('ivnBuscar').value);
+    var l = ventas.filter(function (v) {
+      var p = porId(productos, v.producto_id) || {};
+      return !t || norm([etiquetaProd(p), v.pago && v.pago.paciente ? v.pago.paciente.nombre : '', docPago(v.pago)].join(' ')).indexOf(t) >= 0;
+    });
+    var tv = 0, tc = 0, tu = 0;
+    $('ivnLista').innerHTML = l.length ? l.map(function (v) {
+      var p = porId(productos, v.producto_id) || { nombre: 'Producto ' + v.producto_id }, anul = v.pago && v.pago.anulado;
+      var costo = Number(v.cantidad || 0) * Number(v.costo || 0), venta = Number(v.monto || 0);
+      if (!anul) { tv += venta; tc += costo; tu += Number(v.cantidad || 0); }
+      return '<tr class="' + (anul ? 'inv-anul' : '') + '"><td>' + fecha(v.pago && v.pago.fecha) + '</td><td>' + esc(docPago(v.pago)) + '</td><td>' + esc(v.pago && v.pago.paciente ? v.pago.paciente.nombre : '—') + '</td>' +
+        '<td><div class="inv-prod">' + imagen(p, 30) + '<div><b>' + esc(p.nombre) + '</b><small class="inv-sub">' + esc([p.codigo, p.presentacion].filter(Boolean).join(' · ')) + '</small></div></div></td>' +
+        '<td class="num">' + cant(v.cantidad) + '</td><td class="num">' + q(venta) + '</td><td class="num">' + q(costo) + '</td><td class="num' + (venta - costo < 0 ? ' inv-negativo' : '') + '">' + q(venta - costo) + '</td>' +
+        '<td><span class="estado estado-' + (anul ? 'baja">Anulada' : 'activo">Vendida') + '</span></td></tr>';
+    }).join('') : '<tr><td colspan="9" class="geo-vacia">' + (ventas.length ? 'Ninguna venta coincide.' : 'No hay ventas de productos en este periodo. Se registran en Cobros y pagos eligiendo «Producto» en el detalle.') + '</td></tr>';
+    $('ivnResumen').innerHTML = '<div><span>Unidades vendidas</span><b>' + cant(tu) + '</b></div><div><span>Venta</span><b>' + q(tv) + '</b></div><div><span>Costo</span><b>' + q(tc) + '</b></div><div><span>Utilidad</span><b>' + q(tv - tc) + '</b></div>';
+  }
+  async function cargarVentas() {
+    aviso('ivnMsg', '');
+    try {
+      await cargarCatalogos();
+      var desde = desdePeriodo(periodoVentas);
+      var l = await todas(function () {
+        var c = sb.from('pago_detalle').select('id,linea,producto_id,cantidad,monto,bodega_id,pago:pagos!inner(id,fecha,correlativo,tipo_documento,serie,numero_factura,anulado,paciente:pacientes(nombre))').not('producto_id', 'is', null).order('id', { ascending: false });
+        return c;
+      });
+      if (desde) l = l.filter(function (v) { return v.pago && String(v.pago.fecha) >= desde; });
+      // Costo de la venta: el registrado en el kardex al momento de la salida
+      var movs = l.length ? await todas(function () { return sb.from('inv_movimientos').select('pago_id,producto_id,costo_unitario').eq('origen', 'venta').in('pago_id', l.map(function (v) { return v.pago.id; }).filter(function (x, i, a) { return a.indexOf(x) === i; })); }) : [];
+      l.forEach(function (v) { var m = movs.filter(function (x) { return x.pago_id === v.pago.id && x.producto_id === v.producto_id; })[0]; v.costo = m ? m.costo_unitario : (porId(productos, v.producto_id) || {}).costo; });
+      ventas = l.sort(function (a, b) { return String(b.pago.fecha).localeCompare(String(a.pago.fecha)) || b.id - a.id; });
+    } catch (e) { ventas = []; $('ivnLista').innerHTML = ''; $('ivnResumen').innerHTML = ''; aviso('ivnMsg', traducir(e), true); return; }
+    pintarVentas();
+  }
+  $('ivnBuscar').addEventListener('input', pintarVentas);
+  $('ivnPeriodo').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-valor]'); if (!b) return;
+    periodoVentas = b.dataset.valor;
+    this.querySelectorAll('[data-valor]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+    cargarVentas();
+  });
+  $('ivnNueva').addEventListener('click', function () { var t = document.querySelector('[data-tab="admCobros"]'); if (t) t.click(); });
+
+  // ================= 9. Ajustes de inventario =================
+  // Entradas y salidas manuales (inventario inicial, conteo físico, vencidos, merma) con su motivo.
+  $('admInvAjustes').innerHTML =
+    '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Ajustes de inventario</h3>' +
+    '<button type="button" id="iajNuevo" class="adm-btn adm-primary">Nuevo ajuste</button></div>' +
+    '<p class="dlg-msg">Entradas (inventario inicial, sobrantes) y salidas (merma, vencidos, faltantes) que corrigen la existencia. Cada ajuste queda en el kardex con su motivo, usuario, fecha y hora.</p>' +
+    '<div class="inv-barra"><input id="iajBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar producto o motivo" aria-label="Buscar ajuste">' + filtrosPeriodo('iajPeriodo', periodoAjustes) + '</div>' +
+    '<section class="geo-panel"><div class="roles-wrap"><table class="pr-tabla"><thead><tr><th>Fecha y hora</th><th>Producto</th><th>Bodega</th><th>Tipo</th><th class="num">Cantidad</th><th class="num">Costo</th><th>Motivo</th><th>Usuario</th></tr></thead><tbody id="iajLista"></tbody></table></div></section>' +
+    '<p id="iajMsg" class="dlg-msg" role="status"></p></div>';
+  function pintarAjustes() {
+    var t = norm($('iajBuscar').value);
+    var l = ajustes.filter(function (m) { var p = porId(productos, m.producto_id) || {}; return !t || norm([etiquetaProd(p), m.observaciones, m.usuario].join(' ')).indexOf(t) >= 0; });
+    $('iajLista').innerHTML = l.length ? l.map(function (m) {
+      var p = porId(productos, m.producto_id) || { nombre: 'Producto ' + m.producto_id };
+      return '<tr class="inv-mov-' + m.tipo + '"><td>' + fechaHora(m.fecha) + '</td><td><div class="inv-prod">' + imagen(p, 30) + '<div><b>' + esc(p.nombre) + '</b><small class="inv-sub">' + esc([p.codigo, p.presentacion].filter(Boolean).join(' · ')) + '</small></div></div></td>' +
+        '<td>' + esc(nombreBod(m.bodega_id)) + '</td><td><span class="estado estado-' + (m.tipo === 'entrada' ? 'activo">Entrada' : 'baja">Salida') + '</span></td>' +
+        '<td class="num">' + cant(m.cantidad) + '</td><td class="num">' + q(m.costo_unitario) + '</td><td>' + esc(m.observaciones || '—') + '</td><td>' + esc(m.usuario || '—') + '</td></tr>';
+    }).join('') : '<tr><td colspan="8" class="geo-vacia">' + (ajustes.length ? 'Ningún ajuste coincide.' : 'No hay ajustes en este periodo. Usa «Nuevo ajuste» para cargar el inventario inicial o corregir existencias.') + '</td></tr>';
+  }
+  async function cargarAjustes() {
+    aviso('iajMsg', '');
+    try {
+      await cargarCatalogos();
+      var desde = desdePeriodo(periodoAjustes);
+      ajustes = await todas(function () { var c = sb.from('inv_movimientos').select('*').eq('origen', 'ajuste').order('fecha', { ascending: false }).order('id', { ascending: false }); return desde ? c.gte('fecha', desde) : c; });
+    } catch (e) { ajustes = []; $('iajLista').innerHTML = ''; aviso('iajMsg', traducir(e), true); return; }
+    pintarAjustes();
+  }
+  $('iajBuscar').addEventListener('input', pintarAjustes);
+  $('iajPeriodo').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-valor]'); if (!b) return;
+    periodoAjustes = b.dataset.valor;
+    this.querySelectorAll('[data-valor]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+    cargarAjustes();
+  });
+  $('iajNuevo').addEventListener('click', async function () {
+    if (!productos.length) await cargarAjustes();
+    ajuste(null, async function () { await cargarAjustes(); aviso('iajMsg', 'Ajuste grabado en el kardex.'); });
+  });
+
+  var PANELES = { admInvCompras: function () { return cargarCompras(); }, admInvKardex: function () { return cargarKardex(); }, admInvVentas: function () { return cargarVentas(); }, admInvAjustes: function () { return cargarAjustes(); } };
+  function cargarPanel(id) { return PANELES[id](); }
+  Object.keys(PANELES).forEach(function (id) {
     var tab = document.querySelector('[data-tab="' + id + '"]');
     if (tab) tab.addEventListener('click', function () { setTimeout(function () { cargarPanel(id); }, 0); });
   });
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
-    cargar: function () { ['admInvCompras', 'admInvKardex'].forEach(function (id) { if (!$(id).hidden) cargarPanel(id); }); },
+    cargar: function () { Object.keys(PANELES).forEach(function (id) { if (!$(id).hidden) cargarPanel(id); }); },
     limpiar: function () {
-      proveedores = []; bodegas = []; productos = []; compras = []; items = []; abonos = []; existencias = []; kardex = []; compraSel = prodSel = null; compraForm = null; lineas = [];
-      ['icLista', 'ikExist', 'icLineas', 'icAbonos', 'icRegistro'].forEach(function (i) { $(i).innerHTML = ''; });
+      proveedores = []; bodegas = []; productos = []; compras = []; items = []; abonos = []; existencias = []; kardex = []; compraSel = prodSel = null; compraForm = null; lineas = []; ventas = []; ajustes = [];
+      ['icLista', 'ikExist', 'icLineas', 'icAbonos', 'icRegistro', 'ivnLista', 'ivnResumen', 'iajLista'].forEach(function (i) { $(i).innerHTML = ''; });
       $('ikDetalle').hidden = true;
     }
   });

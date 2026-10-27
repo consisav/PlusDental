@@ -1168,6 +1168,8 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .inv-negativo{color:#B42318}.inv-bajo{color:#B45309}
 .inv-mov-entrada td:nth-child(3){color:#047857}.inv-mov-salida td:nth-child(3){color:#B42318}
 .inv-total td{background:#F1F6FA}
+.inv-resumen{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0}.inv-resumen div{border:1px solid #D7E3EC;border-radius:12px;padding:10px 14px;background:#F8FBFD}.inv-resumen span{display:block;font-size:12px;color:#5A6D7A}.inv-resumen b{font-size:18px;color:#0B2B40}
+.inv-anul td{color:#8A99A5;text-decoration:line-through}.inv-anul td:last-child{text-decoration:none}
 .ic-doc{display:flex;flex-direction:column;gap:10px}
 .ic-blq{border:1px solid #D7E3EC;border-radius:12px;padding:10px 12px}
 .ic-amarillo{background:#FFF9DB}.ic-gris{background:#E4F1F2}.ic-blanco{background:#FFFFFF}.ic-naranja{background:#FDE3C6;border-color:#F3C08C}
@@ -1406,13 +1408,35 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="adm-g">
 <button type="button" class="adm-grupo" id="grpInventarios" aria-expanded="false" aria-controls="grpInventariosItems">Inventarios<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-g-items" id="grpInventariosItems" role="presentation">
-<button type="button" role="tab" id="tabInvProveedores" data-tab="admInvProveedores" aria-selected="false" aria-controls="admInvProveedores">Proveedores</button>
-<button type="button" role="tab" id="tabInvBodegas" data-tab="admInvBodegas" aria-selected="false" aria-controls="admInvBodegas">Bodegas</button>
-<button type="button" role="tab" id="tabInvTipos" data-tab="admInvTipos" aria-selected="false" aria-controls="admInvTipos">Tipo de producto</button>
-<button type="button" role="tab" id="tabInvProductos" data-tab="admInvProductos" aria-selected="false" aria-controls="admInvProductos">Definición de productos</button>
-<button type="button" role="tab" id="tabInvPrecios" data-tab="admInvPrecios" aria-selected="false" aria-controls="admInvPrecios">Precios por tipo de cliente</button>
-<button type="button" role="tab" id="tabInvCompras" data-tab="admInvCompras" aria-selected="false" aria-controls="admInvCompras">Compras de productos</button>
-<button type="button" role="tab" id="tabInvKardex" data-tab="admInvKardex" aria-selected="false" aria-controls="admInvKardex">Movimiento Kardex</button>
+<div class="adm-sg">
+<button type="button" class="adm-subgrupo" id="subInvCatalogos" aria-expanded="false" aria-controls="subInvCatalogosItems">1 · Catálogos<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-sg-items" id="subInvCatalogosItems" role="presentation">
+<button type="button" role="tab" id="tabInvProveedores" data-tab="admInvProveedores" aria-selected="false" aria-controls="admInvProveedores" class="adm-sub-item">Proveedores</button>
+<button type="button" role="tab" id="tabInvBodegas" data-tab="admInvBodegas" aria-selected="false" aria-controls="admInvBodegas" class="adm-sub-item">Bodegas</button>
+<button type="button" role="tab" id="tabInvTipos" data-tab="admInvTipos" aria-selected="false" aria-controls="admInvTipos" class="adm-sub-item">Tipos de productos</button>
+</div>
+</div>
+<div class="adm-sg">
+<button type="button" class="adm-subgrupo" id="subInvProductos" aria-expanded="false" aria-controls="subInvProductosItems">2 · Productos y kardex<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-sg-items" id="subInvProductosItems" role="presentation">
+<button type="button" role="tab" id="tabInvProductos" data-tab="admInvProductos" aria-selected="false" aria-controls="admInvProductos" class="adm-sub-item">Definición de productos</button>
+<button type="button" role="tab" id="tabInvKardex" data-tab="admInvKardex" aria-selected="false" aria-controls="admInvKardex" class="adm-sub-item">Movimiento Kardex</button>
+</div>
+</div>
+<div class="adm-sg">
+<button type="button" class="adm-subgrupo" id="subInvPrecios" aria-expanded="false" aria-controls="subInvPreciosItems">3 · Precios<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-sg-items" id="subInvPreciosItems" role="presentation">
+<button type="button" role="tab" id="tabInvPrecios" data-tab="admInvPrecios" aria-selected="false" aria-controls="admInvPrecios" class="adm-sub-item">Precios por tipo de cliente</button>
+</div>
+</div>
+<div class="adm-sg">
+<button type="button" class="adm-subgrupo" id="subInvMovimientos" aria-expanded="false" aria-controls="subInvMovimientosItems">4 · Compras y ventas<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-sg-items" id="subInvMovimientosItems" role="presentation">
+<button type="button" role="tab" id="tabInvCompras" data-tab="admInvCompras" aria-selected="false" aria-controls="admInvCompras" class="adm-sub-item">Compras</button>
+<button type="button" role="tab" id="tabInvVentas" data-tab="admInvVentas" aria-selected="false" aria-controls="admInvVentas" class="adm-sub-item">Ventas</button>
+<button type="button" role="tab" id="tabInvAjustes" data-tab="admInvAjustes" aria-selected="false" aria-controls="admInvAjustes" class="adm-sub-item">Ajustes</button>
+</div>
+</div>
 </div>
 </div>
 <div class="adm-g">
@@ -2242,6 +2266,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="admInvPrecios" role="tabpanel" aria-labelledby="tabInvPrecios" hidden class="adm-pane"></div>
 <div id="admInvCompras" role="tabpanel" aria-labelledby="tabInvCompras" hidden class="adm-pane"></div>
 <div id="admInvKardex" role="tabpanel" aria-labelledby="tabInvKardex" hidden class="adm-pane"></div>
+<div id="admInvVentas" role="tabpanel" aria-labelledby="tabInvVentas" hidden class="adm-pane"></div>
+<div id="admInvAjustes" role="tabpanel" aria-labelledby="tabInvAjustes" hidden class="adm-pane"></div>
 <div id="admAsistentes" role="tabpanel" aria-labelledby="tabAsistentes" hidden class="adm-pane"></div>
 <div id="admDentistas" role="tabpanel" aria-labelledby="tabDentistas" hidden class="adm-pane">
 
