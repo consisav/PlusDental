@@ -237,6 +237,11 @@
     if (!p && !nuevo) { aviso('agFormMsg', 'Elige el paciente.', true); return; }
     if (nuevo && (!$('agNombre').value.trim() || !$('agTelefono').value.trim())) { aviso('agFormMsg', 'Escribe el nombre y el teléfono del paciente nuevo.', true); return; }
     boton.disabled = true;
+    if (nuevo) {
+      aviso('agFormMsg', 'Creando el expediente del paciente…');
+      var prim = serie.filter(function (o) { return !o.falta; })[0];
+      try { p = await crearExpediente(prim && prim.dentista ? prim.dentista.id : null); nuevo = false; } catch (e) { boton.disabled = false; aviso('agFormMsg', 'No se pudo crear el expediente: ' + traducir(e), true); return; }
+    }
     var hechas = [], fallo = null, lista = serie.filter(function (o) { return !o.falta; });
     for (var i = 0; i < lista.length; i++) {
       var o = lista[i];
@@ -266,6 +271,23 @@
     $('agNotas').value = '';
     if (hechas.length) $('agDia').value = hechas[0].fecha;
     await cargarCitas();
+  }
+
+  // ---------- Expediente del paciente nuevo ----------
+  // Nombre, teléfono, correo, médico (el de la cita o el elegido) y sede; estado Activo, tipo de cliente y agente por defecto
+  async function crearExpediente(dentistaId) {
+    var datos = { nombre: $('agNombre').value.trim(), telefono: $('agTelefono').value.trim() || null, correo: $('agCorreo').value.trim() || null, estado: 'activo',
+      dentista_id: dentistaId || ($('agMedico').value ? +$('agMedico').value : null) || medicoPrincipal() };
+    if (window.PD_SEDES && $('agLoc').options.length > 1 && $('agLoc').value) Object.assign(datos, window.PD_SEDES.valores($('agOrg'), $('agLoc')));
+    var r = await sb.from('pacientes').insert(datos).select('id,nombre,dpi,telefono,dentista_id,estado,correo').single();
+    if (r.error && /correo/.test(r.error.message || '')) { delete datos.correo; r = await sb.from('pacientes').insert(datos).select('id,nombre,dpi,telefono,dentista_id,estado').single(); }
+    if (r.error) throw r.error;
+    pacientes.push(r.data);
+    pacientes.sort(function (a, b) { return String(a.nombre).localeCompare(String(b.nombre), 'es'); });
+    $('agPaciente').insertAdjacentHTML('beforeend', '<option value="' + r.data.id + '">' + esc(r.data.nombre) + '</option>');
+    $('agPaciente').value = String(r.data.id);
+    alCambiarPaciente();
+    return r.data;
   }
 
   // ---------- Formulario ----------
@@ -416,6 +438,11 @@
     if (!p && !nuevo) { aviso('agFormMsg', 'Elige el paciente.', true); return; }
     if (nuevo && (!$('agNombre').value.trim() || !$('agTelefono').value.trim())) { aviso('agFormMsg', 'Escribe el nombre y el teléfono del paciente nuevo.', true); return; }
     boton.disabled = true;
+    var expedienteNuevo = false;
+    if (nuevo) {
+      aviso('agFormMsg', 'Creando el expediente del paciente…');
+      try { p = await crearExpediente(o.dentista ? o.dentista.id : null); nuevo = false; expedienteNuevo = true; } catch (e) { boton.disabled = false; aviso('agFormMsg', 'No se pudo crear el expediente: ' + traducir(e), true); return; }
+    }
     aviso('agFormMsg', 'Agendando…');
     var r = await sb.rpc('agendar_cita', {
       p_fecha: o.fecha, p_hora: o.hora,
@@ -443,6 +470,7 @@
     var avisos = avisosHtml(cita, { paciente: $('agAvPac').checked, medico: $('agAvMed').checked, correo: $('agAvMail').checked });
     $('agSugerencias').innerHTML = '<div class="ag-fijo" style="background:#DCF2EC;border-color:#BFE6D8;color:#08504C;flex-direction:column;align-items:flex-start">' +
       '<span>Cita agendada: <b>' + textoFecha(o.fecha) + ' · ' + o.hora + ' · ' + esc(nombre) + '</b></span>' +
+      (expedienteNuevo ? '<span>Se creó el expediente de <b>' + esc(nombre) + '</b> (Pacientes › Expediente de pacientes): complétalo cuando puedas.</span>' : '') +
       (avisos ? '<span>Envía los avisos:</span>' + avisos : '') + '</div>';
     aviso('agFormMsg', '');
     fijo = null; pintarFijo();
@@ -725,7 +753,7 @@
     bloqueos = rs[4].error ? [] : rs[4].data;
 
     var actual = $('agPaciente').value;
-    $('agPaciente').innerHTML = '<option value="">Elige un paciente…</option><option value="nuevo">+ Paciente nuevo (sin expediente)</option>' +
+    $('agPaciente').innerHTML = '<option value="">Elige un paciente…</option><option value="nuevo">+ Paciente nuevo (se crea su expediente)</option>' +
       pacientes.map(function (p) { return '<option value="' + p.id + '">' + esc(p.nombre) + (p.dpi ? ' · DPI ' + esc(p.dpi) : '') + '</option>'; }).join('');
     $('agPaciente').value = actual;
     var medicoActual = $('agMedico').value;
