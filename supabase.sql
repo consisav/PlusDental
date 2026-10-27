@@ -5400,6 +5400,44 @@ select x.comercial, x.fiscal, x.direccion, x.telefonos, x.contacto, 0, true, l.i
   cross join (select l.id, l.organizacion_id from public.org_localidades l join public.organizaciones o on o.id = l.organizacion_id where o.codigo = '2' and l.codigo = '1') l
  where not exists (select 1 from public.inv_proveedores p where lower(p.nombre_comercial) = lower(x.comercial) and p.localidad_id = l.id);
 
+-- ===== Inventarios: datos adicionales del proveedor (clasificación, contables y de pago) =====
+-- Concepto de gastos, nacional/extranjero, servicio crítico, tipo de proveedor, régimen ISR, bodega predeterminada,
+-- cuenta contable de gastos (una o varias), «visualizar en», transacción y 2da. transacción (exenciones).
+alter table public.inv_proveedores add column if not exists concepto_gastos text not null default 'Proveedor estándar' check (char_length(concepto_gastos) between 1 and 150);
+alter table public.inv_proveedores add column if not exists proveedor_nacional boolean not null default true;
+alter table public.inv_proveedores add column if not exists servicio_critico boolean not null default false;
+alter table public.inv_proveedores add column if not exists tipo_proveedor text not null default '1' check (char_length(tipo_proveedor) <= 10);
+alter table public.inv_proveedores add column if not exists regimen_isr text check (char_length(regimen_isr) <= 10);
+alter table public.inv_proveedores add column if not exists bodega_id bigint references public.inv_bodegas (id) on delete set null;
+alter table public.inv_proveedores add column if not exists cuenta_gastos text check (char_length(cuenta_gastos) <= 30);
+alter table public.inv_proveedores add column if not exists cuenta_gastos_desc text check (char_length(cuenta_gastos_desc) <= 150);
+alter table public.inv_proveedores add column if not exists varias_cuentas boolean not null default false;
+alter table public.inv_proveedores add column if not exists visualizar_en text not null default 'compras_inventario' check (visualizar_en in ('compras_inventario', 'compras_gastos', 'ambos'));
+alter table public.inv_proveedores add column if not exists transaccion text check (char_length(transaccion) <= 20);
+alter table public.inv_proveedores add column if not exists transaccion_exencion text check (char_length(transaccion_exencion) <= 20);
+
+-- Varias cuentas contables de gasto por proveedor
+create table if not exists public.inv_proveedor_cuentas (
+  id            bigint generated always as identity primary key,
+  proveedor_id  bigint not null references public.inv_proveedores (id) on delete cascade,
+  cuenta        text not null check (char_length(cuenta) between 1 and 30),
+  descripcion   text check (char_length(descripcion) <= 150),
+  creado        timestamptz not null default now()
+);
+create unique index if not exists inv_proveedor_cuentas_unica on public.inv_proveedor_cuentas (proveedor_id, lower(cuenta));
+alter table public.inv_proveedor_cuentas enable row level security;
+drop policy if exists inv_proveedor_cuentas_personal on public.inv_proveedor_cuentas;
+create policy inv_proveedor_cuentas_personal on public.inv_proveedor_cuentas for all to authenticated
+  using (public.es_personal() and exists (select 1 from public.inv_proveedores p where p.id = proveedor_id and public.ve_sede(p.localidad_id)))
+  with check (public.es_personal() and exists (select 1 from public.inv_proveedores p where p.id = proveedor_id and public.ve_sede(p.localidad_id)));
+grant select, insert, update, delete on public.inv_proveedor_cuentas to authenticated;
+
+-- Proveedores ya cargados: nacionales, de compras de inventario, con la bodega general y la transacción de su tipo
+update public.inv_proveedores p
+   set bodega_id = coalesce(p.bodega_id, (select b.id from public.inv_bodegas b where b.tipo = 'general' and b.localidad_id is not distinct from p.localidad_id order by b.numero limit 1)),
+       transaccion = coalesce(p.transaccion, case when p.nombre_comercial ilike 'drogu%' or p.nombre_comercial ilike 'medissa%' or p.nombre_comercial ilike 'supharma%' then '1011' else '1012' end)
+ where p.bodega_id is null or p.transaccion is null;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

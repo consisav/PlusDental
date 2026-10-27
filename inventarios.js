@@ -66,35 +66,110 @@
   function porNumero(a, b) { return (a.numero || 0) - (b.numero || 0); }
 
   // ================= 1. Proveedores (empresa principal y sub-empresas) =================
+  // Listas de la ficha del proveedor (se pueden ampliar aquí)
+  var TIPOS_PROV = [['1', 'Proveedor local'], ['2', 'Proveedor del exterior'], ['3', 'Proveedor de servicios'], ['4', 'Laboratorio fabricante']];
+  var REGIMENES_ISR = [['1', 'Régimen sobre las utilidades'], ['2', 'Opcional simplificado sobre ingresos'], ['3', 'Sujeto a pagos trimestrales'], ['4', 'Pequeño contribuyente'], ['5', 'Exento / no afecto']];
+  var TRANS_PROV = [['1011', 'Compra de medicamento'], ['1012', 'Compra de material dental'], ['1013', 'Compra de insumos descartables'], ['1014', 'Compra de instrumental y equipo'], ['1015', 'Compra de productos de limpieza'], ['1016', 'Muestras médicas / donación'], ['2001', 'Exención de IVA'], ['2002', 'Compra con constancia de exención']];
+  var VISUALIZAR = [['compras_inventario', 'Compras de inventario'], ['compras_gastos', 'Compras de gastos'], ['ambos', 'Ambos']];
+  var tipoProv = 'todos', pestanaProv = 'contables', cuentasProv = [];
+  function deLista(l, v) { var x = l.filter(function (o) { return String(o[0]) === String(v); })[0]; return x ? x[0] + ' · ' + x[1] : (v || '—'); }
+  function marca(v, txt) { return '<span class="ip-marca' + (v ? ' si' : '') + '">' + (v ? '✓ ' : '') + txt + '</span>'; }
+
   $('admInvProveedores').innerHTML =
     '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Proveedores</h3><button type="button" class="adm-btn adm-primary" id="ipNuevo">+ Proveedor</button></div>' +
-    '<p class="dlg-msg">Empresas principales y sus sub-empresas (sucursales o razones sociales del mismo proveedor). Toca una fila para ver su detalle y sus sub-empresas.</p>' +
-    '<div class="inv-barra">' + filtrosHtml('prov', F_ESTADO) + '<input id="ipBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar por nombre o NIT" aria-label="Buscar proveedor"></div>' +
-    '<section class="geo-panel"><div class="geo-head"><h4>Empresas principales</h4></div>' +
-    '<div class="roles-wrap geo-scroll"><table class="geo-tabla"><thead><tr><th>N.º</th><th>NIT</th><th>Nombre comercial</th><th>Días crédito</th><th>Retención</th><th>Pend. revisar</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="ipLista"></tbody></table></div>' +
-    '<div id="ipFicha" class="geo-ficha" hidden></div></section>' +
-    '<section class="geo-panel"><div class="geo-head"><h4 id="ipTitSub">Sub-empresas</h4><button type="button" class="adm-btn adm-primary geo-mini" id="ipNuevaSub">+ Sub-empresa</button></div>' +
-    '<div class="roles-wrap"><table class="geo-tabla"><thead><tr><th>N.º</th><th>NIT</th><th>Nombre comercial</th><th>Días crédito</th><th>Retención</th><th>Pend. revisar</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="ipSubs"></tbody></table></div>' +
-    '<div id="ipFichaSub" class="geo-ficha" hidden></div></section>' +
+    '<div class="inv-barra ip-barra"><input id="ipBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar por nombre o NIT" aria-label="Buscar proveedor">' +
+      '<label class="ip-tipo">Tipo <select id="ipTipo" class="adm-input"><option value="todos">Todos</option><option value="nacionales">Nacionales</option><option value="extranjeros">Extranjeros</option></select></label>' +
+      filtrosHtml('prov', F_ESTADO) + '<button type="button" class="adm-btn" id="ipImprimir">Imprimir PDF</button></div>' +
+    '<div class="ip-grid">' +
+      '<section class="geo-panel ip-lista"><div class="roles-wrap geo-scroll"><table class="geo-tabla"><thead><tr><th>N.º</th><th>NIT</th><th>Nombre comercial</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="ipLista"></tbody></table></div><p class="ip-cuenta" id="ipCuenta"></p></section>' +
+      '<section class="geo-panel ip-ficha-panel"><div id="ipFicha" class="geo-ficha" hidden></div><p id="ipSinSel" class="geo-vacia">Elige un proveedor de la lista.</p></section>' +
+    '</div>' +
+    '<section class="geo-panel ip-tabs-panel"><div class="ic-tabs" role="tablist">' + [['contables', 'Datos contables'], ['pago', 'Datos de pago'], ['subs', 'Sub-empresas']].map(function (t) {
+      return '<button type="button" role="tab" data-iptab="' + t[0] + '" aria-selected="' + (t[0] === pestanaProv) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
+      '<div data-ippane="contables" id="ipContables"></div><div data-ippane="pago" id="ipPago" hidden></div>' +
+      '<div data-ippane="subs" hidden><div class="geo-head"><h4 id="ipTitSub">Sub-empresas</h4><button type="button" class="adm-btn adm-primary geo-mini" id="ipNuevaSub">+ Sub-empresa</button></div>' +
+      '<div class="roles-wrap"><table class="geo-tabla"><thead><tr><th>N.º</th><th>NIT</th><th>Nombre comercial</th><th>Días crédito</th><th>Retención</th><th>Pend. revisar</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="ipSubs"></tbody></table></div>' +
+      '<div id="ipFichaSub" class="geo-ficha" hidden></div></div></section>' +
     '<p id="ipMsg" class="dlg-msg" role="status"></p></div>';
 
   function celdasProv(p) { return [p.numero || '—', esc(p.nit || '—'), '<b>' + esc(p.nombre_comercial) + '</b>', credito(p.dias_credito), p.efectuar_retencion ? '✓' : '—', p.pendiente_revisar ? '<span class="inv-alerta">Revisar</span>' : '—', pill(p.estado)]; }
+  function celdasLista(p) { return [p.numero || '—', esc(p.nit || '—'), '<b>' + esc(p.nombre_comercial) + '</b>' + (p.proveedor_nacional === false ? ' <small class="inv-alerta ip-ext">Extranjero</small>' : '') + (p.pendiente_revisar ? ' <small class="inv-alerta">Revisar</small>' : ''), pill(p.estado)]; }
   function fichaProv(p, tipo) {
-    return registro(p, tipo) + '<div class="geo-ficha-grid">' + dato('Nombre fiscal (SAT)', p.nombre_fiscal, 1) + dato('Nombre para emisión de documentos', p.nombre_documentos, 1) + dato('Dirección', p.direccion, 1) +
-      dato('Teléfonos', p.telefonos) + dato('Ext.', p.extension) + dato('Fax', p.fax) + dato('Correo', p.correo) + dato('Contacto', p.contacto) + dato('Banco', p.banco) + dato('Cuenta bancaria', p.cuenta_bancaria) + dato('Días de crédito', credito(p.dias_credito)) + '</div>';
+    return '<h4 class="geo-h ip-titulo">' + esc(p.nombre_comercial) + '</h4>' + registro(p, tipo) + '<div class="geo-ficha-grid ip-ficha-grid">' +
+      dato('Nombre fiscal (SAT)', p.nombre_fiscal, 1) + dato('Nombre emisión de documentos', p.nombre_documentos, 1) + dato('Dirección', p.direccion, 1) +
+      dato('Concepto de gastos', p.concepto_gastos, 1) + dato('Teléfonos', [p.telefonos, p.extension ? 'ext. ' + p.extension : ''].filter(Boolean).join(' · ')) + dato('Contacto', p.contacto) +
+      dato('Correo', p.correo) + dato('Fax', p.fax) + dato('Tipo de proveedor', deLista(TIPOS_PROV, p.tipo_proveedor)) + dato('Régimen ISR', deLista(REGIMENES_ISR, p.regimen_isr)) +
+      dato('Bodega', p.bodega_id ? nombreBodega(p.bodega_id) : '') +
+      '<div class="geo-info full ip-marcas">' + marca(p.proveedor_nacional !== false, 'Proveedor nacional') + marca(p.servicio_critico, 'Servicio crítico') + marca(p.pendiente_revisar, 'Pendiente de revisar') + '</div></div>';
+  }
+  function pintarPestanasProv(p) {
+    $('ipContables').innerHTML = p ? '<div class="geo-ficha-grid ip-tab-grid">' + dato('Días de crédito', credito(p.dias_credito)) + dato('Efectuar retención', p.efectuar_retencion ? 'Sí' : 'No') +
+      dato('Cuenta contable de gastos', [p.cuenta_gastos, p.cuenta_gastos_desc].filter(Boolean).join(' · ')) + dato('Visualizar en', (VISUALIZAR.filter(function (v) { return v[0] === p.visualizar_en; })[0] || ['', '—'])[1]) +
+      dato('Transacción', p.transaccion ? deLista(TRANS_PROV, p.transaccion) : '') + dato('2da. transacción (exenciones)', p.transaccion_exencion ? deLista(TRANS_PROV, p.transaccion_exencion) : '') +
+      '<div class="geo-info"><span>Varias cuentas</span><b>' + (p.varias_cuentas ? 'Sí' : 'No') + ' <button type="button" class="adm-btn geo-mini" id="ipVerCuentas">Ver cuentas</button></b></div></div>' : '<p class="geo-vacia">Elige un proveedor.</p>';
+    $('ipPago').innerHTML = p ? '<div class="geo-ficha-grid ip-tab-grid">' + dato('Banco', p.banco) + dato('Cuenta bancaria', p.cuenta_bancaria) + dato('Días de crédito', credito(p.dias_credito)) + dato('Efectuar retención', p.efectuar_retencion ? 'Sí' : 'No') + '</div>' : '<p class="geo-vacia">Elige un proveedor.</p>';
+  }
+  function pasaTipo(p) { return tipoProv === 'todos' || (tipoProv === 'nacionales' ? p.proveedor_nacional !== false : p.proveedor_nacional === false); }
+  function listaProveedores() {
+    var t = norm($('ipBuscar').value);
+    return proveedores.filter(function (p) { return !p.padre_id && pasaFiltro('prov', p) && pasaTipo(p) && (!t || norm(p.nombre_comercial + ' ' + (p.nit || '') + ' ' + (p.nombre_fiscal || '')).indexOf(t) >= 0); });
   }
   function pintarProveedores() {
-    var t = norm($('ipBuscar').value);
-    var principales = proveedores.filter(function (p) { return !p.padre_id && pasaFiltro('prov', p) && (!t || norm(p.nombre_comercial + ' ' + (p.nit || '') + ' ' + (p.nombre_fiscal || '')).indexOf(t) >= 0); });
-    $('ipLista').innerHTML = principales.length ? principales.map(function (p) { return fila('prov', p.id, p.id === provSel, celdasProv(p)); }).join('') : vacia(8, proveedores.length ? 'Ningún proveedor coincide.' : 'Aún no hay proveedores. Agrega el primero con «+ Proveedor».');
+    var principales = listaProveedores();
+    $('ipLista').innerHTML = principales.length ? principales.map(function (p) { return fila('prov', p.id, p.id === provSel, celdasLista(p)); }).join('') : vacia(5, proveedores.length ? 'Ningún proveedor coincide.' : 'Aún no hay proveedores. Agrega el primero con «+ Proveedor».');
+    $('ipCuenta').textContent = principales.length + ' de ' + proveedores.filter(function (p) { return !p.padre_id; }).length + ' proveedores';
     var p = proveedores.filter(function (x) { return x.id === provSel; })[0];
-    $('ipFicha').hidden = !p; if (p) $('ipFicha').innerHTML = fichaProv(p, 'prov');
+    $('ipFicha').hidden = !p; $('ipSinSel').hidden = !!p; if (p) $('ipFicha').innerHTML = fichaProv(p, 'prov');
+    pintarPestanasProv(p);
     var subs = p ? proveedores.filter(function (x) { return x.padre_id === p.id; }) : [];
     $('ipTitSub').textContent = p ? 'Sub-empresas de ' + p.nombre_comercial : 'Sub-empresas';
     $('ipSubs').innerHTML = !p ? vacia(8, 'Elige una empresa principal.') : subs.length ? subs.map(function (s) { return fila('sub', s.id, s.id === subSel, celdasProv(s)); }).join('') : vacia(8, 'Esta empresa aún no tiene sub-empresas.');
     var s = subs.filter(function (x) { return x.id === subSel; })[0];
     $('ipFichaSub').hidden = !s; if (s) $('ipFichaSub').innerHTML = fichaProv(s, 'sub');
   }
+  function verPestanaProv(t) {
+    pestanaProv = t;
+    $('admInvProveedores').querySelectorAll('[data-iptab]').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.iptab === t); });
+    $('admInvProveedores').querySelectorAll('[data-ippane]').forEach(function (d) { d.hidden = d.dataset.ippane !== t; });
+  }
+  // Lista impresa (o guardada en PDF) con el filtro aplicado
+  function imprimirProveedores() {
+    var P = window.PD_IMPRESION, l = listaProveedores();
+    if (!P) return;
+    var th = 'padding:6px;border-bottom:2px solid #0B2B40;text-align:left;font-size:11px', td = 'padding:6px;border-bottom:1px solid #E3EAF0;font-size:11.5px';
+    var titulo = 'Proveedores' + (tipoProv === 'todos' ? '' : ' ' + tipoProv) + (filtros.prov === 'todos' ? '' : ' · ' + (ESTADOS[filtros.prov] || filtros.prov).toLowerCase());
+    P.imprimir(P.encabezado(titulo) + '<table style="width:100%;border-collapse:collapse"><thead><tr>' + ['N.º', 'NIT', 'Nombre comercial', 'Tipo', 'Régimen ISR', 'Teléfonos', 'Contacto', 'Crédito', 'Estado'].map(function (h) { return '<th style="' + th + '">' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      l.map(function (p) { return '<tr>' + [p.numero, p.nit || '—', p.nombre_comercial, p.proveedor_nacional === false ? 'Extranjero' : 'Nacional', p.regimen_isr ? deLista(REGIMENES_ISR, p.regimen_isr) : '—', p.telefonos || '—', p.contacto || '—', credito(p.dias_credito), ESTADOS[p.estado] || p.estado].map(function (v) { return '<td style="' + td + '">' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</tbody></table><p style="font-size:11px;color:#5A6D7A;margin-top:10px">' + l.length + ' proveedores.</p></div>');
+  }
+  // Varias cuentas contables de gasto del proveedor
+  async function verCuentas() {
+    var p = proveedores.filter(function (x) { return x.id === provSel; })[0];
+    if (!p) return;
+    var r = await sb.from('inv_proveedor_cuentas').select('*').eq('proveedor_id', p.id).order('cuenta');
+    cuentasProv = r.error ? [] : r.data;
+    G.dialogo({
+      eyebrow: 'Proveedores · ' + p.nombre_comercial, titulo: 'Cuentas contables de gasto', valores: {},
+      campos: [{ k: 'lista', label: 'Cuentas del proveedor', tipo: 'info', ancho: 'full' }, { k: 'cuenta', label: 'Cuenta contable', req: true, max: 30, placeholder: '5.1.01.001' }, { k: 'descripcion', label: 'Descripción', max: 150, placeholder: 'Medicamentos y materiales' }],
+      alAbrir: function () {
+        $('geoF_lista').innerHTML = cuentasProv.length ? cuentasProv.map(function (c) { return '<span class="geo-chip">' + esc(c.cuenta + (c.descripcion ? ' · ' + c.descripcion : '')) + ' <button type="button" data-borrar-cuenta="' + c.id + '" aria-label="Quitar ' + esc(c.cuenta) + '">×</button></span>'; }).join('') : (r.error ? esc(traducir(r.error)) : 'Sin cuentas adicionales. ' + (p.cuenta_gastos ? 'Cuenta principal: ' + p.cuenta_gastos : ''));
+        $('geoDlgGrabar').textContent = 'Agregar cuenta';
+      },
+      guardar: async function (d) {
+        var x = await sb.from('inv_proveedor_cuentas').insert({ proveedor_id: p.id, cuenta: d.cuenta, descripcion: d.descripcion });
+        if (x.error) return /inv_proveedor_cuentas_unica|duplicate/i.test(x.error.message || '') ? 'Esa cuenta ya está registrada para este proveedor.' : traducir(x.error);
+        if (!p.varias_cuentas) { await sb.from('inv_proveedores').update({ varias_cuentas: true }).eq('id', p.id); await cargarProveedores(); }
+        return null;
+      }
+    });
+  }
+  document.getElementById('geoDlgCampos').addEventListener('click', async function (e) {
+    var b = e.target.closest('[data-borrar-cuenta]');
+    if (!b) return;
+    var x = await sb.from('inv_proveedor_cuentas').delete().eq('id', +b.dataset.borrarCuenta);
+    if (x.error) { aviso('geoDlgMsg', traducir(x.error), true); return; }
+    b.parentNode.remove(); aviso('geoDlgMsg', 'Cuenta quitada.');
+  });
   async function cargarProveedores() {
     aviso('ipMsg', '');
     try { proveedores = (await todas(function () { return sb.from('inv_proveedores').select('*').order('numero'); })).sort(porNumero); }
@@ -104,27 +179,40 @@
   }
   function editarProveedor(p, padre) {
     var esSub = !!(p ? p.padre_id : padre);
-    var v = p ? Object.assign({}, p) : { estado: 'activo', dias_credito: 0, padre_id: padre ? padre.id : null, localidad_id: padre ? padre.localidad_id : null };
+    var v = p ? Object.assign({}, p) : { estado: 'activo', dias_credito: 0, padre_id: padre ? padre.id : null, localidad_id: padre ? padre.localidad_id : null,
+      concepto_gastos: 'Proveedor estándar', proveedor_nacional: true, tipo_proveedor: '1', visualizar_en: 'compras_inventario', bodega_id: (bodegas.filter(function (b) { return b.tipo === 'general' && b.estado === 'activo'; })[0] || {}).id };
     G.dialogo({
       eyebrow: 'Inventarios · ' + (esSub ? 'Sub-empresa de ' + (padre || proveedores.filter(function (x) { return x.id === p.padre_id; })[0] || {}).nombre_comercial : 'Proveedor'),
       titulo: p ? p.nombre_comercial : (esSub ? 'Nueva sub-empresa' : 'Nuevo proveedor'), valores: v,
       campos: [{ k: 'numero', label: 'N.º proveedor', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
         { k: 'nit', label: 'NIT', max: 20, placeholder: '1234567-8' }, { k: 'dias_credito', label: 'Días de crédito', tipo: 'number', paso: 1, maxNum: 365, ayuda: '0 = pago inmediato' },
         { k: 'nombre_comercial', label: 'Nombre comercial', req: true, max: 150, ancho: 'full' },
-        { k: 'nombre_fiscal', label: 'Nombre fiscal (SAT)', max: 200, ancho: 'full' }, { k: 'nombre_documentos', label: 'Nombre para emisión de documentos', max: 200, ancho: 'full' },
+        { k: 'nombre_fiscal', label: 'Nombre fiscal (SAT)', max: 200, ancho: 'full' }, { k: 'nombre_documentos', label: 'Nombre emisión de documentos', max: 200, ancho: 'full' },
+        { k: 'concepto_gastos', label: 'Concepto de gastos', req: true, max: 150, ancho: 'full', lista: ['Proveedor estándar', 'Medicamentos', 'Materiales dentales', 'Insumos descartables', 'Equipo e instrumental', 'Servicios profesionales', 'Laboratorio dental', 'Mantenimiento'] },
+        { k: 'tipo_proveedor', label: 'Tipo de proveedor', tipo: 'select', opciones: TIPOS_PROV.map(function (t) { return [t[0], t[0] + ' · ' + t[1]]; }) },
+        { k: 'regimen_isr', label: 'Régimen ISR', tipo: 'select', opciones: [['', '—']].concat(REGIMENES_ISR.map(function (t) { return [t[0], t[0] + ' · ' + t[1]]; })) },
+        { k: 'bodega_id', label: 'Bodega', tipo: 'select', opciones: [['', '—']].concat(bodegas.filter(function (b) { return b.estado === 'activo' || (p && b.id === p.bodega_id); }).map(function (b) { return [b.id, b.numero + ' · ' + b.nombre]; })) },
+        { k: 'proveedor_nacional', label: 'Proveedor nacional', tipo: 'check' }, { k: 'servicio_critico', label: 'Servicio crítico', tipo: 'check' },
+        { k: 'cuenta_gastos', label: 'Cuenta contable de gastos', max: 30, placeholder: '5.1.01.001' }, { k: 'cuenta_gastos_desc', label: 'Descripción de la cuenta', max: 150 },
+        { k: 'varias_cuentas', label: 'Varias cuentas', tipo: 'check' },
+        { k: 'visualizar_en', label: 'Visualizar en', tipo: 'select', opciones: VISUALIZAR },
+        { k: 'transaccion', label: 'Transacción', tipo: 'select', opciones: [['', '—']].concat(TRANS_PROV.map(function (t) { return [t[0], t[0] + ' · ' + t[1]]; })) },
+        { k: 'transaccion_exencion', label: '2da. transacción (exenciones)', tipo: 'select', opciones: [['', '—']].concat(TRANS_PROV.map(function (t) { return [t[0], t[0] + ' · ' + t[1]]; })) },
         { k: 'direccion', label: 'Dirección', tipo: 'textarea', max: 300, ancho: 'full' },
         { k: 'telefonos', label: 'Teléfonos', max: 120 }, { k: 'extension', label: 'Ext.', max: 20 }, { k: 'fax', label: 'Fax', max: 40 }, { k: 'correo', label: 'Correo', max: 150 },
         { k: 'contacto', label: 'Persona de contacto', max: 120, ancho: 'full' }, { k: 'banco', label: 'Banco', max: 80, lista: BANCOS_GT, placeholder: 'Elige o escribe el banco' }, { k: 'cuenta_bancaria', label: 'Cuenta bancaria', max: 40 },
         { k: 'sede', tipo: 'sede' },
         { k: 'efectuar_retencion', label: 'Efectuar retención', tipo: 'check' }, { k: 'pendiente_revisar', label: 'Pendiente de revisar', tipo: 'check' }],
       secciones: [
-        { titulo: 'Identificación', campos: ['numero', 'estado', 'nombre_comercial', 'nombre_fiscal', 'nombre_documentos', 'nit', 'dias_credito'] },
+        { titulo: 'Identificación', campos: ['numero', 'estado', 'nombre_comercial', 'nombre_fiscal', 'nombre_documentos', 'nit', 'concepto_gastos'] },
         { titulo: 'Contacto', campos: ['contacto', 'telefonos', 'extension', 'correo', 'fax', 'direccion'] },
-        { titulo: 'Pagos y control', campos: ['banco', 'cuenta_bancaria', 'efectuar_retencion', 'pendiente_revisar', 'sede'] }
+        { titulo: 'Clasificación', campos: ['tipo_proveedor*', 'regimen_isr*', 'bodega_id*', 'proveedor_nacional', 'servicio_critico', 'pendiente_revisar*', 'sede'] },
+        { titulo: 'Datos contables y de pago', campos: ['dias_credito', 'efectuar_retencion', 'cuenta_gastos', 'cuenta_gastos_desc', 'varias_cuentas', 'visualizar_en', 'transaccion*', 'transaccion_exencion*', 'banco', 'cuenta_bancaria'] }
       ],
       alAbrir: function () { if (!p) $('geoF_numero').textContent = 'Se asigna al grabar'; },
       guardar: async function (d) {
         if (!p && padre) d.padre_id = padre.id;
+        d.bodega_id = d.bodega_id ? +d.bodega_id : null;
         var r = p ? await sb.from('inv_proveedores').update(d).eq('id', p.id).select('id').single() : await sb.from('inv_proveedores').insert(d).select('id').single();
         if (r.error) return traducir(r.error);
         if (esSub) subSel = r.data.id; else { provSel = r.data.id; subSel = null; }
@@ -475,6 +563,9 @@
     if (e.target.id === 'iaClasif') { pagProd = 1; pintarProductos(); }
   });
   $('ipBuscar').addEventListener('input', pintarProveedores);
+  $('ipTipo').addEventListener('change', function () { tipoProv = this.value; pintarProveedores(); });
+  $('ipImprimir').addEventListener('click', imprimirProveedores);
+  $('admInvProveedores').addEventListener('click', function (e) { var t = e.target.closest('[data-iptab]'); if (t) verPestanaProv(t.dataset.iptab); if (e.target.id === 'ipVerCuentas') verCuentas(); });
   $('iaBuscar').addEventListener('input', function () { pagProd = 1; pintarProductos(); });
   $('ivBuscar').addEventListener('input', pintarPrecios);
   $('ivLista').addEventListener('click', function (e) { var b = e.target.closest('[data-precio]'); if (b) { var k = b.dataset.precio.split(':'); editarPrecio(+k[0], k[1]); } });
@@ -487,7 +578,7 @@
 
   async function cargarTodo(panel) {
     if (window.PD_SEDES) await window.PD_SEDES.cargar();
-    if (panel === 'admInvProveedores') return cargarProveedores();
+    if (panel === 'admInvProveedores') { try { bodegas = await todas(function () { return sb.from('inv_bodegas').select('*').order('numero'); }); } catch (e) { bodegas = []; } return cargarProveedores(); }
     if (panel === 'admInvBodegas') return cargarBodegas();
     if (panel === 'admInvProductos') { await Promise.all([cargarProveedores(), cargarBodegas(), cargarTipos()]); return cargarProductos(); }
     if (panel === 'admInvTipos') { await cargarTipos(); try { productos = (await todas(function () { return sb.from('inv_productos').select('id,tipo_producto,estado'); })); } catch (e) { productos = []; } return pintarTipos(); }
