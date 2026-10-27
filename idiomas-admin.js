@@ -8,7 +8,7 @@
   var T = {
     // ---- Panel y menú ----
     'Panel de la clínica': 'Clinic dashboard', 'Actualizar': 'Refresh', 'Cerrar panel': 'Close dashboard',
-    'Menú de administración': 'Administration menu', 'Catálogos iniciales': 'Master data', 'Catálogos': 'Catalogs', 'Odontólogos': 'Dentists',
+    'Menú de administración': 'Administration menu', 'Catálogos iniciales': 'Master data', 'Catálogos': 'Catalogs', 'Jornadas': 'Outreach days', 'Instituciones': 'Institutions', 'Jornadas dentales': 'Dental outreach days', 'Odontólogos': 'Dentists',
     'Posiciones y clínicas': 'Chairs and clinics', 'Administración de usuarios': 'User management', 'Agente comercial': 'Sales agents',
     'Agendas': 'Schedules', 'Agendas clínicas': 'Clinic schedules', 'Historial de citas': 'Appointment history', 'Pacientes': 'Patients',
     'Expediente de pacientes': 'Patient records', 'Presupuesto': 'Quotes', 'Estados de cuenta': 'Account statements', 'Cobros y pagos': 'Payments',

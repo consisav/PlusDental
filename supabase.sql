@@ -5954,6 +5954,200 @@ $$;
 revoke execute on function public.cargar_compra(bigint) from public, anon;
 grant execute on function public.cargar_compra(bigint) to authenticated;
 
+-- ===== Jornadas: instituciones y jornadas dentales =====
+-- Instituciones con las que se hacen jornadas (escuelas, municipalidades, ONG…) y cada jornada con sus pacientes,
+-- procedimientos y costo según el precio «Institucional». Los pacientes de la jornada se registran solo aquí.
+create table if not exists public.jor_instituciones (
+  id               bigint generated always as identity primary key,
+  numero           bigint,
+  nombre           text not null check (char_length(nombre) between 1 and 200),
+  tipo             text not null default 'escuela_publica' check (tipo in ('escuela_publica', 'escuela_privada', 'municipalidad', 'ong', 'iglesia', 'empresa', 'centro_salud', 'otro')),
+  nit              text check (char_length(nit) <= 20),
+  estado_id        bigint references public.geo_estados (id) on delete set null,
+  municipio_id     bigint references public.geo_municipios (id) on delete set null,
+  direccion        text check (char_length(direccion) <= 300),
+  responsable      text check (char_length(responsable) <= 150),
+  cargo            text check (char_length(cargo) <= 100),
+  telefono         text check (char_length(telefono) <= 60),
+  correo           text check (char_length(correo) <= 150),
+  poblacion        int check (poblacion >= 0),
+  convenio         boolean not null default false,
+  convenio_desde   date,
+  convenio_hasta   date,
+  observaciones    text check (char_length(observaciones) <= 500),
+  estado           text not null default 'activo' check (estado in ('activo', 'inactivo', 'baja')),
+  organizacion_id  bigint references public.organizaciones (id) on delete set null,
+  localidad_id     bigint references public.org_localidades (id) on delete set null,
+  creado           timestamptz not null default now(),
+  creado_por       text,
+  modificado       timestamptz,
+  modificado_por   text,
+  check (convenio_hasta is null or convenio_desde is null or convenio_hasta >= convenio_desde)
+);
+create table if not exists public.jor_jornadas (
+  id               bigint generated always as identity primary key,
+  numero           bigint,
+  institucion_id   bigint not null references public.jor_instituciones (id),
+  fecha            date not null default current_date,
+  lugar            text check (char_length(lugar) <= 200),
+  dentista_id      bigint references public.dentistas (id) on delete set null,
+  estado           text not null default 'planificada' check (estado in ('planificada', 'realizada', 'cerrada', 'cancelada')),
+  observaciones    text check (char_length(observaciones) <= 500),
+  total            numeric(14,2) not null default 0,
+  cerrada_en       timestamptz,
+  cerrada_por      text,
+  organizacion_id  bigint references public.organizaciones (id) on delete set null,
+  localidad_id     bigint references public.org_localidades (id) on delete set null,
+  creado           timestamptz not null default now(),
+  creado_por       text,
+  modificado       timestamptz,
+  modificado_por   text
+);
+create table if not exists public.jor_pacientes (
+  id           bigint generated always as identity primary key,
+  jornada_id   bigint not null references public.jor_jornadas (id) on delete cascade,
+  orden        int not null default 1,
+  nombre       text not null check (char_length(nombre) between 1 and 150),
+  edad         int check (edad between 0 and 120),
+  sexo         text check (sexo in ('F', 'M')),
+  referencia   text check (char_length(referencia) <= 100)
+);
+create index if not exists jor_pacientes_jornada on public.jor_pacientes (jornada_id, orden);
+create table if not exists public.jor_procedimientos (
+  id              bigint generated always as identity primary key,
+  paciente_id     bigint not null references public.jor_pacientes (id) on delete cascade,
+  orden           int not null default 1,
+  tratamiento_id  bigint references public.tratamientos (id) on delete set null,
+  descripcion     text not null check (char_length(descripcion) between 1 and 200),
+  pieza           text check (char_length(pieza) <= 20),
+  cantidad        int not null default 1 check (cantidad > 0),
+  precio          numeric(12,2) not null default 0 check (precio >= 0)
+);
+create index if not exists jor_procedimientos_paciente on public.jor_procedimientos (paciente_id, orden);
+
+-- Numeración, quién graba y quién modifica, y sede (como en inventarios)
+create or replace function public.inv_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+begin
+  if tg_op = 'INSERT' then
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto', 'inv_compras', 'inv_traslados', 'inv_ordenes_compra', 'jor_instituciones', 'jor_jornadas') then
+      perform pg_advisory_xact_lock(hashtext(tg_table_name || '_numero'));
+      execute format('select coalesce(max(numero), 0) + 1 from public.%I', tg_table_name) into new.numero;
+    end if;
+    new.creado := now(); new.creado_por := v_usuario; new.modificado := null; new.modificado_por := null;
+  else
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto', 'inv_compras', 'inv_traslados', 'inv_ordenes_compra', 'jor_instituciones', 'jor_jornadas') then new.numero := old.numero; end if;
+    new.creado := old.creado; new.creado_por := old.creado_por;
+    new.modificado := now(); new.modificado_por := v_usuario;
+  end if;
+  return new;
+end;
+$$;
+do $$ declare t text; begin
+  foreach t in array array['jor_instituciones', 'jor_jornadas'] loop
+    if not exists (select 1 from pg_trigger where tgname = t || '_registro' and tgrelid = ('public.' || t)::regclass) then
+      execute format('create trigger %I before insert or update on public.%I for each row execute function public.inv_registro()', t || '_registro', t);
+    end if;
+    if not exists (select 1 from pg_trigger where tgname = t || '_sede' and tgrelid = ('public.' || t)::regclass) then
+      execute format('create trigger %I before insert or update of organizacion_id, localidad_id on public.%I for each row execute function public.sede_registro()', t || '_sede', t);
+    end if;
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || '_lee', t);
+    execute format('create policy %I on public.%I for select to authenticated using (public.es_personal() and public.ve_sede(localidad_id))', t || '_lee', t);
+  end loop;
+end $$;
+-- Instituciones: el personal de la sede las crea y modifica; solo el Super Administrador las borra
+drop policy if exists jor_instituciones_crea on public.jor_instituciones;
+create policy jor_instituciones_crea on public.jor_instituciones for insert to authenticated with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists jor_instituciones_edita on public.jor_instituciones;
+create policy jor_instituciones_edita on public.jor_instituciones for update to authenticated using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists jor_instituciones_borra on public.jor_instituciones;
+create policy jor_instituciones_borra on public.jor_instituciones for delete to authenticated using (public.es_super_administrador());
+grant select, insert, update, delete on public.jor_instituciones to authenticated;
+grant select on public.jor_jornadas to authenticated;
+-- Pacientes y procedimientos: lectura del personal que ve la jornada; se graban con guardar_jornada
+alter table public.jor_pacientes enable row level security;
+drop policy if exists jor_pacientes_lee on public.jor_pacientes;
+create policy jor_pacientes_lee on public.jor_pacientes for select to authenticated
+  using (public.es_personal() and exists (select 1 from public.jor_jornadas j where j.id = jornada_id and public.ve_sede(j.localidad_id)));
+grant select on public.jor_pacientes to authenticated;
+alter table public.jor_procedimientos enable row level security;
+drop policy if exists jor_procedimientos_lee on public.jor_procedimientos;
+create policy jor_procedimientos_lee on public.jor_procedimientos for select to authenticated
+  using (public.es_personal() and exists (select 1 from public.jor_pacientes p join public.jor_jornadas j on j.id = p.jornada_id where p.id = paciente_id and public.ve_sede(j.localidad_id)));
+grant select on public.jor_procedimientos to authenticated;
+
+-- Grabar una jornada con sus pacientes y procedimientos (no se puede si está cerrada)
+create or replace function public.guardar_jornada(p_id bigint, p_datos jsonb, p_pacientes jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint := p_id; v_inst public.jor_instituciones; v_estado text := coalesce(nullif(p_datos ->> 'estado', ''), 'planificada');
+  pa jsonb; pr jsonb; v_pac bigint; n int := 0; m int; v_total numeric := 0;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if v_estado not in ('planificada', 'realizada', 'cancelada') then raise exception 'Estado no válido (para cerrar usa «Cerrar jornada»)'; end if;
+  select * into v_inst from public.jor_instituciones where id = nullif(p_datos ->> 'institucion_id', '')::bigint;
+  if v_inst.id is null or not public.ve_sede(v_inst.localidad_id) then raise exception 'Elige una institución de tu sede'; end if;
+  if v_id is not null and not exists (select 1 from public.jor_jornadas where id = v_id and estado <> 'cerrada' and public.ve_sede(localidad_id)) then
+    raise exception 'La jornada está cerrada: reábrela para modificarla';
+  end if;
+  if v_id is null then
+    insert into public.jor_jornadas (institucion_id, localidad_id, organizacion_id) values (v_inst.id, v_inst.localidad_id, v_inst.organizacion_id) returning id into v_id;
+  end if;
+  update public.jor_jornadas set institucion_id = v_inst.id, fecha = coalesce(nullif(p_datos ->> 'fecha', '')::date, current_date),
+    lugar = nullif(trim(p_datos ->> 'lugar'), ''), dentista_id = nullif(p_datos ->> 'dentista_id', '')::bigint, estado = v_estado,
+    observaciones = nullif(trim(p_datos ->> 'observaciones'), '')
+   where id = v_id;
+  delete from public.jor_pacientes where jornada_id = v_id;
+  for pa in select * from jsonb_array_elements(coalesce(p_pacientes, '[]'::jsonb)) loop
+    if coalesce(trim(pa ->> 'nombre'), '') = '' then raise exception 'Cada paciente necesita su nombre'; end if;
+    n := n + 1;
+    insert into public.jor_pacientes (jornada_id, orden, nombre, edad, sexo, referencia)
+    values (v_id, n, trim(pa ->> 'nombre'), nullif(pa ->> 'edad', '')::int, nullif(pa ->> 'sexo', ''), nullif(trim(pa ->> 'referencia'), '')) returning id into v_pac;
+    m := 0;
+    for pr in select * from jsonb_array_elements(coalesce(pa -> 'procedimientos', '[]'::jsonb)) loop
+      if coalesce(trim(pr ->> 'descripcion'), '') = '' then raise exception 'Cada procedimiento necesita su descripción'; end if;
+      m := m + 1;
+      insert into public.jor_procedimientos (paciente_id, orden, tratamiento_id, descripcion, pieza, cantidad, precio)
+      values (v_pac, m, nullif(pr ->> 'tratamiento_id', '')::bigint, trim(pr ->> 'descripcion'), nullif(trim(pr ->> 'pieza'), ''),
+              greatest(coalesce(nullif(pr ->> 'cantidad', '')::int, 1), 1), greatest(coalesce(nullif(pr ->> 'precio', '')::numeric, 0), 0));
+      v_total := v_total + greatest(coalesce(nullif(pr ->> 'cantidad', '')::int, 1), 1) * greatest(coalesce(nullif(pr ->> 'precio', '')::numeric, 0), 0);
+    end loop;
+  end loop;
+  update public.jor_jornadas set total = round(v_total, 2) where id = v_id;
+  return v_id;
+end;
+$$;
+revoke execute on function public.guardar_jornada(bigint, jsonb, jsonb) from public, anon;
+grant execute on function public.guardar_jornada(bigint, jsonb, jsonb) to authenticated;
+
+-- Cerrar (queda solo para consulta) y reabrir (Super Administrador)
+create or replace function public.cerrar_jornada(p_id bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare j public.jor_jornadas;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select * into j from public.jor_jornadas where id = p_id for update;
+  if j.id is null or not public.ve_sede(j.localidad_id) then raise exception 'La jornada no existe'; end if;
+  if j.estado in ('cerrada', 'cancelada') then raise exception 'La jornada ya está cerrada o cancelada'; end if;
+  if not exists (select 1 from public.jor_pacientes where jornada_id = p_id) then raise exception 'Registra al menos un paciente antes de cerrar la jornada'; end if;
+  update public.jor_jornadas set estado = 'cerrada', cerrada_en = now(), cerrada_por = (select usuario from public.perfiles where id = auth.uid()) where id = p_id;
+end;
+$$;
+revoke execute on function public.cerrar_jornada(bigint) from public, anon;
+grant execute on function public.cerrar_jornada(bigint) to authenticated;
+create or replace function public.reabrir_jornada(p_id bigint)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_super_administrador() then raise exception 'Solo el Super Administrador puede reabrir una jornada'; end if;
+  update public.jor_jornadas set estado = 'realizada', cerrada_en = null, cerrada_por = null where id = p_id and estado = 'cerrada';
+  if not found then raise exception 'La jornada no está cerrada'; end if;
+end;
+$$;
+revoke execute on function public.reabrir_jornada(bigint) from public, anon;
+grant execute on function public.reabrir_jornada(bigint) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
