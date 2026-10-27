@@ -10,7 +10,7 @@
     ['iglesia', 'Iglesia'], ['empresa', 'Empresa'], ['centro_salud', 'Centro de salud'], ['otro', 'Otro']];
   var ESTADOS_I = [['activo', 'Activa'], ['inactivo', 'Inactiva'], ['baja', 'Baja']];
   var ESTADOS_J = { planificada: ['Planificada', 'inactivo'], realizada: ['Realizada', 'activo'], cerrada: ['Cerrada', 'activo'], cancelada: ['Cancelada', 'baja'] };
-  var instituciones = [], deptos = [], municipios = {}, dentistas = [], tratamientos = [], precioInst = {}, jornadas = [], jPacientes = [], jProcs = [];
+  var instituciones = [], sucursales = [], deptos = [], municipios = {}, dentistas = [], tratamientos = [], precioInst = {}, jornadas = [], jPacientes = [], jProcs = [];
   var instSel = null, filtroTipo = '', filtroEstadoI = 'activo';
   var form = null, pacientes = [], modoEdicion = false, edit = null, pag = 1, PAG = 6;
 
@@ -21,6 +21,11 @@
   function hoy() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function fecha(f) { if (!f) return '—'; var p = String(f).slice(0, 10).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
   function fechaHora(f) { return f ? new Date(f).toLocaleString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : ''; }
+  function fechaHoraS(f) { return f ? new Date(f).toLocaleString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : ''; }
+  // Quién grabó y quién modificó el registro, con fecha y hora completas
+  function textoRegistro(x) { return x && x.creado ? 'Grabado por ' + (x.creado_por || 'Sin usuario') + ' el ' + fechaHoraS(x.creado) + (x.modificado ? ' · Modificado por ' + (x.modificado_por || 'Sin usuario') + ' el ' + fechaHoraS(x.modificado) : '') : 'Se registra al grabar (usuario, fecha y hora)'; }
+  function codigoSuc(x) { return 'SUC-' + ('00' + (x.numero || x.id)).slice(-3); }
+  function sucursalesDe(inst) { return sucursales.filter(function (x) { return x.institucion_id === inst; }); }
   function aviso(id, t, error) { $(id).textContent = t || ''; $(id).style.color = error ? '#9A3B2E' : '#475B68'; }
   function traducir(err) {
     var m = (err && err.message) || '';
@@ -68,6 +73,7 @@
       '<select id="jiEstado" class="adm-input" aria-label="Estado"><option value="activo">Activas</option><option value="inactivo">Inactivas</option><option value="baja">De baja</option><option value="">Todas</option></select></div>' +
     '<section class="geo-panel"><div class="roles-wrap ia-wrap"><table class="geo-tabla ji-tabla"><colgroup><col class="ji-c-cod"><col><col class="ji-c-ubi"><col class="ji-c-resp"><col class="ji-c-conv"><col class="ji-c-est"><col class="ji-c-acc"></colgroup>' +
       '<thead><tr><th>Código</th><th>Institución</th><th>Ubicación</th><th>Responsable</th><th>Convenio</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody id="jiLista"></tbody></table></div></section>' +
+    '<section id="jiFicha" class="geo-panel ji-ficha" hidden></section>' +
     '<p id="jiMsg" class="dlg-msg" role="status"></p></div>';
   var muniTexto = {};
   function pintarInst() {
@@ -77,13 +83,74 @@
     $('jiLista').innerHTML = l.length ? l.map(function (i) {
       var d = porId(deptos, i.estado_id), conv = i.convenio ? (i.convenio_hasta && i.convenio_hasta < hoy() ? '<span class="estado estado-baja">Vencido</span>' : '<span class="estado estado-activo">Vigente</span>') : '<span class="inv-sub">Sin convenio</span>';
       return '<tr data-inst="' + i.id + '" tabindex="0" class="' + (i.id === instSel ? 'geo-sel' : '') + '"><td><b>' + codigoInst(i) + '</b></td>' +
-        '<td><b class="ia-corto" title="' + esc(i.nombre) + '">' + esc(i.nombre) + '</b><small class="inv-sub">' + nombreTipo(i.tipo) + (i.poblacion ? ' · ' + num(i.poblacion, 0) + ' personas' : '') + '</small></td>' +
+        '<td><b class="ia-corto" title="' + esc(i.nombre) + '">' + esc(i.nombre) + '</b><small class="inv-sub">' + nombreTipo(i.tipo) + (sucursalesDe(i.id).length ? ' · ' + sucursalesDe(i.id).length + ' sucursal' + (sucursalesDe(i.id).length === 1 ? '' : 'es') : '') + (i.poblacion ? ' · ' + num(i.poblacion, 0) + ' personas' : '') + '</small></td>' +
         '<td><span class="ia-corto">' + esc(muniTexto[i.id] || '—') + '</span><small class="inv-sub">' + esc(d ? d.nombre : '') + '</small></td>' +
         '<td><span class="ia-corto">' + esc(i.responsable || '—') + '</span><small class="inv-sub ia-corto">' + esc([i.cargo, i.telefono].filter(Boolean).join(' · ')) + '</small></td>' +
         '<td>' + conv + (i.convenio && i.convenio_hasta ? '<small class="inv-sub">hasta ' + fecha(i.convenio_hasta) + '</small>' : '') + '</td>' +
         '<td><span class="estado estado-' + i.estado + '">' + (ESTADOS_I.filter(function (e) { return e[0] === i.estado; })[0] || ['', i.estado])[1] + '</span></td>' +
         '<td class="geo-acc"><button type="button" class="geo-editar" data-editar-inst="' + i.id + '" aria-label="Modificar" title="Modificar">✎</button></td></tr>';
     }).join('') : '<tr><td colspan="7" class="geo-vacia">' + (instituciones.length ? 'Ninguna institución coincide.' : 'Aún no hay instituciones. Agrega la primera con «+ Institución».') + '</td></tr>';
+    pintarFicha();
+  }
+  // Ficha de la institución elegida: registro (usuario y fecha completa) y sus sucursales
+  function pintarFicha() {
+    var i = porId(instituciones, instSel);
+    $('jiFicha').hidden = !i;
+    if (!i) return;
+    var ls = sucursalesDe(i.id);
+    $('jiFicha').innerHTML = '<div class="ji-ficha-cab"><div><span class="ji-eti">' + codigoInst(i) + ' · ' + nombreTipo(i.tipo) + '</span><h4>' + esc(i.nombre) + '</h4></div>' +
+      '<button type="button" class="adm-btn geo-mini" data-editar-inst="' + i.id + '">Modificar institución</button></div>' +
+      '<div class="org-registro"><div class="org-reg-datos"><span>Grabado por <b>' + esc(i.creado_por || 'Sin usuario') + '</b> el <b>' + fechaHoraS(i.creado) + '</b></span>' +
+        (i.modificado ? '<span>Modificado por <b>' + esc(i.modificado_por || 'Sin usuario') + '</b> el <b>' + fechaHoraS(i.modificado) + '</b></span>' : '') + '<span>Sede <b>' + esc(sede(i)) + '</b></span></div></div>' +
+      '<div class="ik-titulo ji-suc-tit"><h4>Sucursales</h4><span>' + ls.length + ' sucursal' + (ls.length === 1 ? '' : 'es') + ' <button type="button" class="adm-btn adm-primary geo-mini" id="jiNuevaSuc">+ Sucursal</button></span></div>' +
+      '<div class="roles-wrap ia-wrap"><table class="geo-tabla ji-suc"><colgroup><col class="ji-c-cod"><col><col class="ji-c-ubi"><col class="ji-c-resp"><col class="ji-c-reg"><col class="ji-c-est"><col class="ji-c-acc"></colgroup>' +
+      '<thead><tr><th>Código</th><th>Sucursal</th><th>Ubicación</th><th>Responsable</th><th>Registro</th><th>Estado</th><th><span class="sr-only">Editar</span></th></tr></thead><tbody>' +
+      (ls.length ? ls.map(function (x) {
+        var d = porId(deptos, x.estado_id);
+        return '<tr data-suc="' + x.id + '"><td><b>' + codigoSuc(x) + '</b></td><td><b class="ia-corto" title="' + esc(x.nombre) + '">' + esc(x.nombre) + '</b><small class="inv-sub ia-corto">' + esc(x.direccion || '') + '</small></td>' +
+          '<td><span class="ia-corto">' + esc(muniTexto['s' + x.id] || '—') + '</span><small class="inv-sub">' + esc(d ? d.nombre : '') + '</small></td>' +
+          '<td><span class="ia-corto">' + esc(x.responsable || '—') + '</span><small class="inv-sub ia-corto">' + esc([x.cargo, x.telefono].filter(Boolean).join(' · ')) + '</small></td>' +
+          '<td><span class="ia-corto" title="' + esc(textoRegistro(x)) + '">' + esc(x.modificado_por || x.creado_por || '—') + '</span><small class="inv-sub">' + fechaHoraS(x.modificado || x.creado) + '</small></td>' +
+          '<td><span class="estado estado-' + x.estado + '">' + (ESTADOS_I.filter(function (e) { return e[0] === x.estado; })[0] || ['', x.estado])[1] + '</span></td>' +
+          '<td class="geo-acc"><button type="button" class="geo-editar" data-editar-suc="' + x.id + '" aria-label="Modificar sucursal" title="Modificar">✎</button></td></tr>';
+      }).join('') : '<tr><td colspan="7" class="geo-vacia">Sin sucursales. Agrega la primera con «+ Sucursal».</td></tr>') + '</tbody></table></div>';
+  }
+  function editarSuc(x, instId) {
+    var inst = porId(instituciones, x ? x.institucion_id : instId), v = x ? Object.assign({}, x) : { estado: 'activo', estado_id: inst && inst.estado_id };
+    G.dialogo({
+      eyebrow: 'Jornadas · Sucursal de ' + (inst ? inst.nombre : ''), titulo: x ? x.nombre : 'Nueva sucursal', valores: v,
+      campos: [{ k: 'codigo', label: 'Código', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: ESTADOS_I },
+        { k: 'nombre', label: 'Nombre de la sucursal', req: true, max: 200 }, { k: 'poblacion', label: 'Población estimada', tipo: 'number', paso: '1' },
+        { k: 'registro', label: 'Registro', tipo: 'info' },
+        { k: 'estado_id', label: 'Departamento', tipo: 'select', opciones: [['', 'Elige el departamento…']].concat(deptos.map(function (d) { return [d.id, d.nombre]; })) },
+        { k: 'municipio_id', label: 'Municipio', tipo: 'select', opciones: [['', '—']] }, { k: 'direccion', label: 'Dirección', tipo: 'textarea', max: 300 },
+        { k: 'responsable', label: 'Responsable', max: 150 }, { k: 'cargo', label: 'Cargo', max: 100 }, { k: 'telefono', label: 'Teléfono / WhatsApp', max: 60 }, { k: 'correo', label: 'Correo', max: 150 },
+        { k: 'observaciones', label: 'Observaciones', tipo: 'textarea', max: 500 }],
+      secciones: [
+        { titulo: 'Identificación', campos: ['codigo', 'estado', 'nombre*', 'poblacion*', 'registro*'] },
+        { titulo: 'Ubicación', campos: ['estado_id*', 'municipio_id*', 'direccion*'] },
+        { titulo: 'Contacto', campos: ['responsable*', 'cargo*', 'telefono', 'correo', 'observaciones*'] }
+      ],
+      alAbrir: async function () {
+        $('geoF_codigo').textContent = x ? codigoSuc(x) : 'Se asigna al grabar'; $('geoF_registro').textContent = textoRegistro(x);
+        async function munis(sel) {
+          var l = await municipiosDe(+$('geoF_estado_id').value || null);
+          $('geoF_municipio_id').innerHTML = '<option value="">' + (l.length ? 'Elige el municipio…' : '—') + '</option>' + l.map(function (m) { return '<option value="' + m.id + '">' + esc(m.nombre) + '</option>'; }).join('');
+          if (sel) $('geoF_municipio_id').value = String(sel);
+        }
+        $('geoF_estado_id').addEventListener('change', function () { munis(null); });
+        await munis(v.municipio_id);
+      },
+      guardar: async function (d) {
+        d.estado_id = d.estado_id ? +d.estado_id : null; d.municipio_id = d.municipio_id ? +d.municipio_id : null;
+        d.poblacion = d.poblacion == null ? null : Math.max(0, Math.round(d.poblacion));
+        if (d.correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.correo)) return 'Escribe un correo válido.';
+        var r = x ? await sb.from('jor_sucursales').update(d).eq('id', x.id).select('id').single() : await sb.from('jor_sucursales').insert(Object.assign({ institucion_id: inst.id }, d)).select('id').single();
+        if (r.error) return traducir(r.error);
+        await cargarInst(); return null;
+      },
+      eliminar: x ? async function () { var r = await sb.from('jor_sucursales').delete().eq('id', x.id); if (r.error) return traducir(r.error); await cargarInst(); return null; } : null
+    });
   }
   async function cargarInst() {
     aviso('jiMsg', '');
@@ -91,8 +158,10 @@
       if (window.PD_SEDES) await window.PD_SEDES.cargar();
       await cargarDeptos();
       instituciones = await todas(function () { return sb.from('jor_instituciones').select('*').order('numero'); });
-    } catch (e) { instituciones = []; pintarInst(); aviso('jiMsg', traducir(e), true); return; }
+      sucursales = await todas(function () { return sb.from('jor_sucursales').select('*').order('numero'); });
+    } catch (e) { instituciones = []; sucursales = []; pintarInst(); aviso('jiMsg', traducir(e), true); return; }
     for (var k = 0; k < instituciones.length; k++) muniTexto[instituciones[k].id] = await nombreMuni(instituciones[k]);
+    for (var k2 = 0; k2 < sucursales.length; k2++) muniTexto['s' + sucursales[k2].id] = await nombreMuni(sucursales[k2]);
     pintarInst();
   }
   function editarInst(i) {
@@ -100,7 +169,7 @@
     G.dialogo({
       eyebrow: 'Jornadas · Institución', titulo: i ? i.nombre : 'Nueva institución', valores: v,
       campos: [{ k: 'codigo', label: 'Código', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: ESTADOS_I },
-        { k: 'nombre', label: 'Nombre de la institución', req: true, max: 200 }, { k: 'tipo', label: 'Tipo', tipo: 'select', opciones: TIPOS },
+        { k: 'nombre', label: 'Nombre de la institución', req: true, max: 200 }, { k: 'tipo', label: 'Tipo', tipo: 'select', opciones: TIPOS }, { k: 'registro', label: 'Registro', tipo: 'info' },
         { k: 'nit', label: 'NIT', max: 20, placeholder: 'CF' }, { k: 'poblacion', label: 'Población estimada', tipo: 'number', paso: '1', ayuda: 'Alumnos, vecinos o empleados' },
         { k: 'estado_id', label: 'Departamento', tipo: 'select', opciones: [['', 'Elige el departamento…']].concat(deptos.map(function (d) { return [d.id, d.nombre]; })) },
         { k: 'municipio_id', label: 'Municipio', tipo: 'select', opciones: [['', '—']] },
@@ -110,13 +179,13 @@
         { k: 'convenio', label: '¿Tiene convenio?', tipo: 'check' }, { k: 'convenio_desde', label: 'Convenio desde', max: 10 }, { k: 'convenio_hasta', label: 'Convenio hasta', max: 10 },
         { k: 'observaciones', label: 'Observaciones', tipo: 'textarea', max: 500 }, { k: 'sede', tipo: 'sede' }],
       secciones: [
-        { titulo: 'Identificación', campos: ['codigo', 'estado', 'nombre*', 'tipo', 'nit', 'poblacion*'] },
+        { titulo: 'Identificación', campos: ['codigo', 'estado', 'nombre*', 'tipo', 'nit', 'poblacion*', 'registro*'] },
         { titulo: 'Ubicación', campos: ['estado_id*', 'municipio_id*', 'direccion*'] },
         { titulo: 'Contacto', campos: ['responsable*', 'cargo*', 'telefono', 'correo'] },
         { titulo: 'Convenio', campos: ['convenio*', 'convenio_desde', 'convenio_hasta', 'observaciones*'] }
       ],
       alAbrir: async function () {
-        $('geoF_codigo').textContent = i ? codigoInst(i) : 'Se asigna al grabar';
+        $('geoF_codigo').textContent = i ? codigoInst(i) : 'Se asigna al grabar'; $('geoF_registro').textContent = textoRegistro(i);
         ['convenio_desde', 'convenio_hasta'].forEach(function (k) { $('geoF_' + k).type = 'date'; });
         async function munis(sel) {
           var l = await municipiosDe(+$('geoF_estado_id').value || null);
@@ -152,6 +221,12 @@
   $('jiBuscar').addEventListener('input', pintarInst);
   $('jiTipo').addEventListener('change', function () { filtroTipo = this.value; pintarInst(); });
   $('jiEstado').addEventListener('change', function () { filtroEstadoI = this.value; pintarInst(); });
+  $('jiFicha').addEventListener('click', function (e) {
+    if (e.target.id === 'jiNuevaSuc') { editarSuc(null, instSel); return; }
+    var s2 = e.target.closest('[data-editar-suc]'); if (s2) { editarSuc(porId(sucursales, +s2.dataset.editarSuc)); return; }
+    var b2 = e.target.closest('[data-editar-inst]'); if (b2) editarInst(porId(instituciones, +b2.dataset.editarInst));
+  });
+  $('jiFicha').addEventListener('dblclick', function (e) { var tr = e.target.closest('tr[data-suc]'); if (tr) editarSuc(porId(sucursales, +tr.dataset.suc)); });
   $('jiLista').addEventListener('click', function (e) {
     var b = e.target.closest('[data-editar-inst]'); if (b) { editarInst(porId(instituciones, +b.dataset.editarInst)); return; }
     var tr = e.target.closest('tr[data-inst]'); if (tr) { instSel = +tr.dataset.inst; pintarInst(); }
@@ -176,6 +251,7 @@
       '<div class="ic-totales"><div class="ic-total"><span>Pacientes</span><output id="jjTotPac">0</output></div><div class="ic-total ic-total-q"><span>Total institucional Q</span><output id="jjTotQ">0.00</output></div></div></div>' +
     '<section class="ic-tarjeta jj-tarjeta"><h4><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13M7 21v-8h10v8"/></svg>Datos de la jornada</h4><div class="jj-g">' +
       campo('Institución', '<select id="jjInst"></select>', 'jj-inst') + campo('Fecha', '<input id="jjFecha" type="date">') +
+      campo('Sucursal', '<select id="jjSuc"><option value="">Sede principal</option></select>', 'jj-suc') +
       campo('Estado', '<select id="jjEstado"><option value="planificada">Planificada</option><option value="realizada">Realizada</option><option value="cancelada">Cancelada</option></select>') +
       campo('Lugar', '<input id="jjLugar" maxlength="200" placeholder="Salón, aula, centro comunal…">', 'jj-lugar') +
       campo('Odontólogo responsable', '<select id="jjDentista"></select>') + campo('Tipo de precio', '<input value="Institucional" disabled>') +
@@ -244,6 +320,11 @@
     $('jjSumQ').textContent = q(total); $('jjTotQ').textContent = num(total); $('jjTotPac').textContent = pacientes.length;
     $('jjPacLista').innerHTML = pacientes.map(function (p) { return '<option value="' + esc(p.nombre) + '">'; }).join('');
   }
+  function opcionesSuc(sel) {
+    var inst = +$('jjInst').value || null, l = inst ? sucursalesDe(inst).filter(function (x) { return x.estado === 'activo' || x.id === sel; }) : [];
+    $('jjSuc').innerHTML = '<option value="">' + (l.length ? 'Sede principal' : 'Sin sucursales') + '</option>' + l.map(function (x) { return '<option value="' + x.id + '">' + esc(codigoSuc(x) + ' · ' + x.nombre) + '</option>'; }).join('');
+    $('jjSuc').value = sel ? String(sel) : '';
+  }
   function pintarEncabezado() {
     var j = form || {}, ed = editable(), e = ESTADOS_J[j.estado] || ['Nueva', 'inactivo'];
     $('jjNumero').textContent = j.numero ? 'N.º ' + j.numero : 'nueva';
@@ -251,11 +332,12 @@
     $('jjUsuario').textContent = (j.creado_por || usuarioSes() || '—') + (j.creado ? ' · ' + fechaHora(j.creado) : ' · sin grabar');
     $('jjInst').innerHTML = '<option value="">Elige la institución…</option>' + instituciones.filter(function (i) { return i.estado === 'activo' || i.id === j.institucion_id; }).map(function (i) { return '<option value="' + i.id + '">' + esc(codigoInst(i) + ' · ' + i.nombre) + '</option>'; }).join('');
     $('jjInst').value = j.institucion_id ? String(j.institucion_id) : '';
+    opcionesSuc(j.sucursal_id);
     $('jjDentista').innerHTML = '<option value="">Sin asignar</option>' + dentistas.filter(function (d) { return d.estado === 'activo' || d.id === j.dentista_id; }).map(function (d) { return '<option value="' + d.id + '">' + esc(d.nombre) + '</option>'; }).join('');
     $('jjDentista').value = j.dentista_id ? String(j.dentista_id) : '';
     $('jjFecha').value = j.fecha || hoy(); $('jjLugar').value = j.lugar || ''; $('jjObs').value = j.observaciones || '';
     $('jjEstado').value = j.estado && j.estado !== 'cerrada' ? j.estado : 'planificada';
-    ['jjInst', 'jjFecha', 'jjEstado', 'jjLugar', 'jjDentista', 'jjObs'].forEach(function (id) { $(id).disabled = !ed; });
+    ['jjInst', 'jjSuc', 'jjFecha', 'jjEstado', 'jjLugar', 'jjDentista', 'jjObs'].forEach(function (id) { $(id).disabled = !ed; });
     estadoBotones();
   }
   function estadoBotones() {
@@ -288,7 +370,7 @@
     $('jjLista').innerHTML = vis.length ? vis.map(function (j) {
       var ps = jPacientes.filter(function (p) { return p.jornada_id === j.id; }), np = jProcs.filter(function (x) { return ps.some(function (p) { return p.id === x.paciente_id; }); }).length, e = ESTADOS_J[j.estado] || [j.estado, 'inactivo'];
       return '<tr data-jornada="' + j.id + '" tabindex="0" class="' + (form && form.id === j.id ? 'geo-sel' : '') + '"><td><b>' + j.numero + '</b></td><td>' + fecha(j.fecha) + '</td>' +
-        '<td><b class="ia-corto">' + esc(nombreInst(j.institucion_id)) + '</b><small class="inv-sub ia-corto">' + esc(j.lugar || '') + '</small></td><td>' + ps.length + ' pacientes<small class="inv-sub">' + np + ' procedimientos</small></td>' +
+        '<td><b class="ia-corto">' + esc(nombreInst(j.institucion_id)) + '</b><small class="inv-sub ia-corto">' + esc([(porId(sucursales, j.sucursal_id) || {}).nombre, j.lugar].filter(Boolean).join(' · ')) + '</small></td><td>' + ps.length + ' pacientes<small class="inv-sub">' + np + ' procedimientos</small></td>' +
         '<td class="num"><b>' + q(j.total) + '</b></td><td><span class="estado estado-' + e[1] + '">' + e[0] + '</span></td></tr>';
     }).join('') : '<tr><td colspan="6" class="geo-vacia">' + (jornadas.length ? 'Ninguna jornada coincide.' : 'Aún no hay jornadas.') + '</td></tr>';
     $('jjPaginas').hidden = !l.length; $('jjPaginas').innerHTML = paginador(l.length, pag, paginas, ini, vis.length, 'jornadas · toca una para verla');
@@ -299,6 +381,7 @@
       if (window.PD_SEDES) await window.PD_SEDES.cargar();
       var r = await Promise.all([
         todas(function () { return sb.from('jor_instituciones').select('*').order('numero'); }),
+        todas(function () { return sb.from('jor_sucursales').select('*').order('numero'); }),
         todas(function () { return sb.from('dentistas').select('id,nombre,estado').order('nombre'); }),
         todas(function () { return sb.from('tratamientos').select('id,nombre,activo').order('nombre'); }),
         todas(function () { return sb.from('precios').select('tratamiento_id,tipo,valor,estado,localidad_id').eq('tipo', 'institucional'); }),
@@ -306,9 +389,9 @@
         todas(function () { return sb.from('jor_pacientes').select('*'); }),
         todas(function () { return sb.from('jor_procedimientos').select('*'); })
       ]);
-      instituciones = r[0]; dentistas = r[1]; tratamientos = r[2].filter(function (t) { return t.activo !== false; }); jornadas = r[4]; jPacientes = r[5]; jProcs = r[6];
+      instituciones = r[0]; sucursales = r[1]; dentistas = r[2]; tratamientos = r[3].filter(function (t) { return t.activo !== false; }); jornadas = r[5]; jPacientes = r[6]; jProcs = r[7];
       var mi = window.PD_SEDES && window.PD_SEDES.miLocalidad(); precioInst = {};
-      r[3].filter(function (p) { return p.estado !== 'baja' && p.estado !== 'suspendido'; }).sort(function (a, b) { return (a.localidad_id === mi ? 1 : 0) - (b.localidad_id === mi ? 1 : 0); }).forEach(function (p) { precioInst[p.tratamiento_id] = Number(p.valor); });
+      r[4].filter(function (p) { return p.estado !== 'baja' && p.estado !== 'suspendido'; }).sort(function (a, b) { return (a.localidad_id === mi ? 1 : 0) - (b.localidad_id === mi ? 1 : 0); }).forEach(function (p) { precioInst[p.tratamiento_id] = Number(p.valor); });
     } catch (e) { jornadas = []; pintarLista(); abrir(null); aviso('jjMsg', traducir(e), true); return; }
     $('jjFInst').innerHTML = '<option value="">Todas las instituciones</option>' + instituciones.map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
     pintarLista(); abrir(mantener ? porId(jornadas, mantener) : null);
@@ -317,7 +400,7 @@
     if (!+$('jjInst').value) { aviso('jjMsg', 'Elige la institución.', true); return null; }
     aviso('jjMsg', 'Grabando…');
     var r = await sb.rpc('guardar_jornada', { p_id: form ? form.id : null,
-      p_datos: { institucion_id: +$('jjInst').value, fecha: $('jjFecha').value, estado: $('jjEstado').value, lugar: $('jjLugar').value, dentista_id: $('jjDentista').value || null, observaciones: $('jjObs').value },
+      p_datos: { institucion_id: +$('jjInst').value, sucursal_id: +$('jjSuc').value || null, fecha: $('jjFecha').value, estado: $('jjEstado').value, lugar: $('jjLugar').value, dentista_id: $('jjDentista').value || null, observaciones: $('jjObs').value },
       p_pacientes: pacientes });
     if (r.error) { aviso('jjMsg', traducir(r.error), true); return null; }
     await cargarJor(r.data); return r.data;
@@ -334,7 +417,7 @@
     });
     function d(k, v) { return '<div><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.08em">' + k + '</span><b>' + esc(v || '—') + '</b></div>'; }
     return P.encabezado('Jornada dental N.º ' + j.numero + ' · ' + (ESTADOS_J[j.estado] || [j.estado])[0]) +
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;font-size:12px">' + d('Institución', inst.nombre) + d('Fecha', fecha(j.fecha)) + d('Lugar', j.lugar) + d('Odontólogo responsable', den && den.nombre) +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;font-size:12px">' + d('Institución', inst.nombre + ((porId(sucursales, j.sucursal_id) || {}).nombre ? ' · ' + porId(sucursales, j.sucursal_id).nombre : '')) + d('Fecha', fecha(j.fecha)) + d('Lugar', j.lugar) + d('Odontólogo responsable', den && den.nombre) +
       d('Responsable de la institución', [inst.responsable, inst.cargo].filter(Boolean).join(' · ')) + d('Teléfono', inst.telefono) + d('Tipo de precio', 'Institucional') + d('Sede', sede(j)) + '</div>' +
       '<table style="width:100%;border-collapse:collapse"><thead><tr>' + ['#', 'Paciente', 'Procedimiento', 'Pieza', 'Cant.', 'Precio inst.', 'Subtotal Q'].map(function (h, i) { return '<th style="' + th + (i > 3 ? ';text-align:right' : '') + '">' + h + '</th>'; }).join('') + '</tr></thead><tbody>' + filas + '</tbody></table>' +
       '<p style="text-align:right;font-size:14px;margin-top:10px"><b>Total institucional Q ' + num(j.total) + '</b> · ' + ps.length + ' pacientes · ' + np + ' procedimientos</p>' +
@@ -351,7 +434,8 @@
   $('jjNueva').addEventListener('click', async function () { if (!instituciones.length) await cargarJor(); abrir(null); pintarLista(); $('jjForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('jjInst').focus({ preventScroll: true }); });
   $('jjModificar').addEventListener('click', function () { if (!form || form.estado === 'cerrada') return; modoEdicion = true; limpiarPac(); limpiarProc(); pintarEncabezado(); pintarLineas(); $('jjCapPac').focus(); });
   $('jjCancelar').addEventListener('click', function () { abrir(form); aviso('jjMsg', 'Cambios descartados.'); });
-  $('jjInst').addEventListener('change', function () { var i = porId(instituciones, +this.value); if (i && !$('jjLugar').value) $('jjLugar').value = i.direccion || ''; });
+  $('jjInst').addEventListener('change', function () { opcionesSuc(null); var i = porId(instituciones, +this.value); if (i && !$('jjLugar').value) $('jjLugar').value = i.direccion || ''; });
+  $('jjSuc').addEventListener('change', function () { var x = porId(sucursales, +this.value); if (x) $('jjLugar').value = [x.nombre, x.direccion].filter(Boolean).join(' · '); });
   $('jjCapProc').addEventListener('change', function () { var p = precioInst[+this.value]; $('jjCapPrecio').value = p != null ? p : ''; capMsg(this.value && this.value !== 'otro' && p == null ? 'Este procedimiento no tiene precio institucional: escríbelo (o defínelo en Precios y paquetes).' : ''); });
   $('jjCapPac').addEventListener('input', function () { var p = buscarPac(this.value); if (p) { $('jjCapEdad').value = p.edad != null ? p.edad : ''; $('jjCapSexo').value = p.sexo || ''; $('jjCapRef').value = p.referencia || ''; capMsg(p.nombre + ' ya está en la jornada: el procedimiento se le agregará.'); } });
   $('jjNuevoPac').addEventListener('click', function () { limpiarPac(); limpiarProc(); capMsg(''); $('jjCapPac').focus(); });
@@ -397,6 +481,6 @@
   Object.keys(PANELES).forEach(function (id) { var tab = document.querySelector('[data-tab="' + id + '"]'); if (tab) tab.addEventListener('click', function () { setTimeout(function () { PANELES[id](); }, 0); }); });
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { Object.keys(PANELES).forEach(function (id) { if (!$(id).hidden) PANELES[id](); }); },
-    limpiar: function () { instituciones = []; jornadas = []; jPacientes = []; jProcs = []; form = null; pacientes = []; ['jiLista', 'jjLista', 'jjLineas', 'jjRegistro'].forEach(function (i) { $(i).innerHTML = ''; }); }
+    limpiar: function () { instituciones = []; sucursales = []; jornadas = []; jPacientes = []; jProcs = []; form = null; pacientes = []; ['jiLista', 'jjLista', 'jjLineas', 'jjRegistro'].forEach(function (i) { $(i).innerHTML = ''; }); }
   });
 })();

@@ -6148,6 +6148,119 @@ $$;
 revoke execute on function public.reabrir_jornada(bigint) from public, anon;
 grant execute on function public.reabrir_jornada(bigint) to authenticated;
 
+-- ===== Jornadas: sucursales de cada institución =====
+-- Una institución puede tener varias sucursales (sedes, escuelas anexas, agencias…), cada una con su ubicación y contacto.
+-- Como la institución, cada sucursal registra quién la grabó y quién la modificó, con fecha y hora.
+create table if not exists public.jor_sucursales (
+  id              bigint generated always as identity primary key,
+  numero          bigint,
+  institucion_id  bigint not null references public.jor_instituciones (id) on delete cascade,
+  nombre          text not null check (char_length(nombre) between 1 and 200),
+  estado_id       bigint references public.geo_estados (id) on delete set null,
+  municipio_id    bigint references public.geo_municipios (id) on delete set null,
+  direccion       text check (char_length(direccion) <= 300),
+  responsable     text check (char_length(responsable) <= 150),
+  cargo           text check (char_length(cargo) <= 100),
+  telefono        text check (char_length(telefono) <= 60),
+  correo          text check (char_length(correo) <= 150),
+  poblacion       int check (poblacion >= 0),
+  observaciones   text check (char_length(observaciones) <= 500),
+  estado          text not null default 'activo' check (estado in ('activo', 'inactivo', 'baja')),
+  creado          timestamptz not null default now(),
+  creado_por      text,
+  modificado      timestamptz,
+  modificado_por  text
+);
+create index if not exists jor_sucursales_institucion on public.jor_sucursales (institucion_id);
+-- La jornada puede indicar en qué sucursal de la institución se realizó
+alter table public.jor_jornadas add column if not exists sucursal_id bigint references public.jor_sucursales (id) on delete set null;
+
+-- Numeración y registro de quién graba (las sucursales se numeran como las instituciones)
+create or replace function public.inv_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+begin
+  if tg_op = 'INSERT' then
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto', 'inv_compras', 'inv_traslados', 'inv_ordenes_compra', 'jor_instituciones', 'jor_jornadas', 'jor_sucursales') then
+      perform pg_advisory_xact_lock(hashtext(tg_table_name || '_numero'));
+      execute format('select coalesce(max(numero), 0) + 1 from public.%I', tg_table_name) into new.numero;
+    end if;
+    new.creado := now(); new.creado_por := v_usuario; new.modificado := null; new.modificado_por := null;
+  else
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto', 'inv_compras', 'inv_traslados', 'inv_ordenes_compra', 'jor_instituciones', 'jor_jornadas', 'jor_sucursales') then new.numero := old.numero; end if;
+    new.creado := old.creado; new.creado_por := old.creado_por;
+    new.modificado := now(); new.modificado_por := v_usuario;
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'jor_sucursales_registro' and tgrelid = 'public.jor_sucursales'::regclass) then
+    create trigger jor_sucursales_registro before insert or update on public.jor_sucursales for each row execute function public.inv_registro();
+  end if;
+end $$;
+-- Permisos: los de su institución (personal de la sede); solo el Super Administrador borra
+alter table public.jor_sucursales enable row level security;
+drop policy if exists jor_sucursales_lee on public.jor_sucursales;
+create policy jor_sucursales_lee on public.jor_sucursales for select to authenticated
+  using (public.es_personal() and exists (select 1 from public.jor_instituciones i where i.id = institucion_id and public.ve_sede(i.localidad_id)));
+drop policy if exists jor_sucursales_crea on public.jor_sucursales;
+create policy jor_sucursales_crea on public.jor_sucursales for insert to authenticated
+  with check (public.es_personal() and exists (select 1 from public.jor_instituciones i where i.id = institucion_id and public.ve_sede(i.localidad_id)));
+drop policy if exists jor_sucursales_edita on public.jor_sucursales;
+create policy jor_sucursales_edita on public.jor_sucursales for update to authenticated
+  using (public.es_personal() and exists (select 1 from public.jor_instituciones i where i.id = institucion_id and public.ve_sede(i.localidad_id)))
+  with check (public.es_personal() and exists (select 1 from public.jor_instituciones i where i.id = institucion_id and public.ve_sede(i.localidad_id)));
+drop policy if exists jor_sucursales_borra on public.jor_sucursales;
+create policy jor_sucursales_borra on public.jor_sucursales for delete to authenticated using (public.es_super_administrador());
+grant select, insert, update, delete on public.jor_sucursales to authenticated;
+
+-- Grabar jornada: también guarda la sucursal (debe ser de la institución elegida)
+create or replace function public.guardar_jornada(p_id bigint, p_datos jsonb, p_pacientes jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint := p_id; v_inst public.jor_instituciones; v_estado text := coalesce(nullif(p_datos ->> 'estado', ''), 'planificada');
+  v_suc bigint := nullif(p_datos ->> 'sucursal_id', '')::bigint;
+  pa jsonb; pr jsonb; v_pac bigint; n int := 0; m int; v_total numeric := 0;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if v_estado not in ('planificada', 'realizada', 'cancelada') then raise exception 'Estado no válido (para cerrar usa «Cerrar jornada»)'; end if;
+  select * into v_inst from public.jor_instituciones where id = nullif(p_datos ->> 'institucion_id', '')::bigint;
+  if v_inst.id is null or not public.ve_sede(v_inst.localidad_id) then raise exception 'Elige una institución de tu sede'; end if;
+  if v_suc is not null and not exists (select 1 from public.jor_sucursales where id = v_suc and institucion_id = v_inst.id) then raise exception 'La sucursal no pertenece a la institución elegida'; end if;
+  if v_id is not null and not exists (select 1 from public.jor_jornadas where id = v_id and estado <> 'cerrada' and public.ve_sede(localidad_id)) then
+    raise exception 'La jornada está cerrada: reábrela para modificarla';
+  end if;
+  if v_id is null then
+    insert into public.jor_jornadas (institucion_id, localidad_id, organizacion_id) values (v_inst.id, v_inst.localidad_id, v_inst.organizacion_id) returning id into v_id;
+  end if;
+  update public.jor_jornadas set institucion_id = v_inst.id, sucursal_id = v_suc, fecha = coalesce(nullif(p_datos ->> 'fecha', '')::date, current_date),
+    lugar = nullif(trim(p_datos ->> 'lugar'), ''), dentista_id = nullif(p_datos ->> 'dentista_id', '')::bigint, estado = v_estado,
+    observaciones = nullif(trim(p_datos ->> 'observaciones'), '')
+   where id = v_id;
+  delete from public.jor_pacientes where jornada_id = v_id;
+  for pa in select * from jsonb_array_elements(coalesce(p_pacientes, '[]'::jsonb)) loop
+    if coalesce(trim(pa ->> 'nombre'), '') = '' then raise exception 'Cada paciente necesita su nombre'; end if;
+    n := n + 1;
+    insert into public.jor_pacientes (jornada_id, orden, nombre, edad, sexo, referencia)
+    values (v_id, n, trim(pa ->> 'nombre'), nullif(pa ->> 'edad', '')::int, nullif(pa ->> 'sexo', ''), nullif(trim(pa ->> 'referencia'), '')) returning id into v_pac;
+    m := 0;
+    for pr in select * from jsonb_array_elements(coalesce(pa -> 'procedimientos', '[]'::jsonb)) loop
+      if coalesce(trim(pr ->> 'descripcion'), '') = '' then raise exception 'Cada procedimiento necesita su descripción'; end if;
+      m := m + 1;
+      insert into public.jor_procedimientos (paciente_id, orden, tratamiento_id, descripcion, pieza, cantidad, precio)
+      values (v_pac, m, nullif(pr ->> 'tratamiento_id', '')::bigint, trim(pr ->> 'descripcion'), nullif(trim(pr ->> 'pieza'), ''),
+              greatest(coalesce(nullif(pr ->> 'cantidad', '')::int, 1), 1), greatest(coalesce(nullif(pr ->> 'precio', '')::numeric, 0), 0));
+      v_total := v_total + greatest(coalesce(nullif(pr ->> 'cantidad', '')::int, 1), 1) * greatest(coalesce(nullif(pr ->> 'precio', '')::numeric, 0), 0);
+    end loop;
+  end loop;
+  update public.jor_jornadas set total = round(v_total, 2) where id = v_id;
+  return v_id;
+end;
+$$;
+revoke execute on function public.guardar_jornada(bigint, jsonb, jsonb) from public, anon;
+grant execute on function public.guardar_jornada(bigint, jsonb, jsonb) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
