@@ -58,7 +58,19 @@
     dlgCfg = cfg;
     $('geoDlgEyebrow').textContent = cfg.eyebrow || '';
     $('geoDlgTitulo').textContent = cfg.titulo;
-    $('geoDlgCampos').innerHTML = cfg.campos.map(function (c) { return campoHtml(c, (cfg.valores || {})[c.k]); }).join('');
+    var val = cfg.valores || {};
+    if (cfg.secciones) {
+      // Campos agrupados en secciones con título, lado a lado (los que no estén en ninguna van al final)
+      var usados = {};
+      var html = cfg.secciones.map(function (s) {
+        return '<fieldset class="geo-sec"><legend>' + esc(s.titulo) + '</legend><div class="geo-sec-g">' + s.campos.map(function (k) {
+          var c = cfg.campos.filter(function (x) { return x.k === k; })[0]; if (!c) return ''; usados[k] = true; return campoHtml(c, val[c.k]); }).join('') + '</div></fieldset>';
+      }).join('');
+      var resto = cfg.campos.filter(function (c) { return !usados[c.k]; });
+      $('geoDlgCampos').innerHTML = '<div class="geo-secs">' + html + '</div>' + resto.map(function (c) { return campoHtml(c, val[c.k]); }).join('');
+    } else $('geoDlgCampos').innerHTML = cfg.campos.map(function (c) { return campoHtml(c, val[c.k]); }).join('');
+    dlg.classList.toggle('geo-dlg-xl', !!cfg.secciones);
+    $('geoDlgCampos').classList.toggle('con-secciones', !!cfg.secciones);
     $('geoDlgEliminar').hidden = !cfg.eliminar;
     $('geoDlgEliminar').textContent = 'Eliminar'; $('geoDlgEliminar').dataset.confirmar = '0';
     aviso('geoDlgMsg', '');

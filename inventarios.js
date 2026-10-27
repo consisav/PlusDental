@@ -103,15 +103,20 @@
     G.dialogo({
       eyebrow: 'Inventarios · ' + (esSub ? 'Sub-empresa de ' + (padre || proveedores.filter(function (x) { return x.id === p.padre_id; })[0] || {}).nombre_comercial : 'Proveedor'),
       titulo: p ? p.nombre_comercial : (esSub ? 'Nueva sub-empresa' : 'Nuevo proveedor'), valores: v,
-      campos: [{ k: 'numero', label: 'N.º de proveedor (automático)', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
-        { k: 'nit', label: 'NIT', max: 20, placeholder: '1234567-8' }, { k: 'dias_credito', label: 'Días de crédito (0 = inmediato)', tipo: 'number', paso: 1, maxNum: 365 },
+      campos: [{ k: 'numero', label: 'N.º proveedor', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
+        { k: 'nit', label: 'NIT', max: 20, placeholder: '1234567-8' }, { k: 'dias_credito', label: 'Días de crédito', tipo: 'number', paso: 1, maxNum: 365, ayuda: '0 = pago inmediato' },
         { k: 'nombre_comercial', label: 'Nombre comercial', req: true, max: 150, ancho: 'full' },
         { k: 'nombre_fiscal', label: 'Nombre fiscal (SAT)', max: 200, ancho: 'full' }, { k: 'nombre_documentos', label: 'Nombre para emisión de documentos', max: 200, ancho: 'full' },
         { k: 'direccion', label: 'Dirección', tipo: 'textarea', max: 300, ancho: 'full' },
         { k: 'telefonos', label: 'Teléfonos', max: 120 }, { k: 'extension', label: 'Ext.', max: 20 }, { k: 'fax', label: 'Fax', max: 40 }, { k: 'correo', label: 'Correo', max: 150 },
-        { k: 'contacto', label: 'Persona de contacto', max: 120 }, { k: 'banco', label: 'Banco', max: 80 }, { k: 'cuenta_bancaria', label: 'Cuenta bancaria', max: 40 },
+        { k: 'contacto', label: 'Persona de contacto', max: 120, ancho: 'full' }, { k: 'banco', label: 'Banco', max: 80 }, { k: 'cuenta_bancaria', label: 'Cuenta bancaria', max: 40 },
         { k: 'sede', tipo: 'sede' },
         { k: 'efectuar_retencion', label: 'Efectuar retención', tipo: 'check' }, { k: 'pendiente_revisar', label: 'Pendiente de revisar', tipo: 'check' }],
+      secciones: [
+        { titulo: 'Identificación', campos: ['numero', 'estado', 'nombre_comercial', 'nombre_fiscal', 'nombre_documentos', 'nit', 'dias_credito'] },
+        { titulo: 'Contacto', campos: ['contacto', 'telefonos', 'extension', 'correo', 'fax', 'direccion'] },
+        { titulo: 'Pagos y control', campos: ['banco', 'cuenta_bancaria', 'efectuar_retencion', 'pendiente_revisar', 'sede'] }
+      ],
       alAbrir: function () { if (!p) $('geoF_numero').textContent = 'Se asigna al grabar'; },
       guardar: async function (d) {
         if (!p && padre) d.padre_id = padre.id;
