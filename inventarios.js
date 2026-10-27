@@ -54,6 +54,10 @@
     return '<div class="inv-filtros" data-filtro="' + clave + '">' + opciones.map(function (o) { return '<button type="button" class="adm-btn geo-mini" data-valor="' + o[0] + '" aria-pressed="' + (filtros[clave] === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>';
   }
   var F_ESTADO = [['activo', 'Activos'], ['inactivo', 'Inactivos'], ['baja', 'Baja'], ['todos', 'Todos']];
+  // Bancos del sistema bancario de Guatemala (lista sugerida: se puede escribir otro)
+  var BANCOS_GT = ['Banco Industrial', 'Banrural (Banco de Desarrollo Rural)', 'BAC Credomatic (Banco de América Central)', 'Banco G&T Continental', 'BAM (Banco Agromercantil)',
+    'Bantrab (Banco de los Trabajadores)', 'Banco Promerica', 'Banco Ficohsa Guatemala', 'Interbanco (Banco Internacional)', 'Crédito Hipotecario Nacional (CHN)',
+    'Banco de Antigua', 'Banco Inmobiliario', 'Banco Azteca de Guatemala', 'Vivibanco', 'Banco Nexa', 'Banco INV', 'Citibank, N.A. Sucursal Guatemala'];
   function pasaFiltro(clave, x) { return filtros[clave] === 'todos' || (x.estado || 'activo') === filtros[clave]; }
   async function todas(armar) {
     var l = [], desde = 0;
@@ -110,7 +114,7 @@
         { k: 'nombre_fiscal', label: 'Nombre fiscal (SAT)', max: 200, ancho: 'full' }, { k: 'nombre_documentos', label: 'Nombre para emisión de documentos', max: 200, ancho: 'full' },
         { k: 'direccion', label: 'Dirección', tipo: 'textarea', max: 300, ancho: 'full' },
         { k: 'telefonos', label: 'Teléfonos', max: 120 }, { k: 'extension', label: 'Ext.', max: 20 }, { k: 'fax', label: 'Fax', max: 40 }, { k: 'correo', label: 'Correo', max: 150 },
-        { k: 'contacto', label: 'Persona de contacto', max: 120, ancho: 'full' }, { k: 'banco', label: 'Banco', max: 80 }, { k: 'cuenta_bancaria', label: 'Cuenta bancaria', max: 40 },
+        { k: 'contacto', label: 'Persona de contacto', max: 120, ancho: 'full' }, { k: 'banco', label: 'Banco', max: 80, lista: BANCOS_GT, placeholder: 'Elige o escribe el banco' }, { k: 'cuenta_bancaria', label: 'Cuenta bancaria', max: 40 },
         { k: 'sede', tipo: 'sede' },
         { k: 'efectuar_retencion', label: 'Efectuar retención', tipo: 'check' }, { k: 'pendiente_revisar', label: 'Pendiente de revisar', tipo: 'check' }],
       secciones: [
