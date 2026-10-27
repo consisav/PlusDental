@@ -162,6 +162,7 @@
     } catch (e) { instituciones = []; sucursales = []; pintarInst(); aviso('jiMsg', traducir(e), true); return; }
     for (var k = 0; k < instituciones.length; k++) muniTexto[instituciones[k].id] = await nombreMuni(instituciones[k]);
     for (var k2 = 0; k2 < sucursales.length; k2++) muniTexto['s' + sucursales[k2].id] = await nombreMuni(sucursales[k2]);
+    if (!porId(instituciones, instSel)) instSel = instituciones.length ? instituciones[0].id : null;
     pintarInst();
   }
   function editarInst(i) {
@@ -177,15 +178,25 @@
         { k: 'responsable', label: 'Responsable', max: 150 }, { k: 'cargo', label: 'Cargo', max: 100, placeholder: 'Director(a), alcalde…' },
         { k: 'telefono', label: 'Teléfono / WhatsApp', max: 60 }, { k: 'correo', label: 'Correo', max: 150 },
         { k: 'convenio', label: '¿Tiene convenio?', tipo: 'check' }, { k: 'convenio_desde', label: 'Convenio desde', max: 10 }, { k: 'convenio_hasta', label: 'Convenio hasta', max: 10 },
-        { k: 'observaciones', label: 'Observaciones', tipo: 'textarea', max: 500 }, { k: 'sede', tipo: 'sede' }],
+        { k: 'observaciones', label: 'Observaciones', tipo: 'textarea', max: 500 }, { k: 'sucursales', label: 'Sucursales', tipo: 'info' }, { k: 'sede', tipo: 'sede' }],
       secciones: [
         { titulo: 'Identificación', campos: ['codigo', 'estado', 'nombre*', 'tipo', 'nit', 'poblacion*', 'registro*'] },
         { titulo: 'Ubicación', campos: ['estado_id*', 'municipio_id*', 'direccion*'] },
         { titulo: 'Contacto', campos: ['responsable*', 'cargo*', 'telefono', 'correo'] },
-        { titulo: 'Convenio', campos: ['convenio*', 'convenio_desde', 'convenio_hasta', 'observaciones*'] }
+        { titulo: 'Convenio y sucursales', campos: ['convenio*', 'convenio_desde', 'convenio_hasta', 'observaciones*', 'sucursales*'] }
       ],
       alAbrir: async function () {
         $('geoF_codigo').textContent = i ? codigoInst(i) : 'Se asigna al grabar'; $('geoF_registro').textContent = textoRegistro(i);
+        var ls = i ? sucursalesDe(i.id) : [];
+        $('geoF_sucursales').innerHTML = i ? (ls.length ? '<span class="ji-dlg-sucs">' + ls.map(function (x) { return '<button type="button" class="ji-dlg-suc" data-dlg-suc="' + x.id + '" title="Modificar sucursal">' + esc(codigoSuc(x) + ' · ' + x.nombre) + '</button>'; }).join('') + '</span>' : '<span class="inv-sub">Sin sucursales.</span>') +
+          '<button type="button" class="adm-btn geo-mini ji-dlg-mas" data-dlg-nueva-suc>+ Agregar sucursal</button>' : '<span class="inv-sub">Graba la institución para agregarle sucursales.</span>';
+        // La ventana es una sola: se cierra la de la institución y se abre la de la sucursal
+        $('geoF_sucursales').onclick = function (ev) {
+          var n = ev.target.closest('[data-dlg-nueva-suc]'), m = ev.target.closest('[data-dlg-suc]');
+          if (!n && !m) return;
+          document.getElementById('geoDlg').close(); instSel = i.id; pintarInst();
+          setTimeout(function () { if (n) editarSuc(null, i.id); else editarSuc(porId(sucursales, +m.dataset.dlgSuc)); }, 0);
+        };
         ['convenio_desde', 'convenio_hasta'].forEach(function (k) { $('geoF_' + k).type = 'date'; });
         async function munis(sel) {
           var l = await municipiosDe(+$('geoF_estado_id').value || null);
