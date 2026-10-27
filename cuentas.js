@@ -7,7 +7,7 @@
   var METODOS = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', deposito: 'Depósito' };
   var CLINICA = { nombre: 'Plus Dental', direccion: 'Reforma Montúfar, zona 10, Ciudad de Guatemala', telefono: '+502 3756-5739' };
 
-  var saldos = [], saldoDe = {}, pagos = [], ecFiltro = 'saldo', cpPeriodo = 'mes', ecActual = null, movimientos = [];
+  var saldos = [], saldoDe = {}, pagos = [], ecFiltro = 'saldo', ecActual = null, movimientos = [], cpPag = 1, CP_PAG = 10;
   // Documento y detalle del pago
   var TIPOS_DOC = { factura: 'Factura', recibo: 'Recibo' };
   var ESTADOS_DOC = { emitido: 'Emitido', aplicado: 'Aplicado', certificado: 'Certificado', anulado: 'Anulado' };
@@ -247,17 +247,30 @@
   }
 
   // ---------- Cobros ----------
+  // Parámetros de la lista: fecha inicial y final, paciente (o todos) y N.º de recibo (este busca en todas las fechas)
+  function reciboBuscado() { return $('cpRecibo').value.trim().replace(/^n\.?\s*º?\s*/i, '').replace(/[^\w-]/g, ''); }
   async function cargarPagos() {
     aviso('cpMsg', '');
+    if (!$('cpDesde').value) $('cpDesde').value = inicioMes(0);
+    if (!$('cpHasta').value) $('cpHasta').value = hoy();
+    var d = $('cpDesde').value, h = $('cpHasta').value, pac = $('cpPaciente').value, rec = reciboBuscado();
+    if (!rec && d > h) { aviso('cpMsg', 'La fecha inicial no puede ser posterior a la final.', true); return; }
     $('cpBody').innerHTML = '<tr><td colspan="9">Cargando…</td></tr>';
     var consulta = sb.from('pagos').select('*,pacientes(nombre,telefono)').order('id', { ascending: false });
-    if (cpPeriodo === 'mes') consulta = consulta.gte('fecha', inicioMes(0));
-    if (cpPeriodo === 'anterior') consulta = consulta.gte('fecha', inicioMes(-1)).lt('fecha', inicioMes(0));
-    if (cpPeriodo === 'todo') consulta = consulta.limit(500);
-    var r = await consulta;
+    if (rec) consulta = /^\d+$/.test(rec) ? consulta.or('id.eq.' + parseInt(rec, 10) + ',correlativo.ilike.*' + rec + '*') : consulta.ilike('correlativo', '*' + rec + '*');
+    else consulta = consulta.gte('fecha', d).lte('fecha', h);
+    if (pac) consulta = consulta.eq('paciente_id', +pac);
+    var r = await consulta.limit(1000);
     if (r.error) { $('cpBody').innerHTML = ''; aviso('cpMsg', traducir(r.error), true); return; }
-    pagos = r.data;
+    pagos = r.data; cpPag = 1;
     pintarPagos();
+  }
+  async function cargarPacientesLista() {
+    var r = await sb.from('pacientes').select('id,nombre').order('nombre');
+    if (r.error) return;
+    var antes = $('cpPaciente').value;
+    $('cpPaciente').innerHTML = '<option value="">Todos los pacientes</option>' + r.data.map(function (p) { return '<option value="' + p.id + '">' + esc(p.nombre) + '</option>'; }).join('');
+    $('cpPaciente').value = antes;
   }
 
   // Resumen del mes en curso (independiente del periodo que se esté viendo)
@@ -280,35 +293,48 @@
       : 'Sin cobros este mes.';
   }
 
+  var ICO = { recibo: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>',
+    wa: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1.5-1.5-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/></svg>',
+    anular: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>' };
   function pintarPagos() {
-    document.querySelectorAll('#cpPeriodo [data-cpperiodo]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.cpperiodo === cpPeriodo); });
-    var buscar = $('cpBuscar').value.trim().toLowerCase().replace(/^n\.?º?\s*/, '');
-    var filas = pagos.filter(function (p) {
-      return !buscar || String(p.id) === String(parseInt(buscar, 10)) || (p.correlativo || '').indexOf(buscar) === 0 || ((p.pacientes && p.pacientes.nombre) || '').toLowerCase().indexOf(buscar) >= 0;
-    });
-    if (!filas.length) {
-      $('cpBody').innerHTML = '<tr><td colspan="9">' + (buscar ? 'Ningún pago coincide.' : 'No hay pagos en este periodo.') + '</td></tr>';
+    var filas = pagos, validos = filas.filter(function (p) { return !p.anulado; });
+    var total = validos.reduce(function (t, p) { return t + Number(p.monto); }, 0), rec = reciboBuscado();
+    $('cpResumen').innerHTML = filas.length ? '<b>' + filas.length + '</b> pago' + (filas.length === 1 ? '' : 's') + (filas.length - validos.length ? ' (' + (filas.length - validos.length) + ' anulado' + (filas.length - validos.length === 1 ? '' : 's') + ')' : '') +
+      ' · Total cobrado <b>' + q(total) + '</b>' + (rec ? ' · recibo «' + esc(rec) + '» en todas las fechas' : '') : '';
+    var paginas = Math.max(1, Math.ceil(filas.length / CP_PAG)); cpPag = Math.min(Math.max(1, cpPag), paginas);
+    var ini = (cpPag - 1) * CP_PAG, vis = filas.slice(ini, ini + CP_PAG);
+    if (!vis.length) {
+      $('cpBody').innerHTML = '<tr><td colspan="9" class="geo-vacia">' + (rec ? 'Ningún pago tiene ese número de recibo.' : 'No hay pagos con esos parámetros.') + '</td></tr>';
+      $('cpPaginas').hidden = true;
       return;
     }
-    $('cpBody').innerHTML = filas.map(function (p) {
+    $('cpBody').innerHTML = vis.map(function (p) {
       var wa = telWa(p.pacientes && p.pacientes.telefono);
       var texto = 'Hola ' + (p.pacientes ? p.pacientes.nombre : '') + ', Plus Dental confirma la recepción de su pago:\n\nRecibo ' + recibo(p.id) +
         '\nFecha: ' + fechaCorta(p.fecha) + '\nMonto: ' + q(p.monto) + '\nForma de pago: ' + METODOS[p.metodo] + (p.concepto ? '\nConcepto: ' + p.concepto : '') + '\n\n¡Gracias!';
-      var acciones = '<button type="button" class="adm-btn" data-recibo="' + p.id + '">Recibo</button>' +
-        (wa && !p.anulado ? '<a class="adm-btn" href="https://wa.me/' + wa + '?text=' + encodeURIComponent(texto) + '" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">WhatsApp</a>' : '') +
-        (esSuper() && !p.anulado ? '<button type="button" class="adm-btn" data-anular="' + p.id + '">Anular</button>' : '');
+      var acciones = '<button type="button" class="cp-ico" data-recibo="' + p.id + '" title="Ver e imprimir el recibo" aria-label="Recibo ' + recibo(p.id) + '">' + ICO.recibo + '</button>' +
+        (wa && !p.anulado ? '<a class="cp-ico cp-wa" href="https://wa.me/' + wa + '?text=' + encodeURIComponent(texto) + '" target="_blank" rel="noopener" title="Enviar por WhatsApp" aria-label="Enviar por WhatsApp">' + ICO.wa + '</a>' : '') +
+        (esSuper() && !p.anulado ? '<button type="button" class="cp-ico cp-anular" data-anular="' + p.id + '" title="Anular el pago" aria-label="Anular ' + recibo(p.id) + '">' + ICO.anular + '</button>' : '');
       var estado = p.anulado || p.estado_doc === 'anulado'
         ? '<span class="estado estado-cancelada" title="' + esc(p.anulado_motivo || '') + '">Anulado</span>'
         : '<select class="pg-estado-lista" data-estado-pago="' + p.id + '" data-estado="' + (p.estado_doc || 'emitido') + '" aria-label="Estado del documento ' + recibo(p.id) + '">' +
           ['emitido', 'aplicado', 'certificado'].map(function (k) { return '<option value="' + k + '"' + ((p.estado_doc || 'emitido') === k ? ' selected' : '') + '>' + ESTADOS_DOC[k] + '</option>'; }).join('') + '</select>';
-      return '<tr class="' + (p.anulado ? 'anulado' : '') + '" data-pago="' + p.id + '"><td class="fecha"><strong>' + recibo(p.id) + '</strong>' + (p.correlativo ? '<br><span style="color:#005A87;font-size:12.5px;font-weight:700">' + esc(p.correlativo) + '</span>' : '') + '</td>' +
-        '<td class="fecha">' + fechaCorta(p.fecha) + '</td><td><strong>' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</strong>' + (p.nit ? '<br><span style="color:#5A6D7A;font-size:13px">NIT ' + esc(p.nit) + '</span>' : '') + '</td>' +
-        '<td>' + esc(documento(p)) + (p.numero_dte ? '<br><span style="color:#5A6D7A;font-size:12px">DTE ' + esc(p.numero_dte) + '</span>' : '') + (p.numero_cuota ? '<br><span style="color:#5A6D7A;font-size:12px">Cuota ' + p.numero_cuota + '</span>' : '') + '</td>' +
-        '<td>' + esc(p.concepto || (p.presupuesto_id ? 'Presupuesto N.º ' + p.presupuesto_id : '—')) + '</td>' +
-        '<td>' + METODOS[p.metodo] + (p.referencia ? '<br><span style="color:#5A6D7A;font-size:13px">' + esc(p.referencia) + '</span>' : '') + '</td>' +
-        '<td class="num"><strong>' + q(p.monto) + '</strong>' + (Number(p.monto_usd) > 0 ? '<br><span style="color:#5A6D7A;font-size:13px">' + usd(p.monto_usd) + '</span>' : '') + '</td>' +
-        '<td>' + estado + '</td><td><div class="acciones">' + acciones + '</div></td></tr>';
+      var doc = [p.numero_dte ? 'DTE ' + p.numero_dte : '', p.numero_cuota ? 'Cuota ' + p.numero_cuota : ''].filter(Boolean).join(' · ');
+      return '<tr class="' + (p.anulado ? 'anulado' : '') + '" data-pago="' + p.id + '"><td><b>' + recibo(p.id) + '</b>' + (p.correlativo ? '<small class="cp-corr">' + esc(p.correlativo) + '</small>' : '') + '</td>' +
+        '<td>' + fechaCorta(p.fecha) + '</td>' +
+        '<td><b class="ia-corto" title="' + esc(p.pacientes ? p.pacientes.nombre : '') + '">' + esc(p.pacientes ? p.pacientes.nombre : '—') + '</b>' + (p.nit ? '<small>NIT ' + esc(p.nit) + '</small>' : '') + '</td>' +
+        '<td><span class="ia-corto" title="' + esc(documento(p)) + '">' + esc(documento(p)) + '</span>' + (doc ? '<small title="' + esc(doc) + '">' + esc(doc) + '</small>' : '') + '</td>' +
+        '<td><span class="ia-corto" title="' + esc(p.concepto || '') + '">' + esc(p.concepto || (p.presupuesto_id ? 'Presupuesto N.º ' + p.presupuesto_id : '—')) + '</span>' + (p.anulado && p.anulado_motivo ? '<small title="' + esc(p.anulado_motivo) + '">' + esc(p.anulado_motivo) + '</small>' : '') + '</td>' +
+        '<td>' + METODOS[p.metodo] + (p.referencia ? '<small>' + esc(p.referencia) + '</small>' : '') + '</td>' +
+        '<td class="num"><b>' + q(p.monto) + '</b>' + (Number(p.monto_usd) > 0 ? '<small>' + usd(p.monto_usd) + '</small>' : '') + '</td>' +
+        '<td>' + estado + '</td><td><div class="cp-acc">' + acciones + '</div></td></tr>';
     }).join('');
+    var bt = [];
+    if (paginas > 1) for (var n = 1; n <= paginas; n++) if (n === 1 || n === paginas || Math.abs(n - cpPag) <= 1) bt.push(n); else if (bt[bt.length - 1] !== '…') bt.push('…');
+    $('cpPaginas').hidden = filas.length <= CP_PAG;
+    $('cpPaginas').innerHTML = '<span>' + (ini + 1) + '–' + (ini + vis.length) + ' de ' + filas.length + ' pagos</span>' + (paginas > 1 ? '<nav aria-label="Páginas de pagos"><button type="button" class="ia-pag" data-cppag="' + (cpPag - 1) + '"' + (cpPag === 1 ? ' disabled' : '') + ' aria-label="Página anterior">‹</button>' +
+      bt.map(function (n) { return n === '…' ? '<span class="ia-pag-mas">…</span>' : '<button type="button" class="ia-pag" data-cppag="' + n + '"' + (n === cpPag ? ' aria-current="page"' : '') + '>' + n + '</button>'; }).join('') +
+      '<button type="button" class="ia-pag" data-cppag="' + (cpPag + 1) + '"' + (cpPag === paginas ? ' disabled' : '') + ' aria-label="Página siguiente">›</button></nav>' : '');
   }
 
   function pintarSelectorPacientes(elegido) {
@@ -469,6 +495,7 @@
     cargarCorrelativo();
     if (await cargarSaldos()) { pintarSaldos(); pintarSelectorPacientes(); }
     cargarResumen();
+    cargarPacientesLista();
     cargarPagos();
   }
 
@@ -598,16 +625,12 @@
     var c = await sb.from('pagos').select('correlativo').eq('id', r.data).maybeSingle();
     var corr = !c.error && c.data && c.data.correlativo;
     aviso('pgMsg', (corr ? 'Pago registrado con el correlativo ' + corr + ' (recibo ' + recibo(r.data) + ')' : 'Pago registrado con el recibo ' + recibo(r.data)) + '. Puedes imprimirlo o enviarlo desde la lista.');
-    cpPeriodo = 'mes';
     await cargarTodo();
     pintarSelectorPacientes(pid);
   });
 
-  $('cpPeriodo').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-cpperiodo]');
-    if (b) { cpPeriodo = b.dataset.cpperiodo; cargarPagos(); }
-  });
-  $('cpBuscar').addEventListener('input', pintarPagos);
+  $('cpFiltros').addEventListener('submit', function (e) { e.preventDefault(); cargarPagos(); });
+  $('cpPaginas').addEventListener('click', function (e) { var b = e.target.closest('[data-cppag]'); if (b && !b.disabled) { cpPag = +b.dataset.cppag; pintarPagos(); } });
   // Cambiar el estado del documento desde la lista (Emitido, Aplicado, Certificado)
   $('cpBody').addEventListener('change', async function (e) {
     var s = e.target.closest('[data-estado-pago]');

@@ -1303,6 +1303,16 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .inv-precio .inv-desde{color:#005A87;font-weight:600}
 .rep-params{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px;font-size:13px;color:#475B68}.rep-params:empty{display:none}.rep-params-t{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#005A87}.rep-param-i{background:#EEF6FC;border:1px solid #BFD7E8;border-radius:999px;padding:4px 12px}.rep-param-i b{color:#0B2B40}
 .rep-cliente select{min-width:240px}
+.cp-lista{margin-top:22px}.cp-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}.cp-head h3{margin:0;font-size:19px;font-weight:700}.cp-resumen{font-size:13px;color:#475B68}.cp-resumen b{color:#0B2B40}
+.cp-filtros{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:flex-end;background:#F5F9FC;border:1px solid #D7E3EC;border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.cp-campo{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#475B68;min-width:0;flex:1 1 140px}.cp-campo.cp-pac{flex:2 1 220px}.cp-ejecutar{flex:0 0 auto}.cp-campo .adm-input{width:100%;min-width:0;min-height:40px;box-sizing:border-box}.cp-ejecutar{min-height:40px;padding:8px 22px}
+.cp-lista .roles-wrap.ia-wrap{overflow-x:auto}.cp-tabla{table-layout:fixed;min-width:900px}.cp-c-rec{width:106px}.cp-c-fecha{width:92px}.cp-c-doc{width:14%}.cp-c-conc{width:10%}.cp-c-met{width:76px}.cp-c-monto{width:100px}.cp-c-est{width:106px}.cp-c-acc{width:106px}
+.roles-wrap .cp-tabla td{padding:9px 8px;font-size:13px;vertical-align:middle;overflow:hidden}.roles-wrap .cp-tabla th{font-size:11px;letter-spacing:.6px;padding:9px 8px}
+.cp-tabla small{display:block;color:#5A6D7A;font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cp-tabla .num{text-align:right;font-variant-numeric:tabular-nums}
+.cp-tabla td:nth-child(2){white-space:nowrap}.cp-tabla .cp-corr{font-size:11px}.cp-tabla .ia-corto{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cp-tabla .cp-corr{color:#005A87;font-weight:700}.cp-tabla tr.anulado td{background:#FBF4F3;color:#8A6A66}.cp-tabla .pg-estado-lista{width:100%;font-size:12.5px;padding:6px 6px;min-height:34px}
+.cp-acc{display:flex;gap:4px;justify-content:flex-end}.cp-ico{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid #C4D4DF;border-radius:9px;background:#fff;color:#005A87;cursor:pointer;text-decoration:none}.cp-ico:hover{background:#EAF3FA}
+.cp-ico svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.cp-ico.cp-wa{color:#128C4A;border-color:#9FD8B8}.cp-ico.cp-anular{color:#B42318;border-color:#F0C4BF}
+
 .ic-det-pie{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 12px;background:#F8FBFD;font-size:13px;color:#475B68}.ic-det-pie b{color:#0B2B40;font-variant-numeric:tabular-nums}
 @media (max-width:980px){.ic-cap-f1{grid-template-columns:repeat(2,minmax(0,1fr))}.ic-cap-f1 .ic-cap-prod{grid-column:1/-1}.ic-cap-f2{grid-template-columns:repeat(3,minmax(0,1fr))}.ic-cons-filtros{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.ic-det{min-width:680px}.ic-cons-t{min-width:620px}}
@@ -2144,19 +2154,20 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <p id="pgMsg" class="dlg-msg" role="status"></p>
 </form>
 
-<div class="adm-pane-head">
-<h3 style="margin: 0; font-size: 19px; font-weight: 700">Pagos registrados</h3>
-<div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
-<div id="cpPeriodo" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Periodo">
-<button type="button" class="adm-btn" data-cpperiodo="mes" aria-pressed="true">Este mes</button>
-<button type="button" class="adm-btn" data-cpperiodo="anterior" aria-pressed="false">Mes anterior</button>
-<button type="button" class="adm-btn" data-cpperiodo="todo" aria-pressed="false">Todos</button>
-</div>
-<input id="cpBuscar" type="search" class="adm-input" placeholder="Paciente o N.º de recibo" aria-label="Buscar pago">
-</div>
-</div>
-<div class="roles-wrap"><table><thead><tr><th>Recibo</th><th>Fecha</th><th>Paciente</th><th>Documento</th><th>Concepto</th><th>Método</th><th class="num">Monto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="cpBody"></tbody></table></div>
+<section class="cp-lista">
+<div class="cp-head"><h3>Pagos registrados</h3><span id="cpResumen" class="cp-resumen"></span></div>
+<form id="cpFiltros" class="cp-filtros" novalidate>
+<label class="cp-campo">Fecha inicial<input id="cpDesde" type="date" class="adm-input"></label>
+<label class="cp-campo">Fecha final<input id="cpHasta" type="date" class="adm-input"></label>
+<label class="cp-campo cp-pac">Paciente<select id="cpPaciente" class="adm-input"><option value="">Todos los pacientes</option></select></label>
+<label class="cp-campo">N.º de recibo<input id="cpRecibo" type="search" class="adm-input" placeholder="000003 o 2026-10-0003" inputmode="numeric"></label>
+<button type="submit" class="adm-btn adm-primary cp-ejecutar">Ejecutar</button>
+</form>
+<div class="roles-wrap ia-wrap"><table class="geo-tabla cp-tabla"><colgroup><col class="cp-c-rec"><col class="cp-c-fecha"><col><col class="cp-c-doc"><col class="cp-c-conc"><col class="cp-c-met"><col class="cp-c-monto"><col class="cp-c-est"><col class="cp-c-acc"></colgroup>
+<thead><tr><th>Recibo</th><th>Fecha</th><th>Paciente</th><th>Documento</th><th>Concepto</th><th>Método</th><th class="num">Monto</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody id="cpBody"></tbody></table>
+<div id="cpPaginas" class="ia-paginas" hidden></div></div>
 <p id="cpMsg" class="dlg-msg" role="status"></p>
+</section>
 </div>
 
 <!-- 7. Posiciones y clínicas -->
@@ -2978,7 +2989,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="odontograma.js"></script>
 <script src="expedientes.js?v=20261027b"></script>
 <script src="presupuestos.js"></script>
-<script src="cuentas.js?v=20261027b"></script>
+<script src="cuentas.js?v=20261027c"></script>
 <script src="tratamientos-paciente.js"></script>
 <script src="recetas.js"></script>
 <script src="laboratorio.js"></script>
