@@ -13,6 +13,7 @@
   var instituciones = [], sucursales = [], deptos = [], municipios = {}, dentistas = [], tratamientos = [], precioInst = {}, jornadas = [], jPacientes = [], jProcs = [];
   var instSel = null, filtroTipo = '', filtroEstadoI = 'activo';
   var form = null, pacientes = [], modoEdicion = false, edit = null, pag = 1, PAG = 6;
+  var medicos = [], citasJ = {}, imp = null;
 
   function $(id) { return document.getElementById(id); }
   function num(n, d) { return Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d }); }
@@ -29,7 +30,7 @@
   function aviso(id, t, error) { $(id).textContent = t || ''; $(id).style.color = error ? '#9A3B2E' : '#475B68'; }
   function traducir(err) {
     var m = (err && err.message) || '';
-    if (/jor_|guardar_jornada|cerrar_jornada|could not find the (table|function)/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para Jornadas.';
+    if (/jor_|guardar_jornada|cerrar_jornada|agendar_jornada|medicos|cita_id|could not find the (table|function)/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para Jornadas.';
     return G.traducir(err);
   }
   async function todas(armar) {
@@ -265,7 +266,7 @@
       campo('Sucursal', '<select id="jjSuc"><option value="">Sede principal</option></select>', 'jj-suc') +
       campo('Estado', '<select id="jjEstado"><option value="planificada">Planificada</option><option value="realizada">Realizada</option><option value="cancelada">Cancelada</option></select>') +
       campo('Lugar', '<input id="jjLugar" maxlength="200" placeholder="Salón, aula, centro comunal…">', 'jj-lugar') +
-      campo('Odontólogo responsable', '<select id="jjDentista"></select>') + campo('Tipo de precio', '<input value="Institucional" disabled>') +
+      '<div class="ic-campo jj-meds"><span title="El primero (★) es el responsable de la jornada">Médicos asignados</span><div id="jjMeds" class="jj-meds-caja"></div></div>' + campo('Tipo de precio', '<input value="Institucional" disabled>') +
       campo('Observaciones', '<input id="jjObs" maxlength="500">', 'jj-obs') + '</div></section>' +
     '<datalist id="jjPacLista"></datalist>' +
     '<div id="jjCaptura" class="ic-captura jj-captura"><div class="jj-cap1">' +
@@ -277,10 +278,16 @@
       '<div class="jj-cap2">' + campo('Procedimiento', '<select id="jjCapProc"></select>', 'jj-cap-proc') + campo('Pieza', '<input id="jjCapPieza" maxlength="20">') +
       campo('Cant.', '<input id="jjCapCant" type="number" min="1" step="1" class="num" value="1">') + campo('Precio inst. Q', '<input id="jjCapPrecio" type="number" min="0" step="0.01" class="num">') +
       '<span class="ic-cap-btns"><button type="button" id="jjCapAgregar" class="adm-btn adm-primary">+ Agregar</button><button type="button" id="jjCapCancelar" class="adm-btn geo-mini" hidden>Cancelar</button></span></div>' +
-      '<span id="jjCapMsg" class="ic-cap-msg itr-cap-msg" role="status">Escribe el paciente y elige el procedimiento · Enter lo agrega (el paciente se mantiene para su siguiente procedimiento)</span></div>' +
+      '<span id="jjCapMsg" class="ic-cap-msg itr-cap-msg" role="status">Escribe el paciente y elige el procedimiento · Enter lo agrega (el paciente se mantiene para su siguiente procedimiento)</span>' +
+      '<div class="jj-imp-barra"><input type="file" id="jjArchivo" accept=".xlsx,.xls,.csv" hidden><button type="button" id="jjImportar" class="adm-btn geo-mini">Importar pacientes (Excel / CSV)</button>' +
+        '<button type="button" id="jjPlantilla" class="adm-btn geo-mini">Descargar plantilla</button><span class="inv-sub">Columnas: Nombre · Edad · Sexo · Grado / referencia · Tratamiento · Pieza · Cantidad (las citas siguen el orden del archivo)</span></div>' +
+      '<div id="jjImport" hidden></div></div>' +
     '<div class="roles-wrap ia-wrap"><table class="geo-tabla ic-det jj-det"><colgroup><col class="ic-d-n"><col class="jj-c-pac"><col><col class="jj-c-pieza"><col class="ic-d-cant"><col class="ic-d-cu"><col class="ic-d-tot"><col class="ic-d-acc"></colgroup>' +
       '<thead><tr><th>#</th><th>Paciente</th><th>Procedimiento</th><th>Pieza</th><th class="num">Cant.</th><th class="num">Precio inst.</th><th class="num">Subtotal</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody id="jjLineas"></tbody></table>' +
       '<div class="ic-det-pie"><span id="jjResumen">0 pacientes · 0 procedimientos</span><span>Total institucional <b id="jjSumQ">Q0.00</b></span></div></div>' +
+    '<section id="jjAgenda" class="ic-tarjeta jj-agenda" hidden><h4><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Citas en la agenda</h4>' +
+      '<div class="jj-ag-fila">' + campo('Hora de inicio', '<input id="jjAgHora" type="time" value="08:00" step="600">') +
+      '<button type="button" id="jjAgendar" class="adm-btn adm-primary">Crear citas</button><span id="jjAgInfo" class="inv-sub"></span></div></section>' +
     '<div class="ic-botones ic-blq jj-botones">' +
       '<button type="submit" id="jjGrabar" class="adm-btn adm-primary">Grabar</button><button type="button" id="jjCerrar" class="adm-btn">Cerrar jornada</button><button type="button" id="jjReabrir" class="adm-btn">Reabrir</button><span class="ic-sep"></span>' +
       '<button type="button" id="jjImprimir" class="adm-btn">Imprimir</button><button type="button" id="jjCorreo" class="adm-btn">Enviar correo</button><button type="button" id="jjWa" class="adm-btn">Enviar WhatsApp</button></div>' +
@@ -319,7 +326,7 @@
       p.procedimientos.forEach(function (x, j) {
         var st = Number(x.cantidad) * Number(x.precio); total += st; nProc++;
         html += '<tr class="' + (edit && edit.p === i && edit.x === j ? 'ic-editando' : '') + '"><td class="ik-cod">' + (j === 0 ? i + 1 : '') + '</td>' +
-          '<td>' + (j === 0 ? '<b class="ia-corto" title="' + esc(p.nombre) + '">' + esc(p.nombre) + '</b><small class="inv-sub ia-corto">' + esc([p.edad != null && p.edad !== '' ? p.edad + ' años' : '', p.sexo, p.referencia].filter(Boolean).join(' · ')) + '</small>' : '') + '</td>' +
+          '<td>' + (j === 0 ? '<b class="ia-corto" title="' + esc(p.nombre) + '">' + esc(p.nombre) + '</b><small class="inv-sub ia-corto">' + esc([p.edad != null && p.edad !== '' ? p.edad + ' años' : '', p.sexo, p.referencia].filter(Boolean).join(' · ')) + '</small>' + (textoCita(p) ? '<small class="jj-cita ia-corto">' + esc(textoCita(p)) + '</small>' : '') : '') + '</td>' +
           '<td><span class="ia-corto">' + esc(x.descripcion) + '</span>' + (x.tratamiento_id ? '' : '<small class="inv-sub">fuera del catálogo</small>') + '</td><td>' + esc(x.pieza || '—') + '</td>' +
           '<td class="num">' + x.cantidad + '</td><td class="num">' + num(x.precio) + '</td><td class="num"><b>' + num(st) + '</b></td>' +
           '<td class="ic-d-acc">' + (ed ? '<button type="button" class="ic-ico" data-editar="' + i + ':' + j + '" aria-label="Modificar" title="Modificar">✎</button><button type="button" class="ic-ico ic-ico-x" data-quitar="' + i + ':' + j + '" aria-label="Quitar" title="Quitar">×</button>' : '') + '</td></tr>';
@@ -330,12 +337,121 @@
     $('jjResumen').textContent = pacientes.length + ' paciente' + (pacientes.length === 1 ? '' : 's') + ' · ' + nProc + ' procedimiento' + (nProc === 1 ? '' : 's');
     $('jjSumQ').textContent = q(total); $('jjTotQ').textContent = num(total); $('jjTotPac').textContent = pacientes.length;
     $('jjPacLista').innerHTML = pacientes.map(function (p) { return '<option value="' + esc(p.nombre) + '">'; }).join('');
+    pintarAgenda();
   }
   function opcionesSuc(sel) {
     var inst = +$('jjInst').value || null, l = inst ? sucursalesDe(inst).filter(function (x) { return x.estado === 'activo' || x.id === sel; }) : [];
     $('jjSuc').innerHTML = '<option value="">' + (l.length ? 'Sede principal' : 'Sin sucursales') + '</option>' + l.map(function (x) { return '<option value="' + x.id + '">' + esc(codigoSuc(x) + ' · ' + x.nombre) + '</option>'; }).join('');
     $('jjSuc').value = sel ? String(sel) : '';
   }
+  // ---------- Médicos de la jornada ----------
+  function medicosDe(j) { return j.medicos && j.medicos.length ? j.medicos : j.dentista_id ? [j.dentista_id] : []; }
+  function nombreMed(id) { var d = porId(dentistas, id); return d ? d.nombre : 'Médico ' + id; }
+  function esOrto(d) { return ((d && d.especialidades) || []).indexOf('Ortodoncia') >= 0; }
+  function pintarMeds() {
+    var ed = editable();
+    var chips = medicos.map(function (id, k) {
+      return '<span class="jj-med' + (k === 0 ? ' jj-med-resp' : '') + '"' + (k === 0 ? ' title="Responsable de la jornada"' : '') + '>' + (k === 0 ? '★ ' : '') + esc(nombreMed(id)) + (esOrto(porId(dentistas, id)) ? ' <small>· Ortodoncia</small>' : '') +
+        (ed ? '<button type="button" data-quitar-med="' + id + '" aria-label="Quitar a ' + esc(nombreMed(id)) + '">×</button>' : '') + '</span>';
+    }).join('');
+    var libres = dentistas.filter(function (d) { return d.estado === 'activo' && medicos.indexOf(d.id) < 0; });
+    $('jjMeds').innerHTML = (chips || (ed ? '' : '<span class="inv-sub">Sin asignar</span>')) + (ed && libres.length ? '<select id="jjMedAdd" aria-label="Agregar médico"><option value="">+ Agregar médico…</option>' +
+      libres.map(function (d) { return '<option value="' + d.id + '">' + esc(d.nombre + ((d.especialidades || []).length ? ' · ' + d.especialidades.join(', ') : '')) + '</option>'; }).join('') + '</select>' : '');
+  }
+  function textoCita(p) { var c = citasJ[p.cita_id]; return c && c.estado !== 'cancelada' ? 'Cita ' + String(c.hora).slice(0, 5) + ' · ' + nombreMed(c.dentista_id) : ''; }
+  function pintarAgenda() {
+    var j = form || {}, ok = j.id && j.estado !== 'cerrada' && j.estado !== 'cancelada';
+    var sin = pacientes.filter(function (p) { return !textoCita(p); }).length;
+    $('jjAgenda').hidden = !j.id;
+    $('jjAgHora').disabled = !ok || modoEdicion;
+    $('jjAgendar').disabled = !ok || modoEdicion || !sin || !medicosDe(j).length;
+    $('jjAgendar').textContent = sin ? 'Crear ' + sin + ' cita' + (sin === 1 ? '' : 's') : 'Citas creadas';
+    $('jjAgInfo').textContent = !j.id ? '' : !ok ? 'La jornada está ' + (ESTADOS_J[j.estado] || [j.estado])[0].toLowerCase() + ': no se crean citas.' :
+      modoEdicion ? 'Graba los cambios antes de crear las citas.' : !medicosDe(j).length ? 'Asigna al menos un médico y graba la jornada.' :
+      sin ? sin + ' paciente' + (sin === 1 ? '' : 's') + ' sin cita. Se agendan el ' + fecha(j.fecha) + ' en el orden de la lista: ortodoncia cada 10 min con el ortodoncista; los demás cada 30 min, por turnos, con el médico que quede libre.' :
+      'Todos los pacientes ya tienen su cita en la agenda.';
+  }
+
+  // ---------- Importar pacientes de un archivo (Excel o CSV) ----------
+  var XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  function cargarXlsx() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise(function (ok, mal) { var sc = document.createElement('script'); sc.src = XLSX_URL; sc.onload = function () { ok(window.XLSX); }; sc.onerror = function () { mal(new Error('No se pudo cargar el lector de Excel. Revisa tu conexión.')); }; document.head.appendChild(sc); });
+  }
+  var COLS = { nombre: /^(nombre|paciente|alumno|estudiante)/, edad: /^edad/, sexo: /^(sexo|genero)/, ref: /(grado|referencia|seccion|curso)/, trat: /(tratamiento|procedimiento|servicio)/, pieza: /(pieza|diente)/, cant: /^cant/, precio: /precio/ };
+  function buscarTrat(t) {
+    var v = norm(t).trim(); if (!v) return null;
+    return tratamientos.filter(function (x) { return norm(x.nombre).trim() === v; })[0] ||
+      tratamientos.filter(function (x) { var n = norm(x.nombre).trim(); return n.indexOf(v) >= 0 || v.indexOf(n) >= 0; })[0] || porPalabras(t);
+  }
+  // «control ortodoncia» → «Control de ortodoncia»: todas las palabras del archivo están en el nombre del catálogo
+  function palabras(t) { return norm(t).split(/[^a-z0-9]+/).filter(function (w) { return w.length > 2 && ['del', 'las', 'los', 'con', 'para', 'por'].indexOf(w) < 0; }); }
+  function porPalabras(t) {
+    var pv = palabras(t), mejor = null, menos = 1e9; if (!pv.length) return null;
+    tratamientos.forEach(function (x) {
+      var px = palabras(x.nombre), todas = pv.every(function (w) { return px.some(function (y) { return y.indexOf(w) === 0 || w.indexOf(y) === 0; }); });
+      if (todas && px.length < menos) { menos = px.length; mejor = x; }
+    });
+    return mejor;
+  }
+  function sexoDe(t) { var v = norm(t).trim(); return /^(f|mujer|nina)/.test(v) ? 'F' : /^(m|hombre|nino)/.test(v) ? 'M' : ''; }
+  async function leerArchivo(f) {
+    var X = await cargarXlsx(), libro = /\.csv$/i.test(f.name) ? X.read(await f.text(), { type: 'string' }) : X.read(await f.arrayBuffer(), { type: 'array' });
+    var filas = X.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]], { header: 1, defval: '', raw: false }), h = -1, col = {};
+    for (var i = 0; i < Math.min(filas.length, 15); i++) {
+      var c = {};
+      filas[i].forEach(function (v, k) { var t = norm(v).trim(); if (t) Object.keys(COLS).forEach(function (n) { if (c[n] == null && COLS[n].test(t)) c[n] = k; }); });
+      if (c.nombre != null) { h = i; col = c; break; }
+    }
+    if (h < 0) throw new Error('No se encontró la columna «Nombre» en el archivo. Usa la plantilla.');
+    function g(r, n) { return col[n] == null || r[col[n]] == null ? '' : String(r[col[n]]).trim(); }
+    var out = [];
+    filas.slice(h + 1).forEach(function (r, k) {
+      var nombre = g(r, 'nombre').replace(/\s+/g, ' ').slice(0, 150); if (!nombre) return;
+      var e = parseInt(g(r, 'edad'), 10), cant = parseInt(g(r, 'cant'), 10), pr = g(r, 'precio').replace(/[^\d.]/g, '');
+      var textos = g(r, 'trat').split(/[;\n]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+      (textos.length ? textos : ['']).forEach(function (t) {
+        var tr = buscarTrat(t);
+        out.push({ fila: h + k + 2, nombre: nombre, edad: e >= 0 && e <= 120 ? e : null, sexo: sexoDe(g(r, 'sexo')), referencia: g(r, 'ref').slice(0, 100), texto: t,
+          sel: tr ? String(tr.id) : t ? 'otro' : '', pieza: g(r, 'pieza').slice(0, 20), cantidad: cant > 0 ? cant : 1, precio: pr === '' || isNaN(+pr) ? null : +pr });
+      });
+    });
+    return out;
+  }
+  function pintarImport() {
+    var box = $('jjImport');
+    if (!imp) { box.hidden = true; box.innerHTML = ''; return; }
+    var falta = imp.filas.filter(function (f) { return !f.sel; }).length, otros = imp.filas.filter(function (f) { return f.sel === 'otro'; }).length, vistos = {};
+    imp.filas.forEach(function (f) { vistos[norm(f.nombre)] = 1; });
+    var nPac = Object.keys(vistos).length, opts = tratamientos.map(function (t) { return '<option value="' + t.id + '">' + esc(t.nombre) + '</option>'; }).join('');
+    box.hidden = false;
+    box.innerHTML = '<div class="jj-imp-cab"><b>' + esc(imp.archivo) + '</b><span>' + imp.filas.length + ' fila' + (imp.filas.length === 1 ? '' : 's') + ' · ' + nPac + ' paciente' + (nPac === 1 ? '' : 's') + ' · ' +
+        (falta ? '<span class="jj-imp-mal">' + falta + ' sin procedimiento: elígelo</span>' : 'todas con procedimiento') + (otros ? ' · ' + otros + ' fuera del catálogo' : '') + '</span></div>' +
+      '<div class="roles-wrap ia-wrap jj-imp-wrap"><table class="geo-tabla jj-imp-t"><colgroup><col class="jj-i-n"><col><col class="jj-i-arch"><col class="jj-i-proc"></colgroup>' +
+      '<thead><tr><th>Fila</th><th>Paciente</th><th>En el archivo</th><th>Procedimiento</th></tr></thead><tbody>' +
+      imp.filas.map(function (f, i) {
+        return '<tr' + (f.sel ? '' : ' class="jj-imp-falta"') + '><td class="ik-cod">' + f.fila + '</td><td><b class="ia-corto" title="' + esc(f.nombre) + '">' + esc(f.nombre) + '</b><small class="inv-sub ia-corto">' +
+          esc([f.edad != null ? f.edad + ' años' : '', f.sexo, f.referencia, f.pieza ? 'pieza ' + f.pieza : ''].filter(Boolean).join(' · ')) + '</small></td><td><span class="ia-corto" title="' + esc(f.texto) + '">' + esc(f.texto || '—') + '</span></td>' +
+          '<td><select data-imp="' + i + '" aria-label="Procedimiento de ' + esc(f.nombre) + '"><option value="">Elige…</option>' + opts + (f.texto ? '<option value="otro">Dejar «' + esc(f.texto.slice(0, 40)) + '» (fuera del catálogo)</option>' : '') + '</select></td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="jj-imp-pie"><button type="button" class="adm-btn geo-mini" id="jjImpDescartar">Descartar</button><button type="button" class="adm-btn adm-primary" id="jjImpAgregar">Agregar ' + nPac + ' paciente' + (nPac === 1 ? '' : 's') + ' a la jornada</button></div>';
+    box.querySelectorAll('select[data-imp]').forEach(function (x) { x.value = imp.filas[+x.dataset.imp].sel; });
+  }
+  function agregarImport() {
+    var falta = imp.filas.filter(function (f) { return !f.sel; }).length;
+    if (falta) { capMsg('Elige el procedimiento de ' + (falta === 1 ? 'la fila marcada' : 'las ' + falta + ' filas marcadas') + '.', true); return; }
+    var nuevos = 0, n = imp.filas.length;
+    imp.filas.forEach(function (f) {
+      var t = f.sel === 'otro' ? null : porId(tratamientos, +f.sel), p = buscarPac(f.nombre);
+      if (!p) { p = { nombre: f.nombre, edad: f.edad, sexo: f.sexo, referencia: f.referencia, procedimientos: [] }; pacientes.push(p); nuevos++; }
+      else { if (p.edad == null && f.edad != null) p.edad = f.edad; if (!p.sexo) p.sexo = f.sexo; if (!p.referencia) p.referencia = f.referencia; }
+      p.procedimientos.push({ tratamiento_id: t ? t.id : null, descripcion: t ? t.nombre : f.texto, pieza: f.pieza, cantidad: f.cantidad,
+        precio: f.precio != null ? f.precio : t && precioInst[t.id] != null ? precioInst[t.id] : 0 });
+    });
+    imp = null; pintarImport(); pintarLineas();
+    capMsg(nuevos + ' paciente' + (nuevos === 1 ? '' : 's') + ' nuevo' + (nuevos === 1 ? '' : 's') + ' y ' + n + ' procedimiento' + (n === 1 ? '' : 's') + ' importados. Presiona «Grabar» y luego «Crear citas».');
+  }
+
   function pintarEncabezado() {
     var j = form || {}, ed = editable(), e = ESTADOS_J[j.estado] || ['Nueva', 'inactivo'];
     $('jjNumero').textContent = j.numero ? 'N.º ' + j.numero : 'nueva';
@@ -344,11 +460,10 @@
     $('jjInst').innerHTML = '<option value="">Elige la institución…</option>' + instituciones.filter(function (i) { return i.estado === 'activo' || i.id === j.institucion_id; }).map(function (i) { return '<option value="' + i.id + '">' + esc(codigoInst(i) + ' · ' + i.nombre) + '</option>'; }).join('');
     $('jjInst').value = j.institucion_id ? String(j.institucion_id) : '';
     opcionesSuc(j.sucursal_id);
-    $('jjDentista').innerHTML = '<option value="">Sin asignar</option>' + dentistas.filter(function (d) { return d.estado === 'activo' || d.id === j.dentista_id; }).map(function (d) { return '<option value="' + d.id + '">' + esc(d.nombre) + '</option>'; }).join('');
-    $('jjDentista').value = j.dentista_id ? String(j.dentista_id) : '';
+    pintarMeds();
     $('jjFecha').value = j.fecha || hoy(); $('jjLugar').value = j.lugar || ''; $('jjObs').value = j.observaciones || '';
     $('jjEstado').value = j.estado && j.estado !== 'cerrada' ? j.estado : 'planificada';
-    ['jjInst', 'jjSuc', 'jjFecha', 'jjEstado', 'jjLugar', 'jjDentista', 'jjObs'].forEach(function (id) { $(id).disabled = !ed; });
+    ['jjInst', 'jjSuc', 'jjFecha', 'jjEstado', 'jjLugar', 'jjObs'].forEach(function (id) { $(id).disabled = !ed; });
     estadoBotones();
   }
   function estadoBotones() {
@@ -366,10 +481,10 @@
       (j.modificado ? '<span>Modificado por <b>' + esc(j.modificado_por || '—') + '</b> el <b>' + fechaHora(j.modificado) + '</b></span>' : '') + (j.cerrada_en ? '<span>Cerrada por <b>' + esc(j.cerrada_por || '—') + '</b> el <b>' + fechaHora(j.cerrada_en) + '</b></span>' : '') + '</div></div>' : '';
   }
   function abrir(j) {
-    form = j || null; modoEdicion = !j; edit = null;
+    form = j || null; modoEdicion = !j; edit = null; imp = null; medicos = j ? medicosDe(j).slice() : [];
     pacientes = j ? jPacientes.filter(function (p) { return p.jornada_id === j.id; }).sort(function (a, b) { return a.orden - b.orden; }).map(function (p) {
-      return { nombre: p.nombre, edad: p.edad, sexo: p.sexo || '', referencia: p.referencia || '', procedimientos: jProcs.filter(function (x) { return x.paciente_id === p.id; }).sort(function (a, b) { return a.orden - b.orden; }).map(function (x) { return { tratamiento_id: x.tratamiento_id, descripcion: x.descripcion, pieza: x.pieza || '', cantidad: x.cantidad, precio: Number(x.precio) }; }) }; }) : [];
-    opcionesProc(); limpiarProc(); limpiarPac(); capMsg(''); aviso('jjMsg', '');
+      return { nombre: p.nombre, edad: p.edad, sexo: p.sexo || '', referencia: p.referencia || '', cita_id: p.cita_id || null, procedimientos: jProcs.filter(function (x) { return x.paciente_id === p.id; }).sort(function (a, b) { return a.orden - b.orden; }).map(function (x) { return { tratamiento_id: x.tratamiento_id, descripcion: x.descripcion, pieza: x.pieza || '', cantidad: x.cantidad, precio: Number(x.precio) }; }) }; }) : [];
+    opcionesProc(); limpiarProc(); limpiarPac(); capMsg(''); aviso('jjMsg', ''); pintarImport();
     pintarEncabezado(); pintarLineas();
   }
   function pintarLista() {
@@ -393,7 +508,7 @@
       var r = await Promise.all([
         todas(function () { return sb.from('jor_instituciones').select('*').order('numero'); }),
         todas(function () { return sb.from('jor_sucursales').select('*').order('numero'); }),
-        todas(function () { return sb.from('dentistas').select('id,nombre,estado').order('nombre'); }),
+        todas(function () { return sb.from('dentistas').select('id,nombre,estado,especialidades').order('nombre'); }),
         todas(function () { return sb.from('tratamientos').select('id,nombre,activo').order('nombre'); }),
         todas(function () { return sb.from('precios').select('tratamiento_id,tipo,valor,estado,localidad_id').eq('tipo', 'institucional'); }),
         todas(function () { return sb.from('jor_jornadas').select('*').order('numero', { ascending: false }); }),
@@ -403,6 +518,11 @@
       instituciones = r[0]; sucursales = r[1]; dentistas = r[2]; tratamientos = r[3].filter(function (t) { return t.activo !== false; }); jornadas = r[5]; jPacientes = r[6]; jProcs = r[7];
       var mi = window.PD_SEDES && window.PD_SEDES.miLocalidad(); precioInst = {};
       r[4].filter(function (p) { return p.estado !== 'baja' && p.estado !== 'suspendido'; }).sort(function (a, b) { return (a.localidad_id === mi ? 1 : 0) - (b.localidad_id === mi ? 1 : 0); }).forEach(function (p) { precioInst[p.tratamiento_id] = Number(p.valor); });
+      var ids = jPacientes.map(function (p) { return p.cita_id; }).filter(Boolean); citasJ = {};
+      for (var c0 = 0; c0 < ids.length; c0 += 150) {
+        var rc = await sb.from('citas').select('id,hora,dentista_id,estado').in('id', ids.slice(c0, c0 + 150));
+        if (!rc.error) rc.data.forEach(function (c) { citasJ[c.id] = c; });
+      }
     } catch (e) { jornadas = []; pintarLista(); abrir(null); aviso('jjMsg', traducir(e), true); return; }
     $('jjFInst').innerHTML = '<option value="">Todas las instituciones</option>' + instituciones.map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
     pintarLista(); abrir(mantener ? porId(jornadas, mantener) : null);
@@ -411,13 +531,13 @@
     if (!+$('jjInst').value) { aviso('jjMsg', 'Elige la institución.', true); return null; }
     aviso('jjMsg', 'Grabando…');
     var r = await sb.rpc('guardar_jornada', { p_id: form ? form.id : null,
-      p_datos: { institucion_id: +$('jjInst').value, sucursal_id: +$('jjSuc').value || null, fecha: $('jjFecha').value, estado: $('jjEstado').value, lugar: $('jjLugar').value, dentista_id: $('jjDentista').value || null, observaciones: $('jjObs').value },
+      p_datos: { institucion_id: +$('jjInst').value, sucursal_id: +$('jjSuc').value || null, fecha: $('jjFecha').value, estado: $('jjEstado').value, lugar: $('jjLugar').value, dentista_id: medicos[0] || null, medicos: medicos, observaciones: $('jjObs').value },
       p_pacientes: pacientes });
     if (r.error) { aviso('jjMsg', traducir(r.error), true); return null; }
     await cargarJor(r.data); return r.data;
   }
   function htmlImpresion(j) {
-    var P = window.PD_IMPRESION, inst = porId(instituciones, j.institucion_id) || {}, den = porId(dentistas, j.dentista_id);
+    var P = window.PD_IMPRESION, inst = porId(instituciones, j.institucion_id) || {}, meds = medicosDe(j).map(nombreMed);
     var th = 'padding:6px;border-bottom:2px solid #0B2B40;text-align:left;font-size:10px;text-transform:uppercase;color:#475B68', td = 'padding:5px 6px;border-bottom:1px solid #E3EAF0;font-size:11.5px';
     var ps = jPacientes.filter(function (p) { return p.jornada_id === j.id; }).sort(function (a, b) { return a.orden - b.orden; }), filas = '', np = 0;
     ps.forEach(function (p, i) {
@@ -428,7 +548,7 @@
     });
     function d(k, v) { return '<div><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.08em">' + k + '</span><b>' + esc(v || '—') + '</b></div>'; }
     return P.encabezado('Jornada dental N.º ' + j.numero + ' · ' + (ESTADOS_J[j.estado] || [j.estado])[0]) +
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;font-size:12px">' + d('Institución', inst.nombre + ((porId(sucursales, j.sucursal_id) || {}).nombre ? ' · ' + porId(sucursales, j.sucursal_id).nombre : '')) + d('Fecha', fecha(j.fecha)) + d('Lugar', j.lugar) + d('Odontólogo responsable', den && den.nombre) +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;font-size:12px">' + d('Institución', inst.nombre + ((porId(sucursales, j.sucursal_id) || {}).nombre ? ' · ' + porId(sucursales, j.sucursal_id).nombre : '')) + d('Fecha', fecha(j.fecha)) + d('Lugar', j.lugar) + d(meds.length > 1 ? 'Médicos' : 'Odontólogo responsable', meds.join(', ')) +
       d('Responsable de la institución', [inst.responsable, inst.cargo].filter(Boolean).join(' · ')) + d('Teléfono', inst.telefono) + d('Tipo de precio', 'Institucional') + d('Sede', sede(j)) + '</div>' +
       '<table style="width:100%;border-collapse:collapse"><thead><tr>' + ['#', 'Paciente', 'Procedimiento', 'Pieza', 'Cant.', 'Precio inst.', 'Subtotal Q'].map(function (h, i) { return '<th style="' + th + (i > 3 ? ';text-align:right' : '') + '">' + h + '</th>'; }).join('') + '</tr></thead><tbody>' + filas + '</tbody></table>' +
       '<p style="text-align:right;font-size:14px;margin-top:10px"><b>Total institucional Q ' + num(j.total) + '</b> · ' + ps.length + ' pacientes · ' + np + ' procedimientos</p>' +
@@ -450,7 +570,7 @@
   $('jjCapProc').addEventListener('change', function () { var p = precioInst[+this.value]; $('jjCapPrecio').value = p != null ? p : ''; capMsg(this.value && this.value !== 'otro' && p == null ? 'Este procedimiento no tiene precio institucional: escríbelo (o defínelo en Precios y paquetes).' : ''); });
   $('jjCapPac').addEventListener('input', function () { var p = buscarPac(this.value); if (p) { $('jjCapEdad').value = p.edad != null ? p.edad : ''; $('jjCapSexo').value = p.sexo || ''; $('jjCapRef').value = p.referencia || ''; capMsg(p.nombre + ' ya está en la jornada: el procedimiento se le agregará.'); } });
   $('jjNuevoPac').addEventListener('click', function () { limpiarPac(); limpiarProc(); capMsg(''); $('jjCapPac').focus(); });
-  $('jjCaptura').addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) { e.preventDefault(); agregar(); } });
+  $('jjCaptura').addEventListener('keydown', function (e) { if (e.target.closest('#jjImport')) return; if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) { e.preventDefault(); agregar(); } });
   $('jjCapAgregar').addEventListener('click', agregar);
   $('jjCapCancelar').addEventListener('click', function () { limpiarProc(); pintarLineas(); });
   $('jjLineas').addEventListener('click', function (e) {
@@ -483,6 +603,35 @@
     if (!t) { aviso('jjMsg', 'La institución no tiene teléfono: agrégalo en Jornadas › Instituciones.', true); return; }
     window.open('https://wa.me/' + t + '?text=' + encodeURIComponent(textoResumen(form)), '_blank', 'noopener');
     aviso('jjMsg', 'Se abrió WhatsApp con el resumen para +' + t + '.');
+  });
+  $('jjMeds').addEventListener('change', function (e) { if (e.target.id !== 'jjMedAdd' || !e.target.value) return; medicos.push(+e.target.value); pintarMeds(); var s = $('jjMedAdd'); if (s) s.focus(); });
+  $('jjMeds').addEventListener('click', function (e) { var b = e.target.closest('[data-quitar-med]'); if (!b) return; medicos = medicos.filter(function (x) { return x !== +b.dataset.quitarMed; }); pintarMeds(); });
+  $('jjImportar').addEventListener('click', function () { $('jjArchivo').value = ''; $('jjArchivo').click(); });
+  $('jjArchivo').addEventListener('change', async function () {
+    var f = this.files[0]; if (!f) return;
+    capMsg('Leyendo ' + f.name + '…');
+    try {
+      var filas = await leerArchivo(f);
+      if (!filas.length) throw new Error('El archivo no tiene pacientes debajo de los títulos.');
+      imp = { archivo: f.name, filas: filas }; pintarImport(); capMsg('Revisa los pacientes leídos y presiona «Agregar… a la jornada».');
+    } catch (e) { imp = null; pintarImport(); capMsg(e.message || 'No se pudo leer el archivo.', true); }
+  });
+  $('jjPlantilla').addEventListener('click', async function () {
+    try {
+      var X = await cargarXlsx(), ws = X.utils.aoa_to_sheet([['Nombre', 'Edad', 'Sexo', 'Grado / referencia', 'Tratamiento', 'Pieza', 'Cantidad'],
+        ['Ana Pérez López', 9, 'F', '3.º primaria', (tratamientos[0] || {}).nombre || 'Limpieza dental', '', 1]]), wb = X.utils.book_new();
+      ws['!cols'] = [{ wch: 30 }, { wch: 6 }, { wch: 6 }, { wch: 18 }, { wch: 32 }, { wch: 8 }, { wch: 9 }];
+      X.utils.book_append_sheet(wb, ws, 'Pacientes'); X.writeFile(wb, 'plantilla-pacientes-jornada.xlsx');
+    } catch (e) { capMsg(e.message, true); }
+  });
+  $('jjImport').addEventListener('change', function (e) { var x = e.target.closest('select[data-imp]'); if (x && imp) { imp.filas[+x.dataset.imp].sel = x.value; pintarImport(); } });
+  $('jjImport').addEventListener('click', function (e) { if (!imp) return; if (e.target.id === 'jjImpAgregar') agregarImport(); else if (e.target.id === 'jjImpDescartar') { imp = null; pintarImport(); capMsg(''); } });
+  $('jjAgendar').addEventListener('click', async function () {
+    if (!form || modoEdicion) return;
+    var id = form.id, f = form.fecha, b = this; b.disabled = true; aviso('jjMsg', 'Creando las citas en la agenda…');
+    var r = await sb.rpc('agendar_jornada', { p_id: id, p_hora: $('jjAgHora').value || '08:00' });
+    if (r.error) { b.disabled = false; aviso('jjMsg', traducir(r.error), true); return; }
+    await cargarJor(id); aviso('jjMsg', r.data + ' cita' + (r.data === 1 ? '' : 's') + ' creada' + (r.data === 1 ? '' : 's') + ' en la agenda del ' + fecha(f) + '.');
   });
   ['jjFInst', 'jjFEstado', 'jjDesde', 'jjHasta'].forEach(function (id) { $(id).addEventListener('change', function () { pag = 1; pintarLista(); }); });
   $('jjPaginas').addEventListener('click', function (e) { var b = e.target.closest('[data-pag]'); if (b && !b.disabled) { pag = +b.dataset.pag; pintarLista(); } });

@@ -6312,6 +6312,139 @@ select i.id, x.nombre, e.id, m.id, x.direccion, x.telefono, x.correo, x.obs
   left join public.geo_municipios m on m.estado_id = e.id and m.nombre = x.muni
  where not exists (select 1 from public.jor_sucursales s where s.institucion_id = i.id and lower(s.nombre) = lower(x.nombre));
 
+-- ===== Jornadas: varios médicos asignados y citas en la agenda =====
+-- La jornada puede tener varios médicos (el primero es el responsable). Los pacientes de la jornada (capturados o
+-- importados de un archivo) se pasan a la agenda en el orden del archivo: ortodoncia al ortodoncista (cada 10 min),
+-- los demás tratamientos por turnos al médico que quede libre primero (cada 30 min).
+alter table public.jor_jornadas add column if not exists medicos bigint[] not null default '{}';
+update public.jor_jornadas set medicos = array[dentista_id] where dentista_id is not null and medicos = '{}';
+alter table public.jor_pacientes add column if not exists cita_id bigint references public.citas (id) on delete set null;
+
+-- Grabar jornada: también guarda los médicos y conserva la cita ya creada de cada paciente
+create or replace function public.guardar_jornada(p_id bigint, p_datos jsonb, p_pacientes jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint := p_id; v_inst public.jor_instituciones; v_estado text := coalesce(nullif(p_datos ->> 'estado', ''), 'planificada');
+  v_suc bigint := nullif(p_datos ->> 'sucursal_id', '')::bigint;
+  v_meds bigint[];
+  pa jsonb; pr jsonb; v_pac bigint; n int := 0; m int; v_total numeric := 0;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if v_estado not in ('planificada', 'realizada', 'cancelada') then raise exception 'Estado no válido (para cerrar usa «Cerrar jornada»)'; end if;
+  select * into v_inst from public.jor_instituciones where id = nullif(p_datos ->> 'institucion_id', '')::bigint;
+  if v_inst.id is null or not public.ve_sede(v_inst.localidad_id) then raise exception 'Elige una institución de tu sede'; end if;
+  if v_suc is not null and not exists (select 1 from public.jor_sucursales where id = v_suc and institucion_id = v_inst.id) then raise exception 'La sucursal no pertenece a la institución elegida'; end if;
+  -- Médicos en el orden elegido, sin repetir; si no viene la lista, el responsable de siempre
+  select coalesce(array_agg(x.d order by x.o), '{}') into v_meds
+    from (select t.v::bigint d, min(t.o) o from jsonb_array_elements_text(case when jsonb_typeof(p_datos -> 'medicos') = 'array' then p_datos -> 'medicos' else '[]'::jsonb end) with ordinality t(v, o)
+           where t.v ~ '^\d+$' group by t.v::bigint) x;
+  if v_meds = '{}' and nullif(p_datos ->> 'dentista_id', '') is not null then v_meds := array[(p_datos ->> 'dentista_id')::bigint]; end if;
+  if exists (select 1 from unnest(v_meds) d where not exists (select 1 from public.dentistas x where x.id = d)) then raise exception 'Uno de los médicos elegidos no existe'; end if;
+  if v_id is not null and not exists (select 1 from public.jor_jornadas where id = v_id and estado <> 'cerrada' and public.ve_sede(localidad_id)) then
+    raise exception 'La jornada está cerrada: reábrela para modificarla';
+  end if;
+  if v_id is null then
+    insert into public.jor_jornadas (institucion_id, localidad_id, organizacion_id) values (v_inst.id, v_inst.localidad_id, v_inst.organizacion_id) returning id into v_id;
+  end if;
+  update public.jor_jornadas set institucion_id = v_inst.id, sucursal_id = v_suc, fecha = coalesce(nullif(p_datos ->> 'fecha', '')::date, current_date),
+    lugar = nullif(trim(p_datos ->> 'lugar'), ''), medicos = v_meds, dentista_id = v_meds[1], estado = v_estado,
+    observaciones = nullif(trim(p_datos ->> 'observaciones'), '')
+   where id = v_id;
+  delete from public.jor_pacientes where jornada_id = v_id;
+  for pa in select * from jsonb_array_elements(coalesce(p_pacientes, '[]'::jsonb)) loop
+    if coalesce(trim(pa ->> 'nombre'), '') = '' then raise exception 'Cada paciente necesita su nombre'; end if;
+    n := n + 1;
+    insert into public.jor_pacientes (jornada_id, orden, nombre, edad, sexo, referencia, cita_id)
+    values (v_id, n, trim(pa ->> 'nombre'), nullif(pa ->> 'edad', '')::int, nullif(pa ->> 'sexo', ''), nullif(trim(pa ->> 'referencia'), ''),
+            (select c.id from public.citas c where c.id = nullif(pa ->> 'cita_id', '')::bigint)) returning id into v_pac;
+    m := 0;
+    for pr in select * from jsonb_array_elements(coalesce(pa -> 'procedimientos', '[]'::jsonb)) loop
+      if coalesce(trim(pr ->> 'descripcion'), '') = '' then raise exception 'Cada procedimiento necesita su descripción'; end if;
+      m := m + 1;
+      insert into public.jor_procedimientos (paciente_id, orden, tratamiento_id, descripcion, pieza, cantidad, precio)
+      values (v_pac, m, nullif(pr ->> 'tratamiento_id', '')::bigint, trim(pr ->> 'descripcion'), nullif(trim(pr ->> 'pieza'), ''),
+              greatest(coalesce(nullif(pr ->> 'cantidad', '')::int, 1), 1), greatest(coalesce(nullif(pr ->> 'precio', '')::numeric, 0), 0));
+      v_total := v_total + greatest(coalesce(nullif(pr ->> 'cantidad', '')::int, 1), 1) * greatest(coalesce(nullif(pr ->> 'precio', '')::numeric, 0), 0);
+    end loop;
+  end loop;
+  update public.jor_jornadas set total = round(v_total, 2) where id = v_id;
+  return v_id;
+end;
+$$;
+revoke execute on function public.guardar_jornada(bigint, jsonb, jsonb) from public, anon;
+grant execute on function public.guardar_jornada(bigint, jsonb, jsonb) to authenticated;
+
+-- Crear en la agenda las citas de los pacientes de la jornada que aún no tienen cita, en su orden, desde la hora indicada.
+-- Ortodoncia: 10 minutos con un ortodoncista; los demás: 30 minutos con un médico general. Si no hay de esa especialidad,
+-- se usa cualquiera de los asignados. Respeta las citas que el médico ya tenga ese día y los horarios bloqueados.
+create or replace function public.agendar_jornada(p_id bigint, p_hora text)
+returns int language plpgsql security definer set search_path = public as $$
+declare
+  v_j public.jor_jornadas; v_inst public.jor_instituciones; v_suc public.jor_sucursales;
+  v_meds bigint[]; v_esorto boolean[]; v_libre int[]; v_tel text; v_inicio int; v_usuario text;
+  pa record; v_serv text; v_orto boolean; v_dur int; v_k int; v_mejor int; v_t int; v_cita bigint; i int; pasada int; n int := 0;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select * into v_j from public.jor_jornadas where id = p_id and public.ve_sede(localidad_id);
+  if v_j.id is null then raise exception 'Jornada no encontrada'; end if;
+  if v_j.estado in ('cerrada', 'cancelada') then raise exception 'La jornada está cerrada o cancelada: no se crean citas'; end if;
+  v_meds := case when cardinality(v_j.medicos) > 0 then v_j.medicos when v_j.dentista_id is not null then array[v_j.dentista_id] end;
+  if v_meds is null then raise exception 'Asigna al menos un médico a la jornada y grábala'; end if;
+  if p_hora !~ '^\d{1,2}:\d{2}' then raise exception 'Indica la hora de inicio'; end if;
+  if exists (select 1 from public.bloqueos b where b.fecha = v_j.fecha and b.hora is null) then raise exception 'Ese día está bloqueado en la agenda'; end if;
+  v_inicio := extract(hour from p_hora::time)::int * 60 + extract(minute from p_hora::time)::int;
+  select * into v_inst from public.jor_instituciones where id = v_j.institucion_id;
+  select * into v_suc from public.jor_sucursales where id = v_j.sucursal_id;
+  v_tel := coalesce(nullif(trim(v_suc.telefono), ''), nullif(trim(v_inst.telefono), ''), 'Sin teléfono');
+  v_usuario := (select usuario from public.perfiles where id = auth.uid());
+  for i in 1 .. cardinality(v_meds) loop
+    v_esorto[i] := exists (select 1 from public.dentistas d where d.id = v_meds[i] and 'Ortodoncia' = any (d.especialidades));
+    v_libre[i] := v_inicio;
+  end loop;
+  for pa in
+    select p.id, p.nombre, p.referencia,
+           (select string_agg(x.descripcion, ', ' order by x.orden) from public.jor_procedimientos x where x.paciente_id = p.id) procs
+      from public.jor_pacientes p
+     where p.jornada_id = p_id and not exists (select 1 from public.citas c where c.id = p.cita_id and c.estado <> 'cancelada')
+     order by p.orden
+  loop
+    v_serv := coalesce(nullif(trim(pa.procs), ''), 'Evaluación general');
+    v_orto := lower(v_serv) ~ '(orto|bracket|frenos|alineador|invisalign|retenedor)';
+    if v_orto and lower(v_serv) !~ 'ortodon' then v_serv := 'Ortodoncia · ' || v_serv; end if;
+    v_dur := case when v_orto then 10 else 30 end;
+    -- El médico de la especialidad que quede libre primero (empate: el orden de la lista); si no hay, cualquiera
+    v_k := null; v_mejor := null;
+    for pasada in 1 .. 2 loop
+      for i in 1 .. cardinality(v_meds) loop
+        if pasada = 1 and v_esorto[i] <> v_orto then continue; end if;
+        if v_mejor is null or v_libre[i] < v_mejor then v_mejor := v_libre[i]; v_k := i; end if;
+      end loop;
+      exit when v_k is not null;
+    end loop;
+    v_t := v_libre[v_k];
+    loop
+      exit when not exists (select 1 from public.citas c where c.fecha = v_j.fecha and c.dentista_id = v_meds[v_k] and c.estado <> 'cancelada'
+                              and (extract(hour from c.hora)::int * 60 + extract(minute from c.hora)::int) < v_t + v_dur
+                              and (extract(hour from c.hora)::int * 60 + extract(minute from c.hora)::int) + case when lower(c.servicio) ~ 'ortodon' then 10 else 30 end > v_t)
+            and not exists (select 1 from public.bloqueos b where b.fecha = v_j.fecha and b.hora is not null
+                              and (extract(hour from b.hora)::int * 60 + extract(minute from b.hora)::int) between v_t and v_t + v_dur - 1);
+      v_t := v_t + 10;
+      if v_t + v_dur > 24 * 60 then raise exception 'No caben todas las citas ese día: elige una hora de inicio más temprana o asigna más médicos'; end if;
+    end loop;
+    insert into public.citas (fecha, hora, servicio, nombre, telefono, dentista_id, prioridad, notas, estado, creada_por, localidad_id, organizacion_id)
+    values (v_j.fecha, make_time(v_t / 60, v_t % 60, 0), left(v_serv, 200), pa.nombre, v_tel, v_meds[v_k], 'normal',
+            'Jornada N.º ' || v_j.numero || ' · ' || v_inst.nombre || coalesce(' · ' || v_suc.nombre, '') || coalesce(' · ' || nullif(pa.referencia, ''), ''),
+            'pendiente', v_usuario, v_j.localidad_id, v_j.organizacion_id)
+    returning id into v_cita;
+    update public.jor_pacientes set cita_id = v_cita where id = pa.id;
+    v_libre[v_k] := v_t + v_dur; n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+revoke execute on function public.agendar_jornada(bigint, text) from public, anon;
+grant execute on function public.agendar_jornada(bigint, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

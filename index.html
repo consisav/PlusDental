@@ -1325,6 +1325,15 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .jj-cap2{display:grid;grid-template-columns:minmax(0,2.6fr) 90px 80px 120px auto;gap:8px 10px;align-items:end}
 .jj-det .jj-c-pac{width:24%}.jj-det .jj-c-pieza{width:76px}.jj-det tr.jj-sub td{background:#F5F9FC;font-size:12.5px;color:#475B68}
 .jj-botones{flex-wrap:wrap}
+.jj-g .jj-meds{grid-column:2/4}.jj-meds-caja{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:40px;border:1px solid #CFDCE6;border-radius:10px;padding:4px 6px;background:#fff}
+.jj-med{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;background:#EEF6FC;border:1px solid #BFD7E8;color:#0B2B40;border-radius:999px;padding:2px 4px 2px 10px}.jj-med small{font-weight:500;color:#5A6D7A}.jj-med-resp{background:#DCEBF7}
+.jj-med button{border:0;background:none;cursor:pointer;font-size:15px;line-height:1;color:#5A6D7A;padding:0 4px}.jj-med button:hover{color:#9A3B2E}.jj-meds-caja select{border:0;background:transparent;font:inherit;font-size:13px;color:#475B68;min-width:160px;flex:1;padding:4px;box-shadow:none}
+.jj-imp-barra{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px dashed #D7E3EC}.jj-imp-barra .inv-sub{font-size:12px}
+#jjImport{margin-top:10px;background:#fff;border:1px solid #D7E3EC;border-radius:12px;padding:10px}.jj-imp-cab{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;font-size:13px;margin-bottom:8px}.jj-imp-mal{color:#9A3B2E;font-weight:700}
+.jj-imp-wrap{max-height:320px;overflow:auto}.jj-imp-t{table-layout:fixed;width:100%}.jj-imp-t .jj-i-n{width:56px}.jj-imp-t .jj-i-arch{width:26%}.jj-imp-t .jj-i-proc{width:34%}.jj-imp-t select{width:100%}.jj-imp-t .ia-corto{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jj-imp-t tr.jj-imp-falta td{background:#FDF3F1}.jj-imp-pie{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.jj-agenda{margin-top:10px}.jj-ag-fila{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end}.jj-ag-fila .ic-campo{width:140px}#jjAgInfo{flex:1 1 280px;font-size:12.5px;align-self:center}.jj-det .jj-cita{display:block;font-size:11.5px;color:#1F6B4A;font-weight:600}
+@media (max-width:980px){.jj-g .jj-meds{grid-column:1/-1}}
 @media (max-width:980px){.jj-g{grid-template-columns:repeat(2,minmax(0,1fr))}.jj-g .jj-inst,.jj-g .jj-lugar{grid-column:1/-1}.jj-cap1,.jj-cap2{grid-template-columns:repeat(2,minmax(0,1fr))}.jj-cap1 .jj-cap-pac,.jj-cap2 .jj-cap-proc{grid-column:1/-1}.ji-tabla,.jj-det{min-width:760px}}
 .ic-det-pie{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 12px;background:#F8FBFD;font-size:13px;color:#475B68}.ic-det-pie b{color:#0B2B40;font-variant-numeric:tabular-nums}
 @media (max-width:980px){.ic-cap-f1{grid-template-columns:repeat(2,minmax(0,1fr))}.ic-cap-f1 .ic-cap-prod{grid-column:1/-1}.ic-cap-f2{grid-template-columns:repeat(3,minmax(0,1fr))}.ic-cons-filtros{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -3026,7 +3035,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="inventarios.js?v=20261027e"></script>
 <script src="inventarios-movimientos.js?v=20261027i"></script>
 <script src="inventarios-traslados.js?v=20261027"></script>
-<script src="jornadas.js?v=20261027c"></script>
+<script src="jornadas.js?v=20261027d"></script>
 <script src="inventarios-ordenes.js?v=20261027f"></script>
 <script src="asistentes.js"></script>
 <script src="dentistas.js"></script>
