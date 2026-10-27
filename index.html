@@ -1113,6 +1113,22 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .geo-secs{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
 @media(min-width:980px){.geo-secs{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(min-width:680px) and (max-width:979px){.geo-secs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1180px){.geo-secs-4{grid-template-columns:repeat(4,minmax(0,1fr))}#geoDlg.geo-dlg-xl:has(.geo-secs-4){width:min(1320px,calc(100% - 24px))}}
+@media(min-width:980px) and (max-width:1179px){.geo-secs-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ip-barra{justify-content:flex-start}.ip-barra .geo-buscar{flex:1;min-width:220px}
+.ip-tipo{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#475B68}.ip-tipo select{min-height:40px}
+.ip-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
+@media(min-width:1100px){.ip-grid{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}}
+.ip-lista .geo-scroll{max-height:470px}.ip-cuenta{margin:8px 4px 0;font-size:12px;color:#5A6D7A}
+.ip-ficha-panel .geo-ficha{margin:0;border:0;padding:0;background:transparent}
+.ip-titulo{margin:0 0 6px;font-size:18px}
+.ip-ficha-grid,.ip-tab-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:900px){.ip-tab-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.ip-marcas{flex-direction:row!important;flex-wrap:wrap;gap:8px!important}
+.ip-marca{display:inline-flex;align-items:center;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:#EEF2F5;color:#5A6D7A}
+.ip-marca.si{background:#DCF2EC;color:#08504C}
+.ip-ext{background:#E0E7FF;color:#3730A3}
+.ip-tabs-panel{margin-top:14px}.ip-tabs-panel .ic-tabs{margin:0 0 12px}
 .geo-sec{margin:0;border:1px solid #D7E3EC;border-radius:14px;padding:10px 12px 12px;background:#F8FBFD;min-width:0}
 .geo-sec legend{padding:0 6px;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#005A87}
 .geo-sec-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px;align-items:start}
@@ -1180,6 +1196,22 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .inv-lineas td.num,.inv-lineas th.num{white-space:nowrap}
 .inv-compra-pie{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .inv-anulada{background:#FDECEA;color:#9A3B2E;border-radius:10px;padding:8px 12px;font-size:13px}
+.ik-acciones{display:flex;gap:8px;flex-wrap:wrap}
+.ik-filtros{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;background:#F5F9FC;border:1px solid #D7E3EC;border-radius:14px;padding:12px 14px;margin:6px 0 14px}
+.ik-campo{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#475B68}
+.ik-campo .adm-input{min-height:38px}.ik-buscar{flex:1;min-width:220px}
+.ik-check{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:#475B68;min-height:38px}
+.ik-titulo{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}.ik-titulo h4{margin:0;font-size:15px;color:#0B2B40}.ik-titulo>span{font-size:12px;color:#5A6D7A}
+.ik-scroll{max-height:290px;overflow:auto}.ik-scroll thead th,.ik-scroll-d thead th{position:sticky;top:0;background:#fff;z-index:1}
+.ik-scroll-d{max-height:520px;overflow:auto}
+.ik-tabla-m td,.ik-tabla-d td{padding:6px 8px;font-size:12.5px}.ik-tabla-d th{font-size:10.5px;white-space:nowrap}.ik-tabla-d td{white-space:nowrap}
+.ik-tabla-m tr[data-prod]{cursor:pointer}.ik-tabla-m tr.geo-sel td{background:#EAF3FA}
+.ik-cod{color:#5A6D7A;font-variant-numeric:tabular-nums}.ik-mov{font-weight:600;color:#0B2B40}
+.ik-in{color:#047857}.ik-out{color:#B42318}.ik-exist{background:#FFF8E6}
+.ik-tabla-d td:nth-child(n+14){background:#EEF8F2;font-variant-numeric:tabular-nums}
+.ik-detalle{margin-top:14px}.ik-cab h4{margin:0}
+.ik-resumen{display:flex;gap:8px;flex-wrap:wrap}.ik-resumen div{border:1px solid #D7E3EC;border-radius:10px;padding:6px 12px;background:#F8FBFD}.ik-resumen span{display:block;font-size:11px;color:#5A6D7A}.ik-resumen b{font-size:15px}
+.ik-anterior td{background:#F1F5F8;color:#475B68;font-style:italic}
 .inv-kardex{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
 @media(min-width:1100px){.inv-kardex{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}}
 .inv-kardex-cab{margin-bottom:10px}.inv-kardex-cab .geo-h{margin:0}
@@ -2860,7 +2892,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="geografia.js?v=20261026b"></script>
 <script src="organizaciones.js?v=20261026"></script>
 <script src="inventarios.js?v=20261026c"></script>
-<script src="inventarios-movimientos.js?v=20261026b"></script>
+<script src="inventarios-movimientos.js?v=20261026c"></script>
 <script src="asistentes.js"></script>
 <script src="dentistas.js"></script>
 <script src="agenda.js"></script>

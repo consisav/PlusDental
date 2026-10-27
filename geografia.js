@@ -69,7 +69,7 @@
           return campoHtml(ancho ? Object.assign({}, c, { ancho: 'full' }) : c, val[c.k]); }).join('') + '</div></fieldset>';
       }).join('');
       var resto = cfg.campos.filter(function (c) { return !usados[c.k]; });
-      $('geoDlgCampos').innerHTML = '<div class="geo-secs">' + html + '</div>' + resto.map(function (c) { return campoHtml(c, val[c.k]); }).join('');
+      $('geoDlgCampos').innerHTML = '<div class="geo-secs geo-secs-' + cfg.secciones.length + '">' + html + '</div>' + resto.map(function (c) { return campoHtml(c, val[c.k]); }).join('');
     } else $('geoDlgCampos').innerHTML = cfg.campos.map(function (c) { return campoHtml(c, val[c.k]); }).join('');
     dlg.classList.toggle('geo-dlg-xl', !!cfg.secciones);
     $('geoDlgCampos').classList.toggle('con-secciones', !!cfg.secciones);
