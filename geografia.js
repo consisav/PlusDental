@@ -68,8 +68,10 @@
           var c = cfg.campos.filter(function (x) { return x.k === k; })[0]; if (!c) return ''; usados[k] = true;
           return campoHtml(ancho ? Object.assign({}, c, { ancho: 'full' }) : c, val[c.k]); }).join('') + '</div></fieldset>';
       }).join('');
-      var resto = cfg.campos.filter(function (c) { return !usados[c.k]; });
-      $('geoDlgCampos').innerHTML = '<div class="geo-secs geo-secs-' + cfg.secciones.length + '">' + html + '</div>' + resto.map(function (c) { return campoHtml(c, val[c.k]); }).join('');
+      // Organización y localidad: en una sola línea, arriba (debajo del título)
+      var sedeC = cfg.campos.filter(function (c) { return c.tipo === 'sede' && !usados[c.k]; })[0];
+      var resto = cfg.campos.filter(function (c) { return !usados[c.k] && c !== sedeC; });
+      $('geoDlgCampos').innerHTML = (sedeC ? '<div class="geo-sede-linea">' + campoHtml(sedeC) + '</div>' : '') + '<div class="geo-secs geo-secs-' + cfg.secciones.length + '">' + html + '</div>' + resto.map(function (c) { return campoHtml(c, val[c.k]); }).join('');
     } else $('geoDlgCampos').innerHTML = cfg.campos.map(function (c) { return campoHtml(c, val[c.k]); }).join('');
     dlg.classList.toggle('geo-dlg-xl', !!cfg.secciones);
     $('geoDlgCampos').classList.toggle('con-secciones', !!cfg.secciones);
@@ -79,7 +81,7 @@
     if (cfg.campos.some(function (c) { return c.tipo === 'sede'; }) && window.PD_SEDES) window.PD_SEDES.llenar($('geoF_organizacion_id'), $('geoF_localidad_id'), (cfg.valores || {}).localidad_id || null);
     if (cfg.alAbrir) cfg.alAbrir();
     if (!dlg.open) dlg.showModal();
-    var primero = $('geoDlgCampos').querySelector('input:not([type=file]),select,textarea');
+    var primero = $('geoDlgCampos').querySelector('input:not([type=file]):not(:disabled),select:not(:disabled),textarea:not(:disabled)');
     if (primero) primero.focus();
   }
   function leer() {
