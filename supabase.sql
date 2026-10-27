@@ -5373,6 +5373,33 @@ $$;
 revoke execute on function public.crear_productos_compra(bigint) from public, anon;
 grant execute on function public.crear_productos_compra(bigint) to authenticated;
 
+-- ===== Inventarios: proveedores de productos dentales y medicamentos en Guatemala (datos iniciales) =====
+-- Depósitos dentales y droguerías con presencia en Guatemala, tomados de sus sitios y directorios públicos (oct. 2026).
+-- Sin NIT ni condiciones de crédito: quedan «Pendiente de revisar» para que se confirmen con cada proveedor.
+-- Solo se insertan los que falten, en la sede 2-01 (Plus Dental).
+insert into public.inv_proveedores (nombre_comercial, nombre_fiscal, direccion, telefonos, contacto, dias_credito, pendiente_revisar, localidad_id, organizacion_id)
+select x.comercial, x.fiscal, x.direccion, x.telefonos, x.contacto, 0, true, l.id, l.organizacion_id
+  from (values
+  ('Magno Dental', 'Magno Dental, S.A.', '11 Avenida 19-39, Zona 10, Ciudad de Guatemala', null, 'Alex Mármol (distribuidor autorizado Ultradent)'),
+  ('Dentfarma', 'Dentfarma', '4 Calle A 11-69, Zona 4 de Mixco, Colonia Monte Real', '3267-1296 / 5306-7988', 'Representa 3M y Ultradent'),
+  ('Distribuidora Dental (DIDESA)', 'Distribuidora Dental, S.A.', 'Zona 9, Ciudad de Guatemala', '2296-0115', 'Distribuidor oficial MIS Implants'),
+  ('Denti Clínica', 'Denti Clínica, S.A.', null, null, 'Materiales y equipo dental y médico-quirúrgico'),
+  ('Bodega Dental', 'Bodega Dental', null, null, 'Adhesivos, cementos, descartables'),
+  ('Importadora Delgado', 'Importadora Delgado, S.A.', 'Quetzaltenango (envíos a todo el país)', null, 'Depósito dental'),
+  ('Depósito Dental Leal Castro', 'Depósito Dental Leal Castro', '13 Calle 4-24, Zona 1, Ciudad de Guatemala', '2251-8716', 'Materiales de laboratorio dental'),
+  ('Tecnodentic', 'Tecnodentic', 'Zona 11, Colonia Toledo, Ciudad de Guatemala', null, 'Equipos, instrumental y materiales dentales'),
+  ('Denteco', 'Denteco', '3 Calle A 7-35, Zona 10, Ciudad de Guatemala', null, 'Depósito dental'),
+  ('Alumbra', 'Alumbra, S.A.', null, null, 'Equipo médico y dental, implantes, autoclaves'),
+  ('Droguería Colón', 'Droguería Colón, S.A.', '13 Avenida 5-40, Zona 1, Ciudad de Guatemala', null, 'Medicamentos'),
+  ('Droguería Pisa', 'Droguería Pisa de Guatemala, S.A.', 'Zona 13, Ciudad de Guatemala', '2302-4500 / 5730-7171', 'Medicamentos e insumos hospitalarios'),
+  ('Droguería Americana (Grupo DASA)', 'Droguería Americana, S.A.', '7 Avenida 6-51, Zona 2, Ciudad de Guatemala', null, 'Medicamentos'),
+  ('Droguería Italiana', 'Droguería Italiana', null, null, 'Representa 12 laboratorios farmacéuticos'),
+  ('Supharma', 'Supharma, S.A.', null, null, 'Medicamentos, naturales y nutricionales'),
+  ('Medissa', 'Medissa', null, null, 'Distribuidora de medicamentos')
+  ) x (comercial, fiscal, direccion, telefonos, contacto)
+  cross join (select l.id, l.organizacion_id from public.org_localidades l join public.organizaciones o on o.id = l.organizacion_id where o.codigo = '2' and l.codigo = '1') l
+ where not exists (select 1 from public.inv_proveedores p where lower(p.nombre_comercial) = lower(x.comercial) and p.localidad_id = l.id);
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
