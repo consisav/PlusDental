@@ -259,7 +259,7 @@
     var l = productos.filter(function (p) { return pasaFiltro('prod', p) && (!c || p.clasificacion === c) && (!t || norm([p.nombre, p.codigo, p.marca, p.principio_activo].join(' ')).indexOf(t) >= 0); });
     $('iaLista').innerHTML = l.length ? l.map(function (p) {
       var bajo = p.control_minimo && p.minimo != null;
-      return fila('prod', p.id, p.id === prodSel, [p.numero || '—', esc(p.codigo || '—'), '<div class="inv-prod">' + imagenProducto(p, 40) + '<div><b>' + esc(p.nombre) + '</b>' + (p.principio_activo ? '<small class="inv-sub">' + esc(p.principio_activo) + '</small>' : '') + (p.tipo_producto ? '<small class="inv-sub">' + esc(p.tipo_producto) + '</small>' : '') + '</div></div>', esc(p.clasificacion || '—'),
+      return fila('prod', p.id, p.id === prodSel, [p.numero || '—', esc(p.codigo || '—'), '<div class="inv-prod">' + imagenProducto(p, 40) + '<div><b>' + esc(p.nombre) + '</b>' + (p.principio_activo ? '<small class="inv-sub">' + esc(p.principio_activo) + '</small>' : '') + (p.tipo_producto ? '<small class="inv-sub">' + esc(p.tipo_producto) + '</small>' : '') + (p.no_definido ? '<span class="inv-alerta" title="Creado desde una compra: completa su definición">No definido</span>' : '') + '</div></div>', esc(p.clasificacion || '—'),
         esc([p.presentacion, p.unidad].filter(Boolean).join(' · ') || '—'), (p.minimo != null || p.maximo != null ? (p.minimo != null ? Number(p.minimo) : '—') + ' / ' + (p.maximo != null ? Number(p.maximo) : '—') : '—') + (bajo ? ' <span class="inv-alerta" title="Control de punto mínimo activo">mín.</span>' : ''), q(p.costo), p.precio_referencia != null ? '<span class="inv-ref" title="' + esc(p.precio_referencia_nota || 'Precio de referencia estimado') + '">' + q(p.precio_referencia) + '</span>' : '—', pill(p.estado)]);
     }).join('') : vacia(10, productos.length ? 'Ningún producto coincide.' : 'Aún no hay productos. Agrega el primero con «+ Producto».');
     var p = productos.filter(function (x) { return x.id === prodSel; })[0];
@@ -332,6 +332,7 @@
         var archivo = d.foto_archivo; delete d.foto_archivo;
         ['proveedor_id', 'bodega_id'].forEach(function (k) { d[k] = d[k] ? +d[k] : null; });
         if (d.minimo != null && d.maximo != null && d.minimo > d.maximo) return 'El mínimo no puede ser mayor que el máximo.';
+        d.no_definido = false;   // al grabar la ficha, el producto creado desde una compra queda definido
         var r = p ? await sb.from('inv_productos').update(d).eq('id', p.id).select('id').single() : await sb.from('inv_productos').insert(d).select('id').single();
         if (r.error) return traducir(r.error);
         prodSel = r.data.id;

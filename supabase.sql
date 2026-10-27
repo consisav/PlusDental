@@ -5129,6 +5129,250 @@ do $$ begin
   end if;
 end $$;
 
+-- ===== Inventarios: compras con carga al inventario, reversión, abonos y productos no definidos =====
+-- La compra se graba primero (estado «Grabada», se puede modificar) y luego se carga al inventario (estado «Operada»,
+-- entrada en el kardex). «Revertir carga» saca los productos del kardex y la regresa a «Grabada». «Anular» la cierra.
+-- Los abonos (pagos al proveedor) son un sub-detalle de la factura de compra.
+alter table public.inv_compras add column if not exists moneda text not null default 'GTQ' check (moneda in ('GTQ', 'USD'));
+alter table public.inv_compras add column if not exists tipo_compra text not null default 'local' check (tipo_compra in ('local', 'importacion'));
+alter table public.inv_compras add column if not exists tipo_cambio numeric(12,4) not null default 1 check (tipo_cambio > 0);
+alter table public.inv_compras add column if not exists no_interno text check (char_length(no_interno) <= 40);
+alter table public.inv_compras add column if not exists orden_compra text check (char_length(orden_compra) <= 40);
+alter table public.inv_compras add column if not exists nota_credito numeric(12,2) not null default 0 check (nota_credito >= 0);
+alter table public.inv_compras add column if not exists descuentos numeric(12,2) not null default 0 check (descuentos >= 0);
+alter table public.inv_compras add column if not exists aplica_retencion boolean not null default false;
+alter table public.inv_compras add column if not exists valor_retencion numeric(12,2) not null default 0 check (valor_retencion >= 0);
+alter table public.inv_compras add column if not exists formulario_retencion text check (char_length(formulario_retencion) <= 40);
+alter table public.inv_compras add column if not exists regimen_isr text check (char_length(regimen_isr) <= 20);
+alter table public.inv_compras add column if not exists regimen_isr_desc text check (char_length(regimen_isr_desc) <= 120);
+alter table public.inv_compras add column if not exists transaccion text check (char_length(transaccion) <= 20);
+alter table public.inv_compras add column if not exists documento_muestras boolean not null default false;
+alter table public.inv_compras add column if not exists total_usd numeric(12,2) not null default 0 check (total_usd >= 0);
+alter table public.inv_compras add column if not exists cargado_en timestamptz;
+alter table public.inv_compras add column if not exists cargado_por text;
+-- Estados: grabada (sin cargar) → operada (cargada al inventario) → anulada
+alter table public.inv_compras drop constraint if exists inv_compras_estado_check;
+update public.inv_compras set estado = 'operada' where estado = 'registrada';
+alter table public.inv_compras alter column estado set default 'grabada';
+alter table public.inv_compras add constraint inv_compras_estado_check check (estado in ('grabada', 'operada', 'anulada'));
+update public.inv_compras set cargado_en = coalesce(cargado_en, creado), cargado_por = coalesce(cargado_por, creado_por) where estado = 'operada';
+
+alter table public.inv_compra_items alter column producto_id drop not null;
+alter table public.inv_compra_items add column if not exists codigo text check (char_length(codigo) <= 40);
+alter table public.inv_compra_items add column if not exists nombre text check (char_length(nombre) <= 200);
+alter table public.inv_compra_items add column if not exists fecha_fabricacion date;
+alter table public.inv_compra_items add column if not exists descuento numeric(12,2) not null default 0 check (descuento >= 0);
+alter table public.inv_compra_items add column if not exists costo_unitario_mi numeric(12,4) not null default 0 check (costo_unitario_mi >= 0);
+alter table public.inv_compra_items add column if not exists subtotal_mi numeric(12,2) not null default 0 check (subtotal_mi >= 0);
+alter table public.inv_compra_items add column if not exists afecta_inventario boolean not null default true;
+alter table public.inv_compra_items add column if not exists controla_fecha boolean not null default false;
+
+-- Producto creado desde una compra, pendiente de completar su definición
+alter table public.inv_productos add column if not exists no_definido boolean not null default false;
+
+-- Origen nuevo en el kardex: reversión de la carga de una compra
+alter table public.inv_movimientos drop constraint if exists inv_movimientos_origen_check;
+alter table public.inv_movimientos add constraint inv_movimientos_origen_check
+  check (origen in ('compra', 'venta', 'ajuste', 'anulacion_compra', 'anulacion_venta', 'reversion_compra'));
+
+-- Abonos a la factura de compra (cuenta bancaria, documento, fecha de pago, total en quetzales y en moneda internacional)
+create table if not exists public.inv_compra_abonos (
+  id               bigint generated always as identity primary key,
+  compra_id        bigint not null references public.inv_compras (id) on delete cascade,
+  cuenta_bancaria  text check (char_length(cuenta_bancaria) <= 80),
+  descripcion      text check (char_length(descripcion) <= 200),
+  fecha_pago       date not null default current_date,
+  total            numeric(12,2) not null check (total > 0),
+  total_mi         numeric(12,2) not null default 0 check (total_mi >= 0),
+  creado           timestamptz not null default now(),
+  creado_por       text,
+  modificado       timestamptz,
+  modificado_por   text
+);
+create index if not exists inv_compra_abonos_compra on public.inv_compra_abonos (compra_id);
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'inv_compra_abonos_registro' and tgrelid = 'public.inv_compra_abonos'::regclass) then
+    create trigger inv_compra_abonos_registro before insert or update on public.inv_compra_abonos for each row execute function public.inv_registro();
+  end if;
+end $$;
+alter table public.inv_compra_abonos enable row level security;
+drop policy if exists inv_compra_abonos_lee on public.inv_compra_abonos;
+create policy inv_compra_abonos_lee on public.inv_compra_abonos for select to authenticated
+  using (public.es_personal() and exists (select 1 from public.inv_compras c where c.id = compra_id and public.ve_sede(c.localidad_id)));
+drop policy if exists inv_compra_abonos_crea on public.inv_compra_abonos;
+create policy inv_compra_abonos_crea on public.inv_compra_abonos for insert to authenticated
+  with check (public.es_personal() and exists (select 1 from public.inv_compras c where c.id = compra_id and c.estado <> 'anulada' and public.ve_sede(c.localidad_id)));
+drop policy if exists inv_compra_abonos_edita on public.inv_compra_abonos;
+create policy inv_compra_abonos_edita on public.inv_compra_abonos for update to authenticated
+  using (public.es_personal() and exists (select 1 from public.inv_compras c where c.id = compra_id and c.estado <> 'anulada' and public.ve_sede(c.localidad_id)))
+  with check (public.es_personal() and exists (select 1 from public.inv_compras c where c.id = compra_id and c.estado <> 'anulada' and public.ve_sede(c.localidad_id)));
+drop policy if exists inv_compra_abonos_borra on public.inv_compra_abonos;
+create policy inv_compra_abonos_borra on public.inv_compra_abonos for delete to authenticated
+  using (public.es_personal() and exists (select 1 from public.inv_compras c where c.id = compra_id and c.estado <> 'anulada' and public.ve_sede(c.localidad_id)));
+grant select, insert, update, delete on public.inv_compra_abonos to authenticated;
+
+-- Grabar (nueva o modificar) una compra en estado «Grabada», con su detalle. No mueve el inventario.
+create or replace function public.guardar_compra(p_id bigint, p_datos jsonb, p_items jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint := p_id;
+  v_bodega public.inv_bodegas;
+  v_cambio numeric := greatest(coalesce(nullif(p_datos ->> 'tipo_cambio', '')::numeric, 1), 0.0001);
+  v_moneda text := coalesce(nullif(p_datos ->> 'moneda', ''), 'GTQ');
+  v_total numeric := 0;
+  e jsonb; n int := 0;
+  v_cant numeric; v_costo numeric; v_desc numeric; v_sub numeric; v_q numeric;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if jsonb_array_length(coalesce(p_items, '[]'::jsonb)) = 0 then raise exception 'Agrega al menos un artículo a la compra'; end if;
+  select * into v_bodega from public.inv_bodegas where id = nullif(p_datos ->> 'bodega_id', '')::bigint;
+  if v_bodega.id is null or not public.ve_sede(v_bodega.localidad_id) then raise exception 'Elige una bodega de tu sede'; end if;
+  if v_id is not null and not exists (select 1 from public.inv_compras where id = v_id and estado = 'grabada' and public.ve_sede(localidad_id)) then
+    raise exception 'Solo se puede modificar una compra en estado Grabada (revierte la carga primero)';
+  end if;
+  if v_id is null then
+    insert into public.inv_compras (bodega_id, localidad_id, organizacion_id, estado) values (v_bodega.id, v_bodega.localidad_id, v_bodega.organizacion_id, 'grabada') returning id into v_id;
+  end if;
+  update public.inv_compras set
+    proveedor_id = nullif(p_datos ->> 'proveedor_id', '')::bigint, bodega_id = v_bodega.id,
+    fecha = coalesce(nullif(p_datos ->> 'fecha', '')::date, current_date),
+    tipo_documento = coalesce(nullif(p_datos ->> 'tipo_documento', ''), 'factura'),
+    serie = nullif(trim(p_datos ->> 'serie'), ''), numero_documento = nullif(trim(p_datos ->> 'numero_documento'), ''),
+    dias_credito = coalesce(nullif(p_datos ->> 'dias_credito', '')::int, 0), observaciones = nullif(trim(p_datos ->> 'observaciones'), ''),
+    moneda = v_moneda, tipo_compra = coalesce(nullif(p_datos ->> 'tipo_compra', ''), 'local'), tipo_cambio = v_cambio,
+    no_interno = nullif(trim(p_datos ->> 'no_interno'), ''), orden_compra = nullif(trim(p_datos ->> 'orden_compra'), ''),
+    nota_credito = greatest(coalesce(nullif(p_datos ->> 'nota_credito', '')::numeric, 0), 0),
+    descuentos = greatest(coalesce(nullif(p_datos ->> 'descuentos', '')::numeric, 0), 0),
+    aplica_retencion = coalesce((p_datos ->> 'aplica_retencion')::boolean, false),
+    valor_retencion = greatest(coalesce(nullif(p_datos ->> 'valor_retencion', '')::numeric, 0), 0),
+    formulario_retencion = nullif(trim(p_datos ->> 'formulario_retencion'), ''),
+    regimen_isr = nullif(trim(p_datos ->> 'regimen_isr'), ''), regimen_isr_desc = nullif(trim(p_datos ->> 'regimen_isr_desc'), ''),
+    transaccion = nullif(trim(p_datos ->> 'transaccion'), ''), documento_muestras = coalesce((p_datos ->> 'documento_muestras')::boolean, false)
+   where id = v_id;
+  delete from public.inv_compra_items where compra_id = v_id;
+  for e in select * from jsonb_array_elements(p_items) loop
+    v_cant := coalesce(nullif(e ->> 'cantidad', '')::numeric, 0);
+    v_costo := greatest(coalesce(nullif(e ->> 'costo_unitario', '')::numeric, 0), 0);
+    v_desc := greatest(coalesce(nullif(e ->> 'descuento', '')::numeric, 0), 0);
+    if v_cant <= 0 then raise exception 'La cantidad de cada artículo debe ser mayor que cero'; end if;
+    if nullif(e ->> 'producto_id', '') is null and coalesce(trim(e ->> 'nombre'), '') = '' then raise exception 'Escribe el producto de la línea %', n + 1; end if;
+    n := n + 1;
+    v_sub := greatest(round(v_cant * v_costo - v_desc, 2), 0);       -- en la moneda de la compra
+    v_q := case when v_moneda = 'USD' then round(v_sub * v_cambio, 2) else v_sub end;
+    insert into public.inv_compra_items (compra_id, linea, producto_id, codigo, nombre, cantidad, costo_unitario, descuento, subtotal, costo_unitario_mi, subtotal_mi,
+                                         lote, fecha_fabricacion, vencimiento, afecta_inventario, controla_fecha)
+    values (v_id, n, nullif(e ->> 'producto_id', '')::bigint, nullif(trim(e ->> 'codigo'), ''), nullif(trim(e ->> 'nombre'), ''), v_cant,
+            case when v_moneda = 'USD' then round(v_costo * v_cambio, 4) else v_costo end, case when v_moneda = 'USD' then round(v_desc * v_cambio, 2) else v_desc end, v_q,
+            case when v_moneda = 'USD' then v_costo else round(v_costo / v_cambio, 4) end, round(v_q / v_cambio, 2),
+            nullif(trim(e ->> 'lote'), ''), nullif(e ->> 'fecha_fabricacion', '')::date, nullif(e ->> 'vencimiento', '')::date,
+            coalesce((e ->> 'afecta_inventario')::boolean, true), coalesce((e ->> 'controla_fecha')::boolean, false));
+    v_total := v_total + v_q;
+  end loop;
+  v_total := greatest(v_total - (select descuentos + nota_credito from public.inv_compras where id = v_id), 0);
+  update public.inv_compras set total = round(v_total, 2), total_usd = round(v_total / v_cambio, 2) where id = v_id;
+  return v_id;
+end;
+$$;
+revoke execute on function public.guardar_compra(bigint, jsonb, jsonb) from public, anon;
+grant execute on function public.guardar_compra(bigint, jsonb, jsonb) to authenticated;
+
+-- Cargar al inventario: entrada en el kardex de cada artículo que afecta inventario; actualiza el último costo
+create or replace function public.cargar_compra(p_id bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare c public.inv_compras; v_doc text; v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select * into c from public.inv_compras where id = p_id for update;
+  if c.id is null or not public.ve_sede(c.localidad_id) then raise exception 'La compra no existe'; end if;
+  if c.estado <> 'grabada' then raise exception 'La compra ya está cargada o anulada'; end if;
+  if exists (select 1 from public.inv_compra_items where compra_id = p_id and producto_id is null) then
+    raise exception 'Hay artículos sin producto en el inventario: usa «Crear producto» antes de cargar';
+  end if;
+  v_doc := 'Compra N.º ' || c.numero || coalesce(' · ' || nullif(concat_ws(' ', c.serie, c.numero_documento), ''), '');
+  insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, compra_id, documento, cantidad, costo_unitario, usuario, localidad_id, organizacion_id)
+  select now(), i.producto_id, c.bodega_id, 'entrada', 'compra', c.id, v_doc, i.cantidad, round(i.subtotal / i.cantidad, 4), v_usuario, c.localidad_id, c.organizacion_id
+    from public.inv_compra_items i where i.compra_id = p_id and i.afecta_inventario order by i.linea;
+  update public.inv_productos p set costo = round(i.subtotal / i.cantidad, 2)
+    from public.inv_compra_items i where i.compra_id = p_id and i.afecta_inventario and i.producto_id = p.id and i.subtotal > 0;
+  update public.inv_compras set estado = 'operada', cargado_en = now(), cargado_por = v_usuario where id = p_id;
+end;
+$$;
+revoke execute on function public.cargar_compra(bigint) from public, anon;
+grant execute on function public.cargar_compra(bigint) to authenticated;
+
+-- Revertir la carga: salida en el kardex de lo cargado y la compra vuelve a «Grabada» para corregirla
+create or replace function public.revertir_carga_compra(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+declare c public.inv_compras; v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escribe el motivo de la reversión'; end if;
+  select * into c from public.inv_compras where id = p_id for update;
+  if c.id is null or not public.ve_sede(c.localidad_id) then raise exception 'La compra no existe'; end if;
+  if c.estado <> 'operada' then raise exception 'Solo se revierte una compra cargada al inventario (Operada)'; end if;
+  insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, compra_id, documento, cantidad, costo_unitario, observaciones, usuario, localidad_id, organizacion_id)
+  select now(), producto_id, bodega_id, 'salida', 'reversion_compra', p_id, 'Reversión · Compra N.º ' || c.numero || coalesce(' · ' || nullif(concat_ws(' ', c.serie, c.numero_documento), ''), ''),
+           sum(case when origen = 'compra' then cantidad else -cantidad end),
+           (array_agg(costo_unitario order by id desc) filter (where origen = 'compra'))[1], trim(p_motivo), v_usuario, localidad_id, organizacion_id
+      from public.inv_movimientos where compra_id = p_id and origen in ('compra', 'reversion_compra')
+     group by producto_id, bodega_id, localidad_id, organizacion_id
+    having sum(case when origen = 'compra' then cantidad else -cantidad end) > 0;
+  update public.inv_compras set estado = 'grabada', cargado_en = null, cargado_por = null where id = p_id;
+end;
+$$;
+revoke execute on function public.revertir_carga_compra(bigint, text) from public, anon;
+grant execute on function public.revertir_carga_compra(bigint, text) to authenticated;
+
+-- Anular (Super Administrador): si estaba cargada, saca del kardex lo que quedaba ingresado
+create or replace function public.anular_compra(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+declare c public.inv_compras; v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_super_administrador() then raise exception 'Solo el Super Administrador puede anular compras'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escribe el motivo de la anulación'; end if;
+  select * into c from public.inv_compras where id = p_id for update;
+  if c.id is null or c.estado = 'anulada' then raise exception 'La compra no existe o ya estaba anulada'; end if;
+  if c.estado = 'operada' then
+    insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, compra_id, documento, cantidad, costo_unitario, observaciones, usuario, localidad_id, organizacion_id)
+    select now(), producto_id, bodega_id, 'salida', 'anulacion_compra', p_id, 'Anulación · Compra N.º ' || c.numero || coalesce(' · ' || nullif(concat_ws(' ', c.serie, c.numero_documento), ''), ''),
+           sum(case when origen = 'compra' then cantidad else -cantidad end),
+           (array_agg(costo_unitario order by id desc) filter (where origen = 'compra'))[1], trim(p_motivo), v_usuario, localidad_id, organizacion_id
+      from public.inv_movimientos where compra_id = p_id and origen in ('compra', 'reversion_compra')
+     group by producto_id, bodega_id, localidad_id, organizacion_id
+    having sum(case when origen = 'compra' then cantidad else -cantidad end) > 0;
+  end if;
+  update public.inv_compras set estado = 'anulada', anulado_motivo = trim(p_motivo), anulado_en = now(), anulado_por = v_usuario where id = p_id;
+end;
+$$;
+revoke execute on function public.anular_compra(bigint, text) from public, anon;
+grant execute on function public.anular_compra(bigint, text) to authenticated;
+
+-- Crear en el catálogo los artículos de la compra que no existen (marcados «No definido» para completarlos después)
+create or replace function public.crear_productos_compra(p_id bigint)
+returns int language plpgsql security definer set search_path = public as $$
+declare c public.inv_compras; i record; v_prod bigint; n int := 0;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select * into c from public.inv_compras where id = p_id;
+  if c.id is null or not public.ve_sede(c.localidad_id) then raise exception 'La compra no existe'; end if;
+  if c.estado <> 'grabada' then raise exception 'Solo en una compra Grabada'; end if;
+  for i in select * from public.inv_compra_items where compra_id = p_id and producto_id is null order by linea loop
+    select id into v_prod from public.inv_productos
+     where localidad_id is not distinct from c.localidad_id and ((i.codigo is not null and lower(codigo) = lower(i.codigo)) or lower(nombre) = lower(i.nombre)) limit 1;
+    if v_prod is null then
+      insert into public.inv_productos (codigo, nombre, costo, proveedor_id, bodega_id, no_definido, localidad_id, organizacion_id)
+      values (i.codigo, coalesce(i.nombre, i.codigo), round(i.subtotal / i.cantidad, 2), c.proveedor_id, c.bodega_id, true, c.localidad_id, c.organizacion_id)
+      returning id into v_prod;
+      n := n + 1;
+    end if;
+    update public.inv_compra_items set producto_id = v_prod where id = i.id;
+  end loop;
+  return n;
+end;
+$$;
+revoke execute on function public.crear_productos_compra(bigint) from public, anon;
+grant execute on function public.crear_productos_compra(bigint) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

@@ -1,4 +1,4 @@
-// Plus Dental — Inventarios (fase 2): Compras de productos (ingreso a bodega) y Movimiento Kardex (existencias,
+// Plus Dental — Inventarios (fase 2): Compras de productos (grabar, cargar al inventario, revertir, anular, abonos) y Movimiento Kardex (existencias,
 // entradas, salidas y saldo). Las ventas salen del detalle de Cobros y pagos (cuentas.js). Compras, ventas y ajustes
 // se graban con funciones de Supabase que crean el movimiento del kardex; todo en la sede del usuario.
 (function () {
@@ -7,9 +7,9 @@
 
   var G = window.PD_GEO, esc = G.esc;
   var DOCS = [['factura', 'Factura'], ['recibo', 'Recibo'], ['nota_envio', 'Nota de envío'], ['otro', 'Otro']];
-  var ORIGENES = { compra: 'Compra', venta: 'Venta', ajuste: 'Ajuste', anulacion_compra: 'Anulación de compra', anulacion_venta: 'Anulación de venta' };
+  var ORIGENES = { compra: 'Compra', venta: 'Venta', ajuste: 'Ajuste', anulacion_compra: 'Anulación de compra', anulacion_venta: 'Anulación de venta', reversion_compra: 'Reversión de compra' };
   var proveedores = [], bodegas = [], productos = [], compras = [], items = [], existencias = [], kardex = [];
-  var compraSel = null, prodSel = null, lineas = [], filtroCompra = 'registrada';
+  var compraSel = null, prodSel = null, lineas = [], filtroCompra = 'todas';
 
   function $(id) { return document.getElementById(id); }
   function num(n, d) { return Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d }); }
@@ -23,7 +23,7 @@
   function aviso(id, t, error) { $(id).textContent = t || ''; $(id).style.color = error ? '#9A3B2E' : '#475B68'; }
   function traducir(err) {
     var m = (err && err.message) || '';
-    if (/inv_(compras|movimientos|kardex|existencias)|registrar_compra|registrar_ajuste|could not find the (table|function)/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para Compras y Kardex.';
+    if (/inv_(compras|movimientos|kardex|existencias)|registrar_compra|guardar_compra|cargar_compra|revertir_carga|crear_productos_compra|no_definido|registrar_ajuste|could not find the (table|function)/i.test(m)) return 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para Compras y Kardex.';
     return G.traducir(err);
   }
   async function todas(armar) {
@@ -53,166 +53,455 @@
     var r = await Promise.all([
       todas(function () { return sb.from('inv_proveedores').select('id,numero,nombre_comercial,dias_credito,estado,padre_id').order('numero'); }),
       todas(function () { return sb.from('inv_bodegas').select('id,numero,nombre,tipo,estado,localidad_id').order('numero'); }),
-      todas(function () { return sb.from('inv_productos').select('id,numero,codigo,nombre,presentacion,unidad,tipo_producto,clasificacion,costo,minimo,control_minimo,foto,estado,localidad_id').order('numero'); })
+      todas(function () { return sb.from('inv_productos').select('id,numero,codigo,nombre,presentacion,unidad,tipo_producto,clasificacion,costo,minimo,control_minimo,foto,estado,localidad_id,no_definido').order('numero'); })
     ]);
     proveedores = r[0]; bodegas = r[1]; productos = r[2];
-    $('invProdOpciones').innerHTML = productos.filter(function (p) { return p.estado === 'activo'; }).map(function (p) { return '<option value="' + esc(etiquetaProd(p)) + '"></option>'; }).join('');
   }
   async function cargarExistencias() {
     existencias = await todas(function () { return sb.from('inv_existencias').select('producto_id,bodega_id,existencia,ultimo_movimiento'); });
   }
 
   // ================= 6. Compras de productos =================
+  // Encabezado (sede, usuario, estado, moneda, documento, totales, proveedor) y pestañas Artículos, Listado de facturas,
+  // Abonos y Contabilidad. Flujo: Grabar (estado «Grabada») → Cargar al inventario («Operada») → Revertir carga / Anular.
+  var TRANSACCIONES = [['1011', 'COMPRA DE MEDICAMENTO'], ['1012', 'COMPRA DE MATERIAL DENTAL'], ['1013', 'COMPRA DE INSUMOS DESCARTABLES'], ['1014', 'COMPRA DE INSTRUMENTAL Y EQUIPO'], ['1015', 'COMPRA DE PRODUCTOS DE LIMPIEZA'], ['1016', 'MUESTRAS MÉDICAS / DONACIÓN']];
+  var REGIMENES = [['PC', 'Pequeño contribuyente'], ['RU', 'Régimen sobre las utilidades'], ['ROS', 'Régimen opcional simplificado sobre ingresos']];
+  var ESTADOS_C = { grabada: ['Grabada', 'inactivo'], operada: ['Operada', 'activo'], anulada: ['Anulada', 'baja'] };
+  var abonos = [], pestanaCompra = 'articulos', compraForm = null;
+  function opts(l, sel) { return l.map(function (o) { return '<option value="' + o[0] + '"' + (String(o[0]) === String(sel) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join(''); }
+  function campo(etq, html, cls) { return '<label class="ic-campo' + (cls ? ' ' + cls : '') + '"><span>' + etq + '</span>' + html + '</label>'; }
+
   $('admInvCompras').innerHTML =
     '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Compras de productos</h3>' +
     '<button type="button" id="icNueva" class="adm-btn adm-primary">Nueva compra</button></div>' +
-    '<p class="dlg-msg">Cada compra ingresa los productos a la bodega elegida (entrada en el kardex) y actualiza el último costo del producto. Se graba en tu organización y localidad.</p>' +
-    '<form id="icForm" class="inv-compra" hidden novalidate>' +
-    '<div class="inv-compra-enc">' +
-    '<label>Proveedor<select id="icProv" class="adm-input"></select></label>' +
-    '<label>Bodega de ingreso<select id="icBodega" class="adm-input" required></select></label>' +
-    '<label>Fecha<input id="icFecha" type="date" class="adm-input" required></label>' +
-    '<label>Documento<select id="icTipoDoc" class="adm-input">' + DOCS.map(function (d) { return '<option value="' + d[0] + '">' + d[1] + '</option>'; }).join('') + '</select></label>' +
-    '<label>Serie<input id="icSerie" class="adm-input" maxlength="20"></label>' +
-    '<label>Número<input id="icNumero" class="adm-input" maxlength="40"></label>' +
-    '<label>Días de crédito<input id="icCredito" type="number" min="0" max="365" class="adm-input" value="0"></label>' +
-    '<label class="full">Observaciones<input id="icObs" class="adm-input" maxlength="500"></label></div>' +
-    '<div class="roles-wrap"><table class="pr-tabla inv-lineas"><thead><tr><th>#</th><th>Producto</th><th class="num">Existencia</th><th class="num">Cantidad</th><th class="num">Costo unitario (Q)</th><th>Lote</th><th>Vence</th><th class="num">Subtotal</th><th></th></tr></thead>' +
-    '<tbody id="icLineas"></tbody><tfoot><tr><td colspan="7"><button type="button" id="icAgregar" class="adm-btn geo-mini">+ Agregar producto</button></td><td class="num"><b id="icTotal">Q0.00</b></td><td></td></tr></tfoot></table></div>' +
-    '<div class="inv-compra-pie"><button type="submit" class="adm-btn adm-primary">Grabar compra</button><button type="button" id="icCancelar" class="adm-btn">Cancelar</button><span id="icFormMsg" class="dlg-msg" role="status"></span></div></form>' +
-    '<div class="inv-barra"><input id="icBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar proveedor, documento o producto" aria-label="Buscar compra">' +
-    '<div class="inv-filtros" id="icFiltro">' + [['registrada', 'Registradas'], ['anulada', 'Anuladas'], ['todas', 'Todas']].map(function (o) { return '<button type="button" class="adm-btn geo-mini" data-valor="' + o[0] + '" aria-pressed="' + (o[0] === filtroCompra) + '">' + o[1] + '</button>'; }).join('') + '</div></div>' +
-    '<section class="geo-panel"><div class="roles-wrap"><table class="pr-tabla"><thead><tr><th>N.º</th><th>Fecha</th><th>Proveedor</th><th>Documento</th><th>Bodega</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody id="icLista"></tbody></table></div></section>' +
-    '<div id="icFicha" class="org-ficha" hidden></div>' +
-    '<p id="icMsg" class="dlg-msg" role="status"></p></div>' +
-    '<datalist id="invProdOpciones"></datalist>';
+    '<form id="icForm" class="ic-doc" novalidate>' +
+    '<div class="ic-fila1">' +
+      '<div class="ic-blq ic-amarillo">' + campo('Organización', '<span class="ic-par"><input id="icOrgCod" class="ic-cod" readonly tabindex="-1"><input id="icOrgNom" readonly tabindex="-1"></span>') +
+        campo('Empresa', '<span class="ic-par"><input id="icLocCod" class="ic-cod" readonly tabindex="-1"><input id="icLocNom" readonly tabindex="-1"></span>') + '</div>' +
+      '<div class="ic-blq ic-gris">' + campo('Usuario', '<span class="ic-par"><input id="icUsuario" class="ic-cod ic-usr" readonly tabindex="-1"><input id="icGrabado" readonly tabindex="-1"></span>') +
+        campo('Estado', '<span id="icEstado" class="estado"></span>') +
+        campo('Moneda', '<select id="icMoneda"><option value="GTQ">QUETZALES</option><option value="USD">DÓLARES</option></select>') +
+        campo('Compra', '<select id="icTipoCompra"><option value="local">LOCAL</option><option value="importacion">IMPORTACIÓN</option></select>') + '</div>' +
+      '<div class="ic-blq ic-blanco">' + campo('Nota crédito', '<input id="icNotaCredito" type="number" min="0" step="0.01" class="num" placeholder="0.00">') +
+        campo('Descuentos', '<input id="icDescuentos" type="number" min="0" step="0.01" class="num" placeholder="0.00">') +
+        campo('Valor retención', '<input id="icRetencion" type="number" min="0" step="0.01" class="num" placeholder="0.00">') + '</div>' +
+    '</div>' +
+    '<div class="ic-blq ic-naranja ic-fila2"><div class="ic-docto">' +
+      campo('#Compra', '<input id="icNumero" readonly tabindex="-1" class="ic-grande">') + campo('Serie docto', '<input id="icSerie" maxlength="20" class="ic-grande">') +
+      campo('# Documento', '<input id="icNumDoc" maxlength="40" class="ic-grande">') + campo('Fecha', '<input id="icFecha" type="date" class="ic-grande">') +
+      campo('Cambio', '<input id="icCambio" type="number" min="0.0001" step="0.0001" class="ic-grande num" value="1">') +
+      campo('No interno factura', '<input id="icNoInterno" maxlength="40">', 'ic-ancho') +
+      campo('Aplica orden?', '<span class="ic-par"><select id="icAplicaOrden"><option value="no">No</option><option value="si">Sí</option></select><input id="icOrden" maxlength="40" placeholder="N.º de orden" hidden></span>') +
+    '</div><div class="ic-totales">' +
+      '<label class="ic-check"><input id="icAplicaRet" type="checkbox"> Retención?</label>' + campo('Formulario retención', '<input id="icFormRet" maxlength="40">') +
+      '<div class="ic-total"><span>Total $</span><output id="icTotalUsd">0.00</output></div><div class="ic-total"><span>Total Q</span><output id="icTotalQ">0.00</output></div>' +
+    '</div></div>' +
+    '<div class="ic-fila3">' +
+      campo('Proveedor', '<span class="ic-par"><select id="icProv"></select><button type="button" id="icProvNuevo" class="adm-btn geo-mini" title="Crear proveedor" aria-label="Crear proveedor">+</button></span>', 'ic-ancho') +
+      campo('Bodega', '<select id="icBodega"></select>') +
+      campo('Régimen ISR', '<span class="ic-par"><input id="icRegimen" class="ic-cod" list="icRegimenes" maxlength="20"><input id="icRegimenDesc" maxlength="120"></span>', 'ic-ancho') +
+      campo('Tipo docto', '<select id="icTipoDoc">' + opts(DOCS) + '</select>') +
+      campo('Transacción', '<select id="icTransaccion">' + opts(TRANSACCIONES.map(function (t) { return [t[0], t[0] + ' · ' + t[1]]; })) + '</select>') +
+      campo('Días de crédito', '<input id="icCredito" type="number" min="0" max="365" class="num" value="0">') +
+      '<label class="ic-check"><input id="icMuestras" type="checkbox"> Documento de muestras?</label>' +
+      campo('Descripción', '<textarea id="icObs" maxlength="500" rows="2"></textarea>', 'ic-full') +
+    '</div>' +
+    '<datalist id="icRegimenes">' + REGIMENES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</datalist>' +
+    '<datalist id="icCodigos"></datalist><datalist id="icNombres"></datalist>' +
+    '<div class="ic-tabs" role="tablist">' + [['articulos', 'Artículos'], ['listado', 'Listado de facturas'], ['abonos', 'Abonos'], ['contabilidad', 'Contabilidad']].map(function (t) {
+      return '<button type="button" role="tab" data-ictab="' + t[0] + '" aria-selected="' + (t[0] === pestanaCompra) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
+    // Artículos
+    '<section class="ic-pane" data-icpane="articulos"><div class="roles-wrap"><table class="pr-tabla inv-lineas ic-lineas"><thead><tr><th>Prod</th><th>Cod. prod</th><th>Nombre producto</th><th>Lote</th><th>Fecha fabricación</th><th>Fecha vencimiento</th>' +
+      '<th class="num">Cantidad</th><th class="num">Costo unitario</th><th class="num">Descuento</th><th class="num">Costo total</th><th class="num">C/U MI</th><th class="num">Costo total MI</th><th title="Afecta el inventario">Inv?</th><th title="Controla fecha de vencimiento">Fecha</th><th></th></tr></thead>' +
+      '<tbody id="icLineas"></tbody><tfoot><tr><td colspan="2"><b id="icCuenta">0</b> Total productos</td><td colspan="7"><button type="button" id="icAgregar" class="adm-btn geo-mini">+ Agregar artículo</button></td>' +
+      '<td class="num"><b id="icSumQ">0.00</b></td><td></td><td class="num"><b id="icSumMi">0.00</b></td><td colspan="3"></td></tr></tfoot></table></div>' +
+    '<div class="ic-botones ic-blq ic-naranja">' +
+      '<button type="submit" id="icGrabar" class="adm-btn adm-primary">Grabar</button>' +
+      '<button type="button" id="icCargar" class="adm-btn">Cargar al inventario</button>' +
+      '<button type="button" id="icRevertir" class="adm-btn">Revertir carga</button><span class="ic-sep"></span>' +
+      '<button type="button" id="icAnular" class="adm-btn">Anular</button><span class="ic-sep"></span>' +
+      '<button type="button" id="icImprimir" class="adm-btn">Imprimir</button>' +
+      '<button type="button" id="icCrearProd" class="adm-btn">Crear producto</button>' +
+      '<button type="button" id="icPagos" class="adm-btn">Aplicar pagos</button></div></section>' +
+    // Listado de facturas
+    '<section class="ic-pane" data-icpane="listado" hidden><div class="inv-barra"><input id="icBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar proveedor, documento o producto" aria-label="Buscar compra">' +
+      '<div class="inv-filtros" id="icFiltro">' + [['todas', 'Todas'], ['grabada', 'Grabadas'], ['operada', 'Operadas'], ['anulada', 'Anuladas']].map(function (o) { return '<button type="button" class="adm-btn geo-mini" data-valor="' + o[0] + '" aria-pressed="' + (o[0] === 'todas') + '">' + o[1] + '</button>'; }).join('') + '</div></div>' +
+      '<div class="roles-wrap"><table class="pr-tabla"><thead><tr><th>#Compra</th><th>Fecha</th><th>Proveedor</th><th>Documento</th><th>Bodega</th><th class="num">Total Q</th><th class="num">Abonado</th><th class="num">Saldo</th><th>Estado</th></tr></thead><tbody id="icLista"></tbody></table></div></section>' +
+    // Abonos (sub-detalle de la factura)
+    '<section class="ic-pane" data-icpane="abonos" hidden><p class="dlg-msg" id="icAbonosInfo"></p><div class="roles-wrap"><table class="pr-tabla ic-abonos"><thead><tr><th>Cuenta bancaria</th><th>Desc docto</th><th>Fecha pago</th><th class="num">Total</th><th class="num">Total MI</th><th></th></tr></thead>' +
+      '<tbody id="icAbonos"></tbody><tfoot><tr><td><button type="button" id="icAbonoNuevo" class="adm-btn geo-mini">+ Agregar abono</button></td><td></td><td class="num">Total</td><td class="num"><b id="icAbonoQ">0.00</b></td><td class="num"><b id="icAbonoMi">0.00</b></td><td></td></tr></tfoot></table></div>' +
+      '<div class="ic-botones"><button type="button" id="icAbonosGrabar" class="adm-btn adm-primary">Grabar abonos</button><span id="icSaldo" class="ic-saldo"></span></div></section>' +
+    // Contabilidad
+    '<section class="ic-pane" data-icpane="contabilidad" hidden><p class="dlg-msg">Partida sugerida (informativa) según el total, el régimen del proveedor y la retención. El IVA de 12 % se separa solo en facturas de proveedores que no son pequeños contribuyentes.</p><div class="roles-wrap"><table class="pr-tabla"><thead><tr><th>Cuenta</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead><tbody id="icConta"></tbody></table></div></section>' +
+    '<p id="icMsg" class="dlg-msg" role="status"></p><div id="icRegistro"></div></form></div>';
 
-  function documento(c) { return (DOCS.filter(function (d) { return d[0] === c.tipo_documento; })[0] || ['', c.tipo_documento])[1] + (c.serie || c.numero_documento ? ' ' + [c.serie, c.numero_documento].filter(Boolean).join('-') : ''); }
+  function documento(c) { return (DOCS.filter(function (d) { return d[0] === c.tipo_documento; })[0] || ['', c.tipo_documento || ''])[1] + (c.serie || c.numero_documento ? ' ' + [c.serie, c.numero_documento].filter(Boolean).join('-') : ''); }
+  function abonadoDe(id) { return abonos.filter(function (a) { return a.compra_id === id && !a.borrar; }).reduce(function (s, a) { return s + (Number(a.total) || 0); }, 0); }
+  function editable() { return !compraForm || compraForm.estado === 'grabada'; }
+  function cambio() { return Math.max(Number($('icCambio').value) || 1, 0.0001); }
+  function enUsd() { return $('icMoneda').value === 'USD'; }
+  function r2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+
+  // --- Cálculos de una línea (en la moneda de la compra, en quetzales y en moneda internacional) ---
+  function calc(l) {
+    var cu = Number(l.costo_unitario) || 0, sub = Math.max(r2((Number(l.cantidad) || 0) * cu - (Number(l.descuento) || 0)), 0), tc = cambio();
+    var q2 = enUsd() ? r2(sub * tc) : sub;
+    return { sub: sub, q: q2, cuMi: enUsd() ? cu : cu / tc, subMi: r2(q2 / tc) };
+  }
+  function totales() {
+    var sq = 0, smi = 0;
+    lineas.forEach(function (l) { var c = calc(l); sq += c.q; smi += c.subMi; });
+    var t = Math.max(r2(sq - (Number($('icDescuentos').value) || 0) - (Number($('icNotaCredito').value) || 0)), 0);
+    $('icSumQ').textContent = num(enUsd() ? smi : sq); $('icSumMi').textContent = num(smi);
+    $('icTotalQ').textContent = num(t); $('icTotalUsd').textContent = num(t / cambio());
+    $('icCuenta').textContent = lineas.filter(function (l) { return l.nombre || l.producto_id; }).length;
+    pintarConta(t);
+    return t;
+  }
+  function lineaVacia() { return { producto_id: null, codigo: '', nombre: '', lote: '', fecha_fabricacion: '', vencimiento: '', cantidad: '', costo_unitario: '', descuento: '', afecta_inventario: true, controla_fecha: false }; }
+  function pintarLineas() {
+    var ed = editable(), dis = ed ? '' : ' disabled';
+    $('icLineas').innerHTML = lineas.map(function (l, k) {
+      var p = l.producto_id ? porId(productos, l.producto_id) : null, c = calc(l);
+      var prod = p ? (p.numero || p.id) + (p.no_definido ? '<small class="inv-alerta">No definido</small>' : '') : (l.nombre || l.codigo ? '<small class="inv-alerta" title="No existe en el inventario: usa «Crear producto»">Nuevo</small>' : '');
+      function inp(k2, tipo, extra) { return '<input data-cl="' + k2 + '"' + (tipo ? ' type="' + tipo + '"' : '') + ' value="' + esc(l[k2] == null ? '' : l[k2]) + '"' + (extra || '') + dis + ' aria-label="' + k2 + ' línea ' + (k + 1) + '">'; }
+      return '<tr data-linea="' + k + '" class="' + (p ? '' : 'ic-sin-prod') + '"><td class="ic-prod">' + prod + '</td>' +
+        '<td>' + inp('codigo', '', ' list="icCodigos" class="ic-cod-prod" maxlength="40"') + '</td>' +
+        '<td>' + inp('nombre', '', ' list="icNombres" class="inv-prod-input" maxlength="200"') + '</td>' +
+        '<td>' + inp('lote', '', ' maxlength="40" class="ic-lote"') + '</td>' +
+        '<td>' + inp('fecha_fabricacion', 'date') + '</td><td>' + inp('vencimiento', 'date') + '</td>' +
+        '<td class="num">' + inp('cantidad', 'number', ' min="0" step="0.0001"') + '</td>' +
+        '<td class="num">' + inp('costo_unitario', 'number', ' min="0" step="0.0001"') + '</td>' +
+        '<td class="num">' + inp('descuento', 'number', ' min="0" step="0.01"') + '</td>' +
+        '<td class="num ic-ro" data-v="sub">' + num(c.sub, 4) + '</td><td class="num ic-ro ic-mi" data-v="cumi">' + num(c.cuMi, 4) + '</td><td class="num ic-ro ic-mi" data-v="submi">' + num(c.subMi, 4) + '</td>' +
+        '<td><input type="checkbox" data-cl="afecta_inventario"' + (l.afecta_inventario ? ' checked' : '') + dis + ' aria-label="Afecta inventario línea ' + (k + 1) + '"></td>' +
+        '<td><input type="checkbox" data-cl="controla_fecha"' + (l.controla_fecha ? ' checked' : '') + dis + ' aria-label="Controla fecha línea ' + (k + 1) + '"></td>' +
+        '<td>' + (ed && lineas.length > 1 ? '<button type="button" class="adm-btn geo-mini" data-quitar="' + k + '" aria-label="Quitar línea ' + (k + 1) + '">×</button>' : '') + '</td></tr>';
+    }).join('');
+    $('icAgregar').hidden = !ed;
+    totales();
+  }
+  function pintarEncabezado() {
+    var c = compraForm || {}, S = window.PD_SEDES, loc = c.localidad_id || (S && S.miLocalidad());
+    var o = S && loc ? S.organizacion(loc) : null, l = S && loc ? S.localidad(loc) : null;
+    $('icOrgCod').value = o ? o.codigo : ''; $('icOrgNom').value = o ? o.nombre : '';
+    $('icLocCod').value = l ? l.codigo : ''; $('icLocNom').value = l ? (l.nombre_comercial || l.razon_social) : '';
+    $('icUsuario').value = c.creado_por || (window.PD_SESION && window.PD_SESION.usuario()) || '';
+    $('icGrabado').value = c.creado ? fechaHora(c.creado) : 'Sin grabar';
+    var e = ESTADOS_C[c.estado] || ['Nueva', 'inactivo'];
+    $('icEstado').className = 'estado estado-' + e[1]; $('icEstado').textContent = e[0].toUpperCase();
+    $('icNumero').value = c.numero || '';
+    $('icProv').innerHTML = '<option value="">Sin proveedor</option>' + proveedores.filter(function (p) { return p.estado === 'activo' || p.id === c.proveedor_id; }).map(function (p) {
+      return '<option value="' + p.id + '"' + (p.id === c.proveedor_id ? ' selected' : '') + '>' + esc((p.numero ? p.numero + ' · ' : '') + (p.padre_id ? '› ' : '') + p.nombre_comercial) + '</option>'; }).join('');
+    $('icBodega').innerHTML = opcionesBodega(c.bodega_id || bodegaGeneral());
+    var v = { icMoneda: c.moneda || 'GTQ', icTipoCompra: c.tipo_compra || 'local', icNotaCredito: c.nota_credito ? c.nota_credito : '', icDescuentos: c.descuentos ? c.descuentos : '', icRetencion: c.valor_retencion ? c.valor_retencion : '',
+      icSerie: c.serie || '', icNumDoc: c.numero_documento || '', icFecha: c.fecha || hoy(), icCambio: c.tipo_cambio || 1, icNoInterno: c.no_interno || '', icOrden: c.orden_compra || '',
+      icFormRet: c.formulario_retencion || '', icRegimen: c.regimen_isr || '', icRegimenDesc: c.regimen_isr_desc || '', icTipoDoc: c.tipo_documento || 'factura',
+      icTransaccion: c.transaccion || '1011', icCredito: c.dias_credito || 0, icObs: c.observaciones || '' };
+    Object.keys(v).forEach(function (k) { $(k).value = v[k]; });
+    $('icAplicaOrden').value = c.orden_compra ? 'si' : 'no'; $('icOrden').hidden = !c.orden_compra;
+    $('icAplicaRet').checked = !!c.aplica_retencion; $('icMuestras').checked = !!c.documento_muestras;
+    var ed = editable();
+    $('icForm').querySelectorAll('.ic-fila1 input:not([readonly]), .ic-fila1 select, .ic-fila2 input:not([readonly]), .ic-fila2 select, .ic-fila3 input, .ic-fila3 select, .ic-fila3 textarea, #icProvNuevo').forEach(function (x) { x.disabled = !ed; });
+    $('icRetencion').disabled = !ed || !$('icAplicaRet').checked; $('icFormRet').disabled = !ed || !$('icAplicaRet').checked;
+    estadoBotones();
+  }
+  // Botones según el estado de la compra y su registro de auditoría
+  function estadoBotones() {
+    var c = compraForm || {}, ed = editable();
+    var guardada = !!c.id, sinProd = lineas.some(function (x) { return !x.producto_id && (x.nombre || x.codigo); });
+    $('icGrabar').disabled = !ed;
+    $('icCargar').disabled = !(guardada && c.estado === 'grabada');
+    $('icRevertir').disabled = c.estado !== 'operada';
+    $('icAnular').disabled = !(guardada && c.estado !== 'anulada' && window.PD_SEDES && window.PD_SEDES.esSuper());
+    $('icAnular').title = window.PD_SEDES && window.PD_SEDES.esSuper() ? '' : 'Solo el Super Administrador anula compras.';
+    $('icImprimir').disabled = !guardada;
+    $('icCrearProd').disabled = !(ed && sinProd);
+    $('icPagos').disabled = !(guardada && c.estado !== 'anulada');
+    $('icRegistro').innerHTML = guardada ? '<div class="org-registro"><div class="org-reg-datos"><span>Sede <b>' + esc(sede(c)) + '</b></span>' +
+      '<span>Grabado por <b>' + esc(c.creado_por || '—') + '</b> el <b>' + fechaHora(c.creado) + '</b></span>' +
+      (c.modificado ? '<span>Modificado por <b>' + esc(c.modificado_por || '—') + '</b> el <b>' + fechaHora(c.modificado) + '</b></span>' : '') +
+      (c.cargado_en ? '<span>Cargado al inventario por <b>' + esc(c.cargado_por || '—') + '</b> el <b>' + fechaHora(c.cargado_en) + '</b></span>' : '') +
+      (c.estado === 'anulada' ? '<span class="inv-negativo">Anulada por <b>' + esc(c.anulado_por || '—') + '</b> el <b>' + fechaHora(c.anulado_en) + '</b> · ' + esc(c.anulado_motivo || '') + '</span>' : '') +
+      '</div></div>' : '';
+  }
+  function pintarCompra() {
+    pintarEncabezado(); pintarLineas(); pintarAbonos(); estadoBotones();
+  }
+  function cargarEnFormulario(c) {
+    compraForm = c || null;
+    var usd = c && c.moneda === 'USD', tc = (c && Number(c.tipo_cambio)) || 1;
+    lineas = c ? items.filter(function (i) { return i.compra_id === c.id; }).sort(function (a, b) { return a.linea - b.linea; }).map(function (i) {
+      var p = porId(productos, i.producto_id);
+      return { producto_id: i.producto_id, codigo: i.codigo || (p && p.codigo) || '', nombre: i.nombre || (p && p.nombre) || '', lote: i.lote || '', fecha_fabricacion: i.fecha_fabricacion || '', vencimiento: i.vencimiento || '',
+        cantidad: Number(i.cantidad), costo_unitario: usd ? Number(i.costo_unitario_mi) : Number(i.costo_unitario), descuento: Number(i.descuento) ? (usd ? r2(i.descuento / tc) : Number(i.descuento)) : '',
+        afecta_inventario: i.afecta_inventario !== false, controla_fecha: !!i.controla_fecha };
+    }) : [];
+    if (!lineas.length) lineas = [lineaVacia()];
+    $('icCodigos').innerHTML = productos.filter(function (p) { return p.estado === 'activo' && p.codigo; }).map(function (p) { return '<option value="' + esc(p.codigo) + '">' + esc(p.nombre) + '</option>'; }).join('');
+    $('icNombres').innerHTML = productos.filter(function (p) { return p.estado === 'activo'; }).map(function (p) { return '<option value="' + esc(p.nombre) + '">' + esc(p.codigo || '') + '</option>'; }).join('');
+    aviso('icMsg', '');
+    pintarCompra();
+  }
+  function verPestana(t) {
+    pestanaCompra = t;
+    $('icForm').querySelectorAll('[data-ictab]').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.ictab === t); });
+    $('icForm').querySelectorAll('[data-icpane]').forEach(function (p) { p.hidden = p.dataset.icpane !== t; });
+  }
+
+  // --- Listado de facturas ---
   function pintarCompras() {
     var t = norm($('icBuscar').value);
     var l = compras.filter(function (c) {
       if (filtroCompra !== 'todas' && c.estado !== filtroCompra) return false;
       if (!t) return true;
-      var nombres = items.filter(function (i) { return i.compra_id === c.id; }).map(function (i) { var p = porId(productos, i.producto_id); return p ? etiquetaProd(p) : ''; });
-      return norm([c.numero, nombreProv(c.proveedor_id), documento(c), c.observaciones].concat(nombres).join(' ')).indexOf(t) >= 0;
+      var nombres = items.filter(function (i) { return i.compra_id === c.id; }).map(function (i) { return [i.codigo, i.nombre].join(' '); });
+      return norm([c.numero, nombreProv(c.proveedor_id), documento(c), c.no_interno, c.observaciones].concat(nombres).join(' ')).indexOf(t) >= 0;
     });
     $('icLista').innerHTML = l.length ? l.map(function (c) {
-      return '<tr data-compra="' + c.id + '" tabindex="0" class="' + (c.id === compraSel ? 'geo-sel' : '') + '"><td>' + c.numero + '</td><td>' + fecha(c.fecha) + '</td><td>' + esc(nombreProv(c.proveedor_id)) + '</td><td>' + esc(documento(c)) + '</td><td>' + esc(nombreBod(c.bodega_id)) + '</td>' +
-        '<td class="num"><b>' + q(c.total) + '</b></td><td><span class="estado estado-' + (c.estado === 'anulada' ? 'baja' : 'activo') + '">' + (c.estado === 'anulada' ? 'Anulada' : 'Registrada') + '</span></td></tr>';
-    }).join('') : '<tr><td colspan="7" class="geo-vacia">' + (compras.length ? 'Ninguna compra coincide.' : 'Aún no hay compras. Usa «Nueva compra» para ingresar productos a la bodega.') + '</td></tr>';
-    pintarFichaCompra();
+      var ab = abonadoDe(c.id), saldo = c.estado === 'anulada' ? 0 : Number(c.total) - Number(c.valor_retencion || 0) - ab, e = ESTADOS_C[c.estado] || [c.estado, 'inactivo'];
+      return '<tr data-compra="' + c.id + '" tabindex="0" class="' + (compraForm && c.id === compraForm.id ? 'geo-sel' : '') + '"><td>' + c.numero + '</td><td>' + fecha(c.fecha) + '</td><td>' + esc(nombreProv(c.proveedor_id)) + '</td><td>' + esc(documento(c)) + '</td><td>' + esc(nombreBod(c.bodega_id)) + '</td>' +
+        '<td class="num"><b>' + q(c.total) + '</b></td><td class="num">' + q(ab) + '</td><td class="num' + (saldo > 0.004 ? ' inv-bajo' : '') + '">' + q(saldo) + '</td><td><span class="estado estado-' + e[1] + '">' + e[0] + '</span></td></tr>';
+    }).join('') : '<tr><td colspan="9" class="geo-vacia">' + (compras.length ? 'Ninguna compra coincide.' : 'Aún no hay compras.') + '</td></tr>';
   }
-  function pintarFichaCompra() {
-    var c = porId(compras, compraSel);
-    $('icFicha').hidden = !c;
-    if (!c) return;
-    var det = items.filter(function (i) { return i.compra_id === c.id; }).sort(function (a, b) { return a.linea - b.linea; });
-    $('icFicha').innerHTML = '<h4 class="geo-h">Compra N.º ' + c.numero + ' · ' + esc(nombreProv(c.proveedor_id)) + '</h4>' +
-      '<div class="org-datos">' + [['Fecha', fecha(c.fecha)], ['Documento', documento(c)], ['Bodega', nombreBod(c.bodega_id)], ['Crédito', +c.dias_credito ? c.dias_credito + ' días' : 'Contado'], ['Observaciones', c.observaciones || '—']].map(function (d) {
-        return '<div class="geo-info"><span>' + d[0] + '</span><b>' + esc(d[1]) + '</b></div>'; }).join('') + '</div>' +
-      '<div class="roles-wrap"><table class="pr-tabla"><thead><tr><th>#</th><th>Producto</th><th class="num">Cantidad</th><th class="num">Costo unitario</th><th>Lote</th><th>Vence</th><th class="num">Subtotal</th></tr></thead><tbody>' +
-      det.map(function (i) { var p = porId(productos, i.producto_id) || { nombre: 'Producto ' + i.producto_id }; return '<tr><td>' + i.linea + '</td><td><div class="inv-prod">' + imagen(p, 30) + '<div><b>' + esc(etiquetaProd(p)) + '</b></div></div></td><td class="num">' + cant(i.cantidad) + '</td><td class="num">' + q(i.costo_unitario) + '</td><td>' + esc(i.lote || '—') + '</td><td>' + fecha(i.vencimiento) + '</td><td class="num">' + q(i.subtotal) + '</td></tr>'; }).join('') +
-      '</tbody><tfoot><tr><td colspan="6" class="num">Total</td><td class="num"><b>' + q(c.total) + '</b></td></tr></tfoot></table></div>' +
-      (c.estado === 'anulada' ? '<p class="inv-anulada">Anulada por <b>' + esc(c.anulado_por || '—') + '</b> el <b>' + fechaHora(c.anulado_en) + '</b> · ' + esc(c.anulado_motivo || '') + '</p>' : '') +
-      '<div class="org-registro"><div class="org-reg-datos"><span>N.º <b>' + c.numero + '</b></span><span>Sede <b>' + esc(sede(c)) + '</b></span>' +
-      '<span>Grabado por <b>' + esc(c.creado_por || 'Sin usuario') + '</b> el <b>' + fechaHora(c.creado) + '</b></span></div>' +
-      '<div class="org-reg-btns">' + (c.estado === 'registrada' && window.PD_SEDES && window.PD_SEDES.esSuper() ? '<button type="button" class="adm-btn geo-mini" id="icAnular">Anular compra</button>' : '') +
-      '<button type="button" class="adm-btn geo-mini" id="icActualizar">Actualizar</button></div></div>';
-  }
-  async function cargarCompras() {
+  async function cargarCompras(mantener) {
     aviso('icMsg', '');
     try {
       await cargarCatalogos();
       compras = await todas(function () { return sb.from('inv_compras').select('*').order('numero', { ascending: false }); });
       items = await todas(function () { return sb.from('inv_compra_items').select('*'); });
-      await cargarExistencias();
-    } catch (e) { compras = []; items = []; $('icLista').innerHTML = ''; aviso('icMsg', traducir(e), true); return; }
+      abonos = await todas(function () { return sb.from('inv_compra_abonos').select('*').order('fecha_pago').order('id'); });
+    } catch (e) { compras = []; items = []; abonos = []; pintarCompras(); cargarEnFormulario(null); aviso('icMsg', traducir(e), true); return; }
     pintarCompras();
+    cargarEnFormulario(mantener ? porId(compras, mantener) : null);
   }
 
-  // --- Formulario de compra nueva ---
-  function lineaNueva() { return { producto_id: null, texto: '', cantidad: '', costo_unitario: '', lote: '', vencimiento: '' }; }
-  function pintarLineas() {
-    var bod = +$('icBodega').value || null;
-    $('icLineas').innerHTML = lineas.map(function (l, k) {
-      var sub = (Number(l.cantidad) || 0) * (Number(l.costo_unitario) || 0);
-      return '<tr data-linea="' + k + '"><td>' + (k + 1) + '</td>' +
-        '<td><input data-cl="texto" class="adm-input inv-prod-input" list="invProdOpciones" value="' + esc(l.texto) + '" placeholder="Código o nombre del producto" aria-label="Producto de la línea ' + (k + 1) + '"></td>' +
-        '<td class="num inv-exist">' + (l.producto_id ? cant(existencia(l.producto_id, bod)) : '—') + '</td>' +
-        '<td class="num"><input data-cl="cantidad" type="number" min="0" step="0.01" class="adm-input" value="' + esc(l.cantidad) + '" aria-label="Cantidad de la línea ' + (k + 1) + '"></td>' +
-        '<td class="num"><input data-cl="costo_unitario" type="number" min="0" step="0.01" class="adm-input" value="' + esc(l.costo_unitario) + '" aria-label="Costo unitario de la línea ' + (k + 1) + '"></td>' +
-        '<td><input data-cl="lote" class="adm-input" maxlength="40" value="' + esc(l.lote) + '" aria-label="Lote de la línea ' + (k + 1) + '"></td>' +
-        '<td><input data-cl="vencimiento" type="date" class="adm-input" value="' + esc(l.vencimiento) + '" aria-label="Vencimiento de la línea ' + (k + 1) + '"></td>' +
-        '<td class="num inv-sub-linea">' + q(sub) + '</td>' +
-        '<td>' + (lineas.length > 1 ? '<button type="button" class="adm-btn geo-mini" data-quitar="' + k + '">Quitar</button>' : '') + '</td></tr>';
-    }).join('');
-    totalCompra();
+  // --- Abonos ---
+  function abonosDe() { return compraForm ? abonos.filter(function (a) { return a.compra_id === compraForm.id && !a.borrar; }) : []; }
+  function pintarAbonos() {
+    var l = abonosDe(), ed = compraForm && compraForm.estado !== 'anulada', dis = ed ? '' : ' disabled';
+    $('icAbonosInfo').textContent = compraForm ? 'Abonos de la compra N.º ' + compraForm.numero + ' · ' + nombreProv(compraForm.proveedor_id) + ' · ' + documento(compraForm) : 'Graba o elige una compra (pestaña «Listado de facturas») para aplicarle pagos.';
+    $('icAbonos').innerHTML = l.length ? l.map(function (a) {
+      var k = abonos.indexOf(a);
+      function inp(c, tipo, extra) { return '<input data-ab="' + c + '"' + (tipo ? ' type="' + tipo + '"' : '') + ' value="' + esc(a[c] == null ? '' : a[c]) + '"' + (extra || '') + dis + '>'; }
+      return '<tr data-abono="' + k + '"><td>' + inp('cuenta_bancaria', '', ' maxlength="80" placeholder="Banco y cuenta"') + '</td><td>' + inp('descripcion', '', ' maxlength="200" placeholder="Cheque, transferencia…"') + '</td><td>' + inp('fecha_pago', 'date') + '</td>' +
+        '<td class="num">' + inp('total', 'number', ' min="0" step="0.01"') + '</td><td class="num">' + inp('total_mi', 'number', ' min="0" step="0.01"') + '</td>' +
+        '<td>' + (ed ? '<button type="button" class="adm-btn geo-mini" data-quitar-abono="' + k + '" aria-label="Quitar abono">×</button>' : '') + '</td></tr>';
+    }).join('') : '<tr><td colspan="6" class="geo-vacia">Sin abonos.</td></tr>';
+    $('icAbonoNuevo').hidden = !ed; $('icAbonosGrabar').hidden = !ed;
+    var tq = l.reduce(function (s, a) { return s + (Number(a.total) || 0); }, 0), tm = l.reduce(function (s, a) { return s + (Number(a.total_mi) || 0); }, 0);
+    $('icAbonoQ').textContent = num(tq); $('icAbonoMi').textContent = num(tm);
+    if (compraForm) {
+      var porPagar = Number(compraForm.total) - Number(compraForm.valor_retencion || 0), saldo = porPagar - tq;
+      $('icSaldo').innerHTML = 'Por pagar <b>' + q(porPagar) + '</b> · Abonado <b>' + q(tq) + '</b> · Saldo <b class="' + (saldo > 0.004 ? 'inv-bajo' : '') + '">' + q(saldo) + '</b>';
+    } else $('icSaldo').textContent = '';
   }
-  function totalCompra() {
-    var t = lineas.reduce(function (s, l) { return s + Math.round((Number(l.cantidad) || 0) * (Number(l.costo_unitario) || 0) * 100) / 100; }, 0);
-    $('icTotal').textContent = q(t);
-    return t;
+
+  // --- Contabilidad (partida sugerida) ---
+  function pintarConta(total) {
+    var ret = $('icAplicaRet').checked ? Number($('icRetencion').value) || 0 : 0, pc = $('icRegimen').value.trim().toUpperCase() === 'PC';
+    var conIva = $('icTipoDoc').value === 'factura' && !pc, base = conIva ? r2(total / 1.12) : total, iva = r2(total - base);
+    var cuentaInv = $('icMuestras').checked ? 'Muestras médicas' : 'Inventario de ' + ((TRANSACCIONES.filter(function (t) { return t[0] === $('icTransaccion').value; })[0] || ['', 'productos'])[1].replace(/^COMPRA DE /, '').toLowerCase());
+    var f = [[cuentaInv, base, 0]];
+    if (iva) f.push(['IVA por cobrar (crédito fiscal)', iva, 0]);
+    f.push(['Proveedores' + ($('icProv').value ? ' · ' + nombreProv(+$('icProv').value) : ''), 0, r2(total - ret)]);
+    if (ret) f.push(['Retenciones por pagar' + ($('icFormRet').value ? ' · formulario ' + $('icFormRet').value : ''), 0, ret]);
+    $('icConta').innerHTML = f.map(function (x) { return '<tr><td>' + esc(x[0]) + '</td><td class="num">' + (x[1] ? q(x[1]) : '') + '</td><td class="num">' + (x[2] ? q(x[2]) : '') + '</td></tr>'; }).join('') +
+      '<tr class="inv-total"><td class="num">Totales</td><td class="num"><b>' + q(base + iva) + '</b></td><td class="num"><b>' + q(total) + '</b></td></tr>';
   }
-  async function abrirFormulario() {
-    try { await cargarCatalogos(); await cargarExistencias(); } catch (e) { aviso('icMsg', traducir(e), true); return; }
-    $('icProv').innerHTML = '<option value="">Sin proveedor</option>' + proveedores.filter(function (p) { return p.estado === 'activo'; }).map(function (p) {
-      return '<option value="' + p.id + '">' + esc((p.padre_id ? '   › ' : '') + p.nombre_comercial) + '</option>'; }).join('');
-    $('icBodega').innerHTML = opcionesBodega(bodegaGeneral());
-    $('icFecha').value = hoy(); $('icTipoDoc').value = 'factura';
-    ['icSerie', 'icNumero', 'icObs'].forEach(function (i) { $(i).value = ''; });
-    $('icCredito').value = 0;
-    lineas = [lineaNueva()];
-    pintarLineas();
-    aviso('icFormMsg', '');
-    $('icForm').hidden = false;
-    $('icProv').focus();
+
+  // --- Datos para grabar ---
+  function datosEncabezado() {
+    return { proveedor_id: $('icProv').value, bodega_id: $('icBodega').value, fecha: $('icFecha').value || hoy(), tipo_documento: $('icTipoDoc').value,
+      serie: $('icSerie').value, numero_documento: $('icNumDoc').value, dias_credito: $('icCredito').value || 0, observaciones: $('icObs').value,
+      moneda: $('icMoneda').value, tipo_compra: $('icTipoCompra').value, tipo_cambio: cambio(), no_interno: $('icNoInterno').value,
+      orden_compra: $('icAplicaOrden').value === 'si' ? $('icOrden').value : '', nota_credito: $('icNotaCredito').value || 0, descuentos: $('icDescuentos').value || 0,
+      aplica_retencion: $('icAplicaRet').checked, valor_retencion: $('icAplicaRet').checked ? $('icRetencion').value || 0 : 0, formulario_retencion: $('icAplicaRet').checked ? $('icFormRet').value : '',
+      regimen_isr: $('icRegimen').value, regimen_isr_desc: $('icRegimenDesc').value, transaccion: $('icTransaccion').value, documento_muestras: $('icMuestras').checked };
   }
-  $('icNueva').addEventListener('click', abrirFormulario);
-  $('icCancelar').addEventListener('click', function () { $('icForm').hidden = true; });
-  $('icProv').addEventListener('change', function () { var p = porId(proveedores, +this.value); $('icCredito').value = p ? p.dias_credito || 0 : 0; });
-  $('icBodega').addEventListener('change', pintarLineas);
-  $('icAgregar').addEventListener('click', function () {
-    lineas.push(lineaNueva()); pintarLineas();
-    var i = $('icLineas').querySelectorAll('.inv-prod-input'); i[i.length - 1].focus();
+  async function grabar() {
+    var usadas = lineas.filter(function (l) { return l.nombre || l.codigo || l.cantidad || l.costo_unitario; });
+    if (!$('icBodega').value) { aviso('icMsg', 'Elige la bodega.', true); return null; }
+    if (!usadas.length) { aviso('icMsg', 'Agrega al menos un artículo.', true); return null; }
+    if (usadas.some(function (l) { return !l.nombre && !l.producto_id; })) { aviso('icMsg', 'Escribe el nombre del producto en cada línea.', true); return null; }
+    if (usadas.some(function (l) { return !(Number(l.cantidad) > 0); })) { aviso('icMsg', 'La cantidad de cada artículo debe ser mayor que cero.', true); return null; }
+    if (usadas.some(function (l) { return l.controla_fecha && !l.vencimiento; })) { aviso('icMsg', 'Las líneas que controlan fecha necesitan la fecha de vencimiento.', true); return null; }
+    var det = usadas.map(function (l) { return { producto_id: l.producto_id, codigo: l.codigo, nombre: l.nombre, lote: l.lote, fecha_fabricacion: l.fecha_fabricacion, vencimiento: l.vencimiento,
+      cantidad: Number(l.cantidad), costo_unitario: Number(l.costo_unitario) || 0, descuento: Number(l.descuento) || 0, afecta_inventario: !!l.afecta_inventario, controla_fecha: !!l.controla_fecha }; });
+    aviso('icMsg', 'Grabando…');
+    var r = await sb.rpc('guardar_compra', { p_id: compraForm ? compraForm.id : null, p_datos: datosEncabezado(), p_items: det });
+    if (r.error) { aviso('icMsg', traducir(r.error), true); return null; }
+    await cargarCompras(r.data);
+    return r.data;
+  }
+  function confirmarMotivo(titulo, efecto, rpc, args, exito) {
+    G.dialogo({
+      eyebrow: 'Compras de productos', titulo: titulo, valores: {},
+      campos: [{ k: 'aviso', label: 'Efecto', tipo: 'info', ancho: 'full' }, { k: 'motivo', label: 'Motivo', tipo: 'textarea', req: true, max: 300 }],
+      alAbrir: function () { $('geoF_aviso').textContent = efecto; },
+      guardar: async function (d) {
+        var r = await sb.rpc(rpc, Object.assign({ p_motivo: d.motivo }, args));
+        if (r.error) return traducir(r.error);
+        await cargarCompras(args.p_id); aviso('icMsg', exito); return null;
+      }
+    });
+  }
+  function imprimirCompra() {
+    var c = compraForm, P = window.PD_IMPRESION;
+    if (!c || !P) return;
+    var th = 'padding:6px;border-bottom:2px solid #0B2B40;text-align:left;font-size:11px', td = 'padding:6px;border-bottom:1px solid #E3EAF0;font-size:12px';
+    var det = items.filter(function (i) { return i.compra_id === c.id; }).sort(function (a, b) { return a.linea - b.linea; });
+    function d(k, v) { return '<div><span style="display:block;font-size:10px;color:#5A6D7A;text-transform:uppercase;letter-spacing:.08em">' + k + '</span><b>' + esc(v == null || v === '' ? '—' : v) + '</b></div>'; }
+    var e = ESTADOS_C[c.estado] || [c.estado];
+    var html = P.encabezado('Compra N.º ' + c.numero + ' · ' + e[0]) +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;font-size:12px">' +
+      d('Proveedor', nombreProv(c.proveedor_id)) + d('Documento', documento(c)) + d('Fecha', fecha(c.fecha)) + d('Bodega', nombreBod(c.bodega_id)) +
+      d('Moneda / cambio', (c.moneda === 'USD' ? 'Dólares' : 'Quetzales') + ' · ' + num(c.tipo_cambio, 4)) + d('Compra', c.tipo_compra === 'importacion' ? 'Importación' : 'Local') +
+      d('Transacción', (TRANSACCIONES.filter(function (t) { return t[0] === c.transaccion; })[0] || [c.transaccion, ''])[1]) + d('No interno', c.no_interno) + d('Sede', sede(c)) + d('Grabado por', c.creado_por) + d('Crédito', +c.dias_credito ? c.dias_credito + ' días' : 'Contado') + d('Descripción', c.observaciones) + '</div>' +
+      '<table style="width:100%;border-collapse:collapse"><thead><tr>' + ['#', 'Código', 'Producto', 'Lote', 'Vence', 'Cantidad', 'Costo unit.', 'Desc.', 'Costo total Q'].map(function (h, i) { return '<th style="' + th + (i > 4 ? ';text-align:right' : '') + '">' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      det.map(function (i) { return '<tr><td style="' + td + '">' + i.linea + '</td><td style="' + td + '">' + esc(i.codigo || '') + '</td><td style="' + td + '">' + esc(i.nombre || (porId(productos, i.producto_id) || {}).nombre || '') + '</td><td style="' + td + '">' + esc(i.lote || '') + '</td><td style="' + td + '">' + (i.vencimiento ? fecha(i.vencimiento) : '') + '</td>' +
+        '<td style="' + td + ';text-align:right">' + cant(i.cantidad) + '</td><td style="' + td + ';text-align:right">' + num(i.costo_unitario, 4) + '</td><td style="' + td + ';text-align:right">' + num(i.descuento) + '</td><td style="' + td + ';text-align:right">' + num(i.subtotal) + '</td></tr>'; }).join('') +
+      '</tbody></table><div style="margin-top:12px;text-align:right;font-size:13px;line-height:1.7">' +
+      (Number(c.descuentos) ? 'Descuentos: ' + q(c.descuentos) + '<br>' : '') + (Number(c.nota_credito) ? 'Nota de crédito: ' + q(c.nota_credito) + '<br>' : '') +
+      '<b style="font-size:16px">Total Q ' + num(c.total) + '</b> · Total $ ' + num(c.total_usd) + (Number(c.valor_retencion) ? '<br>Retención: ' + q(c.valor_retencion) + (c.formulario_retencion ? ' (formulario ' + esc(c.formulario_retencion) + ')' : '') : '') +
+      '<br>Abonado: ' + q(abonadoDe(c.id)) + '</div></div>';
+    P.imprimir(html);
+  }
+
+  // --- Eventos ---
+  $('icNueva').addEventListener('click', async function () { if (!productos.length) await cargarCompras(); cargarEnFormulario(null); verPestana('articulos'); $('icProv').focus(); });
+  $('icForm').addEventListener('click', function (e) { var t = e.target.closest('[data-ictab]'); if (t) verPestana(t.dataset.ictab); });
+  $('icAplicaOrden').addEventListener('change', function () { $('icOrden').hidden = this.value !== 'si'; if (!$('icOrden').hidden) $('icOrden').focus(); });
+  $('icAplicaRet').addEventListener('change', function () { $('icRetencion').disabled = $('icFormRet').disabled = !this.checked; if (!this.checked) $('icRetencion').value = ''; totales(); });
+  $('icProv').addEventListener('change', function () { var p = porId(proveedores, +this.value); $('icCredito').value = p ? p.dias_credito || 0 : 0; totales(); });
+  $('icRegimen').addEventListener('input', function () { var r = REGIMENES.filter(function (x) { return x[0] === this.value.trim().toUpperCase(); }, this)[0]; if (r) $('icRegimenDesc').value = r[1]; totales(); });
+  ['icMoneda', 'icCambio', 'icDescuentos', 'icNotaCredito', 'icRetencion', 'icTipoDoc', 'icTransaccion', 'icFormRet', 'icMuestras'].forEach(function (id) { $(id).addEventListener(id === 'icMoneda' || id === 'icMuestras' || id === 'icTipoDoc' || id === 'icTransaccion' ? 'change' : 'input', id === 'icMoneda' || id === 'icCambio' ? pintarLineas : function () { totales(); }); });
+  $('icProvNuevo').addEventListener('click', function () {
+    G.dialogo({
+      eyebrow: 'Compras de productos', titulo: 'Nuevo proveedor', valores: { dias_credito: 0 },
+      campos: [{ k: 'nombre_comercial', label: 'Nombre comercial', req: true, max: 150 }, { k: 'nit', label: 'NIT', max: 20 }, { k: 'telefonos', label: 'Teléfonos', max: 120 }, { k: 'dias_credito', label: 'Días de crédito', tipo: 'number' }],
+      guardar: async function (d) {
+        d.dias_credito = d.dias_credito || 0;
+        var r = await sb.from('inv_proveedores').insert(d).select('id,numero,nombre_comercial,dias_credito,estado,padre_id').single();
+        if (r.error) return traducir(r.error);
+        proveedores.push(r.data);
+        var sel = r.data.id;
+        $('icProv').insertAdjacentHTML('beforeend', '<option value="' + sel + '">' + esc((r.data.numero ? r.data.numero + ' · ' : '') + r.data.nombre_comercial) + '</option>');
+        $('icProv').value = sel; $('icCredito').value = r.data.dias_credito || 0;
+        return null;
+      }
+    });
   });
+  $('icAgregar').addEventListener('click', function () { lineas.push(lineaVacia()); pintarLineas(); var i = $('icLineas').querySelectorAll('.ic-cod-prod'); i[i.length - 1].focus(); });
   $('icLineas').addEventListener('input', function (e) {
     var tr = e.target.closest('tr[data-linea]'), c = e.target.dataset.cl;
     if (!tr || !c) return;
     var l = lineas[+tr.dataset.linea];
-    l[c] = e.target.value;
-    if (c === 'texto') {
-      var p = productos.filter(function (x) { return etiquetaProd(x) === e.target.value; })[0];
+    l[c] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    if (c === 'codigo' || c === 'nombre') {
+      var v = norm(e.target.value).trim();
+      var p = v ? productos.filter(function (x) { return c === 'codigo' ? norm(x.codigo) === v : norm(x.nombre) === v; })[0] : null;
+      var antes = l.producto_id;
       l.producto_id = p ? p.id : null;
-      if (p && l.costo_unitario === '' && p.costo != null) { l.costo_unitario = String(p.costo); tr.querySelector('[data-cl="costo_unitario"]').value = l.costo_unitario; }
-      if (p && l.cantidad === '') { l.cantidad = '1'; tr.querySelector('[data-cl="cantidad"]').value = '1'; }
-      tr.querySelector('.inv-exist').textContent = p ? cant(existencia(p.id, +$('icBodega').value || null)) : '—';
+      if (p) {
+        l.codigo = p.codigo || ''; l.nombre = p.nombre;
+        if (l.costo_unitario === '' && p.costo != null) l.costo_unitario = enUsd() ? r2(p.costo / cambio()) : Number(p.costo);
+        if (l.cantidad === '') l.cantidad = 1;
+      }
+      if (p || antes) { pintarLineas(); estadoBotones(); var x = $('icLineas').querySelector('tr[data-linea="' + tr.dataset.linea + '"] [data-cl="cantidad"]'); if (p && x) x.focus(); return; }
+      $('icCrearProd').disabled = !(editable() && lineas.some(function (y) { return !y.producto_id && (y.nombre || y.codigo); }));
+      tr.querySelector('.ic-prod').innerHTML = l.nombre || l.codigo ? '<small class="inv-alerta">Nuevo</small>' : '';
     }
-    tr.querySelector('.inv-sub-linea').textContent = q((Number(l.cantidad) || 0) * (Number(l.costo_unitario) || 0));
-    totalCompra();
+    var k = calc(l);
+    tr.querySelector('[data-v="sub"]').textContent = num(k.sub, 4); tr.querySelector('[data-v="cumi"]').textContent = num(k.cuMi, 4); tr.querySelector('[data-v="submi"]').textContent = num(k.subMi, 4);
+    totales();
   });
-  $('icLineas').addEventListener('click', function (e) { var b = e.target.closest('[data-quitar]'); if (b) { lineas.splice(+b.dataset.quitar, 1); pintarLineas(); } });
+  $('icLineas').addEventListener('change', function (e) { var tr = e.target.closest('tr[data-linea]'); if (tr && e.target.type === 'checkbox') lineas[+tr.dataset.linea][e.target.dataset.cl] = e.target.checked; });
+  $('icLineas').addEventListener('click', function (e) { var b = e.target.closest('[data-quitar]'); if (b) { lineas.splice(+b.dataset.quitar, 1); pintarLineas(); estadoBotones(); } });
   $('icForm').addEventListener('submit', async function (e) {
     e.preventDefault();
-    var usadas = lineas.filter(function (l) { return l.texto || l.cantidad || l.costo_unitario; });
-    if (!$('icBodega').value) { aviso('icFormMsg', 'Elige la bodega de ingreso.', true); return; }
-    if (!usadas.length) { aviso('icFormMsg', 'Agrega al menos un producto.', true); return; }
-    if (usadas.some(function (l) { return !l.producto_id; })) { aviso('icFormMsg', 'Elige cada producto de la lista (escribe el código o el nombre y selecciónalo).', true); return; }
-    if (usadas.some(function (l) { return !(Number(l.cantidad) > 0); })) { aviso('icFormMsg', 'La cantidad de cada producto debe ser mayor que cero.', true); return; }
-    var datos = { proveedor_id: $('icProv').value, bodega_id: $('icBodega').value, fecha: $('icFecha').value || hoy(), tipo_documento: $('icTipoDoc').value,
-      serie: $('icSerie').value.trim(), numero_documento: $('icNumero').value.trim(), dias_credito: $('icCredito').value || 0, observaciones: $('icObs').value.trim() };
-    var det = usadas.map(function (l) { return { producto_id: l.producto_id, cantidad: Number(l.cantidad), costo_unitario: Number(l.costo_unitario) || 0, lote: l.lote.trim(), vencimiento: l.vencimiento }; });
-    var boton = this.querySelector('[type=submit]');
-    boton.disabled = true; aviso('icFormMsg', 'Grabando…');
-    var r = await sb.rpc('registrar_compra', { p_datos: datos, p_items: det });
-    boton.disabled = false;
-    if (r.error) { aviso('icFormMsg', traducir(r.error), true); return; }
-    $('icForm').hidden = true;
-    compraSel = r.data; filtroCompra = 'registrada';
-    $('icFiltro').querySelectorAll('[data-valor]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.valor === filtroCompra); });
-    await cargarCompras();
-    var c = porId(compras, compraSel);
-    aviso('icMsg', 'Compra' + (c ? ' N.º ' + c.numero : '') + ' grabada. Los productos ya ingresaron a ' + nombreBod(+datos.bodega_id) + '.');
+    if (!editable()) return;
+    $('icGrabar').disabled = true;
+    var id = await grabar();
+    $('icGrabar').disabled = false;
+    if (id) { var c = porId(compras, id); aviso('icMsg', 'Compra N.º ' + (c ? c.numero : id) + ' grabada (aún no está cargada al inventario). Usa «Cargar al inventario» cuando esté completa.'); }
   });
+  $('icCargar').addEventListener('click', async function () {
+    if (!compraForm) return;
+    // Primero se graban los cambios pendientes
+    var id = await grabar(); if (!id) return;
+    if (lineas.some(function (l) { return !l.producto_id; })) { aviso('icMsg', 'Hay artículos que no existen en el inventario. Usa «Crear producto» antes de cargar.', true); return; }
+    if (!window.confirm('¿Cargar al inventario la compra N.º ' + compraForm.numero + '? Los artículos marcados «Inv?» ingresarán a ' + nombreBod(compraForm.bodega_id) + '.')) return;
+    var r = await sb.rpc('cargar_compra', { p_id: id });
+    if (r.error) { aviso('icMsg', traducir(r.error), true); return; }
+    await cargarCompras(id); aviso('icMsg', 'Compra N.º ' + compraForm.numero + ' cargada al inventario (estado Operada).');
+  });
+  $('icRevertir').addEventListener('click', function () {
+    if (!compraForm) return;
+    confirmarMotivo('Revertir la carga de la compra N.º ' + compraForm.numero, 'Los artículos cargados saldrán de ' + nombreBod(compraForm.bodega_id) + ' (salida en el kardex) y la compra volverá a «Grabada» para corregirla y cargarla de nuevo.',
+      'revertir_carga_compra', { p_id: compraForm.id }, 'Carga revertida: la compra N.º ' + compraForm.numero + ' quedó Grabada.');
+  });
+  $('icAnular').addEventListener('click', function () {
+    if (!compraForm) return;
+    confirmarMotivo('Anular la compra N.º ' + compraForm.numero, (compraForm.estado === 'operada' ? 'Los artículos cargados saldrán de ' + nombreBod(compraForm.bodega_id) + ' (salida en el kardex). ' : '') + 'La compra quedará Anulada y no se puede deshacer.',
+      'anular_compra', { p_id: compraForm.id }, 'Compra N.º ' + compraForm.numero + ' anulada.');
+  });
+  $('icImprimir').addEventListener('click', imprimirCompra);
+  $('icCrearProd').addEventListener('click', async function () {
+    var nuevos = lineas.filter(function (l) { return !l.producto_id && (l.nombre || l.codigo); });
+    if (!nuevos.length) return;
+    if (!window.confirm('Se crearán en «Definición de productos» ' + nuevos.length + ' producto(s) marcados como «No definido»:\n' + nuevos.map(function (l) { return '· ' + [l.codigo, l.nombre].filter(Boolean).join(' — '); }).join('\n') + '\n\nPodrás completar su definición después. ¿Continuar?')) return;
+    var id = await grabar(); if (!id) return;
+    var r = await sb.rpc('crear_productos_compra', { p_id: id });
+    if (r.error) { aviso('icMsg', traducir(r.error), true); return; }
+    await cargarCompras(id);
+    aviso('icMsg', r.data ? r.data + ' producto(s) creado(s) como «No definido». Complétalos en «Definición de productos». Ya puedes cargar la compra al inventario.' : 'Los artículos ya existían en el inventario y quedaron enlazados.');
+  });
+  $('icPagos').addEventListener('click', function () {
+    if (!compraForm) return;
+    verPestana('abonos');
+    if (!abonosDe().length) $('icAbonoNuevo').click();
+  });
+  // Abonos
+  $('icAbonoNuevo').addEventListener('click', function () {
+    if (!compraForm) return;
+    abonos.push({ compra_id: compraForm.id, cuenta_bancaria: '', descripcion: '', fecha_pago: hoy(), total: '', total_mi: '' });
+    pintarAbonos();
+    var i = $('icAbonos').querySelectorAll('[data-ab="cuenta_bancaria"]'); if (i.length) i[i.length - 1].focus();
+  });
+  $('icAbonos').addEventListener('input', function (e) {
+    var tr = e.target.closest('tr[data-abono]'), c = e.target.dataset.ab; if (!tr || !c) return;
+    var a = abonos[+tr.dataset.abono];
+    a[c] = e.target.value; a.cambiado = true;
+    if (c === 'total') { a.total_mi = e.target.value ? r2(Number(e.target.value) / (Number(compraForm.tipo_cambio) || 1)) : ''; tr.querySelector('[data-ab="total_mi"]').value = a.total_mi; }
+    var l = abonosDe();
+    $('icAbonoQ').textContent = num(l.reduce(function (s, x) { return s + (Number(x.total) || 0); }, 0)); $('icAbonoMi').textContent = num(l.reduce(function (s, x) { return s + (Number(x.total_mi) || 0); }, 0));
+  });
+  $('icAbonos').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-quitar-abono]'); if (!b) return;
+    var a = abonos[+b.dataset.quitarAbono];
+    if (a.id) a.borrar = true; else abonos.splice(abonos.indexOf(a), 1);
+    pintarAbonos();
+  });
+  $('icAbonosGrabar').addEventListener('click', async function () {
+    if (!compraForm) return;
+    var mios = abonos.filter(function (a) { return a.compra_id === compraForm.id; });
+    if (mios.some(function (a) { return !a.borrar && !(Number(a.total) > 0); })) { aviso('icMsg', 'Cada abono necesita un total mayor que cero.', true); return; }
+    this.disabled = true; aviso('icMsg', 'Grabando abonos…');
+    var err = null;
+    for (var i = 0; i < mios.length && !err; i++) {
+      var a = mios[i], d = { cuenta_bancaria: a.cuenta_bancaria || null, descripcion: a.descripcion || null, fecha_pago: a.fecha_pago || hoy(), total: Number(a.total), total_mi: Number(a.total_mi) || 0 }, r = null;
+      if (a.id && a.borrar) r = await sb.from('inv_compra_abonos').delete().eq('id', a.id);
+      else if (a.id && a.cambiado) r = await sb.from('inv_compra_abonos').update(d).eq('id', a.id);
+      else if (!a.id) r = await sb.from('inv_compra_abonos').insert(Object.assign({ compra_id: compraForm.id }, d));
+      if (r && r.error) err = r.error;
+    }
+    this.disabled = false;
+    var id = compraForm.id;
+    await cargarCompras(id); verPestana('abonos');
+    aviso('icMsg', err ? traducir(err) : 'Abonos grabados.', !!err);
+  });
+  // Listado
   $('icBuscar').addEventListener('input', pintarCompras);
   $('icFiltro').addEventListener('click', function (e) {
     var b = e.target.closest('[data-valor]'); if (!b) return;
@@ -220,23 +509,8 @@
     this.querySelectorAll('[data-valor]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
     pintarCompras();
   });
-  $('icLista').addEventListener('click', function (e) { var tr = e.target.closest('tr[data-compra]'); if (tr) { compraSel = +tr.dataset.compra; pintarCompras(); } });
+  $('icLista').addEventListener('click', function (e) { var tr = e.target.closest('tr[data-compra]'); if (tr) { cargarEnFormulario(porId(compras, +tr.dataset.compra)); pintarCompras(); verPestana('articulos'); } });
   $('icLista').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.matches('tr[data-compra]')) e.target.click(); });
-  $('icFicha').addEventListener('click', function (e) {
-    if (e.target.id === 'icActualizar') { cargarCompras(); return; }
-    if (e.target.id !== 'icAnular') return;
-    var c = porId(compras, compraSel);
-    G.dialogo({
-      eyebrow: 'Compras de productos', titulo: 'Anular la compra N.º ' + c.numero, valores: {},
-      campos: [{ k: 'aviso', label: 'Efecto', tipo: 'info', ancho: 'full' }, { k: 'motivo', label: 'Motivo de la anulación', tipo: 'textarea', req: true, max: 300 }],
-      alAbrir: function () { $('geoF_aviso').textContent = 'Los productos de esta compra saldrán de ' + nombreBod(c.bodega_id) + ' (salida en el kardex). No se puede deshacer.'; },
-      guardar: async function (d) {
-        var r = await sb.rpc('anular_compra', { p_id: c.id, p_motivo: d.motivo });
-        if (r.error) return traducir(r.error);
-        await cargarCompras(); aviso('icMsg', 'Compra N.º ' + c.numero + ' anulada.'); return null;
-      }
-    });
-  });
 
   // ================= 7. Movimiento Kardex =================
   $('admInvKardex').innerHTML =
@@ -346,9 +620,9 @@
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { ['admInvCompras', 'admInvKardex'].forEach(function (id) { if (!$(id).hidden) cargarPanel(id); }); },
     limpiar: function () {
-      proveedores = []; bodegas = []; productos = []; compras = []; items = []; existencias = []; kardex = []; compraSel = prodSel = null; lineas = [];
-      ['icLista', 'ikExist'].forEach(function (i) { $(i).innerHTML = ''; });
-      $('icFicha').hidden = true; $('ikDetalle').hidden = true; $('icForm').hidden = true;
+      proveedores = []; bodegas = []; productos = []; compras = []; items = []; abonos = []; existencias = []; kardex = []; compraSel = prodSel = null; compraForm = null; lineas = [];
+      ['icLista', 'ikExist', 'icLineas', 'icAbonos', 'icRegistro'].forEach(function (i) { $(i).innerHTML = ''; });
+      $('ikDetalle').hidden = true;
     }
   });
 })();

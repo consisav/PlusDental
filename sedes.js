@@ -67,5 +67,5 @@
     var f = lista.filter(function (x) { return x.localidad_id === l; });
     return f.length ? f : lista.filter(function (x) { return !x.localidad_id; }).length ? lista.filter(function (x) { return !x.localidad_id; }) : lista;
   }
-  window.PD_SEDES = { bloquear: bloquear, esSuper: esSuper, deSede: deSede, miLocalidad: function () { return miLoc; }, cargar: cargar, llenar: llenar, valores: valores, texto: texto, lista: function () { return locs; }, codigoLoc: codigoLoc, nombreLoc: nombreLoc };
+  window.PD_SEDES = { organizacion: function (locId) { var l = loc(locId); return l ? org(l.organizacion_id) : null; }, localidad: loc, bloquear: bloquear, esSuper: esSuper, deSede: deSede, miLocalidad: function () { return miLoc; }, cargar: cargar, llenar: llenar, valores: valores, texto: texto, lista: function () { return locs; }, codigoLoc: codigoLoc, nombreLoc: nombreLoc };
 })();
