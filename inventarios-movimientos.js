@@ -75,37 +75,40 @@
     '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Compras de productos</h3>' +
     '<button type="button" id="icNueva" class="adm-btn adm-primary">Nueva compra</button></div>' +
     '<form id="icForm" class="ic-doc" novalidate>' +
-    '<div class="ic-fila1">' +
-      '<div class="ic-blq ic-amarillo">' + campo('Organización', '<span class="ic-par"><input id="icOrgCod" class="ic-cod" readonly tabindex="-1"><input id="icOrgNom" readonly tabindex="-1"></span>') +
-        campo('Empresa', '<span class="ic-par"><input id="icLocCod" class="ic-cod" readonly tabindex="-1"><input id="icLocNom" readonly tabindex="-1"></span>') + '</div>' +
-      '<div class="ic-blq ic-gris">' + campo('Usuario', '<span class="ic-par"><input id="icUsuario" class="ic-cod ic-usr" readonly tabindex="-1"><input id="icGrabado" readonly tabindex="-1"></span>') +
-        campo('Estado', '<span id="icEstado" class="estado"></span>') +
-        campo('Moneda', '<select id="icMoneda"><option value="GTQ">QUETZALES</option><option value="USD">DÓLARES</option></select>') +
-        campo('Compra', '<select id="icTipoCompra"><option value="local">LOCAL</option><option value="importacion">IMPORTACIÓN</option></select>') + '</div>' +
-      '<div class="ic-blq ic-blanco">' + campo('Nota crédito', '<input id="icNotaCredito" type="number" min="0" step="0.01" class="num" placeholder="0.00">') +
-        campo('Descuentos', '<input id="icDescuentos" type="number" min="0" step="0.01" class="num" placeholder="0.00">') +
-        campo('Valor retención', '<input id="icRetencion" type="number" min="0" step="0.01" class="num" placeholder="0.00">') + '</div>' +
+    // Barra de estado
+    '<div class="ic-barra">' +
+      '<div class="ic-num"><span>Compra</span><b>N.º <output id="icNumero">—</output></b></div>' +
+      '<span id="icEstado" class="estado"></span>' +
+      '<div class="ic-meta">' +
+        '<span class="ic-chip" title="Organización y empresa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1M9 13h1m4 0h1M9 17h1m4 0h1"/></svg><output id="icOrgCod"></output> · <output id="icOrgNom"></output> › <output id="icLocCod"></output> · <output id="icLocNom"></output></span>' +
+        '<span class="ic-chip" title="Usuario y fecha de grabación"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><output id="icUsuario"></output> · <output id="icGrabado"></output></span>' +
+      '</div>' +
+      '<div class="ic-totales"><div class="ic-total"><span>Total $</span><output id="icTotalUsd">0.00</output></div><div class="ic-total ic-total-q"><span>Total Q</span><output id="icTotalQ">0.00</output></div></div>' +
     '</div>' +
-    '<div class="ic-blq ic-naranja ic-fila2"><div class="ic-docto">' +
-      campo('#Compra', '<input id="icNumero" readonly tabindex="-1" class="ic-grande">') + campo('Serie docto', '<input id="icSerie" maxlength="20" class="ic-grande">') +
-      campo('# Documento', '<input id="icNumDoc" maxlength="40" class="ic-grande">') + campo('Fecha', '<input id="icFecha" type="date" class="ic-grande">') +
-      campo('Cambio', '<input id="icCambio" type="number" min="0.0001" step="0.0001" class="ic-grande num" value="1">') +
-      campo('No interno factura', '<input id="icNoInterno" maxlength="40">', 'ic-ancho') +
-      campo('Aplica orden?', '<span class="ic-par"><select id="icAplicaOrden"><option value="no">No</option><option value="si">Sí</option></select><input id="icOrden" maxlength="40" placeholder="N.º de orden" hidden></span>') +
-    '</div><div class="ic-totales">' +
-      '<label class="ic-check"><input id="icAplicaRet" type="checkbox"> Retención?</label>' + campo('Formulario retención', '<input id="icFormRet" maxlength="40">') +
-      '<div class="ic-total"><span>Total $</span><output id="icTotalUsd">0.00</output></div><div class="ic-total"><span>Total Q</span><output id="icTotalQ">0.00</output></div>' +
-    '</div></div>' +
-    '<div class="ic-fila3">' +
-      campo('Proveedor', '<span class="ic-par"><select id="icProv"></select><button type="button" id="icProvNuevo" class="adm-btn geo-mini" title="Crear proveedor" aria-label="Crear proveedor">+</button></span>', 'ic-ancho') +
-      campo('Bodega', '<select id="icBodega"></select>') +
-      campo('Régimen ISR', '<span class="ic-par"><input id="icRegimen" class="ic-cod" list="icRegimenes" maxlength="20"><input id="icRegimenDesc" maxlength="120"></span>', 'ic-ancho') +
-      campo('Tipo docto', '<select id="icTipoDoc">' + opts(DOCS) + '</select>') +
-      campo('Transacción', '<select id="icTransaccion">' + opts(TRANSACCIONES.map(function (t) { return [t[0], t[0] + ' · ' + t[1]]; })) + '</select>') +
-      campo('Días de crédito', '<input id="icCredito" type="number" min="0" max="365" class="num" value="0">') +
-      '<label class="ic-check"><input id="icMuestras" type="checkbox"> Documento de muestras?</label>' +
-      campo('Descripción', '<textarea id="icObs" maxlength="500" rows="2"></textarea>', 'ic-full') +
+    // Tarjetas
+    '<div class="ic-tarjetas">' +
+      '<section class="ic-tarjeta ic-fila2"><h4><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Documento</h4><div class="ic-g2">' +
+        campo('Tipo docto', '<select id="icTipoDoc">' + opts(DOCS) + '</select>') + campo('Fecha', '<input id="icFecha" type="date">') +
+        campo('Serie docto', '<input id="icSerie" maxlength="20">') + campo('# Documento', '<input id="icNumDoc" maxlength="40">') +
+        campo('No interno factura', '<input id="icNoInterno" maxlength="40">') +
+        campo('Aplica orden?', '<span class="ic-par"><select id="icAplicaOrden" class="ic-corto"><option value="no">No</option><option value="si">Sí</option></select><input id="icOrden" maxlength="40" placeholder="N.º de orden" hidden></span>') +
+      '</div></section>' +
+      '<section class="ic-tarjeta ic-fila3"><h4><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>Proveedor y destino</h4><div class="ic-g2">' +
+        campo('Proveedor', '<span class="ic-par"><select id="icProv"></select><button type="button" id="icProvNuevo" class="ic-mas" title="Crear proveedor" aria-label="Crear proveedor">+</button></span>', 'ic-full') +
+        campo('Régimen ISR', '<span class="ic-par"><input id="icRegimen" class="ic-cod" list="icRegimenes" maxlength="20"><input id="icRegimenDesc" maxlength="120"></span>', 'ic-full') +
+        campo('Bodega', '<select id="icBodega"></select>') + campo('Días de crédito', '<input id="icCredito" type="number" min="0" max="365" class="num" value="0">') +
+        campo('Transacción', '<select id="icTransaccion">' + opts(TRANSACCIONES.map(function (t) { return [t[0], t[0] + ' · ' + t[1]]; })) + '</select>', 'ic-full') +
+      '</div></section>' +
+      '<section class="ic-tarjeta ic-fila1"><h4><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15.5 9.5A6 6 0 1 1 9.5 15.5"/></svg>Moneda y ajustes</h4><div class="ic-g2">' +
+        campo('Moneda', '<select id="icMoneda"><option value="GTQ">Quetzales</option><option value="USD">Dólares</option></select>') + campo('Cambio', '<input id="icCambio" type="number" min="0.0001" step="0.0001" class="num" value="1">') +
+        campo('Compra', '<select id="icTipoCompra"><option value="local">Local</option><option value="importacion">Importación</option></select>') + campo('Descuentos', '<input id="icDescuentos" type="number" min="0" step="0.01" class="num" placeholder="0.00">') +
+        campo('Nota crédito', '<input id="icNotaCredito" type="number" min="0" step="0.01" class="num" placeholder="0.00">') +
+        campo('<span class="ic-ret"><input id="icAplicaRet" type="checkbox" aria-label="Aplica retención"> Retención</span>', '<input id="icRetencion" type="number" min="0" step="0.01" class="num" placeholder="0.00" aria-label="Valor de la retención">') +
+        campo('Formulario retención', '<input id="icFormRet" maxlength="40">', 'ic-full') +
+      '</div></section>' +
     '</div>' +
+    '<div class="ic-tarjeta ic-desc">' + campo('Descripción', '<input id="icObs" maxlength="500" placeholder="Detalle u observaciones de la compra">') +
+      '<label class="ic-check"><input id="icMuestras" type="checkbox"> Documento de muestras</label></div>' +
     '<datalist id="icRegimenes">' + REGIMENES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</datalist>' +
     '<datalist id="icCodigos"></datalist><datalist id="icNombres"></datalist>' +
     '<div class="ic-tabs" role="tablist">' + [['articulos', 'Artículos'], ['listado', 'Listado de facturas'], ['abonos', 'Abonos'], ['contabilidad', 'Contabilidad']].map(function (t) {
@@ -184,13 +187,13 @@
   function pintarEncabezado() {
     var c = compraForm || {}, S = window.PD_SEDES, loc = c.localidad_id || (S && S.miLocalidad());
     var o = S && loc ? S.organizacion(loc) : null, l = S && loc ? S.localidad(loc) : null;
-    $('icOrgCod').value = o ? o.codigo : ''; $('icOrgNom').value = o ? o.nombre : '';
-    $('icLocCod').value = l ? l.codigo : ''; $('icLocNom').value = l ? (l.nombre_comercial || l.razon_social) : '';
-    $('icUsuario').value = c.creado_por || (window.PD_SESION && window.PD_SESION.usuario()) || '';
-    $('icGrabado').value = c.creado ? fechaHora(c.creado) : 'Sin grabar';
+    $('icOrgCod').textContent = o ? o.codigo : '—'; $('icOrgNom').textContent = o ? o.nombre : '';
+    $('icLocCod').textContent = l && o ? o.codigo + '-' + String(l.codigo).padStart(2, '0') : '—'; $('icLocNom').textContent = l ? (l.nombre_comercial || l.razon_social) : '';
+    $('icUsuario').textContent = c.creado_por || (window.PD_SESION && window.PD_SESION.usuario()) || '—';
+    $('icGrabado').textContent = c.creado ? fechaHora(c.creado) : 'sin grabar';
     var e = ESTADOS_C[c.estado] || ['Nueva', 'inactivo'];
-    $('icEstado').className = 'estado estado-' + e[1]; $('icEstado').textContent = e[0].toUpperCase();
-    $('icNumero').value = c.numero || '';
+    $('icEstado').className = 'estado estado-' + e[1]; $('icEstado').textContent = e[0];
+    $('icNumero').textContent = c.numero || 'nueva';
     $('icProv').innerHTML = '<option value="">Sin proveedor</option>' + proveedores.filter(function (p) { return p.estado === 'activo' || p.id === c.proveedor_id; }).map(function (p) {
       return '<option value="' + p.id + '"' + (p.id === c.proveedor_id ? ' selected' : '') + '>' + esc((p.numero ? p.numero + ' · ' : '') + (p.padre_id ? '› ' : '') + p.nombre_comercial) + '</option>'; }).join('');
     $('icBodega').innerHTML = opcionesBodega(c.bodega_id || bodegaGeneral());
@@ -199,10 +202,11 @@
       icFormRet: c.formulario_retencion || '', icRegimen: c.regimen_isr || '', icRegimenDesc: c.regimen_isr_desc || '', icTipoDoc: c.tipo_documento || 'factura',
       icTransaccion: c.transaccion || '1011', icCredito: c.dias_credito || 0, icObs: c.observaciones || '' };
     Object.keys(v).forEach(function (k) { $(k).value = v[k]; });
+    $('icNumero').parentNode.firstChild.textContent = c.numero ? 'N.º ' : '';
     $('icAplicaOrden').value = c.orden_compra ? 'si' : 'no'; $('icOrden').hidden = !c.orden_compra;
     $('icAplicaRet').checked = !!c.aplica_retencion; $('icMuestras').checked = !!c.documento_muestras;
     var ed = editable();
-    $('icForm').querySelectorAll('.ic-fila1 input:not([readonly]), .ic-fila1 select, .ic-fila2 input:not([readonly]), .ic-fila2 select, .ic-fila3 input, .ic-fila3 select, .ic-fila3 textarea, #icProvNuevo').forEach(function (x) { x.disabled = !ed; });
+    $('icForm').querySelectorAll('.ic-tarjetas input, .ic-tarjetas select, .ic-desc input, #icProvNuevo').forEach(function (x) { x.disabled = !ed; });
     $('icRetencion').disabled = !ed || !$('icAplicaRet').checked; $('icFormRet').disabled = !ed || !$('icAplicaRet').checked;
     estadoBotones();
   }
