@@ -1296,6 +1296,11 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .ioc-aprueba{display:inline-block;background:#FFF8E6;border-radius:6px;padding:1px 6px}.ioc-aprueba.ioc-pend{background:transparent;color:#8A9AA6;font-weight:600}
 #icOrden{flex:1;min-width:0}
 @media (max-width:980px){.ioc-cap{grid-template-columns:repeat(2,minmax(0,1fr))}.ioc-cap .ic-cap-prod{grid-column:1/-1}.ioc-cap2{grid-template-columns:minmax(0,1fr)}}
+.ipi-tabla{table-layout:fixed}.ipi-c-pct{width:150px}.ipi-c-ej{width:170px}.ipi-c-act{width:140px}.ipi-c-reg{width:190px}
+.roles-wrap .ipi-tabla td{padding:9px 12px;vertical-align:middle}.ipi-tabla .num{text-align:right}
+.ipi-pct{display:inline-flex;align-items:center;gap:6px}.ipi-pct input{font:inherit;width:96px;text-align:right;padding:7px 10px;border:1px solid #C4D4DF;border-radius:8px}.ipi-pct span{font-weight:700;color:#475B68}
+.ipi-chk{display:flex;align-items:center;gap:6px;font-size:13px;color:#475B68}.ipi-reg{font-size:13px}
+.inv-precio .inv-desde{color:#005A87;font-weight:600}
 .ic-det-pie{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 12px;background:#F8FBFD;font-size:13px;color:#475B68}.ic-det-pie b{color:#0B2B40;font-variant-numeric:tabular-nums}
 @media (max-width:980px){.ic-cap-f1{grid-template-columns:repeat(2,minmax(0,1fr))}.ic-cap-f1 .ic-cap-prod{grid-column:1/-1}.ic-cap-f2{grid-template-columns:repeat(3,minmax(0,1fr))}.ic-cons-filtros{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.ic-det{min-width:680px}.ic-cons-t{min-width:620px}}
@@ -1572,6 +1577,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="adm-sg">
 <button type="button" class="adm-subgrupo" id="subInvPrecios" aria-expanded="false" aria-controls="subInvPreciosItems">3 · Precios<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-sg-items" id="subInvPreciosItems" role="presentation">
+<button type="button" role="tab" id="tabInvPorcentajes" data-tab="admInvPorcentajes" aria-selected="false" aria-controls="admInvPorcentajes" class="adm-sub-item">Porcentaje de ingresos</button>
 <button type="button" role="tab" id="tabInvPrecios" data-tab="admInvPrecios" aria-selected="false" aria-controls="admInvPrecios" class="adm-sub-item">Precios por tipo de cliente</button>
 </div>
 </div>
@@ -2406,6 +2412,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="admInvBodegas" role="tabpanel" aria-labelledby="tabInvBodegas" hidden class="adm-pane"></div>
 <div id="admInvTipos" role="tabpanel" aria-labelledby="tabInvTipos" hidden class="adm-pane"></div>
 <div id="admInvProductos" role="tabpanel" aria-labelledby="tabInvProductos" hidden class="adm-pane"></div>
+<div id="admInvPorcentajes" role="tabpanel" aria-labelledby="tabInvPorcentajes" hidden class="adm-pane"></div>
 <div id="admInvPrecios" role="tabpanel" aria-labelledby="tabInvPrecios" hidden class="adm-pane"></div>
 <div id="admInvOrdenes" role="tabpanel" aria-labelledby="tabInvOrdenes" hidden class="adm-pane"></div>
 <div id="admInvCompras" role="tabpanel" aria-labelledby="tabInvCompras" hidden class="adm-pane"></div>
@@ -2981,7 +2988,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="tipos-dentistas.js"></script>
 <script src="geografia.js?v=20261026b"></script>
 <script src="organizaciones.js?v=20261026"></script>
-<script src="inventarios.js?v=20261027d"></script>
+<script src="inventarios.js?v=20261027e"></script>
 <script src="inventarios-movimientos.js?v=20261027i"></script>
 <script src="inventarios-traslados.js?v=20261027"></script>
 <script src="inventarios-ordenes.js?v=20261027f"></script>

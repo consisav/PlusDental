@@ -480,7 +480,7 @@
   // ================= 5. Precios por tipo de cliente =================
   $('admInvPrecios').innerHTML =
     '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Precios de productos</h3></div>' +
-    '<p class="dlg-msg">Un precio por tipo de cliente para cada producto de tu sede. Toca un precio (o «Definir») para grabarlo o modificarlo; la utilidad se calcula con el precio de costo del producto.</p>' +
+    '<p class="dlg-msg">Un precio por tipo de cliente para cada producto de tu sede, vigente desde su fecha. Al cargar una compra al inventario, cada precio se recalcula solo: costo de esa compra + el % de su tipo en «Porcentaje de ingresos», con la fecha de ese día. Toca un precio (o «Definir») para grabarlo o modificarlo a mano.</p>' +
     '<div class="inv-barra"><input id="ivBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar producto" aria-label="Buscar producto"></div>' +
     '<section class="geo-panel"><div class="roles-wrap pr-wrap"><table class="pr-tabla inv-precios"><colgroup><col class="pr-col-proc">' + TIPOS.map(function () { return '<col>'; }).join('') + '</colgroup>' +
     '<thead><tr><th>Producto</th>' + TIPOS.map(function (t) { return '<th class="num">' + t[1] + '</th>'; }).join('') + '</tr></thead><tbody id="ivLista"></tbody></table></div></section>' +
@@ -494,6 +494,7 @@
         if (!x) return '<td class="num"><button type="button" class="inv-precio vacio" data-precio="' + p.id + ':' + tp[0] + '">Definir</button></td>';
         return '<td class="num"><button type="button" class="inv-precio' + (x.vigente ? '' : ' no-vigente') + '" data-precio="' + p.id + ':' + tp[0] + '" title="' + esc('Fecha ' + fecha(x.fecha) + ' · grabado por ' + (x.modificado_por || x.creado_por || '')) + '"><b>' + q(x.precio) + '</b>' +
           (x.precio_usd != null ? '<small>' + usd(x.precio_usd) + '</small>' : '') + '<small>' + (x.pct_utilidad != null ? 'util. ' + Number(x.pct_utilidad) + ' % · ' : '') + 'desc. ' + Number(x.pct_descuento) + ' %</small>' +
+          '<small class="inv-desde">desde ' + fecha(x.fecha) + '</small>' +
           '<span class="pr-est pr-est-' + (x.vigente ? 'activo' : 'baja') + '">' + (x.vigente ? 'Vigente' : 'No vigente') + '</span></button></td>';
       }).join('') + '</tr>';
     }).join('') : '<tr><td colspan="7" class="geo-vacia">' + (productos.length ? 'Ningún producto coincide.' : 'Primero define productos en «Definición de productos».') + '</td></tr>';
@@ -512,7 +513,7 @@
     var hoy = new Date(), v = x ? Object.assign({}, x) : { fecha: hoy.getFullYear() + '-' + ('0' + (hoy.getMonth() + 1)).slice(-2) + '-' + ('0' + hoy.getDate()).slice(-2), vigente: true, pct_descuento: 0 };
     G.dialogo({
       eyebrow: 'Precios de productos · ' + nombreTipo(tipo), titulo: p.nombre, valores: v,
-      campos: [{ k: 'costo_info', label: 'Precio de costo', tipo: 'info' }, { k: 'fecha', label: 'Fecha', req: true, max: 10, placeholder: 'AAAA-MM-DD' },
+      campos: [{ k: 'costo_info', label: 'Precio de costo', tipo: 'info' }, { k: 'fecha', label: 'Vigente desde', req: true, max: 10, placeholder: 'AAAA-MM-DD', ayuda: 'Por defecto hoy; se actualiza al cargar una compra' },
         { k: 'precio', label: 'Precio (Q)', tipo: 'number', paso: '0.01', req: true }, { k: 'precio_usd', label: 'Precio (US$)', tipo: 'number', paso: '0.01' },
         { k: 'pct_descuento', label: '% de descuento máximo', tipo: 'number', paso: '0.01', maxNum: 100 }, { k: 'utilidad_info', label: '% de utilidad (calculado)', tipo: 'info' },
         { k: 'sede', tipo: 'sede' }, { k: 'vigente', label: 'Vigente', tipo: 'check' }],
@@ -534,6 +535,58 @@
       eliminar: x ? async function () { var r = await sb.from('inv_precios').delete().eq('id', x.id); if (r.error) return traducir(r.error); await cargarPrecios(); return null; } : null
     });
   }
+
+  // ================= 6. Porcentaje de ingresos (por tipo de precio) =================
+  var porcentajes = [];
+  $('admInvPorcentajes').innerHTML =
+    '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Porcentaje de ingresos</h3><button type="button" class="adm-btn adm-primary" id="ipiGrabar">Grabar porcentajes</button></div>' +
+    '<p class="dlg-msg">El % que se suma al costo de la última compra para obtener el precio de cada tipo de cliente. Se aplica al <b>cargar una compra al inventario</b>: los productos de esa compra quedan con precio = costo × (1 + %), vigente desde ese día. Un tipo sin % (o inactivo) no se recalcula.</p>' +
+    '<section class="geo-panel"><div class="roles-wrap ia-wrap"><table class="geo-tabla ipi-tabla"><colgroup><col><col class="ipi-c-pct"><col class="ipi-c-ej"><col class="ipi-c-act"><col class="ipi-c-reg"></colgroup>' +
+    '<thead><tr><th>Tipo de precio</th><th class="num">% de ingreso</th><th class="num" title="Precio que resulta con un costo de Q100.00">Ejemplo · costo Q100</th><th>Aplicar</th><th>Último cambio</th></tr></thead><tbody id="ipiLista"></tbody></table></div></section>' +
+    '<p id="ipiMsg" class="dlg-msg" role="status"></p></div>';
+  function pintarPorcentajes() {
+    $('ipiLista').innerHTML = TIPOS.map(function (t) {
+      var x = porcentajes.filter(function (y) { return y.tipo === t[0]; })[0], v = x ? Number(x.porcentaje) : '';
+      return '<tr data-tipo="' + t[0] + '"><td><b>' + t[1] + '</b><small class="inv-sub">' + t[0] + '</small></td>' +
+        '<td class="num"><span class="ipi-pct"><input type="number" min="0" max="1000" step="0.01" inputmode="decimal" data-pct value="' + v + '" placeholder="Sin %" aria-label="Porcentaje de ' + t[1] + '"><span>%</span></span></td>' +
+        '<td class="num"><b data-ej>' + (v === '' ? '—' : q(100 * (1 + v / 100))) + '</b></td>' +
+        '<td><label class="ipi-chk"><input type="checkbox" data-activo' + (!x || x.activo ? ' checked' : '') + '> En compras</label></td>' +
+        '<td class="ipi-reg">' + (x ? esc(x.modificado_por || x.creado_por || '') + '<small class="inv-sub">' + fechaHora(x.modificado || x.creado) + '</small>' : '<span class="inv-sub">Sin definir</span>') + '</td></tr>';
+    }).join('');
+  }
+  async function cargarPorcentajes() {
+    aviso('ipiMsg', '');
+    try {
+      if (window.PD_SEDES) await window.PD_SEDES.cargar();
+      var r = await sb.from('inv_porcentajes_ingreso').select('*');
+      if (r.error) throw r.error;
+      var mi = window.PD_SEDES && window.PD_SEDES.miLocalidad();
+      porcentajes = r.data.filter(function (x) { return !mi || x.localidad_id === mi; });
+    } catch (e) { porcentajes = []; pintarPorcentajes(); aviso('ipiMsg', /inv_porcentajes_ingreso|could not find the table/i.test((e && e.message) || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para Porcentaje de ingresos.' : traducir(e), true); return; }
+    pintarPorcentajes();
+  }
+  $('ipiLista').addEventListener('input', function (e) {
+    if (!e.target.matches('[data-pct]')) return;
+    var v = e.target.value, tr = e.target.closest('tr');
+    tr.querySelector('[data-ej]').textContent = v === '' ? '—' : q(100 * (1 + Number(v) / 100));
+  });
+  $('ipiGrabar').addEventListener('click', async function () {
+    var filas = [].slice.call($('ipiLista').querySelectorAll('tr[data-tipo]')), mal = filas.filter(function (tr) { var v = tr.querySelector('[data-pct]').value; return v !== '' && !(Number(v) >= 0 && Number(v) <= 1000); })[0];
+    if (mal) { aviso('ipiMsg', 'Cada % debe estar entre 0 y 1000.', true); mal.querySelector('[data-pct]').focus(); return; }
+    this.disabled = true; aviso('ipiMsg', 'Grabando…');
+    var err = null, cambios = 0;
+    for (var i = 0; i < filas.length && !err; i++) {
+      var tr = filas[i], tipo = tr.dataset.tipo, v = tr.querySelector('[data-pct]').value, act = tr.querySelector('[data-activo]').checked;
+      var x = porcentajes.filter(function (y) { return y.tipo === tipo; })[0], r = null;
+      if (x && v === '') r = await sb.from('inv_porcentajes_ingreso').update({ activo: false }).eq('id', x.id);
+      else if (x && (Number(x.porcentaje) !== Number(v) || x.activo !== act)) r = await sb.from('inv_porcentajes_ingreso').update({ porcentaje: Number(v), activo: act }).eq('id', x.id);
+      else if (!x && v !== '') r = await sb.from('inv_porcentajes_ingreso').insert({ tipo: tipo, porcentaje: Number(v), activo: act });
+      if (r) { cambios++; if (r.error) err = r.error; }
+    }
+    this.disabled = false;
+    await cargarPorcentajes();
+    aviso('ipiMsg', err ? traducir(err) : cambios ? 'Porcentajes grabados. Se aplicarán en la próxima compra que cargues al inventario.' : 'No había cambios.', !!err);
+  });
 
   // ================= Eventos =================
   document.querySelectorAll('#admInvProveedores, #admInvBodegas, #admInvTipos, #admInvProductos').forEach(function (pane) {
@@ -591,14 +644,15 @@
     if (panel === 'admInvProductos') { await Promise.all([cargarProveedores(), cargarBodegas(), cargarTipos()]); return cargarProductos(); }
     if (panel === 'admInvTipos') { await cargarTipos(); try { productos = (await todas(function () { return sb.from('inv_productos').select('id,tipo_producto,estado'); })); } catch (e) { productos = []; } return pintarTipos(); }
     if (panel === 'admInvPrecios') { productos = []; return cargarPrecios(); }
+    if (panel === 'admInvPorcentajes') return cargarPorcentajes();
   }
-  ['admInvProveedores', 'admInvBodegas', 'admInvTipos', 'admInvProductos', 'admInvPrecios'].forEach(function (id) {
+  ['admInvProveedores', 'admInvBodegas', 'admInvTipos', 'admInvProductos', 'admInvPrecios', 'admInvPorcentajes'].forEach(function (id) {
     var tab = document.querySelector('[data-tab="' + id + '"]');
     if (tab) tab.addEventListener('click', function () { setTimeout(function () { cargarTodo(id); }, 0); });
   });
   window.PD_INV = { imagenProducto: imagenProducto };
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
-    cargar: function () { ['admInvProveedores', 'admInvBodegas', 'admInvTipos', 'admInvProductos', 'admInvPrecios'].forEach(function (id) { if (!$(id).hidden) cargarTodo(id); }); },
+    cargar: function () { ['admInvProveedores', 'admInvBodegas', 'admInvTipos', 'admInvProductos', 'admInvPrecios', 'admInvPorcentajes'].forEach(function (id) { if (!$(id).hidden) cargarTodo(id); }); },
     limpiar: function () {
       proveedores = []; bodegas = []; productos = []; precios = []; otrosProv = []; tiposProd = []; provSel = subSel = bodSel = prodSel = tipoSel = null;
       ['ipLista', 'ipSubs', 'ibLista', 'itLista', 'iaLista', 'ivLista'].forEach(function (i) { $(i).innerHTML = ''; });

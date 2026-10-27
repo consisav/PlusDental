@@ -5878,6 +5878,82 @@ alter table public.pacientes add column if not exists tipo_cliente text not null
 alter table public.pacientes drop constraint if exists pacientes_tipo_cliente_check;
 alter table public.pacientes add constraint pacientes_tipo_cliente_check check (tipo_cliente in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial'));
 
+-- ===== Inventarios: porcentaje de ingresos por tipo de precio =====
+-- Para cada tipo de precio (cliente directo, institucional, VIP…) y sede, el % que se suma al costo de la última compra.
+-- Al cargar una compra al inventario, el precio de cada producto de cada tipo = costo de esa compra × (1 + % / 100),
+-- con fecha de vigencia = el día en que se carga la compra.
+create table if not exists public.inv_porcentajes_ingreso (
+  id               bigint generated always as identity primary key,
+  tipo             text not null check (tipo in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial')),
+  porcentaje       numeric(6,2) not null default 0 check (porcentaje between 0 and 1000),
+  activo           boolean not null default true,
+  organizacion_id  bigint references public.organizaciones (id) on delete set null,
+  localidad_id     bigint references public.org_localidades (id) on delete set null,
+  creado           timestamptz not null default now(),
+  creado_por       text,
+  modificado       timestamptz,
+  modificado_por   text
+);
+create unique index if not exists inv_porcentajes_ingreso_tipo_sede on public.inv_porcentajes_ingreso (tipo, coalesce(localidad_id, 0));
+do $$ declare t text := 'inv_porcentajes_ingreso'; begin
+  if not exists (select 1 from pg_trigger where tgname = t || '_registro' and tgrelid = ('public.' || t)::regclass) then
+    execute format('create trigger %I before insert or update on public.%I for each row execute function public.inv_registro()', t || '_registro', t);
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = t || '_sede' and tgrelid = ('public.' || t)::regclass) then
+    execute format('create trigger %I before insert or update of organizacion_id, localidad_id on public.%I for each row execute function public.sede_registro()', t || '_sede', t);
+  end if;
+  execute format('alter table public.%I enable row level security', t);
+  execute format('drop policy if exists %I on public.%I', t || '_lee', t);
+  execute format('create policy %I on public.%I for select to authenticated using (public.es_personal() and public.ve_sede(localidad_id))', t || '_lee', t);
+  execute format('drop policy if exists %I on public.%I', t || '_crea', t);
+  execute format('create policy %I on public.%I for insert to authenticated with check (public.es_personal() and public.ve_sede(localidad_id))', t || '_crea', t);
+  execute format('drop policy if exists %I on public.%I', t || '_edita', t);
+  execute format('create policy %I on public.%I for update to authenticated using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id))', t || '_edita', t);
+  execute format('drop policy if exists %I on public.%I', t || '_borra', t);
+  execute format('create policy %I on public.%I for delete to authenticated using (public.es_super_administrador())', t || '_borra', t);
+  execute format('grant select, insert, update, delete on public.%I to authenticated', t);
+end $$;
+
+-- Cargar al inventario: entrada en el kardex, último costo y nuevos precios por tipo según el % de ingresos de la sede
+create or replace function public.cargar_compra(p_id bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare c public.inv_compras; v_doc text; v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select * into c from public.inv_compras where id = p_id for update;
+  if c.id is null or not public.ve_sede(c.localidad_id) then raise exception 'La compra no existe'; end if;
+  if c.estado <> 'grabada' then raise exception 'La compra ya está cargada o anulada'; end if;
+  if exists (select 1 from public.inv_compra_items where compra_id = p_id and producto_id is null) then
+    raise exception 'Hay artículos sin producto en el inventario: usa «Crear producto» antes de cargar';
+  end if;
+  v_doc := 'Compra N.º ' || c.numero || coalesce(' · ' || nullif(concat_ws(' ', c.serie, c.numero_documento), ''), '');
+  insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, compra_id, documento, cantidad, costo_unitario, usuario, localidad_id, organizacion_id)
+  select now(), i.producto_id, c.bodega_id, 'entrada', 'compra', c.id, v_doc, i.cantidad, round(i.subtotal / i.cantidad, 4), v_usuario, c.localidad_id, c.organizacion_id
+    from public.inv_compra_items i where i.compra_id = p_id and i.afecta_inventario order by i.linea;
+  -- Último costo: el de la última línea de cada producto en esta compra
+  update public.inv_productos p set costo = round(x.subtotal / x.cantidad, 2)
+    from (select distinct on (producto_id) producto_id, subtotal, cantidad from public.inv_compra_items
+           where compra_id = p_id and afecta_inventario and producto_id is not null and subtotal > 0 order by producto_id, linea desc) x
+   where x.producto_id = p.id;
+  -- Precios por tipo de cliente: costo de esta compra (última línea del producto) + % de ingresos de cada tipo
+  insert into public.inv_precios (producto_id, tipo, fecha, vigente, precio, precio_usd, pct_utilidad, localidad_id, organizacion_id)
+  select x.producto_id, pi.tipo, current_date, true, round(x.costo * (1 + pi.porcentaje / 100), 2),
+         case when c.tipo_cambio > 1 then round(x.costo * (1 + pi.porcentaje / 100) / c.tipo_cambio, 2) end,
+         pi.porcentaje, c.localidad_id, c.organizacion_id
+    from (select distinct on (producto_id) producto_id, round(subtotal / cantidad, 4) as costo
+            from public.inv_compra_items
+           where compra_id = p_id and afecta_inventario and producto_id is not null and subtotal > 0
+           order by producto_id, linea desc) x
+    join public.inv_porcentajes_ingreso pi on pi.localidad_id is not distinct from c.localidad_id and pi.activo
+  on conflict (producto_id, tipo, coalesce(localidad_id, 0)) do update
+     set precio = excluded.precio, precio_usd = coalesce(excluded.precio_usd, public.inv_precios.precio_usd),
+         pct_utilidad = excluded.pct_utilidad, fecha = excluded.fecha, vigente = true;
+  update public.inv_compras set estado = 'operada', cargado_en = now(), cargado_por = v_usuario where id = p_id;
+end;
+$$;
+revoke execute on function public.cargar_compra(bigint) from public, anon;
+grant execute on function public.cargar_compra(bigint) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
