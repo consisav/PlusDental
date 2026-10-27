@@ -1327,6 +1327,15 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .jj-cap2{display:grid;grid-template-columns:minmax(0,2.6fr) 90px 80px 120px auto;gap:8px 10px;align-items:end}
 .jj-det .jj-c-pac{width:24%}.jj-det .jj-c-pieza{width:76px}.jj-det tr.jj-sub td{background:#F5F9FC;font-size:12.5px;color:#475B68}
 .jj-botones{flex-wrap:wrap}
+.jr-filtros{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end}.jr-filtros>:nth-child(3){grid-column:span 2}.jr-ejecutar{height:42px}.jr-acc{display:flex;gap:8px;flex-wrap:wrap}
+.jr-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:0 0 12px}.jr-kpi{background:#F5F9FC;border:1px solid #E1EAF1;border-radius:12px;padding:10px 12px}.jr-kpi span{display:block;font-size:11.5px;color:#5A6D7A}.jr-kpi b{font-size:20px;color:#0B2B40}
+.jr-tabla{table-layout:fixed;width:100%}.jr-tabla .jr-c-n{width:40px}.jr-tabla .jr-c-ed{width:56px}.jr-tabla .jr-c-sx{width:52px}.jr-tabla .jr-c-ref{width:13%}.jr-tabla .jr-c-pz{width:60px}.jr-tabla .jr-c-cant{width:56px}.jr-tabla .jr-c-q{width:92px}.jr-tabla .ia-corto{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jr-tabla tr.jr-grupo td{background:#EEF5FA;font-weight:700;color:#0B2B40;font-size:12.5px}.jr-tabla tr.jr-sub td{background:#F8FAFC;font-size:12.5px;color:#475B68}.jr-tabla tr.jr-total td,.jr-resumen tr.jr-total td{background:#E6EFF6;font-weight:700}
+.jr-graf-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.jr-card{border:1px solid #D9E4EC;border-radius:14px;padding:12px 14px;background:#fff}.jr-ancha{grid-column:1/-1}.jr-card h5{margin:0 0 10px;font-size:13px;color:#0B2B40}
+.jr-b-fila{display:grid;grid-template-columns:minmax(120px,240px) 1fr 44px 70px;gap:8px;align-items:center;font-size:12.5px;margin:5px 0}.jr-b-etq{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.jr-b-pista{height:14px;background:#EEF2F5;border-radius:4px;display:block}.jr-b-pista i{display:block;height:14px;border-radius:4px}.jr-b-fila b{text-align:right}.jr-b-fila small{color:#5A6D7A}
+.jr-sexo{display:flex;height:18px;border-radius:6px;overflow:hidden;margin-top:6px}.jr-sexo i{display:block}.jr-ley{display:flex;flex-wrap:wrap;gap:12px;font-size:12.5px}.jr-ley i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.jr-resumen{width:100%;border-collapse:collapse;font-size:12.5px}.jr-resumen th,.jr-resumen td{padding:6px 8px;border-bottom:1px solid #E3EAF0;text-align:left}.jr-resumen th{font-size:11px;text-transform:uppercase;color:#5A6D7A}.jr-resumen .num{text-align:right}
+@media (max-width:1100px){.jr-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}@media (max-width:700px){.jr-filtros,.jr-kpis,.jr-graf-g{grid-template-columns:1fr 1fr}.jr-tabla{min-width:820px}.jr-b-fila{grid-template-columns:110px 1fr 36px}.jr-b-fila small{display:none}}
 .jj-g .jj-meds{grid-column:2/4}.jj-meds-caja{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:40px;border:1px solid #CFDCE6;border-radius:10px;padding:4px 6px;background:#fff}
 .jj-med{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;background:#EEF6FC;border:1px solid #BFD7E8;color:#0B2B40;border-radius:999px;padding:2px 4px 2px 10px}.jj-med small{font-weight:500;color:#5A6D7A}.jj-med-resp{background:#DCEBF7}
 .jj-med button{border:0;background:none;cursor:pointer;font-size:15px;line-height:1;color:#5A6D7A;padding:0 4px}.jj-med button:hover{color:#9A3B2E}.jj-meds-caja select{border:0;background:transparent;font:inherit;font-size:13px;color:#475B68;min-width:160px;flex:1;padding:4px;box-shadow:none}
@@ -1647,6 +1656,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="adm-g-items" id="grpJornadasItems" role="presentation">
 <button type="button" role="tab" id="tabJorInstituciones" data-tab="admJorInstituciones" aria-selected="false" aria-controls="admJorInstituciones">Instituciones</button>
 <button type="button" role="tab" id="tabJorJornadas" data-tab="admJorJornadas" aria-selected="false" aria-controls="admJorJornadas">Jornadas dentales</button>
+<hr class="adm-sep" role="separator">
+<button type="button" role="tab" id="tabJorRepPacientes" data-tab="admJorRepPacientes" aria-selected="false" aria-controls="admJorRepPacientes">Reporte de pacientes atendidos</button>
+<button type="button" role="tab" id="tabJorRepGrafica" data-tab="admJorRepGrafica" aria-selected="false" aria-controls="admJorRepGrafica">Gráfica de atención</button>
 </div>
 </div>
 <div class="adm-g">
@@ -2346,6 +2358,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="admRepConstancia" role="tabpanel" aria-labelledby="tabRepConstancia" hidden class="adm-pane"></div>
 <div id="admJorInstituciones" role="tabpanel" aria-labelledby="tabJorInstituciones" hidden class="adm-pane"></div>
 <div id="admJorJornadas" role="tabpanel" aria-labelledby="tabJorJornadas" hidden class="adm-pane"></div>
+<div id="admJorRepPacientes" role="tabpanel" aria-labelledby="tabJorRepPacientes" hidden class="adm-pane"></div>
+<div id="admJorRepGrafica" role="tabpanel" aria-labelledby="tabJorRepGrafica" hidden class="adm-pane"></div>
 
 <div id="admAgentes" role="tabpanel" aria-labelledby="tabAgentes" hidden class="adm-pane">
 
@@ -3044,6 +3058,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="inventarios-movimientos.js?v=20261027i"></script>
 <script src="inventarios-traslados.js?v=20261027"></script>
 <script src="jornadas.js?v=20261027d"></script>
+<script src="jornadas-reportes.js?v=20261027c"></script>
 <script src="inventarios-ordenes.js?v=20261027f"></script>
 <script src="asistentes.js"></script>
 <script src="dentistas.js"></script>
