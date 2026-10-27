@@ -688,51 +688,63 @@
     grupos.forEach(function (x) { x.forEach(function (c) { c._lanes = x.lanes.length; }); });
     return cs;
   }
+  // Bloque de una cita dentro de la celda de la fila donde empieza
+  function bloque2(c, m, conMedico) {
+    var dur = duracion(c), alto = Math.max(1, dur / PASO) * ALTO - 3, ancho = 100 / c._lanes, off = (aMin(c.hora) - m) / PASO * ALTO;
+    var pos = 'top:' + (off + 1) + 'px;height:' + alto + 'px;left:calc(' + (c._lane * ancho) + '% + 2px);width:calc(' + ancho + '% - 4px)';
+    var est = medEstilo(c.dentista_id), estilo = est ? est.replace('style="', 'style="' + pos + ';') : ' style="' + pos + '"';
+    var filas = Math.max(1, dur / PASO);
+    return '<button type="button" class="ag2-cita ' + c.estado + (c.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + c.id + '"' + estilo +
+      ' title="' + esc(hhmm(c.hora) + ' · ' + c.nombre + ' · ' + (c.servicio || '') + ' · ' + nombreDentista(c.dentista_id) + ' · ' + (ESTADOS_CITA[c.estado] || '')) + '">' +
+      '<i class="ag2-punto" style="background:' + (COLOR_ESTADO[c.estado] || '#94A6B2') + '"></i>' + nombrePaciente(c) +
+      (filas > 1 ? '<small>' + esc(hhmm(c.hora) + ' · ' + (c.servicio || '')) + '</small>' : '') +
+      (conMedico && filas > 2 ? '<small>' + esc(nombreDentista(c.dentista_id)) + '</small>' : '') + '</button>';
+  }
+  // cols: [{ th: html del encabezado, citas: [...], celda: function (m, hh) → [clase, html del «+»], hoy }]
+  function cuadricula(cols, conMedico) {
+    var g = document.querySelector('.ag-grid'); g.classList.remove('semana-lista', 'semana'); g.classList.add('semana2');
+    var desde = aMin(JORNADA.semana[0][0]), hasta = aMin(JORNADA.semana[JORNADA.semana.length - 1][1]);
+    cols.forEach(function (c) {
+      carriles(c.citas).forEach(function (x) { var a = aMin(x.hora); desde = Math.min(desde, Math.floor(a / PASO) * PASO); hasta = Math.max(hasta, Math.ceil((a + duracion(x)) / PASO) * PASO); });
+      c.inicioEn = {};
+      c.citas.forEach(function (x) { var k = Math.floor(aMin(x.hora) / PASO) * PASO; (c.inicioEn[k] = c.inicioEn[k] || []).push(x); });
+    });
+    $('agHead').innerHTML = '<tr><th class="ag2-h"></th>' + cols.map(function (c) { return '<th class="' + (c.hoy ? 'hoy' : '') + '">' + c.th + '</th>'; }).join('') + '<th class="ag2-h"></th></tr>';
+    var filas = [];
+    for (var m = desde; m < hasta; m += PASO) {
+      var hh = hhmmDe(m);
+      filas.push('<tr' + (m % 60 === 0 ? ' class="ag2-hora"' : '') + '><td class="ag2-t">' + hh + '</td>' + cols.map(function (c) {
+        var blq = (c.inicioEn[m] || []).map(function (x) { return bloque2(x, m, conMedico); }).join(''), e = c.celda(m, hh);
+        return '<td class="ag2-c ' + e[0] + (c.hoy ? ' hoy' : '') + '"' + (e[2] ? ' title="' + esc(e[2]) + '"' : '') + '>' + (e[1] || '') + blq + '</td>';
+      }).join('') + '<td class="ag2-t">' + hh + '</td></tr>');
+    }
+    $('agBody').innerHTML = filas.join('');
+  }
+  function yaPaso(f, m) { var a = new Date(); return f < hoy() || (f === hoy() && m <= a.getHours() * 60 + a.getMinutes()); }
+  function botonMas(f, hh, sala, texto) {
+    return '<button type="button" class="ag2-mas" data-libre="' + hh + '" data-fecha="' + f + '" data-sala="' + (sala || '') + '" aria-label="Agendar ' + esc(texto) + ' a las ' + hh + '">+</button>';
+  }
   function pintarSemana() {
     var inicio = lunesDe($('agDia').value), dias = [];
     for (var i = 0; i < 7; i++) dias.push(sumar(inicio, i));
     if (semanaAngosta()) { pintarSemanaLista(dias); return; }
-    var g = document.querySelector('.ag-grid'); g.classList.remove('semana-lista', 'semana'); g.classList.add('semana2');
     var activas = salas.filter(function (x) { return x.activa; });
-    var ahora = new Date(), hAhora = ahora.getHours() * 60 + ahora.getMinutes();
-    // Rango de horas: la jornada de la clínica, ampliada si hay citas fuera de ella
-    var desde = aMin(JORNADA.semana[0][0]), hasta = aMin(JORNADA.semana[JORNADA.semana.length - 1][1]);
-    var semana = citas.filter(function (c) { return c.fecha >= dias[0] && c.fecha <= dias[6]; });
-    semana.forEach(function (c) { var a = aMin(c.hora); desde = Math.min(desde, Math.floor(a / PASO) * PASO); hasta = Math.max(hasta, Math.ceil((a + duracion(c)) / PASO) * PASO); });
-    var porDia = {}, inicioEn = {};
-    dias.forEach(function (f) { porDia[f] = carriles(semana.filter(function (c) { return c.fecha === f; })); });
-    dias.forEach(function (f) { porDia[f].forEach(function (c) { var k = f + '|' + Math.floor(aMin(c.hora) / PASO) * PASO; (inicioEn[k] = inicioEn[k] || []).push(c); }); });
-    $('agHead').innerHTML = '<tr><th class="ag2-h"></th>' + dias.map(function (f) {
-      var d = fecha(f), n = porDia[f].length;
-      return '<th class="' + (f === hoy() ? 'hoy' : '') + '"><button type="button" class="ag2-dia" data-ir-dia="' + f + '" title="Ver el día por salas">' +
-        ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][d.getDay()] + ' ' + ('0' + d.getDate()).slice(-2) + (n ? '<small>' + n + (n === 1 ? ' cita' : ' citas') + '</small>' : '') + '</button></th>';
-    }).join('') + '<th class="ag2-h"></th></tr>';
-    var filas = [];
-    for (var m = desde; m < hasta; m += PASO) {
-      var hh = hhmmDe(m);
-      filas.push('<tr' + (m % 60 === 0 ? ' class="ag2-hora"' : '') + '><td class="ag2-t">' + hh + '</td>' + dias.map(function (f) {
-        var blq = (inicioEn[f + '|' + m] || []).map(function (c) {
-          var dur = duracion(c), alto = Math.max(1, dur / PASO) * ALTO - 3, ancho = 100 / c._lanes;
-          var off = (aMin(c.hora) - m) / PASO * ALTO;
-          return '<button type="button" class="ag2-cita ' + c.estado + (c.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + c.id + '"' + medEstilo(c.dentista_id).replace('style="', 'style="top:' + (off + 1) + 'px;height:' + alto + 'px;left:calc(' + (c._lane * ancho) + '% + 2px);width:calc(' + ancho + '% - 4px);') +
-            (medEstilo(c.dentista_id) ? '' : ' style="top:' + (off + 1) + 'px;height:' + alto + 'px;left:calc(' + (c._lane * ancho) + '% + 2px);width:calc(' + ancho + '% - 4px)"') +
-            ' title="' + esc(hhmm(c.hora) + ' · ' + c.nombre + ' · ' + (c.servicio || '') + ' · ' + nombreDentista(c.dentista_id) + ' · ' + (ESTADOS_CITA[c.estado] || '')) + '">' +
-            '<i class="ag2-punto" style="background:' + (COLOR_ESTADO[c.estado] || '#94A6B2') + '"></i>' + nombrePaciente(c) + (dur > PASO ? '<small>' + esc(c.servicio || '') + '</small>' : '') + '</button>';
-        }).join('');
-        var cls = '', libre = '';
-        if (!enJornada(f, m)) cls = 'fuera';
-        else if (bloqueado(f, hh, PASO)) cls = 'bloq';
-        else {
-          var pasado = f < hoy() || (f === hoy() && m <= hAhora);
+    cuadricula(dias.map(function (f) {
+      var d = fecha(f), cs = citas.filter(function (c) { return c.fecha === f; });
+      return {
+        hoy: f === hoy(), citas: cs,
+        th: '<button type="button" class="ag2-dia" data-ir-dia="' + f + '" title="Ver el día por salas">' + ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][d.getDay()] + ' ' + ('0' + d.getDate()).slice(-2) +
+          (cs.length ? '<small>' + cs.length + (cs.length === 1 ? ' cita' : ' citas') + '</small>' : '') + '</button>',
+        celda: function (m, hh) {
+          if (!enJornada(f, m)) return ['fuera'];
+          if (bloqueado(f, hh, PASO)) return ['bloq', '', 'Bloqueado'];
           var hay = activas.length ? activas.some(function (x) { return salaAbierta(x, f, hh) && !salaOcupada(x.id, f, hh, PASO); }) : !ocupan(f, hh, PASO).length;
-          if (!hay) cls = 'lleno';
-          else if (pasado) cls = 'pasado';
-          else { cls = 'libre'; libre = '<button type="button" class="ag2-mas" data-libre="' + hh + '" data-fecha="' + f + '" data-sala="" aria-label="Agendar el ' + textoFecha(f) + ' a las ' + hh + '">+</button>'; }
+          if (!hay) return ['lleno'];
+          if (yaPaso(f, m)) return ['pasado'];
+          return ['libre', botonMas(f, hh, null, 'el ' + textoFecha(f))];
         }
-        return '<td class="ag2-c ' + cls + (f === hoy() ? ' hoy' : '') + '">' + libre + blq + '</td>';
-      }).join('') + '<td class="ag2-t">' + hh + '</td></tr>');
-    }
-    $('agBody').innerHTML = filas.join('');
+      };
+    }), false);
   }
 
   // Vista de mes: calendario de lunes a domingo con las citas de cada día
@@ -796,31 +808,26 @@
   function irExpediente(id) { if (window.PD_EXPEDIENTE) window.PD_EXPEDIENTE.abrir(+id); }
 
   function pintarDia() {
-    document.querySelector('.ag-grid').classList.remove('semana', 'semana-lista', 'semana2');
-    var f = $('agDia').value;
-    var lista = turnos(f);
-    var columnas = salas.filter(function (s) { return s.activa; });
-    var sinSala = citas.some(function (c) { return c.fecha === f && !c.posicion_id; });
-    var cols = columnas.map(function (s) { return { id: s.id, titulo: s.codigo + ' · ' + s.nombre, sala: s }; });
-    if (sinSala || !cols.length) cols.push({ id: null, titulo: 'Sin sala asignada', sala: null });
-    $('agHead').innerHTML = '<tr><th>Hora</th>' + cols.map(function (c) { return '<th>' + esc(c.titulo) + '</th>'; }).join('') + '</tr>';
-    if (!lista.length) { $('agBody').innerHTML = '<tr><td colspan="' + (cols.length + 1) + '">La clínica no atiende este día.</td></tr>'; return; }
-    var ahora = new Date(), esHoy = f === hoy(), hAhora = ('0' + ahora.getHours()).slice(-2) + ':' + ('0' + ahora.getMinutes()).slice(-2);
-    $('agBody').innerHTML = lista.map(function (h) {
-      return '<tr><td class="hora">' + h + '</td>' + cols.map(function (c) {
-        var cs = citasEn(f, h).filter(function (x) { return (x.posicion_id || null) === c.id; });
-        if (cs.length) return '<td>' + cs.map(function (x) {
-          return '<button type="button" class="ag-celda cita ' + x.estado + (x.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + x.id + '"' + medEstilo(x.dentista_id) + '><b>' + nombrePaciente(x) + '</b>' + (x.prioridad === 'urgente' ? '<span class="ag-urg">Urgente</span>' : '') +
-            '<br>' + esc(x.servicio) + '<br><span style="color:#5A6D7A">' + esc(nombreDentista(x.dentista_id)) + (x.estado === 'pendiente' ? ' · sin confirmar' : x.estado === 'reprogramada' ? ' · reprogramada' : x.estado === 'atendida' ? ' · atendida' : '') + '</span></button>';
-        }).join('') + '</td>';
-        var pasado = f < hoy() || (esHoy && h <= hAhora);
-        if (bloqueado(f, h)) return '<td><span class="ag-celda cerrado">Bloqueado</span></td>';
-        if (c.sala && !salaAbierta(c.sala, f, h)) return '<td><span class="ag-celda cerrado">' + (c.sala.estado === 'mantenimiento' ? 'Fuera de servicio' : 'Cerrada') + '</span></td>';
-        if (pasado) return '<td><span class="ag-celda cerrado">—</span></td>';
-        if (citasTodas && (c.sala ? salaOcupada(c.id, f, h) : citasTodas.some(function (x) { var m = aMin(x.hora), a = aMin(h); return x.fecha === f && !x.posicion_id && m >= a && m < a + BLOQUE; }))) return '<td><span class="ag-celda cerrado">Ocupado</span></td>';
-        return '<td><button type="button" class="ag-celda libre" data-libre="' + h + '" data-sala="' + (c.id || '') + '">+ Libre</button></td>';
-      }).join('') + '</tr>';
-    }).join('');
+    var f = $('agDia').value, del = citas.filter(function (c) { return c.fecha === f; });
+    var cols = salas.filter(function (x) { return x.activa; }).map(function (x) { return { id: x.id, titulo: x.codigo + ' · ' + x.nombre, sala: x }; });
+    if (del.some(function (c) { return !c.posicion_id; }) || !cols.length) cols.push({ id: null, titulo: 'Sin sala asignada', sala: null });
+    var todas = citasTodas || citas;
+    cuadricula(cols.map(function (k) {
+      var cs = del.filter(function (c) { return (c.posicion_id || null) === k.id; });
+      return {
+        hoy: false, citas: cs,
+        th: '<span class="ag2-dia ag2-sala">' + esc(k.titulo) + (cs.length ? '<small>' + cs.length + (cs.length === 1 ? ' cita' : ' citas') + '</small>' : '') + '</span>',
+        celda: function (m, hh) {
+          if (!enJornada(f, m)) return ['fuera'];
+          if (bloqueado(f, hh, PASO)) return ['bloq', '', 'Bloqueado'];
+          if (k.sala && !salaAbierta(k.sala, f, hh)) return ['cerrada', '', k.sala.estado === 'mantenimiento' ? 'Fuera de servicio' : 'Sala cerrada'];
+          var ocupada = k.sala ? salaOcupada(k.id, f, hh, PASO) : todas.some(function (x) { return x.fecha === f && !x.posicion_id && choca(m, PASO, aMin(x.hora), duracion(x)); });
+          if (ocupada) return ['lleno'];
+          if (yaPaso(f, m)) return ['pasado'];
+          return ['libre', botonMas(f, hh, k.id, 'en ' + k.titulo)];
+        }
+      };
+    }), true);
   }
 
   function verDetalle(id) {
