@@ -114,8 +114,8 @@
       '<button type="button" id="iocRevertir" class="adm-btn">Revertir autorización</button><span class="ic-sep"></span>' +
       '<button type="button" id="iocAnular" class="adm-btn">Anular</button><span class="ic-sep"></span>' +
       '<button type="button" id="iocImprimir" class="adm-btn">Imprimir</button>' +
-      '<button type="button" id="iocCorreo" class="adm-btn ioc-envio"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Enviar por correo</button>' +
-      '<button type="button" id="iocWa" class="adm-btn ioc-envio ioc-wa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1.5-1.5-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/></svg>Enviar por WhatsApp</button></div></section>' +
+      '<button type="button" id="iocCorreo" class="adm-btn ioc-envio"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Enviar correo</button>' +
+      '<button type="button" id="iocWa" class="adm-btn ioc-envio ioc-wa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1.5-1.5-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/></svg>Enviar WhatsApp</button></div></section>' +
     // Compras asociadas
     '<section class="ic-pane" data-iocpane="compras" hidden><div class="roles-wrap"><table class="pr-tabla"><thead><tr><th>#Compra</th><th>Fecha</th><th>Documento</th><th class="num">Total Q</th><th>Estado</th></tr></thead><tbody id="iocCompras"></tbody></table></div></section>' +
     '<p id="iocMsg" class="dlg-msg" role="status"></p><div id="iocRegistro"></div></form></div>';
@@ -333,7 +333,7 @@
     if (!p) { aviso('iocMsg', 'La orden no tiene proveedor.', true); return; }
     var correo = medio === 'correo';
     G.dialogo({
-      eyebrow: 'Órdenes de compra · ' + (correo ? 'Enviar por correo' : 'Enviar por WhatsApp'), titulo: p.nombre_comercial, valores: { contacto: p.contacto || '', guardar_ficha: true },
+      eyebrow: 'Órdenes de compra · ' + (correo ? 'Enviar correo' : 'Enviar WhatsApp'), titulo: p.nombre_comercial, valores: { contacto: p.contacto || '', guardar_ficha: true },
       campos: [{ k: 'aviso', label: 'Falta un dato', tipo: 'info', ancho: 'full' },
         correo ? { k: 'destino', label: 'Correo del proveedor', req: true, max: 150, placeholder: 'ventas@proveedor.com', ancho: 'full' }
                : { k: 'destino', label: 'Celular (WhatsApp) del proveedor', req: true, max: 30, placeholder: '5555-6666', ayuda: 'Número de Guatemala de 8 dígitos o con código de país', ancho: 'full' },
