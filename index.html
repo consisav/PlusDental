@@ -453,7 +453,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-celda.cita:hover,.ag-mini.cita:hover{filter:brightness(.97)}
 .ag-celda.cita .ag-trat,.ag-mini.cita .ag-trat,.ag-celda.cita span{color:inherit;opacity:.8}
 .ag-leyenda{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
-.ag-filtros{display:flex;flex-wrap:wrap;gap:10px 14px;margin:0 0 12px}.ag-filtros label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:#0B2B40;flex:1 1 240px;max-width:360px}.ag-filtros select{font:inherit;font-weight:500;font-size:14px;padding:8px 10px;border:1px solid #CFDCE6;border-radius:10px;background:#fff}.ag-filtros select:disabled{background:#F1F5F8;color:#475B68}
+.ag-filtros label[hidden]{display:none}.ag-filtros{display:flex;flex-wrap:wrap;gap:10px 14px;margin:0 0 12px}.ag-filtros label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:#0B2B40;flex:1 1 240px;max-width:360px}.ag-filtros select{font:inherit;font-weight:500;font-size:14px;padding:8px 10px;border:1px solid #CFDCE6;border-radius:10px;background:#fff}.ag-filtros select:disabled{background:#F1F5F8;color:#475B68}
 .ag-leyenda span{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:#0B2B40;border:1px solid #D9E4EC;background:#FFFFFF;border-radius:999px;padding:5px 12px}
 .ag-leyenda i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .ag-leyenda b{font-variant-numeric:tabular-nums}
@@ -2032,7 +2032,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" id="agImprimir" class="adm-btn adm-primary">Imprimir agenda</button>
 </div>
 </div>
-<div class="ag-filtros"><label>Institución<select id="agFInst"><option value="">Todas las instituciones</option></select></label><label>Médico<select id="agFMed"><option value="">Todos los médicos</option></select></label></div>
+<div class="ag-filtros"><label>Institución<select id="agFInst"><option value="">Todas las instituciones</option></select></label><label id="agFSucWrap" hidden>Sucursal<select id="agFSuc"><option value="">Todas las sucursales</option></select></label><label>Médico<select id="agFMed"><option value="">Todos los médicos</option></select></label></div>
 <div id="agLeyenda" class="ag-leyenda" aria-live="polite"></div>
 <div class="roles-wrap"><table class="ag-grid"><thead id="agHead"></thead><tbody id="agBody"></tbody></table></div>
 <p id="agAyuda" class="dlg-msg">Toca un espacio <b>Libre</b> para agendar ahí, o una cita para ver su detalle.</p>
@@ -3062,7 +3062,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="inventarios-ordenes.js?v=20261027f"></script>
 <script src="asistentes.js"></script>
 <script src="dentistas.js"></script>
-<script src="agenda.js?v=20261027d"></script>
+<script src="agenda.js?v=20261027e"></script>
 <script src="agentes.js"></script>
 <script src="reportes.js?v=20261027"></script>
 <script src="constancias.js"></script>
