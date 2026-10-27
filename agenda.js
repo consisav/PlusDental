@@ -236,6 +236,7 @@
     var p = pacienteElegido(), nuevo = $('agPaciente').value === 'nuevo';
     if (!p && !nuevo) { aviso('agFormMsg', 'Elige el paciente.', true); return; }
     if (nuevo && (!$('agNombre').value.trim() || !$('agTelefono').value.trim())) { aviso('agFormMsg', 'Escribe el nombre y el teléfono del paciente nuevo.', true); return; }
+    if (!tipoValido()) return;
     boton.disabled = true;
     if (nuevo) {
       aviso('agFormMsg', 'Creando el expediente del paciente…');
@@ -258,6 +259,7 @@
       hechas.push(o);
     }
     boton.disabled = false;
+    if (hechas.length) await guardarTipo(p);
     var nombre = p ? p.nombre : $('agNombre').value.trim(), tel = telWa(p ? p.telefono : $('agTelefono').value.trim());
     var fechasTxt = hechas.map(function (o, i) { return (i + 1) + '. ' + textoFecha(o.fecha) + ' a las ' + o.hora + (o.dentista ? ' con ' + o.dentista.nombre : ''); }).join('\n');
     var msg = 'Hola ' + nombre + ', le confirmamos sus citas en Plus Dental para ' + $('agTratamiento').value.trim() + ':\n' + fechasTxt + '\nDirección: ' + CLINICA + '. Si necesita cambiar alguna, responda a este mensaje.';
@@ -273,13 +275,53 @@
     await cargarCitas();
   }
 
+  // ---------- Tipo de cliente: independiente o de una institución (con su sucursal) ----------
+  var instCat = [], sucCat = [], tipoCli = 'directo';
+  function codigoCat(pre, x) { return pre + '-' + ('00' + (x.numero || x.id)).slice(-3); }
+  function ponerTipo(t) {
+    tipoCli = t === 'institucional' ? 'institucional' : 'directo';
+    document.querySelectorAll('#agForm [data-ag-tipo]').forEach(function (b) { b.setAttribute('aria-checked', b.dataset.agTipo === tipoCli); });
+    $('agInstWrap').hidden = $('agSucWrap').hidden = tipoCli !== 'institucional';
+  }
+  function opcionesInst(instId, sucId) {
+    var l = instCat.filter(function (i) { return i.estado === 'activo' || i.id === instId; });
+    $('agInst').innerHTML = '<option value="">' + (l.length ? 'Elige la institución…' : 'No hay instituciones (Jornadas › Instituciones)') + '</option>' +
+      l.map(function (i) { return '<option value="' + i.id + '">' + esc(codigoCat('INS', i) + ' · ' + i.nombre) + '</option>'; }).join('');
+    $('agInst').value = instId ? String(instId) : '';
+    opcionesSuc(sucId);
+  }
+  function opcionesSuc(sucId) {
+    var inst = +$('agInst').value || null, l = inst ? sucCat.filter(function (x) { return x.institucion_id === inst && (x.estado === 'activo' || x.id === sucId); }) : [];
+    $('agSuc').innerHTML = '<option value="">' + (!inst ? 'Elige primero la institución' : l.length ? 'Sede principal' : 'Sin sucursales') + '</option>' +
+      l.map(function (x) { return '<option value="' + x.id + '">' + esc(codigoCat('SUC', x) + ' · ' + x.nombre) + '</option>'; }).join('');
+    $('agSuc').value = sucId && l.some(function (x) { return x.id === sucId; }) ? String(sucId) : '';
+  }
+  function tipoValido() {
+    if (tipoCli === 'institucional' && !$('agInst').value) { aviso('agFormMsg', 'Elige la institución a la que pertenece el paciente.', true); aviso('agMsgM', 'Elige la institución a la que pertenece el paciente.', true); $('agInst').focus(); return false; }
+    return true;
+  }
+  // Lo que se guarda en el expediente. «Independiente» solo cambia a un paciente que era institucional (respeta VIP, referido…)
+  function datosTipo(p) {
+    if (tipoCli === 'institucional') return { tipo_cliente: 'institucional', institucion_id: +$('agInst').value || null, sucursal_id: +$('agSuc').value || null };
+    return !p || p.tipo_cliente === 'institucional' ? { tipo_cliente: 'directo', institucion_id: null, sucursal_id: null } : {};
+  }
+  async function guardarTipo(p) {
+    if (!p || !instCat.length) return;
+    var d = datosTipo(p), cambia = Object.keys(d).some(function (k) { return (p[k] == null ? null : p[k]) !== d[k]; });
+    if (!cambia) return;
+    var r = await sb.from('pacientes').update(d).eq('id', p.id).select('id');
+    if (!r.error) Object.assign(p, d);
+  }
+
   // ---------- Expediente del paciente nuevo ----------
   // Nombre, teléfono, correo, médico (el de la cita o el elegido) y sede; estado Activo, tipo de cliente y agente por defecto
   async function crearExpediente(dentistaId) {
     var datos = { nombre: $('agNombre').value.trim(), telefono: $('agTelefono').value.trim() || null, correo: $('agCorreo').value.trim() || null, estado: 'activo',
       dentista_id: dentistaId || ($('agMedico').value ? +$('agMedico').value : null) || medicoPrincipal() };
     if (window.PD_SEDES && $('agLoc').options.length > 1 && $('agLoc').value) Object.assign(datos, window.PD_SEDES.valores($('agOrg'), $('agLoc')));
-    var r = await sb.from('pacientes').insert(datos).select('id,nombre,dpi,telefono,dentista_id,estado,correo').single();
+    if (instCat.length) Object.assign(datos, datosTipo(null));
+    var r = await sb.from('pacientes').insert(datos).select('*').single();
+    if (r.error && /tipo_cliente|institucion_id|sucursal_id/.test(r.error.message || '')) { delete datos.tipo_cliente; delete datos.institucion_id; delete datos.sucursal_id; r = await sb.from('pacientes').insert(datos).select('*').single(); }
     if (r.error && /correo/.test(r.error.message || '')) { delete datos.correo; r = await sb.from('pacientes').insert(datos).select('id,nombre,dpi,telefono,dentista_id,estado').single(); }
     if (r.error) throw r.error;
     pacientes.push(r.data);
@@ -303,6 +345,7 @@
     var p = pacienteElegido();
     $('agPacInfo').textContent = p ? [p.telefono ? 'WhatsApp ' + p.telefono : 'Sin teléfono en el expediente', p.correo ? 'Correo ' + p.correo : 'Sin correo', p.dentista_id ? 'Médico asignado: ' + nombreDentista(p.dentista_id) : 'Sin médico asignado'].join(' · ') : '';
     $('agCorreoWrap').hidden = !(nuevo || (p && !p.correo));
+    ponerTipo(p && p.tipo_cliente === 'institucional' ? 'institucional' : 'directo'); opcionesInst(p ? p.institucion_id : null, p ? p.sucursal_id : null);
     $('agCorreo').value = '';
     if (!medicoElegidoAMano) {
       var porDefecto = p && p.dentista_id && dentistas.some(function (d) { return d.id === p.dentista_id; }) ? p.dentista_id : medicoPrincipal();
@@ -437,6 +480,7 @@
     var p = pacienteElegido(), nuevo = $('agPaciente').value === 'nuevo';
     if (!p && !nuevo) { aviso('agFormMsg', 'Elige el paciente.', true); return; }
     if (nuevo && (!$('agNombre').value.trim() || !$('agTelefono').value.trim())) { aviso('agFormMsg', 'Escribe el nombre y el teléfono del paciente nuevo.', true); return; }
+    if (!tipoValido()) return;
     boton.disabled = true;
     var expedienteNuevo = false;
     if (nuevo) {
@@ -459,6 +503,7 @@
     boton.disabled = false;
     if (r.error) { aviso('agFormMsg', traducir(r.error), true); await cargarCitas(); return; }
     await sedeCita(r.data);
+    await guardarTipo(p);
     var nombre = p ? p.nombre : $('agNombre').value.trim(), tel = p ? p.telefono : $('agTelefono').value.trim();
     var correo = (p && p.correo) || $('agCorreo').value.trim();
     if (p && !p.correo && correo) {
@@ -739,12 +784,17 @@
     var rs = await Promise.all([
       sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo').eq('estado', 'activo').order('nombre'),
       sb.from('posiciones').select('id,codigo,nombre,especialidad,estado,activa,horario').order('codigo'),
-      sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo').order('nombre'),
+      sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo,tipo_cliente,institucion_id,sucursal_id').order('nombre'),
       sb.from('tratamientos').select('nombre,activo').eq('activo', true).order('nombre'),
       sb.from('bloqueos').select('fecha,hora').gte('fecha', hoyF)
     ]);
     if (window.PD_COLOR) await window.PD_COLOR.cargar(true);
     if (rs[0].error && /correo/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono').eq('estado', 'activo').order('nombre');
+    if (rs[2].error && /tipo_cliente|institucion_id|sucursal_id/.test(rs[2].error.message)) rs[2] = await sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo').order('nombre');
+    try {
+      var ri = await Promise.all([sb.from('jor_instituciones').select('id,numero,nombre,estado').order('nombre'), sb.from('jor_sucursales').select('id,numero,institucion_id,nombre,estado').order('nombre')]);
+      instCat = ri[0].error ? [] : ri[0].data || []; sucCat = ri[1].error ? [] : ri[1].data || [];
+    } catch (e) { instCat = []; sucCat = []; }
     if (rs[2].error && /correo/.test(rs[2].error.message)) rs[2] = await sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado').order('nombre');
     dentistas = rs[0].error ? [] : rs[0].data;
     salas = rs[1].error ? [] : rs[1].data;
@@ -892,6 +942,8 @@
 
   // ---------- Eventos ----------
   $('agPaciente').addEventListener('change', alCambiarPaciente);
+  document.querySelectorAll('#agForm [data-ag-tipo]').forEach(function (b) { b.addEventListener('click', function () { ponerTipo(b.dataset.agTipo); if (tipoCli === 'institucional' && !$('agInst').value) $('agInst').focus(); }); });
+  $('agInst').addEventListener('change', function () { opcionesSuc(null); });
   $('agMedico').addEventListener('change', function () { medicoElegidoAMano = true; });
   $('agTratamiento').addEventListener('input', alCambiarTratamiento);
   $('agEspecialidad').addEventListener('change', alCambiarTratamiento);

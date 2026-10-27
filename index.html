@@ -538,6 +538,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-paso h4{margin:0;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;color:#0B2B40}
 .ag-num{width:28px;height:28px;border-radius:50%;background:#005A87;color:#FFFFFF;font-size:14px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:none}
 .ag-g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ag-tipo{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}.ag-tipo-etq{font-size:14px;font-weight:600;color:#0B2B40}.ag-tipo .ag-modo{margin:0}
 .ag-pac-info{margin:-4px 0 0;font-size:13.5px;color:#475B68}.ag-pac-info:empty{display:none}#agEspDetectada:empty{display:none}
 .ag-modo{display:inline-flex;align-self:flex-start;max-width:100%;background:#EEF5FA;border:1px solid #D9E4EC;border-radius:999px;padding:4px;gap:4px}
 .ag-modo button{font:inherit;font-size:14px;font-weight:700;border:0;background:transparent;color:#475B68;border-radius:999px;padding:9px 18px;cursor:pointer;min-height:40px}
@@ -1936,6 +1937,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label class="full">Paciente *<select id="agPaciente"><option value="">Cargando pacientes…</option></select></label>
 <label id="agNombreWrap" hidden>Nombre del paciente nuevo *<input id="agNombre" type="text" maxlength="120"></label>
 <label id="agTelWrap" hidden>Teléfono / WhatsApp *<input id="agTelefono" type="tel" maxlength="40"></label>
+<div class="full ag-tipo"><span class="ag-tipo-etq">Tipo de cliente</span><div class="ag-modo" role="radiogroup" aria-label="Tipo de cliente"><button type="button" role="radio" data-ag-tipo="directo" aria-checked="true">Cliente independiente</button><button type="button" role="radio" data-ag-tipo="institucional" aria-checked="false">Pertenece a una institución</button></div></div>
+<label id="agInstWrap" hidden>Institución *<select id="agInst"><option value="">—</option></select></label>
+<label id="agSucWrap" hidden>Sucursal<select id="agSuc"><option value="">—</option></select></label>
 <p id="agPacInfo" class="full ag-pac-info"></p>
 </div>
 </section>
@@ -3041,7 +3045,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="inventarios-ordenes.js?v=20261027f"></script>
 <script src="asistentes.js"></script>
 <script src="dentistas.js"></script>
-<script src="agenda.js?v=20261027b"></script>
+<script src="agenda.js?v=20261027c"></script>
 <script src="agentes.js"></script>
 <script src="reportes.js?v=20261027"></script>
 <script src="constancias.js"></script>
