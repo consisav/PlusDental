@@ -375,6 +375,8 @@
     var e = await sb.from('inv_existencias').select('producto_id,existencia').eq('bodega_id', invBodega).range(0, 4999);
     (e.error ? [] : e.data).forEach(function (x) { invExist[x.producto_id] = Number(x.existencia); });
   }
+  // Solo se venden productos con existencia en la bodega general y con precio de venta al cliente (Cliente directo)
+  function vendible(p) { var pr = invPrecio[p.id]; return (invExist[p.id] || 0) > 0 && !!pr && Number(pr.precio) > 0; }
   function etiquetaProd(p) { return (p.codigo ? p.codigo + ' · ' : '') + p.nombre + (p.presentacion ? ' (' + p.presentacion + ')' : ''); }
   // Cantidad pedida de un producto en todas las líneas (para avisar si no alcanza la existencia)
   function pedido(prodId) { return lineas.reduce(function (t, l) { return t + (l.tipo === 'producto' && String(l.producto_id) === String(prodId) ? Number(l.cantidad) || 0 : 0); }, 0); }
@@ -418,7 +420,7 @@
         '<td><div class="pg-fila' + (prod ? ' es-prod' : '') + '">' +
           (invProductos.length ? '<select data-pl="tipo" class="pg-clase" aria-label="Procedimiento o producto en la línea ' + (k + 1) + '"><option value="procedimiento"' + (!prod ? ' selected' : '') + '>Procedimiento</option><option value="producto"' + (prod ? ' selected' : '') + '>Producto</option></select>' : '') +
           (prod
-            ? '<input data-pl="producto_texto" class="pg-principal" list="pgProdOpciones" value="' + esc(l.producto_texto) + '" placeholder="Código o nombre del producto" aria-label="Producto de la línea ' + (k + 1) + '">' +
+            ? '<input data-pl="producto_texto" class="pg-principal" list="pgProdOpciones" value="' + esc(l.producto_texto) + '" placeholder="' + (invProductos.some(vendible) ? 'Código o nombre del producto' : 'Sin productos con existencia y precio') + '" aria-label="Producto de la línea ' + (k + 1) + '">' +
               '<label class="pg-cant" title="Cantidad"><span>Cant.</span><input data-pl="cantidad" placeholder="Cant." type="number" min="0.01" step="0.01" inputmode="decimal" value="' + esc(l.cantidad) + '" aria-label="Cantidad del producto de la línea ' + (k + 1) + '"></label>' +
               '<span data-stock>' + textoExistencia(l) + '</span>'
             : '<select data-pl="proc" class="pg-principal" aria-label="Procedimiento de la línea ' + (k + 1) + '">' + opcionesProc(l) + '</select>' +
@@ -431,7 +433,7 @@
         '<td class="num"><input data-pl="monto_usd" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(l.monto_usd) + '" placeholder="0.00" aria-label="Monto en dólares de la línea ' + (k + 1) + '"></td>' +
         '<td class="pg-acc">' + (lineas.length > 1 ? '<button type="button" class="pg-quitar" data-quitar-linea="' + k + '" aria-label="Quitar la línea ' + (k + 1) + '" title="Quitar línea">×</button>' : '') + '</td></tr>';
     }).join('');
-    $('pgProdOpciones').innerHTML = invProductos.map(function (p) { return '<option value="' + esc(etiquetaProd(p)) + '"></option>'; }).join('');
+    $('pgProdOpciones').innerHTML = invProductos.filter(vendible).map(function (p) { return '<option value="' + esc(etiquetaProd(p)) + '"></option>'; }).join('');
     pintarTotalesDetalle();
   }
   function pintarTotalesDetalle() {
@@ -515,7 +517,7 @@
     l[c.dataset.pl] = c.value;
     if (c.dataset.pl === 'producto_texto' || c.dataset.pl === 'cantidad') {
       if (c.dataset.pl === 'producto_texto') {
-        var p = invProductos.filter(function (x) { return etiquetaProd(x) === c.value; })[0];
+        var p = invProductos.filter(function (x) { return vendible(x) && etiquetaProd(x) === c.value; })[0];
         l.producto_id = p ? p.id : '';
       }
       // Precio de venta «Cliente directo» × cantidad, si el producto lo tiene
