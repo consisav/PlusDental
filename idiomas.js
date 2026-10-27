@@ -211,6 +211,7 @@
 
     // ---- Preguntas frecuentes ----
     'Preguntas frecuentes': 'Frequently asked questions',
+    'Ayuda': 'Help',
     'Preguntas': 'FAQ',
     '¿Cuánto cuesta la primera evaluación?': 'How much is the first evaluation?',
     '[PRECIO DE EVALUACIÓN]. Incluye revisión clínica, diagnóstico y un plan de tratamiento por escrito.':
