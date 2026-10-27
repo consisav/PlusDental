@@ -113,7 +113,9 @@
       '<button type="button" id="iocAutorizar" class="adm-btn">Autorizar</button>' +
       '<button type="button" id="iocRevertir" class="adm-btn">Revertir autorización</button><span class="ic-sep"></span>' +
       '<button type="button" id="iocAnular" class="adm-btn">Anular</button><span class="ic-sep"></span>' +
-      '<button type="button" id="iocImprimir" class="adm-btn">Imprimir</button></div></section>' +
+      '<button type="button" id="iocImprimir" class="adm-btn">Imprimir</button>' +
+      '<button type="button" id="iocCorreo" class="adm-btn ioc-envio"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Enviar por correo</button>' +
+      '<button type="button" id="iocWa" class="adm-btn ioc-envio ioc-wa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1.5-1.5-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/></svg>Enviar por WhatsApp</button></div></section>' +
     // Compras asociadas
     '<section class="ic-pane" data-iocpane="compras" hidden><div class="roles-wrap"><table class="pr-tabla"><thead><tr><th>#Compra</th><th>Fecha</th><th>Documento</th><th class="num">Total Q</th><th>Estado</th></tr></thead><tbody id="iocCompras"></tbody></table></div></section>' +
     '<p id="iocMsg" class="dlg-msg" role="status"></p><div id="iocRegistro"></div></form></div>';
@@ -194,6 +196,9 @@
     $('iocAnular').disabled = !(guardada && o.estado !== 'anulada' && esSuper && !conCompra);
     $('iocAnular').title = esSuper ? '' : 'Solo el Super Administrador anula órdenes de compra.';
     $('iocImprimir').disabled = !guardada;
+    var prov = porId(proveedores, o.proveedor_id), mail = correoProv(prov), wa = telWa(prov && prov.telefonos), envia = guardada && o.estado !== 'anulada';
+    $('iocCorreo').disabled = !(envia && mail); $('iocCorreo').title = mail ? 'Enviar a ' + mail : 'El proveedor no tiene correo definido';
+    $('iocWa').disabled = !(envia && wa); $('iocWa').title = wa ? 'Enviar a +' + wa : 'El proveedor no tiene teléfono definido';
     var modo = '';
     if (guardada) {
       if (o.estado === 'solicitada' && modoEdicion) modo = 'Modificando la orden folio ' + o.numero + '. Presiona «Grabar» para guardar los cambios.';
@@ -255,7 +260,7 @@
       var r = await Promise.all([
         todas(function () { return sb.from('inv_bodegas').select('id,numero,nombre,tipo,estado,localidad_id').order('numero'); }),
         todas(function () { return sb.from('inv_productos').select('id,numero,codigo,nombre,presentacion,unidad,costo,minimo,maximo,estado').order('numero'); }),
-        todas(function () { return sb.from('inv_proveedores').select('id,numero,nombre_comercial,dias_credito,estado').order('numero'); }),
+        todas(function () { return sb.from('inv_proveedores').select('id,numero,nombre_comercial,dias_credito,estado,correo,telefonos,contacto').order('numero'); }),
         todas(function () { return sb.from('inv_existencias').select('producto_id,bodega_id,existencia'); }),
         todas(function () { return sb.from('inv_ordenes_compra').select('*').order('numero', { ascending: false }); }),
         todas(function () { return sb.from('inv_orden_items').select('*'); }),
@@ -287,6 +292,40 @@
       alAbrir: function () { $('geoF_aviso').textContent = efecto; },
       guardar: async function (d) { var r = await sb.rpc(rpc, { p_id: o.id, p_motivo: d.motivo }); if (r.error) return traducir(r.error); await cargar(o.id); aviso('iocMsg', exito); return null; }
     });
+  }
+  // WhatsApp: de los teléfonos del proveedor, el primer celular de Guatemala (empieza con 3, 4 o 5); si no hay, el primero
+  function telWa(t) {
+    var l = String(t || '').split(/[\/,;]| o | y /).map(function (x) { return x.replace(/\D/g, ''); }).filter(function (x) { return x.length >= 8; }).map(function (x) { return x.length === 8 ? '502' + x : x; });
+    return l.filter(function (x) { return /^502[345]\d{7}$/.test(x); })[0] || l[0] || '';
+  }
+  function correoProv(p) { return p && p.correo ? String(p.correo).split(/[\s,;]+/).filter(function (x) { return /@/.test(x); })[0] || '' : ''; }
+  function textoOrden(o, largo) {
+    var p = porId(proveedores, o.proveedor_id) || {}, usd = o.moneda === 'USD', tc = Number(o.tipo_cambio) || 1, simb = usd ? '$' : 'Q';
+    var det = items.filter(function (i) { return i.orden_id === o.id; }).sort(function (a, b) { return a.linea - b.linea; });
+    var lin = det.map(function (i) { var pr = porId(productos, i.producto_id) || {}, a = i.cantidad_aprueba == null ? Number(i.cantidad_solicita) : Number(i.cantidad_aprueba), pu = Number(i.precio_unitario);
+      return (largo ? '' : '• ') + i.linea + '. ' + (pr.codigo ? pr.codigo + ' · ' : '') + (pr.nombre || 'Producto') + ': ' + cant(a) + ' × ' + simb + num(pu, 2) + ' = ' + simb + num(a * pu) + (i.observaciones ? ' (' + i.observaciones + ')' : ''); });
+    var total = usd ? 'Total $ ' + num(o.total_mi) + ' (Q ' + num(o.total) + ')' : 'Total Q ' + num(o.total);
+    return ['Estimados ' + (p.contacto || p.nombre_comercial || '') + ':', '',
+      'Plus Dental les envía la orden de compra ' + (o.numero_orden || 'folio ' + o.numero) + (o.estado === 'solicitada' ? ' (solicitud pendiente de autorización)' : '') + '.', '',
+      'Fecha: ' + fecha(o.fecha), 'Entregar en: ' + nombreBod(o.bodega_id) + ' · ' + sede(o),
+      'Forma de pago: ' + (o.forma_pago === 'contado' ? 'Contado' : 'Crédito a ' + (o.dias_credito || 0) + ' días') + (usd ? ' · Moneda: dólares (cambio ' + num(tc, 4) + ')' : ''), '',
+      'Productos:'].concat(lin).concat(['', total].concat(o.obs_proveedor ? ['', 'Observaciones: ' + o.obs_proveedor] : []).concat(['',
+      'Por favor confirmar recepción y fecha de entrega.', 'Atentamente, ' + ((window.PD_SESION && window.PD_SESION.usuario && window.PD_SESION.usuario()) ? window.PD_SESION.usuario() + ' · ' : '') + 'Plus Dental'])).join('\n');
+  }
+  function enviar(medio) {
+    var o = form; if (!o || !o.id) return;
+    var p = porId(proveedores, o.proveedor_id), destino = medio === 'correo' ? correoProv(p) : telWa(p && p.telefonos);
+    if (!destino) { aviso('iocMsg', 'El proveedor no tiene ' + (medio === 'correo' ? 'correo' : 'teléfono') + ' definido. Agrégalo en Catálogos → Proveedores.', true); return; }
+    var texto = textoOrden(o, medio === 'correo');
+    if (medio === 'correo') {
+      var asunto = 'Orden de compra ' + (o.numero_orden || o.numero) + ' · Plus Dental';
+      if (texto.length > 1800) texto = texto.slice(0, 1780) + '\n…';
+      window.location.href = 'mailto:' + encodeURIComponent(destino) + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(texto);
+      aviso('iocMsg', 'Se abrió tu programa de correo con la orden lista para ' + destino + '. Para adjuntar el PDF usa «Imprimir» → Guardar como PDF.');
+    } else {
+      window.open('https://wa.me/' + destino + '?text=' + encodeURIComponent(texto), '_blank', 'noopener');
+      aviso('iocMsg', 'Se abrió WhatsApp con la orden lista para +' + destino + '. Solo presiona Enviar.');
+    }
   }
   function imprimir() {
     var o = form, P = window.PD_IMPRESION;
@@ -351,6 +390,8 @@
   $('iocRevertir').addEventListener('click', function () { if (form) conMotivo('Revertir la autorización · folio ' + form.numero, 'La orden vuelve a «Solicitada» para corregirla. El motivo queda en las observaciones internas.', 'revertir_orden_compra', 'Autorización revertida: la orden quedó Solicitada.'); });
   $('iocAnular').addEventListener('click', function () { if (form) conMotivo('Anular la orden folio ' + form.numero, 'La orden quedará Anulada y no se puede deshacer.', 'anular_orden_compra', 'Orden anulada.'); });
   $('iocImprimir').addEventListener('click', imprimir);
+  $('iocCorreo').addEventListener('click', function () { enviar('correo'); });
+  $('iocWa').addEventListener('click', function () { enviar('whatsapp'); });
   $('iocBuscar').addEventListener('input', function () { pag = 1; pintarLista(); });
   ['iocFiltro', 'iocDesde', 'iocHasta'].forEach(function (id) { $(id).addEventListener('change', function () { if (id === 'iocFiltro') filtro = this.value; pag = 1; pintarLista(); }); });
   $('iocPaginas').addEventListener('click', function (e) { var b = e.target.closest('[data-pag]'); if (b && !b.disabled) { pag = +b.dataset.pag; pintarLista(); } });
