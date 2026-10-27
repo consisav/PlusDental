@@ -806,7 +806,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .pg-grid label,.pg-cierre label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600;min-width:0}
 .pg-grid input,.pg-grid select,.pg-cierre textarea,.pg-out{font:inherit;font-size:15px;font-weight:500;padding:11px 14px;border:1px solid #C4D4DF;border-radius:12px;background:#FFFFFF;min-height:46px;box-sizing:border-box;width:100%;color:#0B2B40}
 .pg-grid input.pg-auto,.pg-out{background:#EEF5FA;border-style:dashed;color:#00476B;font-weight:700;cursor:default;display:flex;align-items:center}
-.pg-s2{grid-column:span 2}.pg-s4{grid-column:1/-1}
+.pac-inst[hidden]{display:none!important}.pg-s2{grid-column:span 2}.pg-s4{grid-column:1/-1}
 .pg-saldo{font-size:13px;font-weight:500;color:#5A6D7A;margin:0}
 .pg-cierre{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:end}
 .pg-totales{display:flex;gap:12px;flex-wrap:wrap}
@@ -1746,6 +1746,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>Agente comercial<select id="pAgente"><option value="">0 · NINGUNO</option></select></label>
 <label>Tipo de cliente<select id="pTipoCliente" title="Define el precio que se le aplica (Precios por tipo de cliente)"><option value="directo">Cliente directo</option><option value="institucional">Institucional</option><option value="vip">VIP</option><option value="referido">Referido</option><option value="paquete">Paquete</option><option value="especial">Especial</option></select></label>
 <label>Estado del paciente<select id="pEstado" class="pac-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="suspendido">Suspendido</option><option value="baja">Baja</option></select></label>
+<label class="pg-s2 pac-inst" hidden>Institución<select id="pInstitucion"><option value="">—</option></select></label>
+<label class="pg-s2 pac-inst" hidden>Sucursal<select id="pSucursal"><option value="">—</option></select></label>
 <label class="pg-s2">Organización<select id="pOrg"><option value="">—</option></select></label>
 <label class="pg-s2">Localidad / Empresa<select id="pLoc"><option value="">—</option></select></label>
 </div>
@@ -3018,7 +3020,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="voz-historia.js"></script>
 <script src="voz-odontograma.js"></script>
 <script src="odontograma.js"></script>
-<script src="expedientes.js?v=20261027b"></script>
+<script src="expedientes.js?v=20261027c"></script>
 <script src="presupuestos.js"></script>
 <script src="cuentas.js?v=20261027c"></script>
 <script src="tratamientos-paciente.js"></script>

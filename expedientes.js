@@ -14,6 +14,7 @@
   var ESTADOS_PAC = { activo: 'Activo', inactivo: 'Inactivo', suspendido: 'Suspendido', baja: 'Baja' };
   var pacientes = [], actual = null, odontoCambiado = false;
   var filtroEstado = 'activo', editando = false, fotos = {}, medicos = [], agentesCat = [], clientes = [], usuariosTomados = {}, hayUsuario = false;
+  var instCat = [], sucCat = [];   // Jornadas › Instituciones y sus sucursales (pacientes institucionales)
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -136,6 +137,31 @@
     var r = await Promise.all([window.PD_DENTISTAS ? window.PD_DENTISTAS() : [], window.PD_AGENTES ? window.PD_AGENTES() : []]);
     medicos = r[0]; agentesCat = r[1];
     await cargarUsuarios();
+    try {
+      var ri = await Promise.all([sb.from('jor_instituciones').select('id,numero,nombre,estado').order('nombre'), sb.from('jor_sucursales').select('id,numero,institucion_id,nombre,estado').order('nombre')]);
+      instCat = ri[0].error ? [] : ri[0].data || []; sucCat = ri[1].error ? [] : ri[1].data || [];
+    } catch (e) { instCat = []; sucCat = []; }
+  }
+  // Institución y sucursal: solo para el tipo de cliente «Institucional»
+  function esInstitucional() { return $('pTipoCliente').value === 'institucional'; }
+  function codigo(p, x) { return p + '-' + ('00' + (x.numero || x.id)).slice(-3); }
+  function opcionesInst(instId, sucId) {
+    var l = instCat.filter(function (i) { return i.estado === 'activo' || i.id === instId; });
+    $('pInstitucion').innerHTML = '<option value="">' + (l.length ? 'Elige la institución…' : 'No hay instituciones (Jornadas › Instituciones)') + '</option>' +
+      l.map(function (i) { return '<option value="' + i.id + '">' + esc(codigo('INS', i) + ' · ' + i.nombre) + '</option>'; }).join('');
+    $('pInstitucion').value = instId ? String(instId) : '';
+    opcionesSuc(sucId);
+  }
+  function opcionesSuc(sucId) {
+    var inst = +$('pInstitucion').value || null, l = inst ? sucCat.filter(function (x) { return x.institucion_id === inst && (x.estado === 'activo' || x.id === sucId); }) : [];
+    $('pSucursal').innerHTML = '<option value="">' + (!inst ? 'Elige primero la institución' : l.length ? 'Sede principal' : 'Sin sucursales') + '</option>' +
+      l.map(function (x) { return '<option value="' + x.id + '">' + esc(codigo('SUC', x) + ' · ' + x.nombre) + '</option>'; }).join('');
+    $('pSucursal').value = sucId && l.some(function (x) { return x.id === sucId; }) ? String(sucId) : '';
+  }
+  function pintarInstVis() { document.querySelectorAll('.pac-inst').forEach(function (x) { x.hidden = !esInstitucional(); }); }
+  function textoInstitucion(p) {
+    var i = instCat.filter(function (x) { return x.id === p.institucion_id; })[0], c = sucCat.filter(function (x) { return x.id === p.sucursal_id; })[0];
+    return i ? i.nombre + (c ? ' · ' + c.nombre : '') : '';
   }
 
   // Usuario del portal: los usuarios de tipo Cliente que no estén asignados a otro paciente.
@@ -182,6 +208,7 @@
     Object.keys(CAMPOS).forEach(function (k) { $(CAMPOS[k]).value = (p && p[k]) || ''; });
     $('pEstado').value = (p && p.estado) || 'activo';
     $('pTipoCliente').value = (p && TIPOS_CLIENTE[p.tipo_cliente]) ? p.tipo_cliente : 'directo';
+    opcionesInst(p ? p.institucion_id : null, p ? p.sucursal_id : null); pintarInstVis();
     opcionesMedicos(p ? p.dentista_id : null);
     if (!p) $('pDentista').value = medicoPorDefecto();
     opcionesAgentes(p ? p.agente_id : null);
@@ -291,7 +318,7 @@
       actual.fecha_nacimiento ? '<span class="pac-chip">' + edad(actual.fecha_nacimiento) + '</span>' : '',
       actual.dpi ? '<span class="pac-chip">DPI ' + esc(actual.dpi) + '</span>' : '',
       actual.nit ? '<span class="pac-chip">NIT ' + esc(actual.nit) + '</span>' : '',
-      TIPOS_CLIENTE[actual.tipo_cliente] ? '<span class="pac-chip" title="Tipo de cliente">' + TIPOS_CLIENTE[actual.tipo_cliente] + '</span>' : '',
+      TIPOS_CLIENTE[actual.tipo_cliente] ? '<span class="pac-chip" title="Tipo de cliente">' + TIPOS_CLIENTE[actual.tipo_cliente] + (actual.tipo_cliente === 'institucional' && textoInstitucion(actual) ? ' · ' + esc(textoInstitucion(actual)) : '') + '</span>' : '',
       // Color del paciente: el de su médico asignado (se cambia desde la ficha del odontólogo)
       window.PD_COLOR && window.PD_COLOR.color(actual.dentista_id) ? '<span class="pac-chip pac-med"' + window.PD_COLOR.estilo(actual.dentista_id) + ' title="Se cambia en Catálogos › Odontólogos">' + window.PD_COLOR.punto(actual.dentista_id) + esc(window.PD_COLOR.nombrePaleta(window.PD_COLOR.color(actual.dentista_id))) + (actual.medico ? ' · ' + esc(actual.medico.nombre) : '') + '</span>' : ''].join('') : '';
     $('pMeta').hidden = !actual;
@@ -345,6 +372,7 @@
       o.dentista_id = $('pDentista').value ? +$('pDentista').value : null;
       o.agente_id = $('pAgente').value ? +$('pAgente').value : null;   // vacío = Supabase pone el agente 0
       if (hayUsuario) o.usuario = $('pUsuario').value || null;
+      if (instCat.length || (actual && actual.institucion_id)) { var ins = esInstitucional(); o.institucion_id = ins && $('pInstitucion').value ? +$('pInstitucion').value : null; o.sucursal_id = ins && $('pSucursal').value ? +$('pSucursal').value : null; }
       if (window.PD_SEDES && $('pLoc').options.length > 1) Object.assign(o, window.PD_SEDES.valores($('pOrg'), $('pLoc')));
     }
     return o;
@@ -353,11 +381,14 @@
   async function guardar(claves, msgId, boton) {
     var datos = valores(claves);
     if (claves.indexOf('nombre') >= 0 && !datos.nombre) { aviso(msgId, 'El nombre es obligatorio.', true); return; }
+    if (claves.indexOf('nombre') >= 0 && esInstitucional() && instCat.length && !datos.institucion_id) { aviso(msgId, 'Elige la institución a la que pertenece el paciente institucional.', true); $('pInstitucion').focus(); return; }
     boton.disabled = true;
     aviso(msgId, 'Guardando…');
     var r = actual
       ? await sb.from('pacientes').update(datos).eq('id', actual.id).select('*,medico:dentistas(nombre)').single()
       : await sb.from('pacientes').insert(datos).select('*,medico:dentistas(nombre)').single();
+    // Si aún no se ejecutó el SQL de pacientes institucionales, se graba sin institución ni sucursal
+    if (r.error && /institucion_id|sucursal_id/.test(r.error.message || '')) { delete datos.institucion_id; delete datos.sucursal_id; r = actual ? await sb.from('pacientes').update(datos).eq('id', actual.id).select('*,medico:dentistas(nombre)').single() : await sb.from('pacientes').insert(datos).select('*,medico:dentistas(nombre)').single(); }
     boton.disabled = false;
     if (r.error) { aviso(msgId, traducir(r.error), true); return; }
     var eraNuevo = !actual;
@@ -735,6 +766,8 @@
   $('pFotoBtn').addEventListener('click', function () { $('pFotoArchivo').click(); });
   $('pNacimiento').addEventListener('input', pintarDerivados);
   $('pEstado').addEventListener('change', pintarDerivados);
+  $('pTipoCliente').addEventListener('change', function () { pintarInstVis(); if (esInstitucional() && !$('pInstitucion').value) $('pInstitucion').focus(); });
+  $('pInstitucion').addEventListener('change', function () { opcionesSuc(null); });
   $('pNombre').addEventListener('input', function () { if (!actual) $('pPerfilNombre').textContent = this.value.trim() || 'Nuevo paciente'; });
   $('pFotoArchivo').addEventListener('change', function () { var f = this.files[0]; this.value = ''; subirFoto(f); });
   $('expFiltros').addEventListener('click', function (e) {

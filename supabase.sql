@@ -6445,6 +6445,30 @@ $$;
 revoke execute on function public.agendar_jornada(bigint, text) from public, anon;
 grant execute on function public.agendar_jornada(bigint, text) to authenticated;
 
+-- ===== Pacientes institucionales: institución y sucursal a la que pertenecen =====
+-- Solo los pacientes con tipo de cliente «Institucional» guardan institución y sucursal (de Jornadas › Instituciones).
+alter table public.pacientes add column if not exists institucion_id bigint references public.jor_instituciones (id) on delete set null;
+alter table public.pacientes add column if not exists sucursal_id bigint references public.jor_sucursales (id) on delete set null;
+create index if not exists pacientes_institucion on public.pacientes (institucion_id);
+create or replace function public.paciente_institucion()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.tipo_cliente is distinct from 'institucional' then
+    new.institucion_id := null; new.sucursal_id := null;
+  elsif new.sucursal_id is not null then
+    if new.institucion_id is null then
+      new.institucion_id := (select institucion_id from public.jor_sucursales where id = new.sucursal_id);
+    elsif not exists (select 1 from public.jor_sucursales where id = new.sucursal_id and institucion_id = new.institucion_id) then
+      raise exception 'La sucursal no pertenece a la institución elegida';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists pacientes_institucion on public.pacientes;
+create trigger pacientes_institucion before insert or update of tipo_cliente, institucion_id, sucursal_id on public.pacientes
+  for each row execute function public.paciente_institucion();
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
