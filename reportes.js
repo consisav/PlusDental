@@ -121,8 +121,8 @@
     },
 
     cobros: {
-      panel: 'admRepCobros', titulo: 'Cobros por paciente',
-      nota: 'Pagos con fecha entre las dos fechas, agrupados por paciente. Los recibos anulados no suman al total.',
+      panel: 'admRepCobros', titulo: 'Cobros por paciente', cliente: true,
+      nota: 'Pagos con fecha entre las dos fechas, de un cliente o de todos, agrupados por paciente. Los recibos anulados no suman al total.',
       estados: { valido: ['Válido', 'verde'], anulado: ['Anulado', 'rojo'] },
       columnas: [
         ['Paciente', function (f) { return f.paciente; }],
@@ -134,9 +134,11 @@
       ],
       grupo: function (f) { return f.paciente; },
       cuenta: function (f) { return f.estado === 'valido'; },
-      cargar: async function (d, h) {
-        var r = await sb.from('pagos').select('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,pac:pacientes(nombre)')
-          .gte('fecha', d).lte('fecha', h).order('fecha');
+      cargar: async function (d, h, x) {
+        var c = sb.from('pagos').select('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,pac:pacientes(nombre)')
+          .gte('fecha', d).lte('fecha', h);
+        if (x && x.cliente) c = c.eq('paciente_id', +x.cliente);
+        var r = await c.order('fecha');
         if (r.error) throw r.error;
         return r.data.map(function (p) { p.paciente = p.pac ? p.pac.nombre : '—'; p.estado = p.anulado ? 'anulado' : 'valido'; return p; })
           .sort(function (a, b) { return a.paciente.localeCompare(b.paciente) || String(a.fecha).localeCompare(String(b.fecha)) || a.id - b.id; });
@@ -215,7 +217,9 @@
       '<form class="rep-param" data-rep-form="' + clave + '">' +
       '<label>Fecha inicial<input type="date" name="desde" value="' + inicioMes() + '" required></label>' +
       '<label>Fecha final<input type="date" name="hasta" value="' + hoy() + '" required></label>' +
+      (def.cliente ? '<label class="rep-cliente">Cliente<select name="cliente"><option value="">Todos los clientes</option></select></label>' : '') +
       '<button type="submit" class="dlg-submit">Generar reporte</button></form>' +
+      '<div class="rep-params" data-rep-params="' + clave + '"></div>' +
       '<div class="rep-chips" data-rep-chips="' + clave + '" aria-label="Filtrar por estado"></div>' +
       '<div class="rep-totales" data-rep-totales="' + clave + '"></div>' +
       '<div class="roles-wrap"><table class="rep-tabla"><thead><tr>' +
@@ -223,19 +227,31 @@
       '<tbody data-rep-body="' + clave + '"></tbody></table></div>' +
       '<p class="dlg-msg" role="status" data-rep-msg="' + clave + '"></p>';
     estadoRep[clave] = { filas: null, ocultos: {}, generado: false };
+    if (def.cliente) llenarClientes(p.querySelector('select[name=cliente]'));
   }
+  // Lista de clientes (pacientes) para el parámetro «Cliente»
+  async function llenarClientes(sel) {
+    var r = await sb.from('pacientes').select('id,nombre').order('nombre');
+    if (r.error || !sel.isConnected) return;
+    var antes = sel.value;
+    sel.innerHTML = '<option value="">Todos los clientes</option>' + r.data.map(function (x) { return '<option value="' + x.id + '">' + esc(x.nombre) + '</option>'; }).join('');
+    sel.value = antes;
+  }
+  // Parámetros con que se generó el reporte (se muestran en pantalla, en la impresión y en Excel)
+  function parametros(s) { return [['Fecha inicial', fechaCorta(s.desde)], ['Fecha final', fechaCorta(s.hasta)]].concat(s.cliente !== undefined ? [['Cliente', s.clienteNombre || 'Todos los clientes']] : []); }
 
   async function generar(clave) {
     var def = REPORTES[clave], p = $(def.panel), s = estadoRep[clave];
-    var form = p.querySelector('[data-rep-form]'), d = form.desde.value, h = form.hasta.value;
+    var form = p.querySelector('[data-rep-form]'), d = form.desde.value, h = form.hasta.value, cli = form.cliente ? form.cliente.value : undefined;
     var msg = p.querySelector('[data-rep-msg]');
     if (!d || !h) { msg.textContent = 'Indica la fecha inicial y la final.'; msg.style.color = '#9A3B2E'; return; }
     if (d > h) { msg.textContent = 'La fecha inicial no puede ser posterior a la final.'; msg.style.color = '#9A3B2E'; return; }
     msg.textContent = 'Generando…'; msg.style.color = '#475B68';
     form.querySelector('button').disabled = true;
     try {
-      s.filas = await def.cargar(d, h);
+      s.filas = await def.cargar(d, h, { cliente: cli });
       s.desde = d; s.hasta = h; s.generado = true;
+      s.cliente = cli; s.clienteNombre = cli ? form.cliente.selectedOptions[0].textContent : '';
       msg.textContent = '';
     } catch (e) {
       s.filas = []; s.generado = false;
@@ -265,6 +281,8 @@
   function pintar(clave) {
     var def = REPORTES[clave], p = $(def.panel), s = estadoRep[clave];
     var todas = s.filas || [], filas = visibles(clave);
+    p.querySelector('[data-rep-params]').innerHTML = !s.generado ? '' : '<span class="rep-params-t">Parámetros</span>' +
+      parametros(s).map(function (x) { return '<span class="rep-param-i">' + esc(x[0]) + ' <b>' + esc(x[1]) + '</b></span>'; }).join('');
     // Botones de estado con su color y cantidad (tocar para mostrar u ocultar)
     p.querySelector('[data-rep-chips]').innerHTML = !s.generado ? '' : Object.keys(def.estados).map(function (e) {
       var n = todas.filter(function (f) { return f.estado === e; }).length;
@@ -303,7 +321,8 @@
       '<div><div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:28px">' + CLINICA.nombre + '</div>' +
       '<div style="font-size:12px;color:#475B68">' + CLINICA.direccion + ' · ' + CLINICA.telefono + '</div></div>' +
       '<div style="text-align:right;font-size:12.5px;color:#475B68"><div style="font-size:18px;font-weight:700;color:#0B2B40">' + esc(def.titulo) + '</div>' +
-      rango(s) + '<br>Impreso el ' + fechaCorta(hoy()) + '</div></div>' +
+      rango(s) + (s.cliente !== undefined ? '<br>Cliente: ' + esc(s.clienteNombre || 'Todos los clientes') : '') + '<br>Impreso el ' + fechaCorta(hoy()) + '</div></div>' +
+      '<div style="font-size:12px;color:#475B68;margin-bottom:8px">Parámetros: ' + parametros(s).map(function (x) { return esc(x[0]) + ' <b>' + esc(x[1]) + '</b>'; }).join(' · ') + '</div>' +
       (ocultos.length ? '<div style="font-size:12px;color:#475B68;margin-bottom:8px">Sin incluir: ' + ocultos.map(function (e) { return esc(def.estados[e][0]); }).join(', ') + '</div>' : '') +
       '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin-bottom:12px">' +
       def.totales(visibles(clave)).map(function (t) { return '<div>' + esc(t[0]) + ': <b>' + esc(String(t[1])) + '</b></div>'; }).join('') + '</div>' +
@@ -320,7 +339,7 @@
   function exportar(clave) {
     var def = REPORTES[clave], s = estadoRep[clave], filas = visibles(clave);
     function celda(v) { v = String(v == null ? '' : v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
-    var lineas = [[def.titulo + ' · ' + rango(s)].map(celda).join(','), ''];
+    var lineas = [[def.titulo + ' · ' + rango(s)].map(celda).join(',')].concat(parametros(s).map(function (x) { return [x[0], x[1]].map(celda).join(','); }), ['']);
     lineas.push(def.columnas.map(function (c) { return celda(c[0]); }).concat(['Estado']).join(','));
     filas.forEach(function (f) {
       lineas.push(def.columnas.map(function (c) {
@@ -331,7 +350,7 @@
     var blob = new Blob(['﻿' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'reporte-' + clave + '-' + s.desde + '-al-' + s.hasta + '.csv';
+    a.download = 'reporte-' + clave + '-' + s.desde + '-al-' + s.hasta + (s.cliente ? '-cliente-' + s.cliente : '') + '.csv';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
@@ -340,7 +359,11 @@
   Object.keys(REPORTES).forEach(montar);
   var TABS = { tabRepPacientes: 'pacientes', tabRepCuentas: 'cuentas', tabRepCitas: 'citas', tabRepCobros: 'cobros', tabRepComisiones: 'comisiones' };
   Object.keys(TABS).forEach(function (t) {
-    $(t).addEventListener('click', function () { if (!estadoRep[TABS[t]].generado) generar(TABS[t]); });
+    $(t).addEventListener('click', function () {
+      var def = REPORTES[TABS[t]];
+      if (def.cliente) llenarClientes($(def.panel).querySelector('select[name=cliente]'));
+      if (!estadoRep[TABS[t]].generado) generar(TABS[t]);
+    });
   });
   document.addEventListener('submit', function (e) {
     var f = e.target.closest('[data-rep-form]');

@@ -652,7 +652,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ac-acciones .dlg-submit:disabled{opacity:.45;cursor:not-allowed}
 .rep-param{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
 .rep-param label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
-.rep-param input{font:inherit;font-size:15px;padding:10px 14px;border:1px solid #C4D4DF;border-radius:12px;min-height:44px;box-sizing:border-box;background:#FFFFFF;color:#0B2B40}
+.rep-param input,.rep-param select{font:inherit;font-size:15px;padding:10px 14px;border:1px solid #C4D4DF;border-radius:12px;min-height:44px;box-sizing:border-box;background:#FFFFFF;color:#0B2B40}
 .rep-param .dlg-submit{padding:12px 22px}
 .rep-chips{display:flex;gap:8px;flex-wrap:wrap}
 .rep-chips:empty,.rep-totales:empty{display:none}
@@ -1301,6 +1301,8 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .ipi-pct{display:inline-flex;align-items:center;gap:6px}.ipi-pct input{font:inherit;width:96px;text-align:right;padding:7px 10px;border:1px solid #C4D4DF;border-radius:8px}.ipi-pct span{font-weight:700;color:#475B68}
 .ipi-chk{display:flex;align-items:center;gap:6px;font-size:13px;color:#475B68}.ipi-reg{font-size:13px}
 .inv-precio .inv-desde{color:#005A87;font-weight:600}
+.rep-params{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px;font-size:13px;color:#475B68}.rep-params:empty{display:none}.rep-params-t{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#005A87}.rep-param-i{background:#EEF6FC;border:1px solid #BFD7E8;border-radius:999px;padding:4px 12px}.rep-param-i b{color:#0B2B40}
+.rep-cliente select{min-width:240px}
 .ic-det-pie{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 12px;background:#F8FBFD;font-size:13px;color:#475B68}.ic-det-pie b{color:#0B2B40;font-variant-numeric:tabular-nums}
 @media (max-width:980px){.ic-cap-f1{grid-template-columns:repeat(2,minmax(0,1fr))}.ic-cap-f1 .ic-cap-prod{grid-column:1/-1}.ic-cap-f2{grid-template-columns:repeat(3,minmax(0,1fr))}.ic-cons-filtros{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.ic-det{min-width:680px}.ic-cons-t{min-width:620px}}
@@ -2996,7 +2998,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="dentistas.js"></script>
 <script src="agenda.js?v=20261027"></script>
 <script src="agentes.js"></script>
-<script src="reportes.js"></script>
+<script src="reportes.js?v=20261027"></script>
 <script src="constancias.js"></script>
 <script src="tipos.js"></script>
 <script src="precios.js?v=20261027"></script>
