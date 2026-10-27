@@ -99,7 +99,7 @@
       '<section class="ic-tarjeta ic-fila2"><h4><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Documento</h4><div class="ic-g2">' +
         campo('Tipo docto', '<select id="icTipoDoc">' + opts(DOCS) + '</select>') + campo('Fecha', '<input id="icFecha" type="date">') +
         campo('Serie docto', '<input id="icSerie" maxlength="20">') + campo('# Documento', '<input id="icNumDoc" maxlength="40">') +
-        campo('No interno factura', '<input id="icNoInterno" maxlength="40">') +
+        campo('No interno factura', '<input id="icNoInterno" class="ic-auto" readonly tabindex="-1" placeholder="Automático al grabar" title="Correlativo automático de la compra en la sede; no se puede modificar">') +
         campo('Aplica orden?', '<span class="ic-par"><select id="icAplicaOrden" class="ic-corto"><option value="no">No</option><option value="si">Sí</option></select><input id="icOrden" maxlength="40" placeholder="N.º de orden" hidden></span>') +
       '</div></section>' +
       '<section class="ic-tarjeta ic-fila3"><h4><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>Proveedor y destino</h4><div class="ic-g2">' +
@@ -243,7 +243,7 @@
       return '<option value="' + p.id + '"' + (p.id === c.proveedor_id ? ' selected' : '') + '>' + esc((p.numero ? p.numero + ' · ' : '') + (p.padre_id ? '› ' : '') + p.nombre_comercial) + '</option>'; }).join('');
     $('icBodega').innerHTML = opcionesBodega(c.bodega_id || bodegaGeneral());
     var v = { icMoneda: c.moneda || 'GTQ', icTipoCompra: c.tipo_compra || 'local', icNotaCredito: c.nota_credito ? c.nota_credito : '', icDescuentos: c.descuentos ? c.descuentos : '', icRetencion: c.valor_retencion ? c.valor_retencion : '',
-      icSerie: c.serie || '', icNumDoc: c.numero_documento || '', icFecha: c.fecha || hoy(), icCambio: c.tipo_cambio || 1, icNoInterno: c.no_interno || '', icOrden: c.orden_compra || '',
+      icSerie: c.serie || '', icNumDoc: c.numero_documento || '', icFecha: c.fecha || hoy(), icCambio: c.tipo_cambio || 1, icNoInterno: c.numero ? String(c.numero) : '', icOrden: c.orden_compra || '',
       icFormRet: c.formulario_retencion || '', icRegimen: c.regimen_isr || '', icRegimenDesc: c.regimen_isr_desc || '', icTipoDoc: c.tipo_documento || 'factura',
       icTransaccion: c.transaccion || '1011', icCredito: c.dias_credito || 0, icObs: c.observaciones || '' };
     Object.keys(v).forEach(function (k) { $(k).value = v[k]; });
@@ -252,6 +252,7 @@
     $('icAplicaRet').checked = !!c.aplica_retencion; $('icMuestras').checked = !!c.documento_muestras;
     var ed = editable();
     $('icForm').querySelectorAll('.ic-tarjetas input, .ic-tarjetas select, .ic-desc input, #icProvNuevo').forEach(function (x) { x.disabled = !ed; });
+    $('icNoInterno').disabled = true;
     $('icRetencion').disabled = !ed || !$('icAplicaRet').checked; $('icFormRet').disabled = !ed || !$('icAplicaRet').checked;
     estadoBotones();
   }
@@ -385,7 +386,7 @@
   function datosEncabezado() {
     return { proveedor_id: $('icProv').value, bodega_id: $('icBodega').value, fecha: $('icFecha').value || hoy(), tipo_documento: $('icTipoDoc').value,
       serie: $('icSerie').value, numero_documento: $('icNumDoc').value, dias_credito: $('icCredito').value || 0, observaciones: $('icObs').value,
-      moneda: $('icMoneda').value, tipo_compra: $('icTipoCompra').value, tipo_cambio: cambio(), no_interno: $('icNoInterno').value,
+      moneda: $('icMoneda').value, tipo_compra: $('icTipoCompra').value, tipo_cambio: cambio(), no_interno: compraForm && compraForm.numero ? String(compraForm.numero) : '',
       orden_compra: $('icAplicaOrden').value === 'si' ? $('icOrden').value : '', nota_credito: $('icNotaCredito').value || 0, descuentos: $('icDescuentos').value || 0,
       aplica_retencion: $('icAplicaRet').checked, valor_retencion: $('icAplicaRet').checked ? $('icRetencion').value || 0 : 0, formulario_retencion: $('icAplicaRet').checked ? $('icFormRet').value : '',
       regimen_isr: $('icRegimen').value, regimen_isr_desc: $('icRegimenDesc').value, transaccion: $('icTransaccion').value, documento_muestras: $('icMuestras').checked };
@@ -428,7 +429,7 @@
       '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;font-size:12px">' +
       d('Proveedor', nombreProv(c.proveedor_id)) + d('Documento', documento(c)) + d('Fecha', fecha(c.fecha)) + d('Bodega', nombreBod(c.bodega_id)) +
       d('Moneda / cambio', (c.moneda === 'USD' ? 'Dólares' : 'Quetzales') + ' · ' + num(c.tipo_cambio, 4)) + d('Compra', c.tipo_compra === 'importacion' ? 'Importación' : 'Local') +
-      d('Transacción', (TRANSACCIONES.filter(function (t) { return t[0] === c.transaccion; })[0] || [c.transaccion, ''])[1]) + d('No interno', c.no_interno) + d('Sede', sede(c)) + d('Grabado por', c.creado_por) + d('Crédito', +c.dias_credito ? c.dias_credito + ' días' : 'Contado') + d('Descripción', c.observaciones) + '</div>' +
+      d('Transacción', (TRANSACCIONES.filter(function (t) { return t[0] === c.transaccion; })[0] || [c.transaccion, ''])[1]) + d('No interno', c.numero) + d('Sede', sede(c)) + d('Grabado por', c.creado_por) + d('Crédito', +c.dias_credito ? c.dias_credito + ' días' : 'Contado') + d('Descripción', c.observaciones) + '</div>' +
       '<table style="width:100%;border-collapse:collapse"><thead><tr>' + ['#', 'Código', 'Producto', 'Lote', 'Vence', 'Cantidad', 'Costo unit.', 'Desc.', 'Costo total Q'].map(function (h, i) { return '<th style="' + th + (i > 4 ? ';text-align:right' : '') + '">' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
       det.map(function (i) { return '<tr><td style="' + td + '">' + i.linea + '</td><td style="' + td + '">' + esc(i.codigo || '') + '</td><td style="' + td + '">' + esc(i.nombre || (porId(productos, i.producto_id) || {}).nombre || '') + '</td><td style="' + td + '">' + esc(i.lote || '') + '</td><td style="' + td + '">' + (i.vencimiento ? fecha(i.vencimiento) : '') + '</td>' +
         '<td style="' + td + ';text-align:right">' + cant(i.cantidad) + '</td><td style="' + td + ';text-align:right">' + num(i.costo_unitario, 4) + '</td><td style="' + td + ';text-align:right">' + num(i.descuento) + '</td><td style="' + td + ';text-align:right">' + num(i.subtotal) + '</td></tr>'; }).join('') +
