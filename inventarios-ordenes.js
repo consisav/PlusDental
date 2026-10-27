@@ -197,8 +197,8 @@
     $('iocAnular').title = esSuper ? '' : 'Solo el Super Administrador anula órdenes de compra.';
     $('iocImprimir').disabled = !guardada;
     var prov = porId(proveedores, o.proveedor_id), mail = correoProv(prov), wa = telWa(prov && prov.telefonos), envia = guardada && o.estado !== 'anulada';
-    $('iocCorreo').disabled = !(envia && mail); $('iocCorreo').title = mail ? 'Enviar a ' + mail : 'El proveedor no tiene correo definido';
-    $('iocWa').disabled = !(envia && wa); $('iocWa').title = wa ? 'Enviar a +' + wa : 'El proveedor no tiene teléfono definido';
+    $('iocCorreo').disabled = !envia; $('iocCorreo').title = mail ? 'Enviar a ' + mail : 'El proveedor no tiene correo: se pedirá al enviar';
+    $('iocWa').disabled = !envia; $('iocWa').title = wa ? 'Enviar a +' + wa : 'El proveedor no tiene teléfono: se pedirá al enviar';
     var modo = '';
     if (guardada) {
       if (o.estado === 'solicitada' && modoEdicion) modo = 'Modificando la orden folio ' + o.numero + '. Presiona «Grabar» para guardar los cambios.';
@@ -312,10 +312,8 @@
       'Productos:'].concat(lin).concat(['', total].concat(o.obs_proveedor ? ['', 'Observaciones: ' + o.obs_proveedor] : []).concat(['',
       'Por favor confirmar recepción y fecha de entrega.', 'Atentamente, ' + ((window.PD_SESION && window.PD_SESION.usuario && window.PD_SESION.usuario()) ? window.PD_SESION.usuario() + ' · ' : '') + 'Plus Dental'])).join('\n');
   }
-  function enviar(medio) {
-    var o = form; if (!o || !o.id) return;
-    var p = porId(proveedores, o.proveedor_id), destino = medio === 'correo' ? correoProv(p) : telWa(p && p.telefonos);
-    if (!destino) { aviso('iocMsg', 'El proveedor no tiene ' + (medio === 'correo' ? 'correo' : 'teléfono') + ' definido. Agrégalo en Catálogos → Proveedores.', true); return; }
+  // Abre el correo o WhatsApp con la orden ya escrita
+  function abrirEnvio(o, medio, destino) {
     var texto = textoOrden(o, medio === 'correo');
     if (medio === 'correo') {
       var asunto = 'Orden de compra ' + (o.numero_orden || o.numero) + ' · Plus Dental';
@@ -326,6 +324,37 @@
       window.open('https://wa.me/' + destino + '?text=' + encodeURIComponent(texto), '_blank', 'noopener');
       aviso('iocMsg', 'Se abrió WhatsApp con la orden lista para +' + destino + '. Solo presiona Enviar.');
     }
+  }
+  // Si el proveedor no tiene el correo o el teléfono, se piden aquí y se guardan en su ficha
+  function enviar(medio) {
+    var o = form; if (!o || !o.id) return;
+    var p = porId(proveedores, o.proveedor_id), destino = medio === 'correo' ? correoProv(p) : telWa(p && p.telefonos);
+    if (destino) { abrirEnvio(o, medio, destino); return; }
+    if (!p) { aviso('iocMsg', 'La orden no tiene proveedor.', true); return; }
+    var correo = medio === 'correo';
+    G.dialogo({
+      eyebrow: 'Órdenes de compra · ' + (correo ? 'Enviar por correo' : 'Enviar por WhatsApp'), titulo: p.nombre_comercial, valores: { contacto: p.contacto || '', guardar_ficha: true },
+      campos: [{ k: 'aviso', label: 'Falta un dato', tipo: 'info', ancho: 'full' },
+        correo ? { k: 'destino', label: 'Correo del proveedor', req: true, max: 150, placeholder: 'ventas@proveedor.com', ancho: 'full' }
+               : { k: 'destino', label: 'Celular (WhatsApp) del proveedor', req: true, max: 30, placeholder: '5555-6666', ayuda: 'Número de Guatemala de 8 dígitos o con código de país', ancho: 'full' },
+        { k: 'contacto', label: 'Persona de contacto', max: 120, ancho: 'full' },
+        { k: 'guardar_ficha', label: 'Guardar en la ficha del proveedor', tipo: 'check' }],
+      alAbrir: function () { $('geoDlgGrabar').textContent = 'Enviar'; $('geoF_aviso').textContent = 'Este proveedor no tiene ' + (correo ? 'correo' : 'teléfono') + ' registrado. Escríbelo para enviar la orden ' + (o.numero_orden || o.numero) + '.'; },
+      guardar: async function (d) {
+        var dest = correo ? String(d.destino || '').trim() : telWa(d.destino);
+        if (correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(dest)) return 'Escribe un correo válido.';
+        if (!correo && !/^\d{10,15}$/.test(dest)) return 'Escribe un número de celular válido (8 dígitos en Guatemala).';
+        abrirEnvio(o, medio, dest);
+        if (d.guardar_ficha) {
+          var cambios = correo ? { correo: dest } : { telefonos: [p.telefonos, String(d.destino).trim()].filter(Boolean).join(' / ') };
+          if (d.contacto && d.contacto !== p.contacto) cambios.contacto = d.contacto;
+          var r = await sb.from('inv_proveedores').update(cambios).eq('id', p.id).select('id').single();
+          if (r.error) { aviso('iocMsg', 'La orden se abrió para enviar, pero no se pudo guardar el dato en la ficha: ' + traducir(r.error), true); return null; }
+          Object.assign(p, cambios); estadoBotones();
+        } else if (d.contacto) p.contacto = d.contacto;
+        return null;
+      }
+    });
   }
   function imprimir() {
     var o = form, P = window.PD_IMPRESION;
