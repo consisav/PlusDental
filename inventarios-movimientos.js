@@ -535,11 +535,13 @@
     '</div>' +
     // Maestro
     '<section class="geo-panel ik-maestro"><div class="ik-titulo"><h4>Productos</h4><span id="ikCuenta"></span></div>' +
-      '<div class="roles-wrap ik-scroll"><table class="pr-tabla ik-tabla-m"><thead><tr><th>Código</th><th>Código producto</th><th>Nombre</th><th>Principio activo</th><th class="num">Existencia</th><th class="num">Costo</th><th class="num">Valor</th><th>Estado</th></tr></thead><tbody id="ikExist"></tbody></table></div></section>' +
+      '<div class="roles-wrap ia-wrap"><table class="geo-tabla ik-tabla-m"><colgroup><col class="ik-c-cod"><col><col class="ik-c-num"><col class="ik-c-num"><col class="ik-c-valor"><col class="ik-c-est"></colgroup>' +
+      '<thead><tr><th>Código</th><th>Producto / principio activo</th><th class="num">Existencia</th><th class="num">Costo</th><th class="num">Valor</th><th>Estado</th></tr></thead><tbody id="ikExist"></tbody></table>' +
+      '<div id="ikPaginas" class="ia-paginas"></div></div></section>' +
     // Detalle
     '<section class="geo-panel ik-detalle" id="ikDetalle" hidden></section>' +
     '<p id="ikMsg" class="dlg-msg" role="status"></p></div>';
-  var filtroKardex = 'con', kardexVista = [];
+  var filtroKardex = 'con', kardexVista = [], PAG_KDX = 8, pagKdx = 1;
   function bodKardex() { return +$('ikBodega').value || null; }
   function pintarExistencias() {
     var t = norm($('ikBuscar').value), bod = bodKardex(), inactivos = $('ikInactivos').checked;
@@ -553,17 +555,25 @@
       if (filtroKardex === 'minimo') return p.minimo != null && ex < Number(p.minimo);
       return true;
     });
-    var valor = 0;
+    var valor = l.reduce(function (t, p) { return t + existencia(p.id, bod) * Number(p.costo || 0); }, 0);
+    var paginas = Math.max(1, Math.ceil(l.length / PAG_KDX));
+    pagKdx = Math.min(Math.max(1, pagKdx), paginas);
+    var ini = (pagKdx - 1) * PAG_KDX, vis = l.slice(ini, ini + PAG_KDX);
     $('ikCuenta').textContent = l.length + ' producto' + (l.length === 1 ? '' : 's') + (bod ? ' · ' + nombreBod(bod) : ' · todas las bodegas');
-    $('ikExist').innerHTML = l.length ? l.map(function (p) {
+    $('ikExist').innerHTML = vis.length ? vis.map(function (p) {
       var ex = existencia(p.id, bod), bajo = p.minimo != null && ex < Number(p.minimo);
-      valor += ex * Number(p.costo || 0);
-      return '<tr data-prod="' + p.id + '" tabindex="0" class="' + (p.id === prodSel ? 'geo-sel' : '') + '"><td class="ik-cod">' + (p.numero || p.id) + '</td><td>' + esc(p.codigo || '—') + '</td>' +
-        '<td><div class="inv-prod">' + imagen(p, 26) + '<b>' + esc(p.nombre) + '</b></div></td><td>' + esc(p.principio_activo || '—') + '</td>' +
-        '<td class="num"><b class="' + (ex < 0 ? 'inv-negativo' : bajo ? 'inv-bajo' : '') + '">' + cant(ex) + '</b></td><td class="num">' + q(p.costo) + '</td><td class="num">' + q(ex * Number(p.costo || 0)) + '</td>' +
+      return '<tr data-prod="' + p.id + '" tabindex="0" class="' + (p.id === prodSel ? 'geo-sel' : '') + '"><td><b class="ik-codigo">' + esc(p.codigo || '—') + '</b><small class="inv-sub">N.º ' + (p.numero || p.id) + '</small></td>' +
+        '<td><div class="inv-prod">' + imagen(p, 32) + '<div><b class="ik-nombre">' + esc(p.nombre) + '</b>' + (p.principio_activo ? '<small class="inv-sub ia-corto" title="' + esc(p.principio_activo) + '">' + esc(p.principio_activo) + '</small>' : '') + '</div></div></td>' +
+        '<td class="num"><b class="' + (ex < 0 ? 'inv-negativo' : bajo ? 'inv-bajo' : '') + '">' + cant(ex) + '</b>' + (bajo ? '<small class="inv-sub">mín. ' + cant(Number(p.minimo)) + '</small>' : '') + '</td><td class="num">' + q(p.costo) + '</td><td class="num">' + q(ex * Number(p.costo || 0)) + '</td>' +
         '<td><span class="estado estado-' + p.estado + '">' + (p.estado === 'activo' ? 'Activo' : p.estado === 'baja' ? 'Baja' : 'Inactivo') + '</span></td></tr>';
-    }).join('') + '<tr class="inv-total"><td colspan="6" class="num">Valor del inventario mostrado</td><td class="num"><b>' + q(valor) + '</b></td><td></td></tr>'
-      : '<tr><td colspan="8" class="geo-vacia">' + (filtroKardex === 'con' ? 'Aún no hay movimientos. Registra una compra o un ajuste de inventario inicial.' : 'Ningún producto coincide.') + '</td></tr>';
+    }).join('') + '<tr class="inv-total"><td colspan="4" class="num">Valor del inventario mostrado (' + l.length + ' producto' + (l.length === 1 ? '' : 's') + ')</td><td class="num"><b>' + q(valor) + '</b></td><td></td></tr>'
+      : '<tr><td colspan="6" class="geo-vacia">' + (filtroKardex === 'con' ? 'Aún no hay movimientos. Registra una compra o un ajuste de inventario inicial.' : 'Ningún producto coincide.') + '</td></tr>';
+    var botones = [];
+    if (paginas > 1) for (var n = 1; n <= paginas; n++) if (n === 1 || n === paginas || Math.abs(n - pagKdx) <= 1) botones.push(n); else if (botones[botones.length - 1] !== '…') botones.push('…');
+    $('ikPaginas').hidden = !l.length;
+    $('ikPaginas').innerHTML = l.length ? '<span>' + (ini + 1) + '–' + (ini + vis.length) + ' de ' + l.length + ' productos</span>' + (paginas > 1 ? '<nav aria-label="Páginas de productos"><button type="button" class="ia-pag" data-pag="' + (pagKdx - 1) + '"' + (pagKdx === 1 ? ' disabled' : '') + ' aria-label="Página anterior">‹</button>' +
+      botones.map(function (n) { return n === '…' ? '<span class="ia-pag-mas">…</span>' : '<button type="button" class="ia-pag" data-pag="' + n + '"' + (n === pagKdx ? ' aria-current="page"' : '') + '>' + n + '</button>'; }).join('') +
+      '<button type="button" class="ia-pag" data-pag="' + (pagKdx + 1) + '"' + (pagKdx === paginas ? ' disabled' : '') + ' aria-label="Página siguiente">›</button></nav>' : '') : '';
   }
   // Movimientos del producto con sus documentos, lote, existencias corridas y costo promedio ponderado
   async function datosKardex(p, bod) {
@@ -667,13 +677,14 @@
   }
   $('ikAjuste').addEventListener('click', function () { ajuste(prodSel); });
   $('ikBodega').addEventListener('change', function () { pintarExistencias(); pintarKardex(); });
-  $('ikBuscar').addEventListener('input', pintarExistencias);
-  $('ikInactivos').addEventListener('change', pintarExistencias);
+  $('ikBuscar').addEventListener('input', function () { pagKdx = 1; pintarExistencias(); });
+  $('ikInactivos').addEventListener('change', function () { pagKdx = 1; pintarExistencias(); });
+  $('ikPaginas').addEventListener('click', function (e) { var b = e.target.closest('[data-pag]'); if (b && !b.disabled) { pagKdx = +b.dataset.pag; pintarExistencias(); } });
   ['ikDesde', 'ikHasta'].forEach(function (id) { $(id).addEventListener('change', pintarKardex); });
   $('ikImprimir').addEventListener('click', imprimirKardex);
   $('ikFiltro').addEventListener('click', function (e) {
     var b = e.target.closest('[data-valor]'); if (!b) return;
-    filtroKardex = b.dataset.valor;
+    filtroKardex = b.dataset.valor; pagKdx = 1;
     this.querySelectorAll('[data-valor]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
     pintarExistencias();
   });
