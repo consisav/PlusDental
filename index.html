@@ -1049,6 +1049,7 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .adm-sg.abierto>.adm-subgrupo .adm-chev{transform:rotate(-135deg) translate(-2px,-2px)}
 .adm-sg-items{display:none;flex-direction:column;gap:2px;padding:0 0 6px}
 .adm-sg.abierto>.adm-sg-items{display:flex}
+.adm-sg-items .adm-sep{border:0;border-top:1px solid #C9D6E0;margin:4px 14px 4px 28px;width:auto}
 .adm-sg+.adm-sg{border-top:1px solid #E3EBF1}
 .adm-sub{display:block;margin:6px 10px 2px 22px;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;font-weight:800;color:#005A87}
 .adm-menu button[data-tab].adm-sub-item{margin-left:30px}
@@ -1560,8 +1561,10 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="adm-sg-items" id="subInvMovimientosItems" role="presentation">
 <button type="button" role="tab" id="tabInvOrdenes" data-tab="admInvOrdenes" aria-selected="false" aria-controls="admInvOrdenes" class="adm-sub-item">Órdenes de compra</button>
 <button type="button" role="tab" id="tabInvCompras" data-tab="admInvCompras" aria-selected="false" aria-controls="admInvCompras" class="adm-sub-item">Compras</button>
+<hr class="adm-sep" role="separator">
 <button type="button" role="tab" id="tabInvVentas" data-tab="admInvVentas" aria-selected="false" aria-controls="admInvVentas" class="adm-sub-item">Ventas</button>
 <button type="button" role="tab" id="tabInvAjustes" data-tab="admInvAjustes" aria-selected="false" aria-controls="admInvAjustes" class="adm-sub-item">Ajustes</button>
+<hr class="adm-sep" role="separator">
 <button type="button" role="tab" id="tabInvKardex" data-tab="admInvKardex" aria-selected="false" aria-controls="admInvKardex" class="adm-sub-item">Movimiento Kardex</button>
 </div>
 </div>
