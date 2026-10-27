@@ -9,7 +9,7 @@
   var DOCS = [['factura', 'Factura'], ['recibo', 'Recibo'], ['nota_envio', 'Nota de envío'], ['otro', 'Otro']];
   var ORIGENES = { compra: 'Compra', venta: 'Venta', ajuste: 'Ajuste', anulacion_compra: 'Anulación de compra', anulacion_venta: 'Anulación de venta', reversion_compra: 'Reversión de compra' };
   var proveedores = [], bodegas = [], productos = [], compras = [], items = [], existencias = [], kardex = [];
-  var compraSel = null, prodSel = null, lineas = [], filtroCompra = 'todas';
+  var compraSel = null, prodSel = null, lineas = [], filtroCompra = 'todas', modoEdicion = false, lineaEdit = -1, PAG_C = 6, pagCompras = 1;
 
   function $(id) { return document.getElementById(id); }
   function num(n, d) { return Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d }); }
@@ -62,8 +62,8 @@
   }
 
   // ================= 6. Compras de productos =================
-  // Encabezado (sede, usuario, estado, moneda, documento, totales, proveedor) y pestañas Artículos, Listado de facturas,
-  // Abonos y Contabilidad. Flujo: Grabar (estado «Grabada») → Cargar al inventario («Operada») → Revertir carga / Anular.
+  // Consulta de compras (búsqueda, estado y fechas), encabezado (sede, usuario, estado, moneda, documento, totales, proveedor) y
+  // pestañas Artículos, Abonos y Contabilidad. Una compra existente se abre en modo consulta; «Modificar» solo si está Grabada. Flujo: Grabar (estado «Grabada») → Cargar al inventario («Operada») → Revertir carga / Anular.
   var TRANSACCIONES = [['1011', 'COMPRA DE MEDICAMENTO'], ['1012', 'COMPRA DE MATERIAL DENTAL'], ['1013', 'COMPRA DE INSUMOS DESCARTABLES'], ['1014', 'COMPRA DE INSTRUMENTAL Y EQUIPO'], ['1015', 'COMPRA DE PRODUCTOS DE LIMPIEZA'], ['1016', 'MUESTRAS MÉDICAS / DONACIÓN']];
   var REGIMENES = [['PC', 'Pequeño contribuyente'], ['RU', 'Régimen sobre las utilidades'], ['ROS', 'Régimen opcional simplificado sobre ingresos']];
   var ESTADOS_C = { grabada: ['Grabada', 'inactivo'], operada: ['Operada', 'activo'], anulada: ['Anulada', 'baja'] };
@@ -74,7 +74,16 @@
   $('admInvCompras').innerHTML =
     '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Compras de productos</h3>' +
     '<button type="button" id="icNueva" class="adm-btn adm-primary">Nueva compra</button></div>' +
+    // Consultar compras
+    '<section class="geo-panel ic-consulta"><div class="ik-titulo"><h4>Consultar compras</h4><span id="icConsCuenta"></span></div>' +
+      '<div class="ic-cons-filtros">' + campo('Buscar compra', '<input id="icBuscar" type="search" placeholder="N.º compra, proveedor, serie o documento, producto">', 'ic-cons-buscar') +
+        campo('Estado', '<select id="icFiltroSel"><option value="todas">Todas</option><option value="grabada">Grabadas</option><option value="operada">Operadas</option><option value="anulada">Anuladas</option></select>') +
+        campo('Desde', '<input id="icDesdeC" type="date">') + campo('Hasta', '<input id="icHastaC" type="date">') + '</div>' +
+      '<div class="roles-wrap ia-wrap"><table class="geo-tabla ic-cons-t"><colgroup><col class="ic-c-num"><col class="ic-c-fecha"><col><col class="ic-c-doc"><col class="ic-c-q"><col class="ic-c-q"><col class="ic-c-est"></colgroup>' +
+        '<thead><tr><th>Compra</th><th>Fecha</th><th>Proveedor / bodega</th><th>Documento</th><th class="num">Total Q</th><th class="num">Saldo</th><th>Estado</th></tr></thead><tbody id="icLista"></tbody></table>' +
+        '<div id="icPaginas" class="ia-paginas"></div></div></section>' +
     '<form id="icForm" class="ic-doc" novalidate>' +
+    '<div id="icModo" class="ic-modo" hidden><span id="icModoTxt"></span><span class="ic-modo-btns"><button type="button" id="icCancelar" class="adm-btn geo-mini">Cancelar cambios</button><button type="button" id="icModificar" class="adm-btn adm-primary geo-mini">Modificar</button></span></div>' +
     // Barra de estado
     '<div class="ic-barra">' +
       '<div class="ic-num"><span>Compra</span><b>N.º <output id="icNumero">—</output></b></div>' +
@@ -110,14 +119,23 @@
     '<div class="ic-tarjeta ic-desc">' + campo('Descripción', '<input id="icObs" maxlength="500" placeholder="Detalle u observaciones de la compra">') +
       '<label class="ic-check"><input id="icMuestras" type="checkbox"> Documento de muestras</label></div>' +
     '<datalist id="icRegimenes">' + REGIMENES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</datalist>' +
-    '<datalist id="icCodigos"></datalist><datalist id="icNombres"></datalist>' +
-    '<div class="ic-tabs" role="tablist">' + [['articulos', 'Artículos'], ['listado', 'Listado de facturas'], ['abonos', 'Abonos'], ['contabilidad', 'Contabilidad']].map(function (t) {
+    '<datalist id="icProdLista"></datalist>' +
+    '<div class="ic-tabs" role="tablist">' + [['articulos', 'Artículos'], ['abonos', 'Abonos'], ['contabilidad', 'Contabilidad']].map(function (t) {
       return '<button type="button" role="tab" data-ictab="' + t[0] + '" aria-selected="' + (t[0] === pestanaCompra) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
     // Artículos
-    '<section class="ic-pane" data-icpane="articulos"><div class="roles-wrap"><table class="pr-tabla inv-lineas ic-lineas"><thead><tr><th>Prod</th><th>Cod. prod</th><th>Nombre producto</th><th>Lote</th><th>Fecha fabricación</th><th>Fecha vencimiento</th>' +
-      '<th class="num">Cantidad</th><th class="num">Costo unitario</th><th class="num">Descuento</th><th class="num">Costo total</th><th class="num">C/U MI</th><th class="num">Costo total MI</th><th title="Afecta el inventario">Inv?</th><th title="Controla fecha de vencimiento">Fecha</th><th></th></tr></thead>' +
-      '<tbody id="icLineas"></tbody><tfoot><tr><td colspan="2"><b id="icCuenta">0</b> Total productos</td><td colspan="7"><button type="button" id="icAgregar" class="adm-btn geo-mini">+ Agregar artículo</button></td>' +
-      '<td class="num"><b id="icSumQ">0.00</b></td><td></td><td class="num"><b id="icSumMi">0.00</b></td><td colspan="3"></td></tr></tfoot></table></div>' +
+    '<section class="ic-pane" data-icpane="articulos">' +
+    '<div id="icCaptura" class="ic-captura"><div class="ic-cap-f1">' +
+      campo('Producto (código o nombre)', '<input id="icCapProd" list="icProdLista" maxlength="240" placeholder="Escribe el código o el nombre y elige de la lista" autocomplete="off">', 'ic-cap-prod') +
+      campo('Cantidad', '<input id="icCapCant" type="number" min="0" step="0.0001" class="num">') + campo('Costo unitario', '<input id="icCapCosto" type="number" min="0" step="0.0001" class="num">') +
+      campo('Descuento', '<input id="icCapDesc" type="number" min="0" step="0.01" class="num" placeholder="0.00">') + campo('Total', '<output id="icCapTotal" class="ic-cap-total">0.00</output>') +
+      '<span class="ic-cap-btns"><button type="button" id="icCapAgregar" class="adm-btn adm-primary">+ Agregar</button><button type="button" id="icCapCancelar" class="adm-btn geo-mini" hidden>Cancelar</button></span></div>' +
+      '<div class="ic-cap-f2">' + campo('Lote', '<input id="icCapLote" maxlength="40">') + campo('Fabricación', '<input id="icCapFab" type="date">') + campo('Vencimiento', '<input id="icCapVence" type="date">') +
+      '<label class="ic-check"><input id="icCapInv" type="checkbox" checked> Afecta inventario</label><label class="ic-check"><input id="icCapFecha" type="checkbox"> Controla vencimiento</label>' +
+      '<span id="icCapMsg" class="ic-cap-msg" role="status">Enter agrega el artículo</span></div></div>' +
+    '<div class="roles-wrap ia-wrap"><table class="geo-tabla ic-det"><colgroup><col class="ic-d-n"><col><col class="ic-d-cant"><col class="ic-d-cu"><col class="ic-d-desc"><col class="ic-d-tot"><col class="ic-d-mi"><col class="ic-d-acc"></colgroup>' +
+      '<thead><tr><th>#</th><th>Producto · lote · fechas</th><th class="num">Cantidad</th><th class="num">Costo unit.</th><th class="num">Desc.</th><th class="num">Total Q</th><th class="num" title="Moneda internacional (dólares)">Total MI</th><th><span class="sr-only">Acciones</span></th></tr></thead>' +
+      '<tbody id="icLineas"></tbody></table>' +
+      '<div class="ic-det-pie"><span><b id="icCuenta">0</b> artículos</span><span>Subtotal Q <b id="icSumQ">0.00</b> · MI $ <b id="icSumMi">0.00</b></span></div></div>' +
     '<div class="ic-botones ic-blq ic-naranja">' +
       '<button type="submit" id="icGrabar" class="adm-btn adm-primary">Grabar</button>' +
       '<button type="button" id="icCargar" class="adm-btn">Cargar al inventario</button>' +
@@ -126,10 +144,6 @@
       '<button type="button" id="icImprimir" class="adm-btn">Imprimir</button>' +
       '<button type="button" id="icCrearProd" class="adm-btn">Crear producto</button>' +
       '<button type="button" id="icPagos" class="adm-btn">Aplicar pagos</button></div></section>' +
-    // Listado de facturas
-    '<section class="ic-pane" data-icpane="listado" hidden><div class="inv-barra"><input id="icBuscar" type="search" class="adm-input geo-buscar" placeholder="Buscar proveedor, documento o producto" aria-label="Buscar compra">' +
-      '<div class="inv-filtros" id="icFiltro">' + [['todas', 'Todas'], ['grabada', 'Grabadas'], ['operada', 'Operadas'], ['anulada', 'Anuladas']].map(function (o) { return '<button type="button" class="adm-btn geo-mini" data-valor="' + o[0] + '" aria-pressed="' + (o[0] === 'todas') + '">' + o[1] + '</button>'; }).join('') + '</div></div>' +
-      '<div class="roles-wrap"><table class="pr-tabla"><thead><tr><th>#Compra</th><th>Fecha</th><th>Proveedor</th><th>Documento</th><th>Bodega</th><th class="num">Total Q</th><th class="num">Abonado</th><th class="num">Saldo</th><th>Estado</th></tr></thead><tbody id="icLista"></tbody></table></div></section>' +
     // Abonos (sub-detalle de la factura)
     '<section class="ic-pane" data-icpane="abonos" hidden><p class="dlg-msg" id="icAbonosInfo"></p><div class="roles-wrap"><table class="pr-tabla ic-abonos"><thead><tr><th>Cuenta bancaria</th><th>Desc docto</th><th>Fecha pago</th><th class="num">Total</th><th class="num">Total MI</th><th></th></tr></thead>' +
       '<tbody id="icAbonos"></tbody><tfoot><tr><td><button type="button" id="icAbonoNuevo" class="adm-btn geo-mini">+ Agregar abono</button></td><td></td><td class="num">Total</td><td class="num"><b id="icAbonoQ">0.00</b></td><td class="num"><b id="icAbonoMi">0.00</b></td><td></td></tr></tfoot></table></div>' +
@@ -140,7 +154,7 @@
 
   function documento(c) { return (DOCS.filter(function (d) { return d[0] === c.tipo_documento; })[0] || ['', c.tipo_documento || ''])[1] + (c.serie || c.numero_documento ? ' ' + [c.serie, c.numero_documento].filter(Boolean).join('-') : ''); }
   function abonadoDe(id) { return abonos.filter(function (a) { return a.compra_id === id && !a.borrar; }).reduce(function (s, a) { return s + (Number(a.total) || 0); }, 0); }
-  function editable() { return !compraForm || compraForm.estado === 'grabada'; }
+  function editable() { return !compraForm || (compraForm.estado === 'grabada' && modoEdicion); }
   function cambio() { return Math.max(Number($('icCambio').value) || 1, 0.0001); }
   function enUsd() { return $('icMoneda').value === 'USD'; }
   function r2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
@@ -161,27 +175,58 @@
     pintarConta(t);
     return t;
   }
-  function lineaVacia() { return { producto_id: null, codigo: '', nombre: '', lote: '', fecha_fabricacion: '', vencimiento: '', cantidad: '', costo_unitario: '', descuento: '', afecta_inventario: true, controla_fecha: false }; }
+  // Artículo que se está digitando en la barra de captura
+  function buscarProd(t) {
+    var v = norm(t).trim(); if (!v) return null;
+    return productos.filter(function (x) { return norm(x.codigo) === v || norm(x.nombre) === v || norm((x.codigo ? x.codigo + ' · ' : '') + x.nombre) === v; })[0] || null;
+  }
+  function lineaCaptura() {
+    var t = $('icCapProd').value.trim(), p = buscarProd(t), cod = '', nom = t;
+    if (!p && t.indexOf(' · ') > 0) { cod = t.split(' · ')[0].trim(); nom = t.slice(t.indexOf(' · ') + 3).trim(); }
+    return { producto_id: p ? p.id : null, codigo: p ? p.codigo || '' : cod, nombre: p ? p.nombre : nom, lote: $('icCapLote').value.trim(), fecha_fabricacion: $('icCapFab').value, vencimiento: $('icCapVence').value,
+      cantidad: $('icCapCant').value, costo_unitario: $('icCapCosto').value, descuento: $('icCapDesc').value, afecta_inventario: $('icCapInv').checked, controla_fecha: $('icCapFecha').checked };
+  }
+  function capMsg(t, error) { $('icCapMsg').textContent = t || 'Enter agrega el artículo'; $('icCapMsg').classList.toggle('error', !!error); }
+  function limpiarCaptura() {
+    lineaEdit = -1;
+    ['icCapProd', 'icCapCant', 'icCapCosto', 'icCapDesc', 'icCapLote', 'icCapFab', 'icCapVence'].forEach(function (id) { $(id).value = ''; });
+    $('icCapInv').checked = true; $('icCapFecha').checked = false; $('icCapTotal').textContent = '0.00';
+    $('icCapAgregar').textContent = '+ Agregar'; $('icCapCancelar').hidden = true; capMsg('');
+  }
+  function totalCaptura() { $('icCapTotal').textContent = num(calc(lineaCaptura()).q); }
+  function agregarCaptura() {
+    var l = lineaCaptura();
+    if (!l.nombre) { capMsg('Escribe el producto.', true); $('icCapProd').focus(); return; }
+    if (!(Number(l.cantidad) > 0)) { capMsg('La cantidad debe ser mayor que cero.', true); $('icCapCant').focus(); return; }
+    if (l.controla_fecha && !l.vencimiento) { capMsg('Indica la fecha de vencimiento (la línea controla vencimiento).', true); $('icCapVence').focus(); return; }
+    if (l.fecha_fabricacion && l.vencimiento && l.vencimiento < l.fecha_fabricacion) { capMsg('El vencimiento no puede ser anterior a la fabricación.', true); $('icCapVence').focus(); return; }
+    if (lineaEdit >= 0) lineas[lineaEdit] = l; else lineas.push(l);
+    limpiarCaptura(); pintarLineas(); estadoBotones(); $('icCapProd').focus();
+  }
+  function editarLinea(k) {
+    var l = lineas[k]; if (!l) return;
+    lineaEdit = k;
+    $('icCapProd').value = (l.codigo ? l.codigo + ' · ' : '') + l.nombre; $('icCapCant').value = l.cantidad; $('icCapCosto').value = l.costo_unitario; $('icCapDesc').value = l.descuento;
+    $('icCapLote').value = l.lote || ''; $('icCapFab').value = l.fecha_fabricacion || ''; $('icCapVence').value = l.vencimiento || '';
+    $('icCapInv').checked = !!l.afecta_inventario; $('icCapFecha').checked = !!l.controla_fecha;
+    $('icCapAgregar').textContent = 'Actualizar línea ' + (k + 1); $('icCapCancelar').hidden = false; capMsg('Modificando la línea ' + (k + 1) + '. Enter para actualizar.');
+    totalCaptura(); pintarLineas(); $('icCapCant').focus();
+  }
   function pintarLineas() {
-    var ed = editable(), dis = ed ? '' : ' disabled';
-    $('icLineas').innerHTML = lineas.map(function (l, k) {
+    var ed = editable();
+    $('icCaptura').hidden = !ed;
+    if (!ed && lineaEdit >= 0) limpiarCaptura();
+    $('icLineas').innerHTML = lineas.length ? lineas.map(function (l, k) {
       var p = l.producto_id ? porId(productos, l.producto_id) : null, c = calc(l);
-      var prod = p ? (p.numero || p.id) + (p.no_definido ? '<small class="inv-alerta">No definido</small>' : '') : (l.nombre || l.codigo ? '<small class="inv-alerta" title="No existe en el inventario: usa «Crear producto»">Nuevo</small>' : '');
-      function inp(k2, tipo, extra) { return '<input data-cl="' + k2 + '"' + (tipo ? ' type="' + tipo + '"' : '') + ' value="' + esc(l[k2] == null ? '' : l[k2]) + '"' + (extra || '') + dis + ' aria-label="' + k2 + ' línea ' + (k + 1) + '">'; }
-      return '<tr data-linea="' + k + '" class="' + (p ? '' : 'ic-sin-prod') + '"><td class="ic-prod">' + prod + '</td>' +
-        '<td>' + inp('codigo', '', ' list="icCodigos" class="ic-cod-prod" maxlength="40"') + '</td>' +
-        '<td>' + inp('nombre', '', ' list="icNombres" class="inv-prod-input" maxlength="200"') + '</td>' +
-        '<td>' + inp('lote', '', ' maxlength="40" class="ic-lote"') + '</td>' +
-        '<td>' + inp('fecha_fabricacion', 'date') + '</td><td>' + inp('vencimiento', 'date') + '</td>' +
-        '<td class="num">' + inp('cantidad', 'number', ' min="0" step="0.0001"') + '</td>' +
-        '<td class="num">' + inp('costo_unitario', 'number', ' min="0" step="0.0001"') + '</td>' +
-        '<td class="num">' + inp('descuento', 'number', ' min="0" step="0.01"') + '</td>' +
-        '<td class="num ic-ro" data-v="sub">' + num(c.sub, 4) + '</td><td class="num ic-ro ic-mi" data-v="cumi">' + num(c.cuMi, 4) + '</td><td class="num ic-ro ic-mi" data-v="submi">' + num(c.subMi, 4) + '</td>' +
-        '<td><input type="checkbox" data-cl="afecta_inventario"' + (l.afecta_inventario ? ' checked' : '') + dis + ' aria-label="Afecta inventario línea ' + (k + 1) + '"></td>' +
-        '<td><input type="checkbox" data-cl="controla_fecha"' + (l.controla_fecha ? ' checked' : '') + dis + ' aria-label="Controla fecha línea ' + (k + 1) + '"></td>' +
-        '<td>' + (ed && lineas.length > 1 ? '<button type="button" class="adm-btn geo-mini" data-quitar="' + k + '" aria-label="Quitar línea ' + (k + 1) + '">×</button>' : '') + '</td></tr>';
-    }).join('');
-    $('icAgregar').hidden = !ed;
+      var marca = p ? (p.no_definido ? ' <span class="inv-alerta">No definido</span>' : '') : ' <span class="inv-alerta" title="No existe en el inventario: usa «Crear producto»">Nuevo</span>';
+      var extra = [l.lote ? 'Lote ' + esc(l.lote) : 'Sin lote', l.fecha_fabricacion ? 'fab. ' + fecha(l.fecha_fabricacion) : '', l.vencimiento ? 'vence ' + fecha(l.vencimiento) : (l.controla_fecha ? '' : 'no controla vencimiento'),
+        l.afecta_inventario ? '' : 'no afecta inventario'].filter(Boolean).join(' · ');
+      return '<tr data-linea="' + k + '" class="' + (p ? '' : 'ic-sin-prod') + (k === lineaEdit ? ' ic-editando' : '') + '"><td class="ik-cod">' + (k + 1) + '</td>' +
+        '<td><b class="ic-d-nom">' + esc((l.codigo ? l.codigo + ' · ' : '') + l.nombre) + '</b>' + marca + '<small class="inv-sub ia-corto">' + extra + '</small></td>' +
+        '<td class="num">' + cant(l.cantidad) + '</td><td class="num">' + num(l.costo_unitario, 4) + '</td><td class="num">' + (Number(l.descuento) ? num(l.descuento) : '—') + '</td>' +
+        '<td class="num"><b>' + num(c.q) + '</b></td><td class="num ic-mi">' + num(c.subMi) + '<small class="inv-sub">c/u ' + num(c.cuMi, 4) + '</small></td>' +
+        '<td class="ic-d-acc">' + (ed ? '<button type="button" class="ic-ico" data-editar-linea="' + k + '" aria-label="Modificar línea ' + (k + 1) + '" title="Modificar">✎</button><button type="button" class="ic-ico ic-ico-x" data-quitar="' + k + '" aria-label="Quitar línea ' + (k + 1) + '" title="Quitar">×</button>' : '') + '</td></tr>';
+    }).join('') : '<tr><td colspan="8" class="geo-vacia">' + (ed ? 'Aún no hay artículos. Digítalos en la barra de arriba y presiona Enter.' : 'Sin artículos.') + '</td></tr>';
     totales();
   }
   function pintarEncabezado() {
@@ -215,12 +260,23 @@
     var c = compraForm || {}, ed = editable();
     var guardada = !!c.id, sinProd = lineas.some(function (x) { return !x.producto_id && (x.nombre || x.codigo); });
     $('icGrabar').disabled = !ed;
+    var modo = '', puedeMod = false;
+    if (guardada) {
+      if (c.estado === 'grabada' && modoEdicion) modo = 'Modificando la compra N.º ' + c.numero + '. Presiona «Grabar» para guardar los cambios.';
+      else if (c.estado === 'grabada') { modo = 'Compra N.º ' + c.numero + ' · Grabada · modo consulta. Puedes modificarla porque aún no se ha cargado al inventario.'; puedeMod = true; }
+      else if (c.estado === 'operada') modo = 'Compra N.º ' + c.numero + ' · Operada · solo consulta: ya fue cargada al inventario. Para modificarla, primero «Revertir carga».';
+      else modo = 'Compra N.º ' + c.numero + ' · Anulada · solo consulta.';
+    }
+    $('icModo').hidden = !guardada; $('icModoTxt').textContent = modo;
+    $('icModo').className = 'ic-modo' + (modoEdicion && c.estado === 'grabada' ? ' editando' : c.estado === 'grabada' ? '' : ' bloqueada');
+    $('icModificar').hidden = !(c.estado === 'grabada' && !modoEdicion); $('icModificar').disabled = !puedeMod;
+    $('icCancelar').hidden = !(c.estado === 'grabada' && modoEdicion);
     $('icCargar').disabled = !(guardada && c.estado === 'grabada');
     $('icRevertir').disabled = c.estado !== 'operada';
     $('icAnular').disabled = !(guardada && c.estado !== 'anulada' && window.PD_SEDES && window.PD_SEDES.esSuper());
     $('icAnular').title = window.PD_SEDES && window.PD_SEDES.esSuper() ? '' : 'Solo el Super Administrador anula compras.';
     $('icImprimir').disabled = !guardada;
-    $('icCrearProd').disabled = !(ed && sinProd);
+    $('icCrearProd').disabled = !((!guardada || c.estado === 'grabada') && sinProd);
     $('icPagos').disabled = !(guardada && c.estado !== 'anulada');
     $('icRegistro').innerHTML = guardada ? '<div class="org-registro"><div class="org-reg-datos"><span>Sede <b>' + esc(sede(c)) + '</b></span>' +
       '<span>Grabado por <b>' + esc(c.creado_por || '—') + '</b> el <b>' + fechaHora(c.creado) + '</b></span>' +
@@ -233,7 +289,7 @@
     pintarEncabezado(); pintarLineas(); pintarAbonos(); estadoBotones();
   }
   function cargarEnFormulario(c) {
-    compraForm = c || null;
+    compraForm = c || null; modoEdicion = false; lineaEdit = -1;
     var usd = c && c.moneda === 'USD', tc = (c && Number(c.tipo_cambio)) || 1;
     lineas = c ? items.filter(function (i) { return i.compra_id === c.id; }).sort(function (a, b) { return a.linea - b.linea; }).map(function (i) {
       var p = porId(productos, i.producto_id);
@@ -241,9 +297,8 @@
         cantidad: Number(i.cantidad), costo_unitario: usd ? Number(i.costo_unitario_mi) : Number(i.costo_unitario), descuento: Number(i.descuento) ? (usd ? r2(i.descuento / tc) : Number(i.descuento)) : '',
         afecta_inventario: i.afecta_inventario !== false, controla_fecha: !!i.controla_fecha };
     }) : [];
-    if (!lineas.length) lineas = [lineaVacia()];
-    $('icCodigos').innerHTML = productos.filter(function (p) { return p.estado === 'activo' && p.codigo; }).map(function (p) { return '<option value="' + esc(p.codigo) + '">' + esc(p.nombre) + '</option>'; }).join('');
-    $('icNombres').innerHTML = productos.filter(function (p) { return p.estado === 'activo'; }).map(function (p) { return '<option value="' + esc(p.nombre) + '">' + esc(p.codigo || '') + '</option>'; }).join('');
+    $('icProdLista').innerHTML = productos.filter(function (p) { return p.estado === 'activo'; }).map(function (p) { return '<option value="' + esc((p.codigo ? p.codigo + ' · ' : '') + p.nombre) + '">' + esc([p.presentacion, p.unidad].filter(Boolean).join(' · ')) + '</option>'; }).join('');
+    limpiarCaptura();
     aviso('icMsg', '');
     pintarCompra();
   }
@@ -253,20 +308,32 @@
     $('icForm').querySelectorAll('[data-icpane]').forEach(function (p) { p.hidden = p.dataset.icpane !== t; });
   }
 
-  // --- Listado de facturas ---
+  // --- Consulta de compras ---
   function pintarCompras() {
-    var t = norm($('icBuscar').value);
+    var t = norm($('icBuscar').value), desde = $('icDesdeC').value, hasta = $('icHastaC').value;
     var l = compras.filter(function (c) {
       if (filtroCompra !== 'todas' && c.estado !== filtroCompra) return false;
+      if ((desde && c.fecha < desde) || (hasta && c.fecha > hasta)) return false;
       if (!t) return true;
       var nombres = items.filter(function (i) { return i.compra_id === c.id; }).map(function (i) { return [i.codigo, i.nombre].join(' '); });
       return norm([c.numero, nombreProv(c.proveedor_id), documento(c), c.no_interno, c.observaciones].concat(nombres).join(' ')).indexOf(t) >= 0;
     });
-    $('icLista').innerHTML = l.length ? l.map(function (c) {
+    var paginas = Math.max(1, Math.ceil(l.length / PAG_C));
+    pagCompras = Math.min(Math.max(1, pagCompras), paginas);
+    var ini = (pagCompras - 1) * PAG_C, vis = l.slice(ini, ini + PAG_C);
+    $('icConsCuenta').textContent = l.length + ' compra' + (l.length === 1 ? '' : 's');
+    $('icLista').innerHTML = vis.length ? vis.map(function (c) {
       var ab = abonadoDe(c.id), saldo = c.estado === 'anulada' ? 0 : Number(c.total) - Number(c.valor_retencion || 0) - ab, e = ESTADOS_C[c.estado] || [c.estado, 'inactivo'];
-      return '<tr data-compra="' + c.id + '" tabindex="0" class="' + (compraForm && c.id === compraForm.id ? 'geo-sel' : '') + '"><td>' + c.numero + '</td><td>' + fecha(c.fecha) + '</td><td>' + esc(nombreProv(c.proveedor_id)) + '</td><td>' + esc(documento(c)) + '</td><td>' + esc(nombreBod(c.bodega_id)) + '</td>' +
-        '<td class="num"><b>' + q(c.total) + '</b></td><td class="num">' + q(ab) + '</td><td class="num' + (saldo > 0.004 ? ' inv-bajo' : '') + '">' + q(saldo) + '</td><td><span class="estado estado-' + e[1] + '">' + e[0] + '</span></td></tr>';
-    }).join('') : '<tr><td colspan="9" class="geo-vacia">' + (compras.length ? 'Ninguna compra coincide.' : 'Aún no hay compras.') + '</td></tr>';
+      return '<tr data-compra="' + c.id + '" tabindex="0" class="' + (compraForm && c.id === compraForm.id ? 'geo-sel' : '') + '"><td><b>' + c.numero + '</b></td><td>' + fecha(c.fecha) + '</td>' +
+        '<td><b class="ia-corto">' + esc(nombreProv(c.proveedor_id)) + '</b><small class="inv-sub ia-corto">' + esc(nombreBod(c.bodega_id)) + '</small></td><td><span class="ia-corto" title="' + esc(documento(c)) + '">' + esc(documento(c)) + '</span></td>' +
+        '<td class="num"><b>' + q(c.total) + '</b></td><td class="num' + (saldo > 0.004 ? ' inv-bajo' : '') + '">' + q(saldo) + '</td><td><span class="estado estado-' + e[1] + '">' + e[0] + '</span></td></tr>';
+    }).join('') : '<tr><td colspan="7" class="geo-vacia">' + (compras.length ? 'Ninguna compra coincide.' : 'Aún no hay compras.') + '</td></tr>';
+    var botones = [];
+    if (paginas > 1) for (var n = 1; n <= paginas; n++) if (n === 1 || n === paginas || Math.abs(n - pagCompras) <= 1) botones.push(n); else if (botones[botones.length - 1] !== '…') botones.push('…');
+    $('icPaginas').hidden = !l.length;
+    $('icPaginas').innerHTML = l.length ? '<span>' + (ini + 1) + '–' + (ini + vis.length) + ' de ' + l.length + ' compras · toca una para verla</span>' + (paginas > 1 ? '<nav aria-label="Páginas de compras"><button type="button" class="ia-pag" data-pag="' + (pagCompras - 1) + '"' + (pagCompras === 1 ? ' disabled' : '') + ' aria-label="Página anterior">‹</button>' +
+      botones.map(function (n) { return n === '…' ? '<span class="ia-pag-mas">…</span>' : '<button type="button" class="ia-pag" data-pag="' + n + '"' + (n === pagCompras ? ' aria-current="page"' : '') + '>' + n + '</button>'; }).join('') +
+      '<button type="button" class="ia-pag" data-pag="' + (pagCompras + 1) + '"' + (pagCompras === paginas ? ' disabled' : '') + ' aria-label="Página siguiente">›</button></nav>' : '') : '';
   }
   async function cargarCompras(mantener) {
     aviso('icMsg', '');
@@ -284,7 +351,7 @@
   function abonosDe() { return compraForm ? abonos.filter(function (a) { return a.compra_id === compraForm.id && !a.borrar; }) : []; }
   function pintarAbonos() {
     var l = abonosDe(), ed = compraForm && compraForm.estado !== 'anulada', dis = ed ? '' : ' disabled';
-    $('icAbonosInfo').textContent = compraForm ? 'Abonos de la compra N.º ' + compraForm.numero + ' · ' + nombreProv(compraForm.proveedor_id) + ' · ' + documento(compraForm) : 'Graba o elige una compra (pestaña «Listado de facturas») para aplicarle pagos.';
+    $('icAbonosInfo').textContent = compraForm ? 'Abonos de la compra N.º ' + compraForm.numero + ' · ' + nombreProv(compraForm.proveedor_id) + ' · ' + documento(compraForm) : 'Graba la compra o elígela en «Consultar compras» para aplicarle pagos.';
     $('icAbonos').innerHTML = l.length ? l.map(function (a) {
       var k = abonos.indexOf(a);
       function inp(c, tipo, extra) { return '<input data-ab="' + c + '"' + (tipo ? ' type="' + tipo + '"' : '') + ' value="' + esc(a[c] == null ? '' : a[c]) + '"' + (extra || '') + dis + '>'; }
@@ -373,7 +440,9 @@
   }
 
   // --- Eventos ---
-  $('icNueva').addEventListener('click', async function () { if (!productos.length) await cargarCompras(); cargarEnFormulario(null); verPestana('articulos'); $('icProv').focus(); });
+  $('icNueva').addEventListener('click', async function () { if (!productos.length) await cargarCompras(); cargarEnFormulario(null); pintarCompras(); verPestana('articulos'); $('icForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('icProv').focus({ preventScroll: true }); });
+  $('icModificar').addEventListener('click', function () { if (!compraForm || compraForm.estado !== 'grabada') return; modoEdicion = true; pintarCompra(); verPestana('articulos'); aviso('icMsg', ''); $('icCapProd').focus(); });
+  $('icCancelar').addEventListener('click', function () { cargarEnFormulario(compraForm); aviso('icMsg', 'Cambios descartados.'); });
   $('icForm').addEventListener('click', function (e) { var t = e.target.closest('[data-ictab]'); if (t) verPestana(t.dataset.ictab); });
   $('icAplicaOrden').addEventListener('change', function () { $('icOrden').hidden = this.value !== 'si'; if (!$('icOrden').hidden) $('icOrden').focus(); });
   $('icAplicaRet').addEventListener('change', function () { $('icRetencion').disabled = $('icFormRet').disabled = !this.checked; if (!this.checked) $('icRetencion').value = ''; totales(); });
@@ -396,32 +465,25 @@
       }
     });
   });
-  $('icAgregar').addEventListener('click', function () { lineas.push(lineaVacia()); pintarLineas(); var i = $('icLineas').querySelectorAll('.ic-cod-prod'); i[i.length - 1].focus(); });
-  $('icLineas').addEventListener('input', function (e) {
-    var tr = e.target.closest('tr[data-linea]'), c = e.target.dataset.cl;
-    if (!tr || !c) return;
-    var l = lineas[+tr.dataset.linea];
-    l[c] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    if (c === 'codigo' || c === 'nombre') {
-      var v = norm(e.target.value).trim();
-      var p = v ? productos.filter(function (x) { return c === 'codigo' ? norm(x.codigo) === v : norm(x.nombre) === v; })[0] : null;
-      var antes = l.producto_id;
-      l.producto_id = p ? p.id : null;
-      if (p) {
-        l.codigo = p.codigo || ''; l.nombre = p.nombre;
-        if (l.costo_unitario === '' && p.costo != null) l.costo_unitario = enUsd() ? r2(p.costo / cambio()) : Number(p.costo);
-        if (l.cantidad === '') l.cantidad = 1;
-      }
-      if (p || antes) { pintarLineas(); estadoBotones(); var x = $('icLineas').querySelector('tr[data-linea="' + tr.dataset.linea + '"] [data-cl="cantidad"]'); if (p && x) x.focus(); return; }
-      $('icCrearProd').disabled = !(editable() && lineas.some(function (y) { return !y.producto_id && (y.nombre || y.codigo); }));
-      tr.querySelector('.ic-prod').innerHTML = l.nombre || l.codigo ? '<small class="inv-alerta">Nuevo</small>' : '';
+  // Barra de captura: Enter agrega (o actualiza) el artículo
+  $('icCaptura').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); agregarCaptura(); } if (e.key === 'Escape' && lineaEdit >= 0) { limpiarCaptura(); pintarLineas(); } });
+  $('icCaptura').addEventListener('input', function (e) {
+    if (e.target.id === 'icCapProd') {
+      var p = buscarProd(e.target.value);
+      if (p) { if ($('icCapCosto').value === '' && p.costo != null) $('icCapCosto').value = enUsd() ? r2(p.costo / cambio()) : Number(p.costo); if ($('icCapCant').value === '') $('icCapCant').value = 1;
+        capMsg('Producto ' + (p.numero || p.id) + ' · ' + [p.presentacion, p.unidad].filter(Boolean).join(' · ')); if (e.inputType === 'insertReplacementText' || !e.inputType) $('icCapCant').select(); }
+      else capMsg(e.target.value.trim() ? 'No existe en el inventario: se agregará como «Nuevo» (luego «Crear producto»).' : '');
     }
-    var k = calc(l);
-    tr.querySelector('[data-v="sub"]').textContent = num(k.sub, 4); tr.querySelector('[data-v="cumi"]').textContent = num(k.cuMi, 4); tr.querySelector('[data-v="submi"]').textContent = num(k.subMi, 4);
-    totales();
+    totalCaptura();
   });
-  $('icLineas').addEventListener('change', function (e) { var tr = e.target.closest('tr[data-linea]'); if (tr && e.target.type === 'checkbox') lineas[+tr.dataset.linea][e.target.dataset.cl] = e.target.checked; });
-  $('icLineas').addEventListener('click', function (e) { var b = e.target.closest('[data-quitar]'); if (b) { lineas.splice(+b.dataset.quitar, 1); pintarLineas(); estadoBotones(); } });
+  $('icCapAgregar').addEventListener('click', agregarCaptura);
+  $('icCapCancelar').addEventListener('click', function () { limpiarCaptura(); pintarLineas(); $('icCapProd').focus(); });
+  $('icLineas').addEventListener('click', function (e) {
+    var ed = e.target.closest('[data-editar-linea]'); if (ed) { editarLinea(+ed.dataset.editarLinea); return; }
+    var b = e.target.closest('[data-quitar]');
+    if (b) { var k = +b.dataset.quitar; lineas.splice(k, 1); if (lineaEdit === k) limpiarCaptura(); else if (lineaEdit > k) lineaEdit--; pintarLineas(); estadoBotones(); }
+  });
+  $('icLineas').addEventListener('dblclick', function (e) { var tr = e.target.closest('tr[data-linea]'); if (tr && editable()) editarLinea(+tr.dataset.linea); });
   $('icForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     if (!editable()) return;
@@ -506,14 +568,10 @@
     aviso('icMsg', err ? traducir(err) : 'Abonos grabados.', !!err);
   });
   // Listado
-  $('icBuscar').addEventListener('input', pintarCompras);
-  $('icFiltro').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-valor]'); if (!b) return;
-    filtroCompra = b.dataset.valor;
-    this.querySelectorAll('[data-valor]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
-    pintarCompras();
-  });
-  $('icLista').addEventListener('click', function (e) { var tr = e.target.closest('tr[data-compra]'); if (tr) { cargarEnFormulario(porId(compras, +tr.dataset.compra)); pintarCompras(); verPestana('articulos'); } });
+  $('icBuscar').addEventListener('input', function () { pagCompras = 1; pintarCompras(); });
+  ['icFiltroSel', 'icDesdeC', 'icHastaC'].forEach(function (id) { $(id).addEventListener('change', function () { if (id === 'icFiltroSel') filtroCompra = this.value; pagCompras = 1; pintarCompras(); }); });
+  $('icPaginas').addEventListener('click', function (e) { var b = e.target.closest('[data-pag]'); if (b && !b.disabled) { pagCompras = +b.dataset.pag; pintarCompras(); } });
+  $('icLista').addEventListener('click', function (e) { var tr = e.target.closest('tr[data-compra]'); if (tr) { cargarEnFormulario(porId(compras, +tr.dataset.compra)); pintarCompras(); verPestana('articulos'); $('icForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
   $('icLista').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.matches('tr[data-compra]')) e.target.click(); });
 
   // ================= 7. Movimiento Kardex (maestro - detalle) =================
