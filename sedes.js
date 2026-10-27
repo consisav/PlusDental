@@ -31,7 +31,7 @@
 
   // Llena los <select> de organización y localidad (solo activas, más la ya elegida) y los encadena.
   // Por defecto: la sede del usuario conectado.
-  async function llenar(selOrg, selLoc, locId, porDefecto) {
+  async function llenar(selOrg, selLoc, locId, porDefecto, esFiltro) {
     await cargar();
     if (!locId && porDefecto !== false) locId = miLoc || null;
     var l0 = locId ? loc(locId) : null, orgId = l0 ? l0.organizacion_id : null;
@@ -46,15 +46,17 @@
     }
     locales(locId);
     if (!selOrg.dataset.sedeEnlazado) { selOrg.dataset.sedeEnlazado = '1'; selOrg.addEventListener('change', function () { locales(null); }); }
-    bloquear(selOrg, selLoc);
+    bloquear(selOrg, selLoc, esFiltro);
   }
-  // Solo el Super Administrador elige o cambia la sede; los demás graban siempre en la suya (Supabase también lo exige)
+  // La organización y la localidad de un registro solo se muestran: nadie las cambia (los registros nuevos quedan en la sede
+  // del usuario conectado; Supabase también lo exige a quien no es Super Administrador). Los selectores que solo filtran
+  // la vista (esFiltro) siguen libres para el Super Administrador.
   function esSuper() { return !!(window.PD_SESION && window.PD_SESION.esSuper()); }
-  function bloquear(selOrg, selLoc) {
-    var b = !esSuper();
+  function bloquear(selOrg, selLoc, esFiltro) {
+    var b = !(esFiltro && esSuper());
     [selOrg, selLoc].forEach(function (x) {
       x.disabled = b; x.dataset.sedeBloqueada = b ? '1' : '';
-      x.title = b ? 'Solo el Super Administrador puede cambiar la organización y la localidad.' : '';
+      x.title = b ? 'La organización y la localidad no se pueden modificar.' : '';
     });
   }
   // Valores para grabar (la organización la completa Supabase a partir de la localidad)

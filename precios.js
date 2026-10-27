@@ -92,7 +92,7 @@
     if (r[0].error && /tipo_id/.test(r[0].error.message || '')) r[0] = await sb.from('tratamientos').select('id,nombre,precio,activo').order('nombre');
     if (r[0].error || r[1].error) { $('prBody').innerHTML = ''; aviso('prMsg', traducir(r[0].error || r[1].error), true); return; }
     tratamientos = r[0].data || []; precios = r[1].data || [];
-    if (window.PD_SEDES && !$('prLoc').dataset.listo) { $('prLoc').dataset.listo = '1'; await window.PD_SEDES.llenar($('prOrg'), $('prLoc'), null); }
+    if (window.PD_SEDES && !$('prLoc').dataset.listo) { $('prLoc').dataset.listo = '1'; await window.PD_SEDES.llenar($('prOrg'), $('prLoc'), null, true, true); }
     tiposProc = r[2].error ? [] : (r[2].data || []).filter(function (t) { return t.estado === 'activo'; });
     pintarTiposProc();
     pintarLista();
