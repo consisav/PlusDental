@@ -6,8 +6,10 @@
   var BUCKET = 'expedientes';
   var CAMPOS = {
     nombre: 'pNombre', dpi: 'pDpi', nit: 'pNit', fecha_nacimiento: 'pNacimiento', telefono: 'pTelefono', direccion: 'pDireccion',
-    emergencia_nombre: 'pEmNombre', emergencia_telefono: 'pEmTelefono', estado: 'pEstado', correo: 'pCorreo'
+    emergencia_nombre: 'pEmNombre', emergencia_telefono: 'pEmTelefono', estado: 'pEstado', correo: 'pCorreo', tipo_cliente: 'pTipoCliente'
   };
+  // Tipo de cliente: el mismo catálogo de tipos de precio (Inventarios › Precios por tipo de cliente)
+  var TIPOS_CLIENTE = { directo: 'Cliente directo', institucional: 'Institucional', vip: 'VIP', referido: 'Referido', paquete: 'Paquete', especial: 'Especial' };
 
   var ESTADOS_PAC = { activo: 'Activo', inactivo: 'Inactivo', suspendido: 'Suspendido', baja: 'Baja' };
   var pacientes = [], actual = null, odontoCambiado = false;
@@ -179,6 +181,7 @@
   function rellenar(p) {
     Object.keys(CAMPOS).forEach(function (k) { $(CAMPOS[k]).value = (p && p[k]) || ''; });
     $('pEstado').value = (p && p.estado) || 'activo';
+    $('pTipoCliente').value = (p && TIPOS_CLIENTE[p.tipo_cliente]) ? p.tipo_cliente : 'directo';
     opcionesMedicos(p ? p.dentista_id : null);
     if (!p) $('pDentista').value = medicoPorDefecto();
     opcionesAgentes(p ? p.agente_id : null);
@@ -288,6 +291,7 @@
       actual.fecha_nacimiento ? '<span class="pac-chip">' + edad(actual.fecha_nacimiento) + '</span>' : '',
       actual.dpi ? '<span class="pac-chip">DPI ' + esc(actual.dpi) + '</span>' : '',
       actual.nit ? '<span class="pac-chip">NIT ' + esc(actual.nit) + '</span>' : '',
+      TIPOS_CLIENTE[actual.tipo_cliente] ? '<span class="pac-chip" title="Tipo de cliente">' + TIPOS_CLIENTE[actual.tipo_cliente] + '</span>' : '',
       // Color del paciente: el de su médico asignado (se cambia desde la ficha del odontólogo)
       window.PD_COLOR && window.PD_COLOR.color(actual.dentista_id) ? '<span class="pac-chip pac-med"' + window.PD_COLOR.estilo(actual.dentista_id) + ' title="Se cambia en Catálogos › Odontólogos">' + window.PD_COLOR.punto(actual.dentista_id) + esc(window.PD_COLOR.nombrePaleta(window.PD_COLOR.color(actual.dentista_id))) + (actual.medico ? ' · ' + esc(actual.medico.nombre) : '') + '</span>' : ''].join('') : '';
     $('pMeta').hidden = !actual;
@@ -741,7 +745,7 @@
   $('fDatos').addEventListener('submit', function (e) {
     e.preventDefault();
     if (!editando) return;
-    guardar(['nombre', 'dpi', 'nit', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'emergencia_nombre', 'emergencia_telefono', 'estado'], 'fDatosMsg', this.querySelector('[type=submit]'));
+    guardar(['nombre', 'dpi', 'nit', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'emergencia_nombre', 'emergencia_telefono', 'estado', 'tipo_cliente'], 'fDatosMsg', this.querySelector('[type=submit]'));
   });
 
   $('odoGuardar').addEventListener('click', function () { guardarOdonto(this); });

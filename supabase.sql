@@ -5873,6 +5873,11 @@ begin
 end;
 $$;
 
+-- ===== Pacientes: tipo de cliente (el mismo catálogo de tipos de precio) =====
+alter table public.pacientes add column if not exists tipo_cliente text not null default 'directo';
+alter table public.pacientes drop constraint if exists pacientes_tipo_cliente_check;
+alter table public.pacientes add constraint pacientes_tipo_cliente_check check (tipo_cliente in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial'));
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
