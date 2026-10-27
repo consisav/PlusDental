@@ -5438,6 +5438,190 @@ update public.inv_proveedores p
        transaccion = coalesce(p.transaccion, case when p.nombre_comercial ilike 'drogu%' or p.nombre_comercial ilike 'medissa%' or p.nombre_comercial ilike 'supharma%' then '1011' else '1012' end)
  where p.bodega_id is null or p.transaccion is null;
 
+-- ===== Inventarios: traslados de productos entre bodegas =====
+-- Flujo: Grabar (estado «Grabado», no mueve inventario) → Descargar (estado «Operado»: salida de la bodega origen y
+-- entrada en la bodega destino en el kardex) → Revertir (deshace los movimientos y vuelve a «Grabado»).
+create table if not exists public.inv_traslados (
+  id                 bigint generated always as identity primary key,
+  numero             bigint,
+  fecha              timestamptz not null default now(),
+  estado             text not null default 'grabado' check (estado in ('grabado', 'operado')),
+  bodega_origen_id   bigint not null references public.inv_bodegas (id),
+  bodega_destino_id  bigint not null references public.inv_bodegas (id),
+  descripcion        text check (char_length(descripcion) <= 500),
+  aplica_conta       boolean not null default false,
+  operado_en         timestamptz,
+  operado_por        text,
+  revertido_en       timestamptz,
+  revertido_por      text,
+  revertido_motivo   text check (char_length(revertido_motivo) <= 300),
+  creado             timestamptz not null default now(),
+  creado_por         text,
+  modificado         timestamptz,
+  modificado_por     text,
+  organizacion_id    bigint references public.organizaciones (id) on delete set null,
+  localidad_id       bigint references public.org_localidades (id) on delete set null,
+  check (bodega_origen_id <> bodega_destino_id)
+);
+create table if not exists public.inv_traslado_items (
+  id                 bigint generated always as identity primary key,
+  traslado_id        bigint not null references public.inv_traslados (id) on delete cascade,
+  linea              int not null default 1,
+  producto_id        bigint not null references public.inv_productos (id),
+  lote               text check (char_length(lote) <= 40),
+  vencimiento        date,
+  cantidad           numeric(12,2) not null check (cantidad > 0),
+  afecta_inventario  boolean not null default true
+);
+create index if not exists inv_traslado_items_traslado on public.inv_traslado_items (traslado_id, linea);
+
+-- El kardex sabe de qué traslado sale cada movimiento
+alter table public.inv_movimientos add column if not exists traslado_id bigint references public.inv_traslados (id) on delete set null;
+create index if not exists inv_movimientos_traslado on public.inv_movimientos (traslado_id) where traslado_id is not null;
+alter table public.inv_movimientos drop constraint if exists inv_movimientos_origen_check;
+alter table public.inv_movimientos add constraint inv_movimientos_origen_check
+  check (origen in ('compra', 'venta', 'ajuste', 'anulacion_compra', 'anulacion_venta', 'reversion_compra', 'traslado', 'reversion_traslado'));
+
+-- El registro automático también numera los traslados
+create or replace function public.inv_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+begin
+  if tg_op = 'INSERT' then
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto', 'inv_compras', 'inv_traslados') then
+      perform pg_advisory_xact_lock(hashtext(tg_table_name || '_numero'));
+      execute format('select coalesce(max(numero), 0) + 1 from public.%I', tg_table_name) into new.numero;
+    end if;
+    new.creado := now(); new.creado_por := v_usuario; new.modificado := null; new.modificado_por := null;
+  else
+    if tg_table_name in ('inv_proveedores', 'inv_bodegas', 'inv_productos', 'inv_tipos_producto', 'inv_compras', 'inv_traslados') then new.numero := old.numero; end if;
+    new.creado := old.creado; new.creado_por := old.creado_por;
+    new.modificado := now(); new.modificado_por := v_usuario;
+  end if;
+  return new;
+end;
+$$;
+do $$ declare t text := 'inv_traslados'; begin
+  if not exists (select 1 from pg_trigger where tgname = t || '_registro' and tgrelid = ('public.' || t)::regclass) then
+    execute format('create trigger %I before insert or update on public.%I for each row execute function public.inv_registro()', t || '_registro', t);
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = t || '_sede' and tgrelid = ('public.' || t)::regclass) then
+    execute format('create trigger %I before insert or update of organizacion_id, localidad_id on public.%I for each row execute function public.sede_registro()', t || '_sede', t);
+  end if;
+end $$;
+
+-- Lectura para el personal de su sede; se graban solo con las funciones de abajo
+alter table public.inv_traslados enable row level security;
+drop policy if exists inv_traslados_lee on public.inv_traslados;
+create policy inv_traslados_lee on public.inv_traslados for select to authenticated using (public.es_personal() and public.ve_sede(localidad_id));
+grant select on public.inv_traslados to authenticated;
+alter table public.inv_traslado_items enable row level security;
+drop policy if exists inv_traslado_items_lee on public.inv_traslado_items;
+create policy inv_traslado_items_lee on public.inv_traslado_items for select to authenticated
+  using (public.es_personal() and exists (select 1 from public.inv_traslados t where t.id = traslado_id and public.ve_sede(t.localidad_id)));
+grant select on public.inv_traslado_items to authenticated;
+
+-- Grabar (nuevo o modificar) un traslado en estado «Grabado», con su detalle. No mueve el inventario.
+create or replace function public.guardar_traslado(p_id bigint, p_datos jsonb, p_items jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint := p_id;
+  v_org public.inv_bodegas; v_des public.inv_bodegas;
+  e jsonb; n int := 0;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if jsonb_array_length(coalesce(p_items, '[]'::jsonb)) = 0 then raise exception 'Agrega al menos un producto al traslado'; end if;
+  select * into v_org from public.inv_bodegas where id = nullif(p_datos ->> 'bodega_origen_id', '')::bigint;
+  select * into v_des from public.inv_bodegas where id = nullif(p_datos ->> 'bodega_destino_id', '')::bigint;
+  if v_org.id is null or not public.ve_sede(v_org.localidad_id) then raise exception 'Elige la bodega origen de tu sede'; end if;
+  if v_des.id is null or not public.ve_sede(v_des.localidad_id) then raise exception 'Elige la bodega destino de tu sede'; end if;
+  if v_org.id = v_des.id then raise exception 'La bodega origen y la destino deben ser distintas'; end if;
+  if v_id is not null and not exists (select 1 from public.inv_traslados where id = v_id and estado = 'grabado' and public.ve_sede(localidad_id)) then
+    raise exception 'Solo se puede modificar un traslado en estado Grabado (revierte la descarga primero)';
+  end if;
+  if v_id is null then
+    insert into public.inv_traslados (bodega_origen_id, bodega_destino_id, localidad_id, organizacion_id)
+    values (v_org.id, v_des.id, v_org.localidad_id, v_org.organizacion_id) returning id into v_id;
+  end if;
+  update public.inv_traslados set bodega_origen_id = v_org.id, bodega_destino_id = v_des.id,
+    descripcion = nullif(trim(p_datos ->> 'descripcion'), ''), aplica_conta = coalesce((p_datos ->> 'aplica_conta')::boolean, false)
+   where id = v_id;
+  delete from public.inv_traslado_items where traslado_id = v_id;
+  for e in select * from jsonb_array_elements(p_items) loop
+    if nullif(e ->> 'producto_id', '') is null then raise exception 'Cada línea necesita un producto del inventario'; end if;
+    if coalesce(nullif(e ->> 'cantidad', '')::numeric, 0) <= 0 then raise exception 'La cantidad de cada producto debe ser mayor que cero'; end if;
+    n := n + 1;
+    insert into public.inv_traslado_items (traslado_id, linea, producto_id, lote, vencimiento, cantidad, afecta_inventario)
+    values (v_id, n, (e ->> 'producto_id')::bigint, nullif(trim(e ->> 'lote'), ''), nullif(e ->> 'vencimiento', '')::date,
+            (e ->> 'cantidad')::numeric, coalesce((e ->> 'afecta_inventario')::boolean, true));
+  end loop;
+  return v_id;
+end;
+$$;
+revoke execute on function public.guardar_traslado(bigint, jsonb, jsonb) from public, anon;
+grant execute on function public.guardar_traslado(bigint, jsonb, jsonb) to authenticated;
+
+-- Descargar: salida de la bodega origen y entrada en la destino (al costo del producto). Exige existencia suficiente.
+create or replace function public.descargar_traslado(p_id bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare t public.inv_traslados; v_doc text; v_usuario text := (select usuario from public.perfiles where id = auth.uid()); f record;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select * into t from public.inv_traslados where id = p_id for update;
+  if t.id is null or not public.ve_sede(t.localidad_id) then raise exception 'El traslado no existe'; end if;
+  if t.estado <> 'grabado' then raise exception 'El traslado ya fue descargado'; end if;
+  for f in select i.producto_id, sum(i.cantidad) as cant, max(p.nombre) as nombre,
+                  coalesce((select sum(case when m.tipo = 'entrada' then m.cantidad else -m.cantidad end) from public.inv_movimientos m
+                             where m.producto_id = i.producto_id and m.bodega_id = t.bodega_origen_id), 0) as exist
+             from public.inv_traslado_items i join public.inv_productos p on p.id = i.producto_id
+            where i.traslado_id = p_id and i.afecta_inventario group by i.producto_id loop
+    if f.exist < f.cant then raise exception 'Existencia insuficiente de «%» en la bodega origen: hay %, se trasladan %', f.nombre, f.exist, f.cant; end if;
+  end loop;
+  v_doc := 'Traslado N.º ' || t.numero;
+  insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, traslado_id, documento, cantidad, costo_unitario, observaciones, usuario, localidad_id, organizacion_id)
+  select now(), i.producto_id, x.bodega, x.tipo, 'traslado', t.id, v_doc, i.cantidad, coalesce(p.costo, 0), t.descripcion, v_usuario, b.localidad_id, b.organizacion_id
+    from public.inv_traslado_items i join public.inv_productos p on p.id = i.producto_id
+    cross join (values (t.bodega_origen_id, 'salida', 1), (t.bodega_destino_id, 'entrada', 2)) as x(bodega, tipo, orden)
+    join public.inv_bodegas b on b.id = x.bodega
+   where i.traslado_id = p_id and i.afecta_inventario order by i.linea, x.orden;
+  update public.inv_traslados set estado = 'operado', fecha = now(), operado_en = now(), operado_por = v_usuario where id = p_id;
+end;
+$$;
+revoke execute on function public.descargar_traslado(bigint) from public, anon;
+grant execute on function public.descargar_traslado(bigint) to authenticated;
+
+-- Revertir: devuelve los productos a la bodega origen y el traslado vuelve a «Grabado» para corregirlo
+create or replace function public.revertir_traslado(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+declare t public.inv_traslados; v_usuario text := (select usuario from public.perfiles where id = auth.uid()); f record;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escribe el motivo de la reversión'; end if;
+  select * into t from public.inv_traslados where id = p_id for update;
+  if t.id is null or not public.ve_sede(t.localidad_id) then raise exception 'El traslado no existe'; end if;
+  if t.estado <> 'operado' then raise exception 'Solo se revierte un traslado descargado (Operado)'; end if;
+  -- Lo que entró al destino por este traslado y sigue neto se devuelve
+  for f in select m.producto_id, max(p.nombre) as nombre,
+                  sum(case when m.origen = 'traslado' then m.cantidad else -m.cantidad end) as neto,
+                  coalesce((select sum(case when k.tipo = 'entrada' then k.cantidad else -k.cantidad end) from public.inv_movimientos k
+                             where k.producto_id = m.producto_id and k.bodega_id = t.bodega_destino_id), 0) as exist
+             from public.inv_movimientos m join public.inv_productos p on p.id = m.producto_id
+            where m.traslado_id = p_id and m.bodega_id = t.bodega_destino_id group by m.producto_id loop
+    if f.neto > 0 and f.exist < f.neto then raise exception 'No se puede revertir: en la bodega destino solo quedan % de «%» (el traslado ingresó %)', f.exist, f.nombre, f.neto; end if;
+  end loop;
+  insert into public.inv_movimientos (fecha, producto_id, bodega_id, tipo, origen, traslado_id, documento, cantidad, costo_unitario, observaciones, usuario, localidad_id, organizacion_id)
+  select now(), producto_id, bodega_id, case when sum(case when tipo = 'entrada' then cantidad else -cantidad end) > 0 then 'salida' else 'entrada' end,
+         'reversion_traslado', p_id, 'Reversión · Traslado N.º ' || t.numero,
+         abs(sum(case when tipo = 'entrada' then cantidad else -cantidad end)), (array_agg(costo_unitario order by id desc))[1], trim(p_motivo), v_usuario, localidad_id, organizacion_id
+    from public.inv_movimientos where traslado_id = p_id
+   group by producto_id, bodega_id, localidad_id, organizacion_id
+  having sum(case when tipo = 'entrada' then cantidad else -cantidad end) <> 0;
+  update public.inv_traslados set estado = 'grabado', operado_en = null, operado_por = null, revertido_en = now(), revertido_por = v_usuario, revertido_motivo = trim(p_motivo) where id = p_id;
+end;
+$$;
+revoke execute on function public.revertir_traslado(bigint, text) from public, anon;
+grant execute on function public.revertir_traslado(bigint, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

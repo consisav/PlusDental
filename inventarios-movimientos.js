@@ -7,8 +7,8 @@
 
   var G = window.PD_GEO, esc = G.esc;
   var DOCS = [['factura', 'Factura'], ['recibo', 'Recibo'], ['nota_envio', 'Nota de envío'], ['otro', 'Otro']];
-  var ORIGENES = { compra: 'Compra', venta: 'Venta', ajuste: 'Ajuste', anulacion_compra: 'Anulación de compra', anulacion_venta: 'Anulación de venta', reversion_compra: 'Reversión de compra' };
-  var proveedores = [], bodegas = [], productos = [], compras = [], items = [], existencias = [], kardex = [], ultMovs = [], docsMov = { compras: [], pagos: [] };
+  var ORIGENES = { compra: 'Compra', venta: 'Venta', ajuste: 'Ajuste', anulacion_compra: 'Anulación de compra', anulacion_venta: 'Anulación de venta', reversion_compra: 'Reversión de compra', traslado: 'Traslado', reversion_traslado: 'Reversión de traslado' };
+  var proveedores = [], bodegas = [], productos = [], compras = [], items = [], existencias = [], kardex = [], ultMovs = [], docsMov = { compras: [], pagos: [], traslados: [] };
   var compraSel = null, prodSel = null, lineas = [], filtroCompra = 'todas', modoEdicion = false, lineaEdit = -1, PAG_C = 6, pagCompras = 1;
 
   function $(id) { return document.getElementById(id); }
@@ -579,8 +579,9 @@
   // Maestro: productos con su existencia en la bodega elegida (o en todas). Detalle: cada movimiento del producto con
   // documento interno y físico, lote, fabricación, vencimiento, cantidades, existencia por lote y del producto, y costos
   // (unitario, del movimiento, promedio ponderado y total). Lote y documentos salen de las compras y los pagos.
-  var MOVS = { compra: [1, 'Ingreso - compra'], anulacion_compra: [7, 'Anulación ingreso'], reversion_compra: [40, 'Reversión ingreso'], venta: [19, 'Salida - factura'], anulacion_venta: [20, 'Anulación - factura'], ajuste_entrada: [5, 'Ajuste entrada'], ajuste_salida: [6, 'Ajuste salida'] };
-  function tipoMov(m) { return MOVS[m.origen === 'ajuste' ? 'ajuste_' + m.tipo : m.origen] || [0, m.origen]; }
+  var MOVS = { compra: [1, 'Ingreso - compra'], anulacion_compra: [7, 'Anulación ingreso'], reversion_compra: [40, 'Reversión ingreso'], venta: [19, 'Salida - factura'], anulacion_venta: [20, 'Anulación - factura'], ajuste_entrada: [5, 'Ajuste entrada'], ajuste_salida: [6, 'Ajuste salida'],
+    traslado_entrada: [21, 'Traslado - ingreso'], traslado_salida: [22, 'Traslado - salida'], reversion_traslado_entrada: [41, 'Reversión traslado - ingreso'], reversion_traslado_salida: [42, 'Reversión traslado - salida'] };
+  function tipoMov(m) { return MOVS[/^(ajuste|traslado|reversion_traslado)$/.test(m.origen) ? m.origen + '_' + m.tipo : m.origen] || [0, m.origen]; }
   $('admInvKardex').innerHTML =
     '<div class="adm-pane"><div class="adm-pane-head"><h3 class="adm-h">Movimientos de productos en bodega (Kardex)</h3>' +
     '<div class="ik-acciones"><button type="button" id="ikImprimir" class="adm-btn">Imprimir</button><button type="button" id="ikAjuste" class="adm-btn adm-primary">Ajuste de inventario</button></div></div>' +
@@ -609,11 +610,13 @@
   }
   function operacion(m) {
     var t = { compra: ['Compra', 'ik-op-compra'], venta: ['Venta', 'ik-op-venta'], ajuste: [m.tipo === 'entrada' ? 'Ajuste (entrada)' : 'Ajuste (salida)', 'ik-op-ajuste'],
-      anulacion_compra: ['Anulación de compra', 'ik-op-anul'], reversion_compra: ['Reversión de compra', 'ik-op-anul'], anulacion_venta: ['Anulación de venta', 'ik-op-anul'] }[m.origen];
+      anulacion_compra: ['Anulación de compra', 'ik-op-anul'], reversion_compra: ['Reversión de compra', 'ik-op-anul'], anulacion_venta: ['Anulación de venta', 'ik-op-anul'],
+      traslado: [m.tipo === 'entrada' ? 'Traslado (entrada)' : 'Traslado (salida)', 'ik-op-traslado'], reversion_traslado: [m.tipo === 'entrada' ? 'Rev. traslado (entrada)' : 'Rev. traslado (salida)', 'ik-op-anul'] }[m.origen];
     return t || [ORIGENES[m.origen] || m.origen, 'ik-op-ajuste'];
   }
   function documentoMov(m) {
-    var c = m.compra_id ? porId(docsMov.compras, m.compra_id) : null, pg = m.pago_id ? porId(docsMov.pagos, m.pago_id) : null;
+    var c = m.compra_id ? porId(docsMov.compras, m.compra_id) : null, pg = m.pago_id ? porId(docsMov.pagos, m.pago_id) : null, tr = m.traslado_id ? porId(docsMov.traslados, m.traslado_id) : null;
+    if (tr) return ['Traslado N.º ' + tr.numero, nombreBod(tr.bodega_origen_id) + ' → ' + nombreBod(tr.bodega_destino_id)];
     if (c) return ['Compra N.º ' + c.numero, [(DOCS.filter(function (d) { return d[0] === c.tipo_documento; })[0] || ['', ''])[1], [c.serie, c.numero_documento].filter(Boolean).join('-')].filter(Boolean).join(' ')];
     if (pg) return [pg.tipo_documento === 'factura' && pg.numero_factura ? 'Factura ' + ['FE', pg.serie, pg.numero_factura].filter(Boolean).join('-') : 'Recibo REC-' + (pg.correlativo || pg.id), 'Cobro N.º ' + (pg.correlativo || pg.id)];
     return ['Ajuste N.º ' + m.id, m.observaciones || ''];
@@ -666,13 +669,15 @@
     var cs = idsC.length ? (await sb.from('inv_compras').select('id,numero,serie,numero_documento,tipo_documento').in('id', idsC)).data || [] : [];
     var its = idsC.length ? (await sb.from('inv_compra_items').select('compra_id,producto_id,lote,fecha_fabricacion,vencimiento').in('compra_id', idsC).eq('producto_id', p.id)).data || [] : [];
     var ps = idsP.length ? (await sb.from('pagos').select('id,correlativo,tipo_documento,serie,numero_factura').in('id', idsP)).data || [] : [];
+    var idsT = movs.map(function (m) { return m.traslado_id; }).filter(function (x, i, a) { return x && a.indexOf(x) === i; });
+    var ts = idsT.length ? (await sb.from('inv_traslados').select('id,numero,bodega_origen_id,bodega_destino_id').in('id', idsT)).data || [] : [];
     var exist = 0, prom = 0, porLote = {};
     movs.forEach(function (m, k) {
-      var c = m.compra_id ? porId(cs, m.compra_id) : null, it = m.compra_id ? its.filter(function (i) { return i.compra_id === m.compra_id; })[0] : null, pg = m.pago_id ? porId(ps, m.pago_id) : null;
+      var c = m.compra_id ? porId(cs, m.compra_id) : null, it = m.compra_id ? its.filter(function (i) { return i.compra_id === m.compra_id; })[0] : null, pg = m.pago_id ? porId(ps, m.pago_id) : null, tr = m.traslado_id ? porId(ts, m.traslado_id) : null;
       var n = Number(m.cantidad), cu = Number(m.costo_unitario || 0), entra = m.tipo === 'entrada';
       m.n = k + 1; m.mov = tipoMov(m);
-      m.interno = c ? c.numero : pg ? (pg.correlativo || pg.id) : m.id;
-      m.fisico = c ? [c.serie, c.numero_documento].filter(Boolean).join('-') : pg ? (pg.tipo_documento === 'factura' && pg.numero_factura ? 'FE-' + [pg.serie, pg.numero_factura].filter(Boolean).join('-') : 'REC-' + (pg.correlativo || pg.id)) : '';
+      m.interno = c ? c.numero : pg ? (pg.correlativo || pg.id) : tr ? tr.numero : m.id;
+      m.fisico = tr ? nombreBod(tr.bodega_origen_id) + ' → ' + nombreBod(tr.bodega_destino_id) : c ? [c.serie, c.numero_documento].filter(Boolean).join('-') : pg ? (pg.tipo_documento === 'factura' && pg.numero_factura ? 'FE-' + [pg.serie, pg.numero_factura].filter(Boolean).join('-') : 'REC-' + (pg.correlativo || pg.id)) : '';
       m.lote = it ? it.lote : ''; m.fab = it ? it.fecha_fabricacion : null; m.venc = it ? it.vencimiento : null;
       if (entra && exist + n > 0) prom = exist > 0 ? (exist * prom + n * cu) / (exist + n) : cu;
       exist += entra ? n : -n;
@@ -681,7 +686,7 @@
     });
     return movs;
   }
-  function prefijoDoc(m) { return /venta/.test(m.origen) ? 'Cobro ' : m.origen === 'ajuste' ? 'Ajuste ' : 'Compra '; }
+  function prefijoDoc(m) { return /venta/.test(m.origen) ? 'Cobro ' : m.origen === 'ajuste' ? 'Ajuste ' : /traslado/.test(m.origen) ? 'Traslado ' : 'Compra '; }
   function iniciales(u) { var p = String(u || '').replace(/@.*/, '').split(/[\s._-]+/).filter(Boolean); return ((p[0] || '?')[0] + (p[1] ? p[1][0] : (p[0] || '').slice(1, 2))).toUpperCase(); }
   // Celdas de un movimiento: [fecha, movimiento, documento, lote, cantidad, existencias, costos, promedio/total, usuario]
   function celdasKardex(m) {
@@ -748,19 +753,21 @@
   }
   // Movimientos más recientes primero (para el último movimiento de cada producto) y los documentos que los respaldan
   async function cargarUltimos() {
-    ultMovs = await todas(function () { return sb.from('inv_movimientos').select('id,producto_id,bodega_id,fecha,origen,tipo,cantidad,compra_id,pago_id,observaciones').order('fecha', { ascending: false }).order('id', { ascending: false }); });
+    ultMovs = await todas(function () { return sb.from('inv_movimientos').select('id,producto_id,bodega_id,fecha,origen,tipo,cantidad,compra_id,pago_id,traslado_id,observaciones').order('fecha', { ascending: false }).order('id', { ascending: false }); });
     ultMovs.sort(function (x, y) { return x.fecha < y.fecha ? 1 : x.fecha > y.fecha ? -1 : y.id - x.id; });
-    var vistos = {}, idsC = [], idsP = [];
+    var vistos = {}, idsC = [], idsP = [], idsT = [];
     ultMovs.forEach(function (m) {
       var k = m.producto_id + '-' + m.bodega_id, k2 = m.producto_id + '-*';
       if (vistos[k] && vistos[k2]) return;
       vistos[k] = vistos[k2] = true;
       if (m.compra_id && idsC.indexOf(m.compra_id) < 0) idsC.push(m.compra_id);
       if (m.pago_id && idsP.indexOf(m.pago_id) < 0) idsP.push(m.pago_id);
+      if (m.traslado_id && idsT.indexOf(m.traslado_id) < 0) idsT.push(m.traslado_id);
     });
     var r = await Promise.all([idsC.length ? sb.from('inv_compras').select('id,numero,serie,numero_documento,tipo_documento').in('id', idsC) : { data: [] },
-      idsP.length ? sb.from('pagos').select('id,correlativo,tipo_documento,serie,numero_factura').in('id', idsP) : { data: [] }]);
-    docsMov = { compras: r[0].data || [], pagos: r[1].data || [] };
+      idsP.length ? sb.from('pagos').select('id,correlativo,tipo_documento,serie,numero_factura').in('id', idsP) : { data: [] },
+      idsT.length ? sb.from('inv_traslados').select('id,numero,bodega_origen_id,bodega_destino_id').in('id', idsT) : { data: [] }]);
+    docsMov = { compras: r[0].data || [], pagos: r[1].data || [], traslados: r[2].data || [] };
   }
   function llenarProductosKdx() {
     var sel = +$('ikProducto').value || null, inactivos = $('ikInactivos').checked;
@@ -770,7 +777,7 @@
   async function cargarKardex() {
     aviso('ikMsg', '');
     try { await cargarCatalogos(); await cargarExistencias(); } catch (e) { productos = []; existencias = []; $('ikExist').innerHTML = ''; aviso('ikMsg', traducir(e), true); return; }
-    try { await cargarUltimos(); } catch (e) { ultMovs = []; docsMov = { compras: [], pagos: [] }; }
+    try { await cargarUltimos(); } catch (e) { ultMovs = []; docsMov = { compras: [], pagos: [], traslados: [] }; }
     var antes = $('ikBodega').options.length ? bodKardex() : bodegaGeneral();
     $('ikBodega').innerHTML = '<option value="">Todas las bodegas</option>' + opcionesBodega(antes);
     $('ikBodega').value = antes ? String(antes) : '';
