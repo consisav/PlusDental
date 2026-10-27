@@ -587,8 +587,9 @@
       '<label class="ik-campo"><span>Bodega</span><select id="ikBodega" class="adm-input"></select></label>' +
       '<label class="ik-campo"><span>Fecha inicial</span><input id="ikDesde" type="date" class="adm-input"></label>' +
       '<label class="ik-campo"><span>Fecha final</span><input id="ikHasta" type="date" class="adm-input"></label>' +
-      '<label class="ik-campo ik-buscar"><span>Producto</span><input id="ikBuscar" type="search" class="adm-input" placeholder="Código, nombre o principio activo" aria-label="Buscar producto"></label>' +
+      '<label class="ik-campo ik-producto"><span>Producto</span><select id="ikProducto" class="adm-input"><option value="">Todos los productos</option></select></label>' +
       '<div class="ik-campo"><span>Mostrar</span><div class="inv-filtros" id="ikFiltro">' + [['con', 'Con movimientos'], ['minimo', 'Bajo el mínimo'], ['todos', 'Todos']].map(function (o, i) { return '<button type="button" class="adm-btn geo-mini" data-valor="' + o[0] + '" aria-pressed="' + (i === 0) + '">' + o[1] + '</button>'; }).join('') + '</div></div>' +
+      '<label class="ik-campo ik-buscar"><span>Buscar en la lista</span><input id="ikBuscar" type="search" class="adm-input" placeholder="Código, nombre o principio activo" aria-label="Buscar producto"></label>' +
       '<label class="ik-check"><input id="ikInactivos" type="checkbox"> Incluir inactivos</label>' +
     '</div>' +
     // Maestro
@@ -620,7 +621,8 @@
     var t = norm($('ikBuscar').value), bod = bodKardex(), inactivos = $('ikInactivos').checked;
     var conMov = {};
     existencias.forEach(function (x) { if (!bod || x.bodega_id === bod) conMov[x.producto_id] = true; });
-    var l = productos.filter(function (p) {
+    var unico = +$('ikProducto').value || null;
+    var l = unico ? productos.filter(function (p) { return p.id === unico; }) : productos.filter(function (p) {
       if (!inactivos && p.estado !== 'activo') return false;
       if (t && norm([p.numero, p.codigo, p.nombre, p.principio_activo, p.tipo_producto].join(' ')).indexOf(t) < 0) return false;
       var ex = existencia(p.id, bod);
@@ -628,6 +630,7 @@
       if (filtroKardex === 'minimo') return p.minimo != null && ex < Number(p.minimo);
       return true;
     });
+    $('ikFiltro').classList.toggle('ik-apagado', !!unico); $('ikBuscar').disabled = !!unico;
     var valor = l.reduce(function (t, p) { return t + existencia(p.id, bod) * Number(p.costo || 0); }, 0);
     var paginas = Math.max(1, Math.ceil(l.length / PAG_KDX));
     pagKdx = Math.min(Math.max(1, pagKdx), paginas);
@@ -741,6 +744,11 @@
       idsP.length ? sb.from('pagos').select('id,correlativo,tipo_documento,serie,numero_factura').in('id', idsP) : { data: [] }]);
     docsMov = { compras: r[0].data || [], pagos: r[1].data || [] };
   }
+  function llenarProductosKdx() {
+    var sel = +$('ikProducto').value || null, inactivos = $('ikInactivos').checked;
+    $('ikProducto').innerHTML = '<option value="">Todos los productos</option>' + productos.filter(function (p) { return inactivos || p.estado === 'activo' || p.id === sel; }).map(function (p) {
+      return '<option value="' + p.id + '"' + (p.id === sel ? ' selected' : '') + '>' + esc((p.codigo ? p.codigo + ' · ' : '') + p.nombre + (p.estado !== 'activo' ? ' (inactivo)' : '')) + '</option>'; }).join('');
+  }
   async function cargarKardex() {
     aviso('ikMsg', '');
     try { await cargarCatalogos(); await cargarExistencias(); } catch (e) { productos = []; existencias = []; $('ikExist').innerHTML = ''; aviso('ikMsg', traducir(e), true); return; }
@@ -749,6 +757,7 @@
     $('ikBodega').innerHTML = '<option value="">Todas las bodegas</option>' + opcionesBodega(antes);
     $('ikBodega').value = antes ? String(antes) : '';
     if (!$('ikHasta').value) $('ikHasta').value = hoy();
+    llenarProductosKdx();
     pintarExistencias();
     if (prodSel) pintarKardex();
   }
@@ -774,7 +783,8 @@
   $('ikAjuste').addEventListener('click', function () { ajuste(prodSel); });
   $('ikBodega').addEventListener('change', function () { pintarExistencias(); pintarKardex(); });
   $('ikBuscar').addEventListener('input', function () { pagKdx = 1; pintarExistencias(); });
-  $('ikInactivos').addEventListener('change', function () { pagKdx = 1; pintarExistencias(); });
+  $('ikInactivos').addEventListener('change', function () { pagKdx = 1; llenarProductosKdx(); pintarExistencias(); });
+  $('ikProducto').addEventListener('change', function () { pagKdx = 1; var id = +this.value || null; if (id) prodSel = id; pintarExistencias(); if (id) pintarKardex(); });
   $('ikPaginas').addEventListener('click', function (e) { var b = e.target.closest('[data-pag]'); if (b && !b.disabled) { pagKdx = +b.dataset.pag; pintarExistencias(); } });
   ['ikDesde', 'ikHasta'].forEach(function (id) { $(id).addEventListener('change', pintarKardex); });
   $('ikImprimir').addEventListener('click', imprimirKardex);
