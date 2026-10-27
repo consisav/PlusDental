@@ -104,10 +104,15 @@
     var v = o ? Object.assign({}, o) : { codigo: 'Se asigna al grabar', estado: 'activo', pais_id: guatemala() };
     G.dialogo({
       eyebrow: 'Organizaciones', titulo: o ? o.nombre : 'Nueva organización', valores: v,
-      campos: [{ k: 'codigo', label: 'Código de organización (automático)', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
+      campos: [{ k: 'codigo', label: 'Código', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
         { k: 'nombre', label: 'Nombre de la organización', req: true, max: 150, ancho: 'full' },
         { k: 'representante', label: 'Representante legal', max: 150 }, { k: 'telefonos', label: 'Teléfonos', max: 120 }, { k: 'correos', label: 'Correos', max: 200, ancho: 'full' },
         { k: 'direccion', label: 'Dirección', tipo: 'textarea', max: 300, ancho: 'full' }].concat(camposUbicacion()),
+      secciones: [
+        { titulo: 'Identificación', campos: ['codigo', 'estado', 'nombre', 'representante*'] },
+        { titulo: 'Contacto', campos: ['telefonos*', 'correos', 'direccion'] },
+        { titulo: 'Ubicación', campos: ['pais_id*', 'estado_id*', 'municipio_id*'] }
+      ],
       alAbrir: function () { G.encadenar('pais_id', 'estado_id', 'municipio_id')(v); colorEstado(); },
       guardar: async function (d) {
         d = ids(d);
@@ -138,13 +143,18 @@
     var v = l ? Object.assign({}, l, { codigo: codigoLoc(l) }) : { codigo: o.codigo + '-' + String(locs.reduce(function (m, x) { return Math.max(m, parseInt(x.codigo, 10) || 0); }, 0) + 1).padStart(2, '0') + ' (se confirma al grabar)', estado: 'activo', pais_id: o.pais_id || guatemala(), estado_id: o.estado_id, municipio_id: o.municipio_id };
     G.dialogo({
       eyebrow: 'Organizaciones · ' + o.nombre, titulo: l ? (l.nombre_comercial || l.razon_social) : 'Nueva localidad', valores: v,
-      campos: [{ k: 'codigo', label: 'Código de localidad (automático)', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
+      campos: [{ k: 'codigo', label: 'Código', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
         { k: 'nit', label: 'NIT', max: 20, placeholder: '1234567-8' },
         { k: 'razon_social', label: 'Razón social', req: true, max: 200, ancho: 'full' }, { k: 'nombre_comercial', label: 'Nombre comercial', max: 150 },
         { k: 'representante', label: 'Representante legal', max: 150 }, { k: 'codigo_patrono', label: 'Código patronal', max: 30 }, { k: 'telefonos', label: 'Teléfonos', max: 120 },
         { k: 'correos', label: 'Correos', max: 200, ancho: 'full' }].concat(camposUbicacion()).concat([
         { k: 'direccion', label: 'Detalle de dirección', tipo: 'textarea', max: 300, ancho: 'full' },
         { k: 'logo_archivo', label: l && l.logo ? 'Cambiar logo' : 'Logo', tipo: 'file', accept: 'image/png,image/jpeg,image/webp', ayuda: 'PNG, JPG o WEBP de hasta 2 MB.', ancho: 'full' }]),
+      secciones: [
+        { titulo: 'Identificación', campos: ['codigo', 'estado', 'razon_social', 'nombre_comercial*', 'nit', 'codigo_patrono', 'representante*'] },
+        { titulo: 'Contacto y ubicación', campos: ['telefonos*', 'correos', 'pais_id*', 'estado_id', 'municipio_id', 'direccion'] },
+        { titulo: 'Logo', campos: ['logo_archivo'] }
+      ],
       alAbrir: function () { G.encadenar('pais_id', 'estado_id', 'municipio_id')(v); colorEstado(); },
       guardar: async function (d) {
         var archivo = d.logo_archivo; delete d.logo_archivo;

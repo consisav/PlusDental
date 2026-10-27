@@ -64,7 +64,9 @@
       var usados = {};
       var html = cfg.secciones.map(function (s) {
         return '<fieldset class="geo-sec"><legend>' + esc(s.titulo) + '</legend><div class="geo-sec-g">' + s.campos.map(function (k) {
-          var c = cfg.campos.filter(function (x) { return x.k === k; })[0]; if (!c) return ''; usados[k] = true; return campoHtml(c, val[c.k]); }).join('') + '</div></fieldset>';
+          var ancho = /\*$/.test(k); k = k.replace(/\*$/, '');
+          var c = cfg.campos.filter(function (x) { return x.k === k; })[0]; if (!c) return ''; usados[k] = true;
+          return campoHtml(ancho ? Object.assign({}, c, { ancho: 'full' }) : c, val[c.k]); }).join('') + '</div></fieldset>';
       }).join('');
       var resto = cfg.campos.filter(function (c) { return !usados[c.k]; });
       $('geoDlgCampos').innerHTML = '<div class="geo-secs">' + html + '</div>' + resto.map(function (c) { return campoHtml(c, val[c.k]); }).join('');

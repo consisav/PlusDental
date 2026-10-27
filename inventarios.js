@@ -158,15 +158,20 @@
     var v = b ? Object.assign({}, b) : { estado: 'activo', tipo: 'general', tipo_precio: 'directo', permite_carga_directa: true };
     G.dialogo({
       eyebrow: 'Inventarios · Bodega', titulo: b ? b.nombre : 'Nueva bodega', valores: v,
-      campos: [{ k: 'numero', label: 'N.º de bodega (automático)', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
+      campos: [{ k: 'numero', label: 'N.º bodega', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
         { k: 'nombre', label: 'Nombre de la bodega', req: true, max: 120, ancho: 'full' },
         { k: 'tipo', label: 'Tipo', tipo: 'select', opciones: [['general', 'General'], ['sub', 'Sub-bodega']] },
-        { k: 'bodega_mayor_id', label: 'Bodega mayor (para sub-bodegas)', tipo: 'select', opciones: [['', '—']].concat(bodegas.filter(function (x) { return !b || x.id !== b.id; }).map(function (x) { return [x.id, x.numero + ' · ' + x.nombre]; })) },
+        { k: 'bodega_mayor_id', label: 'Bodega mayor', ayuda: 'Solo para sub-bodegas', tipo: 'select', opciones: [['', '—']].concat(bodegas.filter(function (x) { return !b || x.id !== b.id; }).map(function (x) { return [x.id, x.numero + ' · ' + x.nombre]; })) },
         { k: 'siglas', label: 'Siglas', max: 10, placeholder: 'GEN' }, { k: 'encargado', label: 'Encargado', max: 120 },
         { k: 'direccion', label: 'Dirección', tipo: 'textarea', max: 300, ancho: 'full' },
         { k: 'tipo_precio', label: 'Tipo de precio por defecto', tipo: 'select', opciones: TIPOS },
         { k: 'sede', tipo: 'sede' },
         { k: 'permite_carga_directa', label: '¿Permitir carga directa?', tipo: 'check' }, { k: 'consignacion', label: '¿Bodega de consignación?', tipo: 'check' }],
+      secciones: [
+        { titulo: 'Identificación', campos: ['numero', 'estado', 'nombre', 'tipo', 'bodega_mayor_id', 'siglas', 'encargado'] },
+        { titulo: 'Ubicación', campos: ['direccion', 'sede'] },
+        { titulo: 'Configuración', campos: ['tipo_precio*', 'permite_carga_directa*', 'consignacion*'] }
+      ],
       alAbrir: function () { if (!b) $('geoF_numero').textContent = 'Se asigna al grabar'; },
       guardar: async function (d) {
         d.bodega_mayor_id = d.bodega_mayor_id ? +d.bodega_mayor_id : null;
@@ -304,19 +309,24 @@
     var v = p ? Object.assign({}, p) : { estado: 'activo', bodega_id: (bodegas.filter(function (b) { return b.tipo === 'general' && b.estado === 'activo'; })[0] || {}).id };
     G.dialogo({
       eyebrow: 'Inventarios · Producto', titulo: p ? p.nombre : 'Nuevo producto', valores: v,
-      campos: [{ k: 'numero', label: 'N.º de artículo (automático)', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
+      campos: [{ k: 'numero', label: 'N.º artículo', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
         { k: 'codigo', label: 'Código de producto', max: 40, placeholder: 'AMX-500' }, { k: 'codigo_barras', label: 'Código de barras', max: 60 },
         { k: 'nombre', label: 'Nombre del producto', req: true, max: 200, ancho: 'full' },
         { k: 'clasificacion', label: 'Clasificación', max: 80, lista: CLASIFICACIONES }, { k: 'tipo_producto', label: 'Tipo de producto', max: 80, placeholder: 'Ej.: Antibióticos', lista: tiposProd.filter(function (x) { return x.estado === 'activo'; }).map(function (x) { return x.nombre; }) },
-        { k: 'principio_activo', label: 'Principio activo (medicamentos)', max: 150 }, { k: 'marca', label: 'Marca', max: 80 },
+        { k: 'principio_activo', label: 'Principio activo', max: 150 }, { k: 'marca', label: 'Marca', max: 80 },
         { k: 'presentacion', label: 'Presentación', max: 80, lista: PRESENTACIONES }, { k: 'unidad', label: 'Unidad de medida', max: 40, lista: UNIDADES },
         { k: 'proveedor_id', label: 'Proveedor principal', tipo: 'select', opciones: [['', '—']].concat(proveedores.filter(function (x) { return x.estado === 'activo' || (p && x.id === p.proveedor_id); }).map(function (x) { return [x.id, x.nombre_comercial]; })) },
         { k: 'bodega_id', label: 'Bodega', tipo: 'select', opciones: [['', '—']].concat(bodegas.filter(function (x) { return x.estado === 'activo' || (p && x.id === p.bodega_id); }).map(function (x) { return [x.id, x.numero + ' · ' + x.nombre]; })) },
-        { k: 'costo', label: 'Precio de costo (Q)', tipo: 'number', paso: '0.01' }, { k: 'precio_referencia', label: 'Precio de referencia (Q, estimado)', tipo: 'number', paso: '0.01' }, { k: 'minimo', label: 'Mínimo', tipo: 'number', paso: '0.01' }, { k: 'maximo', label: 'Máximo', tipo: 'number', paso: '0.01' },
+        { k: 'costo', label: 'Precio de costo (Q)', tipo: 'number', paso: '0.01' }, { k: 'precio_referencia', label: 'Precio ref. (Q, estimado)', tipo: 'number', paso: '0.01' }, { k: 'minimo', label: 'Mínimo', tipo: 'number', paso: '0.01' }, { k: 'maximo', label: 'Máximo', tipo: 'number', paso: '0.01' },
         { k: 'estante', label: 'Estante', max: 20 }, { k: 'fila', label: 'Fila', max: 20 }, { k: 'bloque', label: 'Bloque', max: 20 },
         { k: 'sede', tipo: 'sede' },
         { k: 'generico', label: '¿Es genérico?', tipo: 'check' }, { k: 'control_minimo', label: 'Administrar punto mínimo', tipo: 'check' },
         { k: 'foto_archivo', label: p && p.foto ? 'Cambiar imagen' : 'Imagen', tipo: 'file', accept: 'image/png,image/jpeg,image/webp', ayuda: 'PNG, JPG o WEBP de hasta 2 MB.', ancho: 'full' }],
+      secciones: [
+        { titulo: 'Identificación', campos: ['numero', 'estado', 'codigo', 'codigo_barras', 'nombre', 'clasificacion', 'tipo_producto', 'principio_activo', 'marca', 'presentacion', 'unidad'] },
+        { titulo: 'Abastecimiento y existencias', campos: ['proveedor_id*', 'bodega_id', 'costo', 'precio_referencia', 'minimo', 'maximo', 'generico', 'control_minimo'] },
+        { titulo: 'Ubicación e imagen', campos: ['estante', 'fila', 'bloque', 'sede', 'foto_archivo'] }
+      ],
       alAbrir: function () {
         if (!p) $('geoF_numero').textContent = 'Se asigna al grabar';
         // Imagen actual del producto al final del formulario; si no tiene foto, se pide subir el archivo
