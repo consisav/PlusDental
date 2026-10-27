@@ -1491,6 +1491,14 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 </div>
 <div class="adm-g">
+<button type="button" class="adm-grupo" id="grpAgendas" aria-expanded="false" aria-controls="grpAgendasItems">Agendas<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-g-items" id="grpAgendasItems" role="presentation">
+<button type="button" role="tab" id="tabAgenda" data-tab="admAgenda" aria-selected="false" aria-controls="admAgenda">Administrar citas</button>
+<button type="button" role="tab" id="tabVerCitas" data-tab="admVerCitas" aria-selected="false" aria-controls="admVerCitas">Visualizar citas</button>
+<button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
+</div>
+</div>
+<div class="adm-g">
 <button type="button" class="adm-grupo" id="grpCatalogos" aria-expanded="false" aria-controls="grpCatalogosItems">Catálogos iniciales<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-g-items" id="grpCatalogosItems" role="presentation">
 <div class="adm-sg">
@@ -1568,14 +1576,6 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" role="tab" id="tabInvKardex" data-tab="admInvKardex" aria-selected="false" aria-controls="admInvKardex" class="adm-sub-item">Movimiento Kardex</button>
 </div>
 </div>
-</div>
-</div>
-<div class="adm-g">
-<button type="button" class="adm-grupo" id="grpAgendas" aria-expanded="false" aria-controls="grpAgendasItems">Agendas<span class="adm-chev" aria-hidden="true"></span></button>
-<div class="adm-g-items" id="grpAgendasItems" role="presentation">
-<button type="button" role="tab" id="tabAgenda" data-tab="admAgenda" aria-selected="false" aria-controls="admAgenda">Administrar citas</button>
-<button type="button" role="tab" id="tabVerCitas" data-tab="admVerCitas" aria-selected="false" aria-controls="admVerCitas">Visualizar citas</button>
-<button type="button" role="tab" id="tabCitas" data-tab="admCitas" aria-selected="true" aria-controls="admCitas">Historial de citas <span id="nPend" class="adm-count" hidden></span></button>
 </div>
 </div>
 <div class="adm-g">
