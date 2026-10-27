@@ -332,6 +332,7 @@
           : 'No tiene saldo pendiente. El pago quedará como saldo a favor.';
     }
     $('pgPresupuesto').innerHTML = '<option value="">Sin presupuesto</option>';
+    if (presItems.length) { presItems = []; pintarDetalle(); }
     $('pgNit').value = ''; $('pgNitNota').hidden = true;
     if (!pid) return;
     // NIT del expediente del paciente (no se modifica aquí; sin NIT se usa CF, consumidor final)
@@ -344,6 +345,8 @@
     var r = await sb.from('presupuestos').select('id,fecha').eq('paciente_id', pid).eq('estado', 'aprobado').order('id', { ascending: false });
     if (r.error || $('pgPaciente').value !== pid) return;
     $('pgPresupuesto').innerHTML += r.data.map(function (p) { return '<option value="' + p.id + '">N.º ' + p.id + ' · ' + fechaCorta(p.fecha) + '</option>'; }).join('');
+    if (r.data.length) $('pgPresupuesto').value = String(r.data[0].id);
+    cargarItemsPresupuesto();
   }
 
   // ---------- Detalle del pago ----------
@@ -378,24 +381,55 @@
   function textoExistencia(l) {
     if (!l.producto_id) return '';
     var ex = invExist[l.producto_id] || 0, falta = pedido(l.producto_id) > ex;
-    return '<span class="pg-stock' + (falta ? ' falta' : '') + '">Existencia: ' + ex + (falta ? ' · no alcanza (se registrará igual)' : '') + '</span>';
+    return '<span class="pg-stock' + (falta ? ' falta' : '') + '" title="' + (falta ? 'La existencia en bodega no alcanza; el pago se registrará igual' : 'Existencia en la bodega general') + '">Exist. ' + ex + (falta ? ' · no alcanza' : '') + '</span>';
   }
-  function lineaNueva(monto) { return { tipo: 'procedimiento', tipo_procedimiento_id: '', producto_id: '', producto_texto: '', cantidad: '1', clasificacion: 'bien', monto: monto || '', monto_usd: '' }; }
+  function lineaNueva(monto) { return { tipo: 'procedimiento', item_id: '', tipo_procedimiento_id: '', producto_id: '', producto_texto: '', cantidad: '1', clasificacion: 'bien', monto: monto || '', monto_usd: '' }; }
+  // Procedimientos del presupuesto actual (el elegido en «Presupuesto»); al elegir uno se proponen su tipo y su monto
+  var presItems = [], tipoDeTrat = {};
+  function normT(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim(); }
+  async function cargarItemsPresupuesto() {
+    var id = $('pgPresupuesto').value;
+    presItems = [];
+    if (id) {
+      var r = await Promise.all([sb.from('presupuesto_items').select('id,orden,tratamiento,pieza,cantidad,precio,realizado').eq('presupuesto_id', +id).order('orden').order('id'),
+        Object.keys(tipoDeTrat).length ? null : sb.from('tratamientos').select('nombre,tipo_id')]);
+      if ($('pgPresupuesto').value !== id) return;
+      presItems = r[0].error ? [] : r[0].data;
+      if (r[1] && !r[1].error) r[1].data.forEach(function (t) { if (t.tipo_id) tipoDeTrat[normT(t.nombre)] = t.tipo_id; });
+    }
+    // Las líneas que venían de otro presupuesto pierden el procedimiento elegido
+    lineas.forEach(function (l) { if (l.item_id && !presItems.some(function (x) { return String(x.id) === String(l.item_id); })) l.item_id = ''; });
+    pintarDetalle();
+  }
+  function textoItem(x) { return x.tratamiento + (x.pieza ? ' · pieza ' + x.pieza : '') + (x.cantidad > 1 ? ' ×' + x.cantidad : '') + ' · ' + q(x.precio * x.cantidad) + (x.realizado ? ' · realizado' : ''); }
+  function tipoDeItem(x) { var t = normT(x.tratamiento); if (tipoDeTrat[t]) return tipoDeTrat[t]; var k = Object.keys(tipoDeTrat).filter(function (n) { return n && (t.indexOf(n) === 0 || n.indexOf(t) === 0); })[0]; return k ? tipoDeTrat[k] : ''; }
+  function opcionesProc(l) {
+    var tipos = tiposProc.map(function (t) { return '<option value="t:' + t.id + '"' + (!l.item_id && String(l.tipo_procedimiento_id) === String(t.id) ? ' selected' : '') + '>' + esc(t.nombre) + '</option>'; }).join('');
+    if (!presItems.length) return '<option value="">' + ($('pgPresupuesto').value ? 'Elige el tipo de procedimiento…' : 'Elige un tipo de procedimiento…') + '</option>' + tipos;
+    return '<option value="">Elige el procedimiento…</option><optgroup label="Presupuesto N.º ' + esc($('pgPresupuesto').value) + '">' +
+      presItems.map(function (x) { return '<option value="i:' + x.id + '"' + (String(l.item_id) === String(x.id) ? ' selected' : '') + '>' + esc(textoItem(x)) + '</option>'; }).join('') +
+      '</optgroup><optgroup label="Otros tipos de procedimiento">' + tipos + '</optgroup>';
+  }
   function pintarDetalle() {
     if (!lineas.length) lineas.push(lineaNueva());
     $('pgDetalle').innerHTML = lineas.map(function (l, k) {
+      var prod = l.tipo === 'producto', sinTipo = !prod && l.item_id && !l.tipo_procedimiento_id;
       return '<tr data-linea="' + k + '"><td class="pg-linea">' + (k + 1) + '</td>' +
-        '<td><div class="pg-tipo-linea">' + (invProductos.length ? '<select data-pl="tipo" aria-label="Procedimiento o producto en la línea ' + (k + 1) + '"><option value="procedimiento"' + (l.tipo !== 'producto' ? ' selected' : '') + '>Procedimiento</option><option value="producto"' + (l.tipo === 'producto' ? ' selected' : '') + '>Producto</option></select>' : '') +
-        (l.tipo === 'producto'
-          ? '<input data-pl="producto_texto" list="pgProdOpciones" value="' + esc(l.producto_texto) + '" placeholder="Código o nombre del producto" aria-label="Producto de la línea ' + (k + 1) + '">'
-          : '<select data-pl="tipo_procedimiento_id" aria-label="Tipo de procedimiento de la línea ' + (k + 1) + '"><option value="">Elige un tipo…</option>' +
-            tiposProc.map(function (t) { return '<option value="' + t.id + '"' + (String(l.tipo_procedimiento_id) === String(t.id) ? ' selected' : '') + '>' + esc(t.nombre) + '</option>'; }).join('') + '</select>') + '</div>' +
-        (l.tipo === 'producto' ? '<div class="pg-prod-extra"><label>Cantidad <input data-pl="cantidad" type="number" min="0.01" step="0.01" inputmode="decimal" value="' + esc(l.cantidad) + '" aria-label="Cantidad del producto de la línea ' + (k + 1) + '"></label><span data-stock>' + textoExistencia(l) + '</span></div>' : '') + '</td>' +
-        '<td><select data-pl="clasificacion" aria-label="Clasificación de la línea ' + (k + 1) + '">' +
+        '<td><div class="pg-fila' + (prod ? ' es-prod' : '') + '">' +
+          (invProductos.length ? '<select data-pl="tipo" class="pg-clase" aria-label="Procedimiento o producto en la línea ' + (k + 1) + '"><option value="procedimiento"' + (!prod ? ' selected' : '') + '>Procedimiento</option><option value="producto"' + (prod ? ' selected' : '') + '>Producto</option></select>' : '') +
+          (prod
+            ? '<input data-pl="producto_texto" class="pg-principal" list="pgProdOpciones" value="' + esc(l.producto_texto) + '" placeholder="Código o nombre del producto" aria-label="Producto de la línea ' + (k + 1) + '">' +
+              '<label class="pg-cant" title="Cantidad"><span>Cant.</span><input data-pl="cantidad" placeholder="Cant." type="number" min="0.01" step="0.01" inputmode="decimal" value="' + esc(l.cantidad) + '" aria-label="Cantidad del producto de la línea ' + (k + 1) + '"></label>' +
+              '<span data-stock>' + textoExistencia(l) + '</span>'
+            : '<select data-pl="proc" class="pg-principal" aria-label="Procedimiento de la línea ' + (k + 1) + '">' + opcionesProc(l) + '</select>' +
+              (sinTipo ? '<select data-pl="tipo_procedimiento_id" class="pg-tipo-falta" aria-label="Tipo de procedimiento de la línea ' + (k + 1) + '" title="El tratamiento no tiene tipo de procedimiento en el catálogo: elígelo"><option value="">Tipo…</option>' +
+                tiposProc.map(function (t) { return '<option value="' + t.id + '"' + (String(l.tipo_procedimiento_id) === String(t.id) ? ' selected' : '') + '>' + esc(t.nombre) + '</option>'; }).join('') + '</select>' : '')) +
+        '</div></td>' +
+        '<td><select data-pl="clasificacion" class="pg-clasif" aria-label="Clasificación de la línea ' + (k + 1) + '">' +
         Object.keys(CLASIF).map(function (c) { return '<option value="' + c + '"' + (l.clasificacion === c ? ' selected' : '') + '>' + CLASIF[c] + '</option>'; }).join('') + '</select></td>' +
         '<td class="num"><input data-pl="monto" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(l.monto) + '" placeholder="0.00" aria-label="Monto en quetzales de la línea ' + (k + 1) + '"></td>' +
         '<td class="num"><input data-pl="monto_usd" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(l.monto_usd) + '" placeholder="0.00" aria-label="Monto en dólares de la línea ' + (k + 1) + '"></td>' +
-        '<td>' + (lineas.length > 1 ? '<button type="button" class="adm-btn" data-quitar-linea="' + k + '">Quitar</button>' : '') + '</td></tr>';
+        '<td class="pg-acc">' + (lineas.length > 1 ? '<button type="button" class="pg-quitar" data-quitar-linea="' + k + '" aria-label="Quitar la línea ' + (k + 1) + '" title="Quitar línea">×</button>' : '') + '</td></tr>';
     }).join('');
     $('pgProdOpciones').innerHTML = invProductos.map(function (p) { return '<option value="' + esc(etiquetaProd(p)) + '"></option>'; }).join('');
     pintarTotalesDetalle();
@@ -471,6 +505,7 @@
   });
 
   $('pgPaciente').addEventListener('change', alElegirPaciente);
+  $('pgPresupuesto').addEventListener('change', cargarItemsPresupuesto);
   $('pgMetodo').addEventListener('change', function () { $('pgRefWrap').hidden = this.value === 'efectivo'; });
   // Detalle: cambios en las líneas, agregar y quitar
   $('pgDetalle').addEventListener('input', function (e) {
@@ -497,7 +532,14 @@
   $('pgDetalle').addEventListener('change', function (e) {
     var c = e.target.closest('select[data-pl]');
     if (!c) return;
-    lineas[+c.closest('tr').dataset.linea][c.dataset.pl] = c.value;
+    var l = lineas[+c.closest('tr').dataset.linea];
+    if (c.dataset.pl === 'proc') {
+      var v = c.value, it = v.indexOf('i:') === 0 ? presItems.filter(function (x) { return 'i:' + x.id === v; })[0] : null;
+      if (it) { l.item_id = it.id; l.tipo_procedimiento_id = tipoDeItem(it); l.clasificacion = 'servicio'; l.monto = (Number(it.precio) * Number(it.cantidad)).toFixed(2); }
+      else { l.item_id = ''; l.tipo_procedimiento_id = v.indexOf('t:') === 0 ? v.slice(2) : ''; }
+      pintarDetalle(); return;
+    }
+    l[c.dataset.pl] = c.value;
     if (c.dataset.pl === 'tipo') pintarDetalle();
   });
   $('pgDetalle').addEventListener('click', function (e) {
@@ -507,7 +549,7 @@
   $('pgAgregarLinea').addEventListener('click', function () {
     lineas.push(lineaNueva());
     pintarDetalle();
-    var s = $('pgDetalle').querySelectorAll('select[data-pl="tipo_procedimiento_id"]');
+    var s = $('pgDetalle').querySelectorAll('select[data-pl="proc"]');
     s[s.length - 1].focus();
   });
   $('pgEstado').addEventListener('change', pintarEstadoNuevo);
@@ -518,7 +560,7 @@
     if (!$('pgPaciente').value) { aviso('pgMsg', 'Elige un paciente.', true); $('pgPaciente').focus(); return; }
     var usadas = lineas.filter(function (l) { return Number(l.monto) > 0 || Number(l.monto_usd) > 0 || l.tipo_procedimiento_id || l.producto_id || l.producto_texto; });
     if (!usadas.length) { aviso('pgMsg', 'Agrega al menos una línea al detalle del pago.', true); return; }
-    if (usadas.some(function (l) { return l.tipo !== 'producto' && !l.tipo_procedimiento_id; })) { aviso('pgMsg', 'Elige el tipo de procedimiento en cada línea del detalle.', true); return; }
+    if (usadas.some(function (l) { return l.tipo !== 'producto' && !l.tipo_procedimiento_id; })) { aviso('pgMsg', 'Elige el procedimiento en cada línea del detalle (y su tipo, si el tratamiento del presupuesto no lo tiene).', true); return; }
     if (usadas.some(function (l) { return l.tipo === 'producto' && !l.producto_id; })) { aviso('pgMsg', 'Elige cada producto de la lista (escribe el código o el nombre y selecciónalo).', true); return; }
     if (usadas.some(function (l) { return l.tipo === 'producto' && !(Number(l.cantidad) > 0); })) { aviso('pgMsg', 'La cantidad de cada producto debe ser mayor que cero.', true); return; }
     var faltan = usadas.filter(function (l) { return l.tipo === 'producto' && pedido(l.producto_id) > (invExist[l.producto_id] || 0); });
