@@ -7172,6 +7172,94 @@ revoke execute on function public.puede_pagar_comisiones() from public, anon;
 grant execute on function public.puede_pagar_comisiones() to authenticated;
 -- (registrar_pago_comision, arriba, valida: if not public.puede_pagar_comisiones() then raise exception ...)
 
+-- ===== Generar comisiones: «Pagar» traslada las autorizadas a Pagar Comisiones y «Revertir» las saca (si no se han pagado) =====
+alter table public.comisiones_generadas add column if not exists trasladado boolean not null default false;
+alter table public.comisiones_generadas add column if not exists trasladado_en timestamptz;
+alter table public.comisiones_generadas add column if not exists trasladado_por text;
+
+-- Al modificar: lo pagado y lo trasladado a Pagar Comisiones no se toca (salvo desde las funciones de traslado y pago)
+create or replace function public.comisiones_generadas_cambio() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(current_setting('pd.pago_comision', true), '') <> '1' then
+    if old.pago_id is not null then raise exception 'Esta comisión ya está pagada (pago No. %): anula el pago para modificarla', old.pago_id; end if;
+    if old.trasladado then raise exception 'Esta comisión está en Pagar Comisiones: usa «Revertir» para modificarla'; end if;
+    new.pago_id := old.pago_id; new.trasladado := old.trasladado; new.trasladado_en := old.trasladado_en; new.trasladado_por := old.trasladado_por;
+    new.modificado := now(); new.modificado_por := (select usuario from public.perfiles where id = auth.uid());
+  end if;
+  new.beneficiario := old.beneficiario; new.agente_id := old.agente_id; new.institucion_id := old.institucion_id;
+  new.origen := old.origen; new.ref_id := old.ref_id; new.fecha := old.fecha; new.base := old.base; new.cantidad := old.cantidad;
+  new.tipo := old.tipo; new.valor_original := old.valor_original; new.generado := old.generado; new.generado_por := old.generado_por;
+  new.comision := round(case when new.tipo = 'porcentaje' then new.base * new.valor / 100 else new.valor * new.cantidad end, 2);
+  if new.estado <> 'pendiente' then new.autorizado := false; if new.pago_id is null then new.trasladado := false; end if; end if;
+  return new;
+end;
+$$;
+
+-- Generar: al anular comisiones cuyo cobro se anuló, también pueden estar trasladadas
+do $do$
+declare d text;
+begin
+  d := pg_get_functiondef('public.generar_comisiones(date, date, text, text)'::regprocedure);
+  d := replace(d, '  update public.comisiones_generadas g set estado = ''anulado'', autorizado = false',
+                  '  perform set_config(''pd.pago_comision'', ''1'', true);' || chr(10) || '  update public.comisiones_generadas g set estado = ''anulado'', autorizado = false');
+  d := replace(d, '  get diagnostics v_anul = row_count;', '  get diagnostics v_anul = row_count;' || chr(10) || '  perform set_config(''pd.pago_comision'', '''', true);');
+  execute d;
+end
+$do$;
+
+-- «Pagar»: traslada a Pagar Comisiones las comisiones autorizadas y pendientes de un beneficiario
+create or replace function public.trasladar_comisiones(p_beneficiario text, p_id bigint, p_desde date, p_hasta date)
+returns int language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if not public.puede_pagar_comisiones() then raise exception 'Solo el médico principal o el Super Administrador pueden pagar comisiones'; end if;
+  perform set_config('pd.pago_comision', '1', true);
+  update public.comisiones_generadas g set trasladado = true, trasladado_en = now(), trasladado_por = (select usuario from public.perfiles where id = auth.uid())
+  where g.beneficiario = p_beneficiario and (case when p_beneficiario = 'agente' then g.agente_id else g.institucion_id end) = p_id
+    and g.fecha between p_desde and p_hasta and g.estado = 'pendiente' and g.autorizado and not g.trasladado and g.pago_id is null and g.comision > 0;
+  get diagnostics n = row_count;
+  perform set_config('pd.pago_comision', '', true);
+  if n = 0 then raise exception 'No hay comisiones autorizadas para trasladar a Pagar Comisiones'; end if;
+  return n;
+end;
+$$;
+revoke execute on function public.trasladar_comisiones(text, bigint, date, date) from public, anon;
+grant execute on function public.trasladar_comisiones(text, bigint, date, date) to authenticated;
+
+-- «Revertir»: saca de Pagar Comisiones las comisiones trasladadas que aún no se han pagado
+create or replace function public.revertir_comisiones(p_beneficiario text, p_id bigint, p_desde date, p_hasta date)
+returns int language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if not public.puede_pagar_comisiones() then raise exception 'Solo el médico principal o el Super Administrador pueden revertir comisiones'; end if;
+  perform set_config('pd.pago_comision', '1', true);
+  update public.comisiones_generadas g set trasladado = false, trasladado_en = null, trasladado_por = null
+  where g.beneficiario = p_beneficiario and (case when p_beneficiario = 'agente' then g.agente_id else g.institucion_id end) = p_id
+    and g.fecha between p_desde and p_hasta and g.trasladado and g.estado = 'pendiente' and g.pago_id is null;
+  get diagnostics n = row_count;
+  perform set_config('pd.pago_comision', '', true);
+  if n = 0 then raise exception 'No hay comisiones sin pagar en Pagar Comisiones para revertir'; end if;
+  return n;
+end;
+$$;
+revoke execute on function public.revertir_comisiones(text, bigint, date, date) from public, anon;
+grant execute on function public.revertir_comisiones(text, bigint, date, date) to authenticated;
+
+-- El pago toma solo las comisiones trasladadas; al anularlo vuelven a Pagar Comisiones
+do $do$
+declare d text;
+begin
+  d := pg_get_functiondef('public.registrar_pago_comision(text, bigint, date, date, jsonb)'::regprocedure);
+  d := replace(d, 'and g.autorizado and g.pago_id is null', 'and g.autorizado and g.trasladado and g.pago_id is null');
+  execute d;
+  d := pg_get_functiondef('public.anular_pago_comision(bigint, text)'::regprocedure);
+  d := replace(d, 'autorizado = true where pago_id = p_id', 'autorizado = true, trasladado = true where pago_id = p_id');
+  execute d;
+end
+$do$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

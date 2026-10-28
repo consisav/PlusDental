@@ -275,14 +275,16 @@
   }
 
   // ======================= Generar comisiones =======================
-  // Graba las comisiones del rango (agentes y/o instituciones). Maestro por beneficiario con casilla «Autorizar pago»;
-  // en el detalle se cambia el % (o el valor), el estado y la autorización de cada línea, y el maestro se totaliza solo.
-  var gen = [], genParams = null, genAbierto = null;
+  // Graba las comisiones del rango (agentes y/o instituciones). Maestro por beneficiario con casilla «Autorizar pago»,
+  // «Detalle» (cambiar %, estado y autorización; se graba con «Confirmar y actualizar maestro»), «Pagar» (traslada
+  // las autorizadas a Pagar Comisiones) y «Revertir» (las saca de Pagar Comisiones si aún no se han pagado).
+  var gen = [], genParams = null, genAbierto = null, borrador = {};
   $('admRepComisiones').innerHTML =
     '<div class="adm-pane-head"><h3 class="adm-h">Generar comisiones</h3>' +
     '<div class="hi-botones"><button type="button" class="adm-btn" id="gcImprimir" disabled>Imprimir</button><button type="button" class="adm-btn" id="gcExcel" disabled>Exportar a Excel</button></div></div>' +
     '<p class="dlg-msg">Elige las fechas y de quién generar comisiones: agentes comerciales, instituciones o ambos. Al generar se graban las nuevas; las ya generadas conservan tus cambios. ' +
-    'Marca «Autorizar pago» para que se puedan pagar en Pagar Comisiones; en «Detalle» puedes cambiar el %, el estado y autorizar línea por línea.</p>' +
+    'Marca «Autorizar pago»; en «Detalle» puedes cambiar el %, el estado y autorizar línea por línea y luego «Confirmar y actualizar maestro». ' +
+    '«Pagar» traslada las comisiones autorizadas a Pagar Comisiones; «Revertir» las saca de ahí mientras no se hayan pagado.</p>' +
     '<div class="com-filtros"><label>Fecha inicial<input id="gcDesde" type="date" class="adm-input"></label><label>Fecha final<input id="gcHasta" type="date" class="adm-input"></label>' +
     '<label>Agente comercial<select id="gcAgente" class="adm-input"><option value="ninguno">Ninguno</option></select></label>' +
     '<label>Institución<select id="gcInst" class="adm-input"><option value="ninguna">Ninguna</option></select></label>' +
@@ -291,12 +293,36 @@
     '<div id="gcRes" class="adm-pane" hidden>' +
     '<div class="rep-params" id="gcParams"></div>' +
     '<div id="gcResumen" class="com-resumen"></div>' +
-    '<div class="roles-wrap"><table class="rep-tabla"><thead><tr><th class="com-chk"><span class="sr-only">Autorizar pago</span>Autorizar pago</th><th>Beneficiario</th><th>Tipo</th><th class="num">Líneas</th><th class="num">Base</th><th class="num">Comisión</th><th class="num">Autorizado</th><th class="num">Pagado</th><th class="num">Pendiente</th><th><span class="sr-only">Detalle</span></th></tr></thead>' +
+    '<div class="roles-wrap"><table class="rep-tabla"><thead><tr><th class="com-chk">Autorizar pago</th><th>Beneficiario</th><th>Tipo</th><th class="num">Líneas</th><th class="num">Base</th><th class="num">Comisión</th><th class="num">Autorizado</th><th class="num">En Pagar Comisiones</th><th class="num">Pagado</th><th class="num">Pendiente</th><th><span class="sr-only">Acciones</span></th></tr></thead>' +
     '<tbody id="gcBody"></tbody><tfoot id="gcPie"></tfoot></table></div>' +
     '<div id="gcDet" class="rep-det" hidden></div>' +
     '</div>';
   (function () { var h = new Date(); $('gcDesde').value = iso(new Date(h.getFullYear(), h.getMonth(), 1)); $('gcHasta').value = iso(h); })();
 
+  function editable(l) { return !l.pago_id && !l.trasladado; }
+  // Línea con los cambios aún sin confirmar del detalle
+  function conBorrador(l) {
+    var c = borrador[l.id];
+    if (!c) return l;
+    var x = Object.assign({}, l, c);
+    x.comision = Math.round((x.tipo === 'porcentaje' ? x.base * x.valor / 100 : x.valor * x.cantidad) * 100) / 100;
+    if (x.estado !== 'pendiente') x.autorizado = false;
+    return x;
+  }
+  function resumir(lineasBen) {
+    function s(a, k) { return a.reduce(function (t, l) { return t + Number(l[k]); }, 0); }
+    var b = {}, vivas = lineasBen.filter(function (l) { return l.estado !== 'anulado'; }), pend = lineasBen.filter(function (l) { return l.estado === 'pendiente'; });
+    var libres = pend.filter(function (l) { return !l.trasladado; });
+    b.n = vivas.length; b.base = s(vivas, 'base'); b.comision = s(vivas.filter(function (l) { return l.estado !== 'suspendido'; }), 'comision');
+    b.autorizado = s(pend.filter(function (l) { return l.autorizado; }), 'comision');
+    b.enPago = s(pend.filter(function (l) { return l.trasladado; }), 'comision');
+    b.pagado = s(lineasBen.filter(function (l) { return l.estado === 'pagado'; }), 'comision');
+    b.pendiente = s(pend, 'comision');
+    b.libres = libres.length; b.aut = libres.filter(function (l) { return l.autorizado; }).length;
+    b.porTrasladar = libres.filter(function (l) { return l.autorizado && Number(l.comision) > 0; }).length;
+    b.trasladadas = pend.filter(function (l) { return l.trasladado; }).length;
+    return b;
+  }
   function resumirGen() {
     var porBen = {}, orden = [];
     gen.forEach(function (l) {
@@ -304,15 +330,7 @@
       if (!porBen[k]) { porBen[k] = { clave: k, benef: l.beneficiario, id: idBen(l), nombre: nombreBen(l.beneficiario, idBen(l)), lineas: [] }; orden.push(porBen[k]); }
       porBen[k].lineas.push(l);
     });
-    orden.forEach(function (b) {
-      var vivas = b.lineas.filter(function (l) { return l.estado !== 'anulado'; }), pend = b.lineas.filter(function (l) { return l.estado === 'pendiente'; });
-      function s(a, k) { return a.reduce(function (t, l) { return t + Number(l[k]); }, 0); }
-      b.n = vivas.length; b.base = s(vivas, 'base'); b.comision = s(vivas.filter(function (l) { return l.estado !== 'suspendido'; }), 'comision');
-      b.autorizado = s(pend.filter(function (l) { return l.autorizado; }), 'comision');
-      b.pagado = s(b.lineas.filter(function (l) { return l.estado === 'pagado'; }), 'comision');
-      b.pendiente = s(pend, 'comision');
-      b.pend = pend.length; b.aut = pend.filter(function (l) { return l.autorizado; }).length;
-    });
+    orden.forEach(function (b) { Object.assign(b, resumir(b.lineas)); });
     return orden.sort(ordenBen);
   }
   function pintarGen() {
@@ -323,43 +341,48 @@
     $('gcParams').innerHTML = '<span class="rep-params-t">Parámetros</span>' + [['Fecha inicial', fechaCorta(genParams.desde)], ['Fecha final', fechaCorta(genParams.hasta)], ['Agente comercial', genParams.agTxt], ['Institución', genParams.inTxt]]
       .map(function (x) { return '<span class="rep-param-i">' + esc(x[0]) + ' <b>' + esc(x[1]) + '</b></span>'; }).join('');
     function s(k) { return bs.reduce(function (t, b) { return t + b[k]; }, 0); }
-    $('gcResumen').innerHTML = [['Beneficiarios', bs.length], ['Base', q(s('base'))], ['Comisiones', q(s('comision'))], ['Pagado', q(s('pagado'))], ['Total a pagar (autorizado)', q(s('autorizado')), 1]]
+    $('gcResumen').innerHTML = [['Beneficiarios', bs.length], ['Base', q(s('base'))], ['Comisiones', q(s('comision'))], ['En Pagar Comisiones', q(s('enPago'))], ['Pagado', q(s('pagado'))], ['Total autorizado', q(s('autorizado')), 1]]
       .map(function (x) { return '<div' + (x[2] ? ' class="com-dest"' : '') + '><small>' + x[0] + '</small><b>' + x[1] + '</b></div>'; }).join('');
+    var sinPermiso = puedePagar ? '' : ' disabled title="Solo el médico principal o el Super Administrador"';
     $('gcBody').innerHTML = bs.length ? bs.map(function (b) {
-      var todo = b.pend > 0 && b.aut === b.pend, parte = b.aut > 0 && b.aut < b.pend;
-      return '<tr' + (genAbierto === b.clave ? ' class="com-sel"' : '') + '><td class="com-chk"><input type="checkbox" data-gc-aut="' + b.clave + '"' + (todo ? ' checked' : '') + (parte ? ' data-parte="1"' : '') + (b.pend ? '' : ' disabled') +
-        ' aria-label="Autorizar el pago de ' + esc(b.nombre) + '" title="' + (b.pend ? b.aut + ' de ' + b.pend + ' comisiones pendientes autorizadas' : 'Sin comisiones pendientes') + '"></td>' +
+      var todo = b.libres > 0 && b.aut === b.libres, parte = b.aut > 0 && b.aut < b.libres;
+      return '<tr' + (genAbierto === b.clave ? ' class="com-sel"' : '') + '><td class="com-chk"><input type="checkbox" data-gc-aut="' + b.clave + '"' + (todo ? ' checked' : '') + (parte ? ' data-parte="1"' : '') + (b.libres ? '' : ' disabled') +
+        ' aria-label="Autorizar el pago de ' + esc(b.nombre) + '" title="' + (b.libres ? b.aut + ' de ' + b.libres + ' comisiones pendientes autorizadas' : 'Sin comisiones pendientes por autorizar') + '"></td>' +
         '<td><strong>' + esc(b.nombre) + '</strong></td><td>' + etiquetaBen(b.benef) + '</td><td class="num">' + b.n + '</td><td class="num">' + q(b.base) + '</td><td class="num">' + q(b.comision) + '</td>' +
-        '<td class="num"><strong>' + q(b.autorizado) + '</strong></td><td class="num">' + q(b.pagado) + '</td><td class="num">' + q(b.pendiente) + '</td>' +
-        '<td><button type="button" class="adm-btn rep-det-btn" data-gc-det="' + b.clave + '">Detalle</button></td></tr>';
-    }).join('') : '<tr><td colspan="10">No hay comisiones para esos parámetros.</td></tr>';
+        '<td class="num"><strong>' + q(b.autorizado) + '</strong></td><td class="num">' + q(b.enPago) + '</td><td class="num">' + q(b.pagado) + '</td><td class="num">' + q(b.pendiente) + '</td>' +
+        '<td><div class="com-acc"><button type="button" class="adm-btn rep-det-btn" data-gc-det="' + b.clave + '">Detalle</button>' +
+        '<button type="button" class="adm-btn rep-det-btn com-btn-pagar" data-gc-pagar-ben="' + b.clave + '"' + (b.porTrasladar ? sinPermiso : ' disabled title="No hay comisiones autorizadas por trasladar"') + '>Pagar</button>' +
+        '<button type="button" class="adm-btn rep-det-btn com-btn-rev" data-gc-revertir="' + b.clave + '"' + (b.trasladadas ? sinPermiso : ' disabled title="No hay comisiones sin pagar en Pagar Comisiones"') + '>Revertir</button></div></td></tr>';
+    }).join('') : '<tr><td colspan="11">No hay comisiones para esos parámetros.</td></tr>';
     document.querySelectorAll('#gcBody [data-parte]').forEach(function (c) { c.indeterminate = true; });
-    $('gcPie').innerHTML = bs.length ? '<tr class="rep-total"><td></td><td>TOTAL</td><td></td><td class="num">' + s('n') + '</td><td class="num">' + q(s('base')) + '</td><td class="num">' + q(s('comision')) + '</td><td class="num">' + q(s('autorizado')) + '</td><td class="num">' + q(s('pagado')) + '</td><td class="num">' + q(s('pendiente')) + '</td><td></td></tr>' : '';
+    $('gcPie').innerHTML = bs.length ? '<tr class="rep-total"><td></td><td>TOTAL</td><td></td><td class="num">' + s('n') + '</td><td class="num">' + q(s('base')) + '</td><td class="num">' + q(s('comision')) + '</td><td class="num">' + q(s('autorizado')) + '</td><td class="num">' + q(s('enPago')) + '</td><td class="num">' + q(s('pagado')) + '</td><td class="num">' + q(s('pendiente')) + '</td><td></td></tr>' : '';
     pintarGenDet(bs);
   }
   function pintarGenDet(bs) {
     var b = (bs || resumirGen()).filter(function (x) { return x.clave === genAbierto; })[0];
     if (!b) { $('gcDet').hidden = true; $('gcDet').innerHTML = ''; return; }
-    var ls = b.lineas.slice().sort(ordenLinea);
-    function s(a, k) { return a.reduce(function (t, l) { return t + Number(l[k]); }, 0); }
+    var ls = b.lineas.map(conBorrador).sort(ordenLinea), t = resumir(ls);
+    var nCambios = b.lineas.filter(function (l) { return borrador[l.id]; }).length;
     $('gcDet').hidden = false;
-    $('gcDet').innerHTML = '<div class="rep-det-head"><div><h4>Detalle · ' + esc(b.nombre) + ' ' + etiquetaBen(b.benef) + '</h4><p class="dlg-msg">' + ls.length + (ls.length === 1 ? ' comisión' : ' comisiones') + ', por paciente y fecha. Los cambios se graban solos y se suman al maestro.</p></div>' +
+    $('gcDet').innerHTML = '<div class="rep-det-head"><div><h4>Detalle · ' + esc(b.nombre) + ' ' + etiquetaBen(b.benef) + '</h4><p class="dlg-msg">' + ls.length + (ls.length === 1 ? ' comisión' : ' comisiones') + ', por paciente y fecha. Haz tus cambios y pulsa «Confirmar y actualizar maestro».</p></div>' +
       '<div class="hi-botones"><button type="button" class="adm-btn" data-gc-cerrar>Cerrar</button></div></div>' +
       '<div class="roles-wrap"><table class="rep-tabla com-det"><thead><tr><th>Paciente · concepto</th><th>Fecha</th><th class="num">Base</th><th class="num">% comisión</th><th class="num">Valor de comisión</th><th>Estado</th><th class="com-chk">Pagar comisión</th></tr></thead><tbody>' +
       ls.map(function (l) {
-        var bloq = !!l.pago_id;
+        var bloq = !editable(l), nota = l.pago_id ? 'Pago No. ' + l.pago_id : l.trasladado ? 'En Pagar Comisiones' : '';
         var valor = l.tipo === 'valor'
           ? '<span class="com-in">Q<input type="number" min="0" step="0.01" value="' + Number(l.valor) + '" data-gc-valor="' + l.id + '"' + (bloq ? ' disabled' : '') + ' aria-label="Valor por unidad"></span><small class="hi-desc">c/u</small>'
           : '<span class="com-in"><input type="number" min="0" max="100" step="0.01" value="' + Number(l.valor) + '" data-gc-valor="' + l.id + '"' + (bloq ? ' disabled' : '') + ' aria-label="% de comisión">%</span>';
-        return '<tr class="com-e-' + l.estado + '"><td><strong>' + esc(l.paciente) + '</strong><br><span class="hi-desc">' + esc(l.concepto) + (Number(l.cantidad) !== 1 ? ' × ' + Number(l.cantidad) : '') + ' · ' + esc(l.documento) + ' · ' + (CATEGORIA[l.categoria] || '') + '</span></td>' +
+        return '<tr class="com-e-' + l.estado + (borrador[l.id] ? ' com-cambio' : '') + '"><td><strong>' + esc(l.paciente) + '</strong><br><span class="hi-desc">' + esc(l.concepto) + (Number(l.cantidad) !== 1 ? ' × ' + Number(l.cantidad) : '') + ' · ' + esc(l.documento) + ' · ' + (CATEGORIA[l.categoria] || '') + '</span></td>' +
           '<td class="fecha">' + fechaCorta(l.fecha) + '</td><td class="num">' + q(l.base) + '</td><td class="num">' + valor + (Number(l.valor) !== Number(l.valor_original) ? '<br><small class="hi-desc">antes ' + (l.tipo === 'valor' ? q(l.valor_original) : pct(l.valor_original)) + '</small>' : '') + '</td>' +
           '<td class="num"><strong>' + q(l.comision) + '</strong></td>' +
-          '<td><select class="com-estado com-estado-' + l.estado + '" data-gc-estado="' + l.id + '"' + (bloq ? ' disabled title="Pagada con el pago No. ' + l.pago_id + '"' : '') + '>' +
-          Object.keys(ESTADOS_COM).map(function (k) { return '<option value="' + k + '"' + (k === l.estado ? ' selected' : '') + '>' + ESTADOS_COM[k] + '</option>'; }).join('') + '</select>' + (bloq ? '<br><small class="hi-desc">Pago No. ' + l.pago_id + '</small>' : '') + '</td>' +
-          '<td class="com-chk"><input type="checkbox" data-gc-pagar="' + l.id + '"' + (l.autorizado ? ' checked' : '') + (l.estado !== 'pendiente' ? ' disabled' : '') + ' aria-label="Autorizar el pago de esta comisión"></td></tr>';
+          '<td><select class="com-estado com-estado-' + l.estado + '" data-gc-estado="' + l.id + '"' + (bloq ? ' disabled' : '') + '>' +
+          Object.keys(ESTADOS_COM).map(function (k) { return '<option value="' + k + '"' + (k === l.estado ? ' selected' : '') + '>' + ESTADOS_COM[k] + '</option>'; }).join('') + '</select>' + (nota ? '<br><small class="hi-desc">' + nota + '</small>' : '') + '</td>' +
+          '<td class="com-chk"><input type="checkbox" data-gc-pagar="' + l.id + '"' + (l.autorizado ? ' checked' : '') + (l.estado !== 'pendiente' || bloq ? ' disabled' : '') + ' aria-label="Autorizar el pago de esta comisión"></td></tr>';
       }).join('') +
-      '<tr class="rep-total"><td colspan="2">TOTAL ' + esc(b.nombre) + '</td><td class="num">' + q(s(ls.filter(function (l) { return l.estado !== 'anulado'; }), 'base')) + '</td><td></td><td class="num">' + q(b.comision) + '</td><td colspan="2">Autorizado <b>' + q(b.autorizado) + '</b></td></tr></tbody></table></div>' +
-      '<p class="dlg-msg" role="status" id="gcDetMsg"></p>';
+      '<tr class="rep-total"><td colspan="2">TOTAL ' + esc(b.nombre) + '</td><td class="num">' + q(t.base) + '</td><td></td><td class="num">' + q(t.comision) + '</td><td colspan="2">Autorizado <b>' + q(t.autorizado) + '</b></td></tr></tbody></table></div>' +
+      '<div class="com-det-acc"><p class="dlg-msg" role="status" id="gcDetMsg">' + (nCambios ? nCambios + (nCambios === 1 ? ' cambio sin confirmar.' : ' cambios sin confirmar.') : '') + '</p>' +
+      (nCambios ? '<button type="button" class="adm-btn" data-gc-descartar>Descartar cambios</button>' : '') +
+      '<button type="button" class="dlg-submit" data-gc-confirmar' + (nCambios ? '' : ' disabled') + '>Confirmar y actualizar maestro</button></div>';
   }
   async function generarCom() {
     var d = $('gcDesde').value, h = $('gcHasta').value, ag = $('gcAgente').value, ins = $('gcInst').value;
@@ -367,9 +390,11 @@
     if (ag === 'ninguno' && ins === 'ninguna') { aviso('gcMsg', 'Elige de quién generar comisiones: agentes comerciales, instituciones o ambos.', true); $('gcAgente').focus(); return; }
     $('gcGenerar').disabled = true; aviso('gcMsg', 'Generando…');
     try {
+      await permisoPago();
       var r = await sb.rpc('generar_comisiones', { p_desde: d, p_hasta: h, p_agentes: ag, p_instituciones: ins });
       if (r.error) throw r.error;
       gen = await leerGeneradas(d, h, ag, ins);
+      borrador = {};
       genParams = { desde: d, hasta: h, agente: ag, inst: ins, agTxt: $('gcAgente').selectedOptions[0].textContent, inTxt: $('gcInst').selectedOptions[0].textContent };
       var n = (r.data.agentes || 0) + (r.data.instituciones || 0);
       aviso('gcMsg', (n ? 'Se generaron ' + n + (n === 1 ? ' comisión nueva' : ' comisiones nuevas') : 'No había comisiones nuevas') + (r.data.anuladas ? '; ' + r.data.anuladas + ' pasaron a «Anulado» porque se anuló su cobro' : '') + '.');
@@ -378,46 +403,99 @@
     if (genAbierto && !gen.some(function (l) { return claveBen(l) === genAbierto; })) genAbierto = null;
     pintarGen();
   }
+  async function recargarGen() { if (genParams) gen = await leerGeneradas(genParams.desde, genParams.hasta, genParams.agente, genParams.inst); pintarGen(); }
   async function actualizarLineas(ids, cambios, msgId) {
     var r = await sb.from('comisiones_generadas').update(cambios).in('id', ids).select('*');
     if (r.error) { aviso(msgId, traducir(r.error), true); pintarGen(); return false; }
     var nuevo = {}; (r.data || []).forEach(function (x) { nuevo[x.id] = x; });
     gen = gen.map(function (l) { return nuevo[l.id] || l; });
-    pintarGen();
     return true;
   }
+  function benDeClave(k) { return resumirGen().filter(function (b) { return b.clave === k; })[0]; }
   $('gcGenerar').addEventListener('click', generarCom);
   ['gcDesde', 'gcHasta', 'gcAgente', 'gcInst'].forEach(function (id) { $(id).addEventListener('change', function () { if (genParams) aviso('gcMsg', 'Cambiaste los parámetros: pulsa «Generar comisiones».'); }); });
-  $('gcBody').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-gc-det]');
+  $('gcBody').addEventListener('click', async function (e) {
+    var d = e.target.closest('[data-gc-det]'), p = e.target.closest('[data-gc-pagar-ben]'), rv = e.target.closest('[data-gc-revertir]');
+    if (d) {
+      genAbierto = genAbierto === d.dataset.gcDet ? null : d.dataset.gcDet;
+      pintarGen();
+      if (genAbierto) $('gcDet').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    var bt = p || rv;
+    if (!bt || !genParams) return;
+    var b = benDeClave(bt.dataset.gcPagarBen || bt.dataset.gcRevertir);
     if (!b) return;
-    genAbierto = genAbierto === b.dataset.gcDet ? null : b.dataset.gcDet;
-    pintarGen();
-    if (genAbierto) $('gcDet').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (b.lineas.some(function (l) { return borrador[l.id]; })) { aviso('gcMsg', 'Tienes cambios sin confirmar en el detalle de ' + b.nombre + ': confírmalos o descártalos primero.', true); return; }
+    if (!pedirConfirmacion(bt)) return;
+    bt.disabled = true; aviso('gcMsg', p ? 'Trasladando a Pagar Comisiones…' : 'Revirtiendo…');
+    var r = await sb.rpc(p ? 'trasladar_comisiones' : 'revertir_comisiones', { p_beneficiario: b.benef, p_id: b.id, p_desde: genParams.desde, p_hasta: genParams.hasta });
+    if (r.error) { aviso('gcMsg', traducir(r.error), true); pintarGen(); return; }
+    await recargarGen();
+    if (p) {
+      aviso('gcMsg', 'Se trasladaron ' + r.data + (r.data === 1 ? ' comisión' : ' comisiones') + ' de ' + b.nombre + ' a Pagar Comisiones.');
+      irAPagar(b);
+    } else aviso('gcMsg', 'Se revirtieron ' + r.data + (r.data === 1 ? ' comisión' : ' comisiones') + ' de ' + b.nombre + ': ya no están en Pagar Comisiones y se pueden modificar.');
   });
   $('gcBody').addEventListener('change', async function (e) {
     var c = e.target.closest('[data-gc-aut]');
     if (!c) return;
-    var ids = gen.filter(function (l) { return claveBen(l) === c.dataset.gcAut && l.estado === 'pendiente'; }).map(function (l) { return l.id; });
+    var ids = gen.filter(function (l) { return claveBen(l) === c.dataset.gcAut && l.estado === 'pendiente' && editable(l); }).map(function (l) { return l.id; });
     if (!ids.length) return;
     c.disabled = true; aviso('gcMsg', 'Guardando…');
-    if (await actualizarLineas(ids, { autorizado: c.checked }, 'gcMsg')) aviso('gcMsg', c.checked ? 'Pago autorizado: ya se puede pagar en Pagar Comisiones.' : 'Se quitó la autorización de pago.');
+    ids.forEach(function (id) { if (borrador[id]) { delete borrador[id].autorizado; if (!Object.keys(borrador[id]).length) delete borrador[id]; } });
+    var ok = await actualizarLineas(ids, { autorizado: c.checked }, 'gcMsg');
+    pintarGen();
+    if (ok) aviso('gcMsg', c.checked ? 'Pago autorizado: usa «Pagar» para trasladarlo a Pagar Comisiones.' : 'Se quitó la autorización de pago.');
   });
-  $('gcDet').addEventListener('click', function (e) { if (e.target.closest('[data-gc-cerrar]')) { genAbierto = null; pintarGen(); } });
-  $('gcDet').addEventListener('change', async function (e) {
+  // Detalle: los cambios quedan en borrador hasta «Confirmar y actualizar maestro»
+  function anotar(id, campo, valor) {
+    var l = gen.filter(function (x) { return x.id === id; })[0];
+    if (!l) return;
+    var c = borrador[id] || {};
+    if (String(valor) === String(l[campo])) delete c[campo]; else c[campo] = valor;
+    if (Object.keys(c).length) borrador[id] = c; else delete borrador[id];
+  }
+  $('gcDet').addEventListener('change', function (e) {
     var v = e.target.closest('[data-gc-valor]'), es = e.target.closest('[data-gc-estado]'), pg = e.target.closest('[data-gc-pagar]');
-    var id, cambios;
     if (v) {
       var l = gen.filter(function (x) { return String(x.id) === v.dataset.gcValor; })[0], n = v.value === '' ? NaN : Number(v.value);
-      if (isNaN(n) || n < 0 || (l.tipo === 'porcentaje' && n > 100)) { aviso('gcDetMsg', l.tipo === 'porcentaje' ? 'El % debe estar entre 0 y 100.' : 'Escribe un valor mayor o igual a cero.', true); v.value = Number(l.valor); return; }
-      id = +v.dataset.gcValor; cambios = { valor: Math.round(n * 100) / 100 };
-    } else if (es) { id = +es.dataset.gcEstado; cambios = { estado: es.value }; }
-    else if (pg) { id = +pg.dataset.gcPagar; cambios = { autorizado: pg.checked }; }
+      if (isNaN(n) || n < 0 || (l.tipo === 'porcentaje' && n > 100)) { pintarGenDet(); aviso('gcDetMsg', l.tipo === 'porcentaje' ? 'El % debe estar entre 0 y 100.' : 'Escribe un valor mayor o igual a cero.', true); return; }
+      anotar(l.id, 'valor', Math.round(n * 100) / 100);
+    } else if (es) anotar(+es.dataset.gcEstado, 'estado', es.value);
+    else if (pg) anotar(+pg.dataset.gcPagar, 'autorizado', pg.checked);
     else return;
-    var el = v || es || pg; el.disabled = true;
-    aviso('gcDetMsg', 'Guardando…');
-    if (await actualizarLineas([id], cambios, 'gcDetMsg')) aviso('gcDetMsg', 'Cambio guardado; el maestro ya está totalizado.');
+    pintarGenDet();
   });
+  $('gcDet').addEventListener('click', async function (e) {
+    if (e.target.closest('[data-gc-cerrar]')) {
+      var abiertas = gen.filter(function (l) { return claveBen(l) === genAbierto && borrador[l.id]; });
+      if (abiertas.length && !confirm('Tienes cambios sin confirmar. ¿Cerrar y descartarlos?')) return;
+      abiertas.forEach(function (l) { delete borrador[l.id]; });
+      genAbierto = null; pintarGen(); return;
+    }
+    if (e.target.closest('[data-gc-descartar]')) { gen.forEach(function (l) { if (claveBen(l) === genAbierto) delete borrador[l.id]; }); pintarGenDet(); return; }
+    var bc = e.target.closest('[data-gc-confirmar]');
+    if (!bc) return;
+    var ids = gen.filter(function (l) { return claveBen(l) === genAbierto && borrador[l.id]; }).map(function (l) { return l.id; });
+    if (!ids.length) return;
+    bc.disabled = true; aviso('gcDetMsg', 'Guardando ' + ids.length + (ids.length === 1 ? ' cambio…' : ' cambios…'));
+    var fallos = 0;
+    for (var k = 0; k < ids.length; k++) {
+      var cambios = Object.assign({}, borrador[ids[k]]);
+      if (await actualizarLineas([ids[k]], cambios, 'gcDetMsg')) delete borrador[ids[k]]; else fallos++;
+    }
+    pintarGen();
+    aviso('gcDetMsg', fallos ? 'No se pudieron guardar ' + fallos + ' cambios; revisa el mensaje y vuelve a intentar.' : 'Cambios confirmados: el maestro ya está actualizado.', !!fallos);
+  });
+  // Después de «Pagar»: abre Pagar Comisiones con ese beneficiario y las mismas fechas
+  function irAPagar(b) {
+    $('cpDesde').value = genParams.desde; $('cpHasta').value = genParams.hasta;
+    $('cpAgente').value = b.benef === 'agente' ? String(b.id) : 'ninguno';
+    $('cpInst').value = b.benef === 'institucion' ? String(b.id) : 'ninguna';
+    $('tabComPago').click();
+    calcular();
+  }
   $('gcImprimir').addEventListener('click', function () {
     if (!window.PD_IMPRESION || !genParams) return;
     var bs = resumirGen(), td = 'padding:5px 6px;border-bottom:1px solid #D9E4EC;font-size:11.5px', tdn = td + ';text-align:right';
@@ -425,7 +503,7 @@
     var html = window.PD_IMPRESION.encabezado('Comisiones generadas') +
       '<div style="font-size:12px;color:#475B68;margin-bottom:10px">Parámetros: Fecha inicial <b>' + fechaCorta(genParams.desde) + '</b> · Fecha final <b>' + fechaCorta(genParams.hasta) + '</b> · Agente comercial <b>' + esc(genParams.agTxt) + '</b> · Institución <b>' + esc(genParams.inTxt) + '</b></div>' +
       '<table style="width:100%;border-collapse:collapse"><thead><tr>' + ['Autorizado', 'Beneficiario', 'Tipo', 'Líneas', 'Base', 'Comisión', 'Autorizado Q', 'Pagado', 'Pendiente'].map(function (t, i) { return '<th style="' + (i > 2 ? tdn : td + ';text-align:left') + '">' + t + '</th>'; }).join('') + '</tr></thead><tbody>' +
-      bs.map(function (b) { return '<tr><td style="' + td + '">' + (b.pend && b.aut === b.pend ? 'Sí' : b.aut ? 'Parcial' : 'No') + '</td><td style="' + td + '">' + esc(b.nombre) + '</td><td style="' + td + '">' + (b.benef === 'agente' ? 'Agente' : 'Institución') + '</td><td style="' + tdn + '">' + b.n + '</td><td style="' + tdn + '">' + q(b.base) + '</td><td style="' + tdn + '">' + q(b.comision) + '</td><td style="' + tdn + '">' + q(b.autorizado) + '</td><td style="' + tdn + '">' + q(b.pagado) + '</td><td style="' + tdn + '">' + q(b.pendiente) + '</td></tr>'; }).join('') +
+      bs.map(function (b) { return '<tr><td style="' + td + '">' + (b.libres && b.aut === b.libres ? 'Sí' : b.aut ? 'Parcial' : 'No') + '</td><td style="' + td + '">' + esc(b.nombre) + '</td><td style="' + td + '">' + (b.benef === 'agente' ? 'Agente' : 'Institución') + '</td><td style="' + tdn + '">' + b.n + '</td><td style="' + tdn + '">' + q(b.base) + '</td><td style="' + tdn + '">' + q(b.comision) + '</td><td style="' + tdn + '">' + q(b.autorizado) + '</td><td style="' + tdn + '">' + q(b.pagado) + '</td><td style="' + tdn + '">' + q(b.pendiente) + '</td></tr>'; }).join('') +
       '<tr><td colspan="3" style="' + td + ';font-weight:800">TOTAL</td><td style="' + tdn + ';font-weight:800">' + s('n') + '</td><td style="' + tdn + ';font-weight:800">' + q(s('base')) + '</td><td style="' + tdn + ';font-weight:800">' + q(s('comision')) + '</td><td style="' + tdn + ';font-weight:800">' + q(s('autorizado')) + '</td><td style="' + tdn + ';font-weight:800">' + q(s('pagado')) + '</td><td style="' + tdn + ';font-weight:800">' + q(s('pendiente')) + '</td></tr></tbody></table>';
     window.PD_IMPRESION.imprimir(html);
   });
@@ -447,7 +525,7 @@
   // (agente o institución) con forma de pago, fecha, banco, cuenta bancaria y fecha de operación.
   $('admComPago').innerHTML =
     '<div class="adm-pane-head"><h3 class="adm-h">Pagar Comisiones</h3></div>' +
-    '<p class="dlg-msg">Aquí se pagan las comisiones <b>autorizadas</b> en «Generar comisiones». Elige las fechas, el agente y la institución y pulsa «Calcular»; en el resumen por beneficiario llena la forma de pago y pulsa «Pagar». ' +
+    '<p class="dlg-msg">Aquí se pagan las comisiones que se trasladaron con «Pagar» en «Generar comisiones». Elige las fechas, el agente y la institución y pulsa «Calcular»; en el resumen por beneficiario llena la forma de pago y pulsa «Pagar». ' +
     'Si anulas un pago, sus comisiones vuelven a quedar pendientes.</p>' +
     '<div class="com-filtros"><label>Fecha inicial<input id="cpDesde" type="date" class="adm-input"></label><label>Fecha final<input id="cpHasta" type="date" class="adm-input"></label>' +
     '<label>Agente comercial<select id="cpAgente" class="adm-input" data-def="todos"><option value="todos">Todos los agentes</option></select></label>' +
@@ -457,7 +535,7 @@
     '<div id="cpResultado" class="adm-pane" hidden>' +
     '<div id="cpResumen" class="com-resumen"></div>' +
     '<h4 class="com-sub">Detalle del pago</h4>' +
-    '<div class="com-filtros" role="group" aria-label="Mostrar comisiones"><button type="button" class="adm-btn" data-cpver="aut" aria-pressed="true">Autorizadas por pagar</button><button type="button" class="adm-btn" data-cpver="sin" aria-pressed="false">Sin autorizar</button><button type="button" class="adm-btn" data-cpver="pag" aria-pressed="false">Pagadas</button><button type="button" class="adm-btn" data-cpver="todas" aria-pressed="false">Todas</button></div>' +
+    '<div class="com-filtros" role="group" aria-label="Mostrar comisiones"><button type="button" class="adm-btn" data-cpver="aut" aria-pressed="true">Por pagar</button><button type="button" class="adm-btn" data-cpver="pag" aria-pressed="false">Pagadas</button><button type="button" class="adm-btn" data-cpver="todas" aria-pressed="false">Todas</button></div>' +
     '<div class="roles-wrap"><table><thead><tr><th>Paciente · concepto</th><th>Beneficiario</th><th>Fecha generada</th><th class="num">Base</th><th class="num">% comisión</th><th class="num">Valor de comisión</th><th>Estado</th></tr></thead><tbody id="cpBody"></tbody></table></div>' +
     '<h4 class="com-sub">Resumen de pago por beneficiario</h4>' +
     '<div id="cpVendedores" class="com-vends"></div>' +
@@ -490,21 +568,22 @@
     aviso('cpMsg', 'Calculando…');
     try { lineas = await leerGeneradas(d, h, ag, ins, ['pendiente', 'pagado']); }
     catch (e) { $('cpResultado').hidden = true; aviso('cpMsg', traducir(e), true); return; }
+    lineas = lineas.filter(function (l) { return l.estado === 'pagado' || l.trasladado; });
     lineas.sort(function (x, y) { return ordenBen({ benef: x.beneficiario, nombre: nombreBen(x.beneficiario, idBen(x)) }, { benef: y.beneficiario, nombre: nombreBen(y.beneficiario, idBen(y)) }) || ordenLinea(x, y); });
     calculo = { agente: ag, inst: ins, desde: d, hasta: h };
     await permisoPago();
-    aviso('cpMsg', lineas.length ? '' : 'No hay comisiones generadas para esos parámetros. Genéralas primero en «Generar comisiones».');
+    aviso('cpMsg', lineas.length ? '' : 'No hay comisiones por pagar con esos parámetros. Trasládalas con «Pagar» en «Generar comisiones».');
     $('cpResultado').hidden = !lineas.length;
     await cargarPagos();
     pintarLineas();
   }
   function pintarLineas() {
-    var aut = lineas.filter(function (l) { return l.estado === 'pendiente' && l.autorizado; }), sin = lineas.filter(function (l) { return l.estado === 'pendiente' && !l.autorizado; }), pag = lineas.filter(function (l) { return l.estado === 'pagado'; });
+    var aut = lineas.filter(function (l) { return l.estado === 'pendiente' && l.trasladado; }), pag = lineas.filter(function (l) { return l.estado === 'pagado'; });
     function s(a, k) { return a.reduce(function (t, l) { return t + Number(l[k]); }, 0); }
-    $('cpResumen').innerHTML = [['Comisiones', lineas.length], ['Sin autorizar', q(s(sin, 'comision'))], ['Ya pagado', q(s(pag, 'comision'))], ['Autorizado por pagar', q(s(aut, 'comision')), 1]]
+    $('cpResumen').innerHTML = [['Comisiones', lineas.length], ['Ya pagado', q(s(pag, 'comision'))], ['Por pagar', q(s(aut, 'comision')), 1]]
       .map(function (x) { return '<div' + (x[2] ? ' class="com-dest"' : '') + '><small>' + x[0] + '</small><b>' + x[1] + '</b></div>'; }).join('');
     document.querySelectorAll('[data-cpver]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.cpver === verLineas); });
-    var lista = verLineas === 'aut' ? aut : verLineas === 'sin' ? sin : verLineas === 'pag' ? pag : lineas;
+    var lista = verLineas === 'aut' ? aut : verLineas === 'pag' ? pag : lineas;
     var pagoDe = {}; pagos.forEach(function (p) { pagoDe[p.id] = p; });
     $('cpBody').innerHTML = lista.length ? lista.map(function (l) {
       var p = pagoDe[l.pago_id];
@@ -512,16 +591,16 @@
         '<td>' + esc(nombreBen(l.beneficiario, idBen(l))) + ' ' + etiquetaBen(l.beneficiario) + '</td><td class="fecha">' + fechaCorta(l.fecha) + '</td>' +
         '<td class="num">' + q(l.base) + '</td><td class="num">' + textoValor(l) + '</td><td class="num"><strong>' + q(l.comision) + '</strong></td>' +
         '<td>' + (l.estado === 'pagado' ? '<span class="estado estado-finalizado">Pagada' + (l.pago_id ? ' · No. ' + l.pago_id : '') + '</span>' + (p ? '<br><span class="hi-desc">' + fechaCorta(p.fecha_pago) + ' · ' + (METODOS[p.metodo] || p.metodo) + '</span>' : '')
-          : l.autorizado ? '<span class="estado estado-proceso">Pendiente de pago</span>' : '<span class="estado estado-inactivo">Sin autorizar</span>') + '</td></tr>';
+          : '<span class="estado estado-proceso">Pendiente de pago</span>') + '</td></tr>';
     }).join('') + '<tr class="com-total"><td colspan="3">Total</td><td class="num">' + q(s(lista, 'base')) + '</td><td></td><td class="num">' + q(s(lista, 'comision')) + '</td><td></td></tr>'
-      : '<tr><td colspan="7">' + (verLineas === 'aut' ? 'No hay comisiones autorizadas por pagar. Autorízalas en «Generar comisiones».' : 'No hay comisiones en esta vista.') + '</td></tr>';
+      : '<tr><td colspan="7">' + (verLineas === 'aut' ? 'No hay comisiones por pagar. Trasládalas con «Pagar» en «Generar comisiones».' : 'No hay comisiones en esta vista.') + '</td></tr>';
     pintarVendedores(aut);
   }
   // Una tarjeta por beneficiario con comisiones autorizadas; banco y cuenta se proponen con los de su último pago
   function pintarVendedores(aut) {
     var porB = {}, orden = [];
     aut.forEach(function (l) { if (Number(l.comision) <= 0) return; var k = claveBen(l); if (!porB[k]) { porB[k] = { benef: l.beneficiario, id: idBen(l), nombre: nombreBen(l.beneficiario, idBen(l)), ls: [] }; orden.push(porB[k]); } porB[k].ls.push(l); });
-    if (!orden.length) { $('cpVendedores').innerHTML = '<p class="dlg-msg">No hay comisiones autorizadas por pagar con estos parámetros.</p>'; return; }
+    if (!orden.length) { $('cpVendedores').innerHTML = '<p class="dlg-msg">No hay comisiones por pagar con estos parámetros.</p>'; return; }
     var hoyIso = iso(new Date());
     $('cpVendedores').innerHTML = (puedePagar ? '' : '<p class="com-sin-permiso">Solo el <b>médico principal</b> o el <b>Super Administrador</b> pueden pagar comisiones.</p>') + orden.sort(ordenBen).map(function (b) {
       var total = b.ls.reduce(function (t, l) { return t + Number(l.comision); }, 0);
@@ -530,7 +609,7 @@
       return '<div class="com-vend" data-vend="' + b.id + '" data-benef="' + b.benef + '">' +
         '<div class="com-vend-head"><h5>' + esc(b.nombre) + ' ' + etiquetaBen(b.benef) + '</h5><span class="hi-desc">' + b.ls.length + (b.ls.length === 1 ? ' comisión' : ' comisiones') + ' · ' + Object.keys(pacs).length + (Object.keys(pacs).length === 1 ? ' paciente' : ' pacientes') + '</span></div>' +
         '<div class="com-vend-grid">' +
-        '<div><small>Total autorizado</small><b>' + q(total) + '</b></div>' +
+        '<div><small>Total a pagar</small><b>' + q(total) + '</b></div>' +
         '<label><small>Forma de pago</small><select data-v="metodo">' + Object.keys(METODOS).map(function (k) { return '<option value="' + k + '">' + METODOS[k] + '</option>'; }).join('') + '</select></label>' +
         '<label><small>Fecha de pago</small><input type="date" data-v="fecha_pago" value="' + hoyIso + '"></label>' +
         '<label><small>Fecha operación</small><input type="date" data-v="fecha_operacion" value="' + hoyIso + '"></label>' +
@@ -628,11 +707,11 @@
   var t1 = $('tabComReglas'), t2 = $('tabComPago'), t3 = $('tabRepComisiones');
   if (t1) t1.addEventListener('click', function () { verReglas('crLista'); cargarReglas(); });
   if (t2) t2.addEventListener('click', function () { permisoPago(); cargarApoyo().then(cargarPagos); });
-  if (t3) t3.addEventListener('click', function () { cargarApoyo(); });
+  if (t3) t3.addEventListener('click', function () { permisoPago().then(function () { if (genParams) pintarGen(); }); cargarApoyo(); });
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { cargarReglas(); },
     limpiar: function () {
-      reglas = []; lineas = []; pagos = []; calculo = null; gen = []; genParams = null; genAbierto = null;
+      reglas = []; lineas = []; pagos = []; calculo = null; gen = []; genParams = null; genAbierto = null; borrador = {};
       $('crBody').innerHTML = ''; $('cpBody').innerHTML = ''; $('cpPagosBody').innerHTML = ''; $('cpVendedores').innerHTML = '';
       $('cpResultado').hidden = true; verReglas('crLista'); aviso('cpMsg', ''); aviso('crMsg', ''); aviso('gcMsg', ''); pintarGen();
     }
