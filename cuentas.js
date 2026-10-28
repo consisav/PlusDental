@@ -5,7 +5,7 @@
   if (!sb) return;
 
   var METODOS = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', deposito: 'Depósito' };
-  var CLINICA = { nombre: 'Plus Dental', direccion: 'Reforma Montúfar, zona 10, Ciudad de Guatemala', telefono: '+502 3756-5739' };
+  var CLINICA = { nombre: 'Plus Dental', direccion: 'Reforma Montúfar, zona 10, Nivel 9, Oficina 910, Ciudad de Guatemala', telefono: '+502 3756-5739' };
 
   var saldos = [], saldoDe = {}, pagos = [], ecFiltro = 'saldo', ecActual = null, movimientos = [], cpPag = 1, CP_PAG = 10;
   // Documento y detalle del pago

@@ -372,7 +372,7 @@
   }
 
   // ---------- Avisos: WhatsApp al paciente y al médico, recordatorio por correo ----------
-  var CLINICA = 'Reforma Montúfar, zona 10, Ciudad de Guatemala', TEL_CLINICA = '+502 3756-5739';
+  var CLINICA = 'Reforma Montúfar, zona 10, Nivel 9, Oficina 910, Ciudad de Guatemala', TEL_CLINICA = '+502 3756-5739';
   function datosAviso(c) {
     var d = dentistas.filter(function (x) { return x.id === c.dentista_id; })[0] || null;
     return {

@@ -232,7 +232,7 @@
     'Escribir por WhatsApp': 'Message on WhatsApp',
     'Escribir por WhatsApp a Plus Dental': 'Message Plus Dental on WhatsApp',
     'Dirección': 'Address',
-    'Reforma Montúfar, zona 10, Ciudad de Guatemala': 'Reforma Montúfar, Zone 10, Guatemala City',
+    'Reforma Montúfar, zona 10, Nivel 9, Oficina 910, Ciudad de Guatemala': 'Reforma Montúfar, Zone 10, Level 9, Office 910, Guatemala City',
     'Ver en Google Maps →': 'View on Google Maps →',
     'Horario': 'Hours',
     'Lunes a viernes': 'Monday to Friday',
@@ -240,7 +240,7 @@
     'Sábados': 'Saturdays',
     '8:00 a. m. – 12:30 p. m.': '8:00 a.m. – 12:30 p.m.',
     'Ubicación de Plus Dental en Google Maps': 'Plus Dental location on Google Maps',
-    'Reforma Montúfar, zona 10, Guatemala': 'Reforma Montúfar, Zone 10, Guatemala',
+    'Reforma Montúfar, zona 10, Nivel 9, Oficina 910, Guatemala': 'Reforma Montúfar, Zone 10, Level 9, Office 910, Guatemala',
     'Lun a vie 8:00 a. m. – 6:00 p. m.': 'Mon–Fri 8:00 a.m. – 6:00 p.m.',
     'Sáb 8:00 a. m. – 12:30 p. m.': 'Sat 8:00 a.m. – 12:30 p.m.',
 

@@ -242,7 +242,7 @@
       '<div style="background:#F5F9FC;border:1px solid #D9E4EC;border-radius:12px;padding:12px 14px;font-size:13.5px"><b>' + esc(p.nombre) + '</b><br><span style="color:#475B68">Tratamientos: ' + esc(items().map(function (i) { return i.tratamiento + (i.pieza ? ' (pieza ' + i.pieza + ')' : ''); }).join(', ')) + '</span></div>' +
       (a.mensaje ? '<p style="font-size:14px;margin:14px 0 0">' + esc(a.mensaje) + '</p>' : '') +
       lista('✓ Qué hacer', '#08504C', a.hacer) + lista('✕ Qué evitar', '#9F1239', a.evitar) + lista('⚠ Llame a la clínica si tiene', '#92400E', a.alarma) +
-      '<p style="margin-top:22px;font-size:12px;color:#5A6D7A">Dudas o urgencias: WhatsApp +502 3756-5739 · Reforma Montúfar, zona 10.</p></div>');
+      '<p style="margin-top:22px;font-size:12px;color:#5A6D7A">Dudas o urgencias: WhatsApp +502 3756-5739 · Reforma Montúfar, zona 10, Nivel 9, Oficina 910.</p></div>');
   }
 
   // ---------- Modo de la pestaña: tabla, Seguimientos o Acciones del paciente ----------
