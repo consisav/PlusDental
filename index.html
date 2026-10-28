@@ -2208,15 +2208,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label>NIT del paciente<input id="pgNit" type="text" readonly tabindex="-1" class="pg-auto" placeholder="Se llena al elegir el paciente"><small id="pgNitNota" class="pg-nota" hidden>El expediente no tiene NIT; se usa CF (consumidor final). Para cambiarlo, edítalo en Expediente de pacientes.</small></label>
 <label>Usuario que registra<output id="pgUsuario" class="pg-auto pg-out">—</output></label>
 </div>
-<div class="pg-sec"><b aria-hidden="true">2</b>Documento fiscal</div>
-<div class="pg-grid">
-<label>Tipo de documento *<select id="pgTipoDoc"><option value="factura">Factura</option><option value="recibo">Recibo</option></select></label>
-<label>Serie factura<input id="pgSerie" type="text" maxlength="20" autocomplete="off"></label>
-<label>Número factura<input id="pgNumFactura" type="text" maxlength="30" autocomplete="off"></label>
-<label>Estado<select id="pgEstado" class="pg-estado"><option value="emitido">Emitido</option><option value="aplicado">Aplicado</option><option value="certificado">Certificado</option></select></label>
-<label class="pg-s4">Número DTE (autorización FEL)<input id="pgDte" type="text" maxlength="60" autocomplete="off"></label>
-</div>
-<div class="pg-sec"><b aria-hidden="true">3</b>Datos del pago</div>
+<div class="pg-sec"><b aria-hidden="true">2</b>Datos del pago</div>
 <div class="pg-grid">
 <label>Fecha *<input id="pgFecha" type="date" required></label>
 <label>Método *<select id="pgMetodo"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option><option value="deposito">Depósito</option></select></label>
@@ -2227,6 +2219,14 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="pg-imprimir"><button type="button" id="pgImprimir" class="adm-btn" disabled title="Se activa al registrar el pago">Imprimir documento</button></div>
 <label class="pg-s2">Presupuesto (opcional)<select id="pgPresupuesto"><option value="">Sin presupuesto</option></select></label>
 <label class="pg-s2">Concepto<input id="pgConcepto" type="text" maxlength="150" placeholder="Ej.: abono, pago de limpieza"></label>
+</div>
+<div class="pg-sec"><b aria-hidden="true">3</b>Documento fiscal</div>
+<div class="pg-grid">
+<label>Tipo de documento *<select id="pgTipoDoc"><option value="factura">Factura</option><option value="recibo">Recibo</option></select></label>
+<label class="pg-solo-factura">Serie factura<input id="pgSerie" type="text" maxlength="20" autocomplete="off"></label>
+<label class="pg-solo-factura">Número factura<input id="pgNumFactura" type="text" maxlength="30" autocomplete="off"></label>
+<label>Estado<select id="pgEstado" class="pg-estado"><option value="emitido">Emitido</option><option value="aplicado">Aplicado</option><option value="certificado">Certificado</option></select></label>
+<label class="pg-s4 pg-solo-factura">Número DTE (autorización FEL)<input id="pgDte" type="text" maxlength="60" autocomplete="off"></label>
 </div>
 <div class="pg-sec"><b aria-hidden="true">4</b>Detalle del pago</div>
 <div class="roles-wrap"><table class="pg-detalle"><thead><tr><th>Línea</th><th>Procedimiento o producto</th><th>Clasificación</th><th class="num">Monto Q</th><th class="num">Monto US$</th><th><span class="sr-only">Quitar</span></th></tr></thead>
@@ -3085,7 +3085,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="odontograma.js"></script>
 <script src="expedientes.js?v=20261028c"></script>
 <script src="presupuestos.js"></script>
-<script src="cuentas.js?v=20261028b"></script>
+<script src="cuentas.js?v=20261028c"></script>
 <script src="tratamientos-paciente.js"></script>
 <script src="recetas.js"></script>
 <script src="laboratorio.js"></script>

@@ -51,6 +51,10 @@
       logoClinica() +
       '<div style="text-align:right;font-size:13px;color:#475B68"><div style="font-size:18px;font-weight:700;color:#0B2B40">' + titulo + '</div>Impreso el ' + fechaCorta(hoy()) + '</div></div>';
   }
+  // Serie, número de factura y DTE solo se muestran (y se graban) cuando el documento es factura
+  function esFactura() { return $('pgTipoDoc').value === 'factura'; }
+  function pintarTipoDoc() { document.querySelectorAll('#pagoForm .pg-solo-factura').forEach(function (l) { l.hidden = !esFactura(); }); }
+  if ($('pgTipoDoc')) { $('pgTipoDoc').addEventListener('change', pintarTipoDoc); pintarTipoDoc(); }
   function imprimir(html) {
     $('impresion').innerHTML = html;
     document.body.classList.add('imprimir');
@@ -501,7 +505,7 @@
     lineas = [lineaNueva()];
     $('pgNitNota').hidden = true;
     ['pgNit', 'pgSerie', 'pgNumFactura', 'pgDte', 'pgCuota', 'pgConcepto', 'pgObservaciones'].forEach(function (id) { $(id).value = ''; });
-    $('pgTipoDoc').value = 'factura'; $('pgMetodo').value = 'efectivo'; $('pgEstado').value = 'emitido'; pintarEstadoNuevo();
+    $('pgTipoDoc').value = 'factura'; $('pgMetodo').value = 'efectivo'; $('pgEstado').value = 'emitido'; pintarEstadoNuevo(); pintarTipoDoc();
     $('pgFecha').value = hoy();
     $('pgBanco').value = ''; $('pgDocBanco').value = ''; $('pgComprobante').value = ''; pintarBancario();
     $('pgUsuario').textContent = (window.PD_SESION && window.PD_SESION.usuario()) || '—';
@@ -634,8 +638,8 @@
       metodo: $('pgMetodo').value,
       referencia: null,
       concepto: $('pgConcepto').value.trim() || null,
-      nit: $('pgNit').value.trim(), tipo_documento: $('pgTipoDoc').value, serie: $('pgSerie').value.trim(),
-      numero_factura: $('pgNumFactura').value.trim(), numero_dte: $('pgDte').value.trim(),
+      nit: $('pgNit').value.trim(), tipo_documento: $('pgTipoDoc').value, serie: esFactura() ? $('pgSerie').value.trim() : '',
+      numero_factura: esFactura() ? $('pgNumFactura').value.trim() : '', numero_dte: esFactura() ? $('pgDte').value.trim() : '',
       numero_cuota: $('pgCuota').value ? +$('pgCuota').value : null, estado_doc: $('pgEstado').value,
       observaciones: $('pgObservaciones').value.trim()
     };
