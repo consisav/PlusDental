@@ -6602,6 +6602,9 @@ grant execute on function public.generar_acceso_paciente(bigint, text) to authen
 -- ===== Parentesco del contacto de emergencia del paciente =====
 alter table public.pacientes add column if not exists emergencia_parentesco text check (char_length(emergencia_parentesco) <= 40);
 
+-- ===== Código del paciente en el sistema anterior =====
+alter table public.pacientes add column if not exists codigo_anterior text check (char_length(codigo_anterior) <= 40);
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

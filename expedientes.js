@@ -6,7 +6,7 @@
   var BUCKET = 'expedientes';
   var CAMPOS = {
     nombre: 'pNombre', dpi: 'pDpi', nit: 'pNit', fecha_nacimiento: 'pNacimiento', telefono: 'pTelefono', direccion: 'pDireccion',
-    emergencia_nombre: 'pEmNombre', emergencia_parentesco: 'pEmParentesco', emergencia_telefono: 'pEmTelefono', estado: 'pEstado', correo: 'pCorreo', tipo_cliente: 'pTipoCliente'
+    emergencia_nombre: 'pEmNombre', emergencia_parentesco: 'pEmParentesco', emergencia_telefono: 'pEmTelefono', estado: 'pEstado', correo: 'pCorreo', tipo_cliente: 'pTipoCliente', codigo_anterior: 'pCodAnterior'
   };
   // Tipo de cliente: el mismo catálogo de tipos de precio (Inventarios › Precios por tipo de cliente)
   var TIPOS_CLIENTE = { directo: 'Cliente directo', institucional: 'Institucional', vip: 'VIP', referido: 'Referido', paquete: 'Paquete', especial: 'Especial' };
@@ -80,7 +80,7 @@
     var lista = pacientes.filter(function (p) {
       var est = p.estado || 'activo';
       return (filtroEstado === 'todos' || est === filtroEstado) &&
-        (!q || [p.nombre, p.dpi, p.telefono, p.medico && p.medico.nombre].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; }));
+        (!q || [p.nombre, p.dpi, p.telefono, p.codigo_anterior, p.medico && p.medico.nombre].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; }));
     });
     if (!lista.length) {
       $('expBody').innerHTML = '<tr><td colspan="8">' + (q ? 'Ningún paciente coincide con «' + esc(q) + '».'
@@ -416,7 +416,7 @@
       ? await sb.from('pacientes').update(datos).eq('id', actual.id).select('*,medico:dentistas(nombre)').single()
       : await sb.from('pacientes').insert(datos).select('*,medico:dentistas(nombre)').single();
     // Si aún no se ejecutó el SQL de pacientes institucionales, se graba sin institución ni sucursal
-    if (r.error && /institucion_id|sucursal_id|emergencia_parentesco/.test(r.error.message || '')) { delete datos.institucion_id; delete datos.sucursal_id; delete datos.emergencia_parentesco; r = actual ? await sb.from('pacientes').update(datos).eq('id', actual.id).select('*,medico:dentistas(nombre)').single() : await sb.from('pacientes').insert(datos).select('*,medico:dentistas(nombre)').single(); }
+    if (r.error && /institucion_id|sucursal_id|emergencia_parentesco|codigo_anterior/.test(r.error.message || '')) { delete datos.institucion_id; delete datos.sucursal_id; delete datos.emergencia_parentesco; delete datos.codigo_anterior; r = actual ? await sb.from('pacientes').update(datos).eq('id', actual.id).select('*,medico:dentistas(nombre)').single() : await sb.from('pacientes').insert(datos).select('*,medico:dentistas(nombre)').single(); }
     boton.disabled = false;
     if (r.error) { aviso(msgId, traducir(r.error), true); return; }
     var eraNuevo = !actual;
@@ -806,7 +806,7 @@
   $('fDatos').addEventListener('submit', function (e) {
     e.preventDefault();
     if (!editando) return;
-    guardar(['nombre', 'dpi', 'nit', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'emergencia_nombre', 'emergencia_parentesco', 'emergencia_telefono', 'estado', 'tipo_cliente'], 'fDatosMsg', this.querySelector('[type=submit]'));
+    guardar(['nombre', 'dpi', 'nit', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'emergencia_nombre', 'emergencia_parentesco', 'emergencia_telefono', 'estado', 'tipo_cliente', 'codigo_anterior'], 'fDatosMsg', this.querySelector('[type=submit]'));
   });
 
   $('odoGuardar').addEventListener('click', function () { guardarOdonto(this); });
