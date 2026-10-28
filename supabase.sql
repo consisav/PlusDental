@@ -6698,7 +6698,7 @@ create or replace function public.comisiones_lineas(p_desde date, p_hasta date, 
 returns table (origen text, ref_id bigint, fecha date, agente_id bigint, paciente_id bigint, paciente text, documento text,
   categoria text, concepto text, cantidad numeric, base numeric, regla_id bigint, tipo text, valor numeric, comision numeric,
   pago_comision_id bigint)
-language plpgsql stable security definer set search_path = public as $
+language plpgsql stable security definer set search_path = public as $$
 #variable_conflict use_column
 begin
   if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
