@@ -11,8 +11,10 @@
     { id: 'implante', nombre: 'Implante', tipo: 'pieza', abrev: 'IM' },
     { id: 'extraccion', nombre: 'Extracción indicada', tipo: 'pieza', fijo: 'r', abrev: 'EX' },
     { id: 'ausente', nombre: 'Ausente', tipo: 'pieza', fijo: 'a', abrev: 'AU' },
-    { id: 'borrar', nombre: 'Borrar pieza', tipo: 'borrar' }
+    { id: 'borrar', nombre: 'Borrar pieza', tipo: 'borrar' },
+    { id: 'limpieza', nombre: 'Limpieza', tipo: 'boca', abrev: 'LP' }
   ];
+  var BOCA = 0;   // «pieza» que guarda los hallazgos de toda la boca
   var POR_ID = {}; HERRAMIENTAS.forEach(function (h) { POR_ID[h.id] = h; });
   // Procedimientos del catálogo relacionados con cada herramienta (por palabras en el nombre)
   var CLAVES = {
@@ -22,7 +24,8 @@
     endodoncia: ['endodon', 'conducto', 'pulpot', 'pulpect', 'apicec'],
     implante: ['implante'],
     extraccion: ['extrac', 'exodon', 'cordal', 'tercer molar'],
-    ausente: ['protesis', 'puente', 'implante']
+    ausente: ['protesis', 'puente', 'implante'],
+    limpieza: ['limpieza', 'profilax', 'detartraj', 'tartrectom', 'raspado', 'alisado', 'pulido', 'curetaje', 'periodon', 'fluor', 'blanqueam', 'higiene']
   };
   var TIPOS_PRECIO = [['directo', 'Cliente directo'], ['institucional', 'Institucional'], ['vip', 'VIP'], ['referido', 'Referido'], ['paquete', 'Paquete'], ['especial', 'Especial']];
   var catalogo = [], tipoPrecio = 'directo';
@@ -168,6 +171,7 @@
       '.odg-det-c td.odg-c-pz strong{font-size:15px}',
       '.odg-det-c tfoot td small{font-weight:600}',
       '.odg-ver-pre{font:inherit;font-size:13px;font-weight:800;letter-spacing:.3px;padding:7px 14px;border-radius:999px;border:1px solid #0B2B40;background:#0B2B40;color:#FFFFFF;cursor:pointer;white-space:nowrap}',
+      '.odg-boca-r,.odg-boca-a{font-size:10.5px;font-weight:800;letter-spacing:.3px;padding:2px 7px;border-radius:999px;margin-left:4px}.odg-boca-r{background:#FDE2E4;color:#B4232F}.odg-boca-a{background:#DBEAFE;color:#1E40AF}',
       '.odg-ver-pre:hover{background:#005A87;border-color:#005A87}.odg-ver-pre[aria-expanded="true"]{background:#FFFFFF;color:#0B2B40}',
       '.odg-det-c select.odg-ie{width:100%;max-width:150px}',
       '.odg-det .odg-mod{font:inherit;font-size:12.5px;font-weight:700;border:1px solid #C4D4DF;border-radius:999px;padding:5px 10px;min-height:32px;background:#FFFFFF;color:#0B2B40;cursor:pointer;white-space:nowrap}',
@@ -266,7 +270,8 @@
       implante: '<text x="30" y="40" text-anchor="middle" font-size="28" font-weight="800" fill="' + c + '">IM</text>',
       extraccion: '<path d="M10 10L50 50M50 10L10 50" stroke="' + c + '" stroke-width="8"/>',
       ausente: '<path d="M8 52L52 8" stroke="' + c + '" stroke-width="8"/>',
-      borrar: '<path d="M18 18L42 42M42 18L18 42" stroke="#5A6D7A" stroke-width="7"/>'
+      borrar: '<path d="M18 18L42 42M42 18L18 42" stroke="#5A6D7A" stroke-width="7"/>',
+      limpieza: '<path d="M14 40c6-14 26-14 32 0" fill="none" stroke="' + c + '" stroke-width="6" stroke-linecap="round"/><circle cx="21" cy="24" r="4" fill="' + c + '"/><circle cx="30" cy="19" r="4" fill="' + c + '"/><circle cx="39" cy="24" r="4" fill="' + c + '"/>'
     }[h.id];
     return base + marca + '</svg>';
   }
@@ -347,6 +352,11 @@
     }
     function filasDetalle() {
       var req = [], hecho = [];
+      var boca = datos.piezas[BOCA];
+      if (boca) Object.keys(boca.estados).forEach(function (k) {
+        if (!POR_ID[k]) return;
+        (boca.estados[k] === 'r' ? req : hecho).push({ n: BOCA, clave: k, h: k, texto: POR_ID[k].nombre + ' · toda la boca', proc: boca.proc && boca.proc[k] });
+      });
       ORDEN.forEach(function (n) {
         var p = datos.piezas[n];
         if (!p) return;
@@ -371,7 +381,7 @@
       var cant = Math.max(parseInt(f.proc.cant, 10) || 1, 1);
       return { unit: unit, cant: cant, total: unit == null ? null : Math.round(unit * cant * 100) / 100, manual: f.proc.precio != null };
     }
-    function piezaDe(f) { return f.proc && f.proc.pieza ? f.proc.pieza : String(f.n); }
+    function piezaDe(f) { return f.proc && f.proc.pieza ? f.proc.pieza : f.n === BOCA ? 'Toda la boca' : String(f.n); }
     function textoDe(f) { return f.proc && f.proc.hallazgo ? f.proc.hallazgo : f.texto; }
     // Estado de cada procedimiento: el de su línea en el presupuesto confirmado (Pendiente si aún no hay)
     var ESTADOS_ITEM = [['pendiente', 'Pendiente'], ['proceso', 'Proceso'], ['finalizado', 'Finalizado'], ['eliminado', 'Eliminado']];
@@ -631,12 +641,33 @@
         '</div>' +
         '<div class="odg-herr" role="group" aria-label="Herramienta">' +
         '<span class="grupo">Por cara</span>' + HERRAMIENTAS.filter(function (h) { return h.tipo === 'cara'; }).map(boton).join('') +
-        '<span class="grupo" style="margin-left:8px">Pieza completa</span>' + HERRAMIENTAS.filter(function (h) { return h.tipo !== 'cara'; }).map(boton).join('') +
+        '<span class="grupo" style="margin-left:8px">Pieza completa</span>' + HERRAMIENTAS.filter(function (h) { return h.tipo === 'pieza' || h.tipo === 'borrar'; }).map(boton).join('') +
+        '<span class="grupo" style="margin-left:8px">Toda la boca</span>' + HERRAMIENTAS.filter(function (h) { return h.tipo === 'boca'; }).map(botonBoca).join('') +
         '</div>' +
         '<div class="odg-lienzo"><div class="odg-mapa">' + mapa.join('') + '</div></div>' +
         '<div class="odg-ley"><span><i style="background:' + ROJO + '"></i>Requerido / caries</span><span><i style="background:' + AZUL + '"></i>Realizado / existente</span>' +
-        '<span>CR corona · TC endodoncia · IM implante · EX extracción indicada · AU ausente</span></div>' +
+        '<span>CR corona · TC endodoncia · IM implante · EX extracción indicada · AU ausente · Limpieza: toda la boca</span></div>' +
         '<div class="odg-res">' + resumen() + '</div></div>';
+    }
+    // Botón de toda la boca: muestra si ya está marcado (Requerido o Realizado)
+    function botonBoca(h) {
+      var p = datos.piezas[BOCA], c = p && p.estados[h.id];
+      return '<button type="button" data-boca="' + h.id + '" aria-pressed="' + !!c + '" title="' + (c ? h.nombre + ' de toda la boca: ' + (c === 'r' ? 'Requerido' : 'Realizado') + '. Tócalo para quitarla o cambiar el procedimiento.' : 'Marcar ' + h.nombre.toLowerCase() + ' para toda la boca (' + (modo === 'r' ? 'Requerido' : 'Realizado') + ')') + '">' +
+        icono(h, c || modo) + h.nombre + (c ? ' <b class="odg-boca-' + c + '">' + (c === 'r' ? 'Requerido' : 'Realizado') + '</b>' : '') + '</button>';
+    }
+    // Marcar / desmarcar un hallazgo de toda la boca; al marcarlo como Requerido se elige el procedimiento de limpieza
+    function marcarBoca(id) {
+      var h = POR_ID[id], p = datos.piezas[BOCA], actualC = p && p.estados[id];
+      if (actualC) {
+        if (actualC === 'r' && p.proc && p.proc[id] && esSuper() && !confirm('La ' + h.nombre.toLowerCase() + ' de toda la boca ya está marcada. Aceptar = quitarla · Cancelar = cambiar su procedimiento')) {
+          abrirVentana({ n: BOCA, clave: id, h: id, texto: h.nombre + ' · toda la boca' }); return;
+        }
+        delete p.estados[id]; quitarProc(p, id); limpiarVacias(BOCA);
+        avisar(); pintar(); return;
+      }
+      pieza(BOCA).estados[id] = modo;
+      avisar(); pintar();
+      if (modo === 'r') abrirVentana({ n: BOCA, clave: id, h: id, texto: h.nombre + ' · toda la boca' });
     }
     function boton(h) {
       return '<button type="button" data-herr="' + h.id + '" aria-pressed="' + (herramienta === h.id) + '">' + icono(h, modo) + h.nombre + '</button>';
@@ -756,7 +787,7 @@
       }
       info.elegir = ponerProc;
       dlg._info = info; dlg._todos = false; dlg._sel = null; dlg._val = {};
-      dlg.querySelector('h4').textContent = 'Pieza ' + info.n + ' · ' + info.texto;
+      dlg.querySelector('h4').textContent = info.n === BOCA ? info.texto.charAt(0).toUpperCase() + info.texto.slice(1) : 'Pieza ' + info.n + ' · ' + info.texto;
       var tp = TIPOS_PRECIO.filter(function (t) { return t[0] === tipoPrecio; })[0];
       dlg.querySelector('p').innerHTML = '¿Qué procedimiento se hará? Precios de <b>' + (tp ? tp[1] : '') + '</b>. Elige el procedimiento, ajusta su valor si es necesario y pulsa «Confirmar»: ese será el valor real.';
       dlg.querySelector('input').value = '';
@@ -980,6 +1011,8 @@
       if (est) { if (!est.disabled && editandoDatos && esSuper()) { datosPre.estado = est.dataset.preEstado; pintar(); } return; }
       if (e.target.closest('[data-crear-presupuesto]')) { abrirPresupuesto(); return; }
       if (e.target.closest('[data-imprimir-odg]')) { imprimirDetalle(); return; }
+      var bb = e.target.closest('[data-boca]');
+      if (bb) { marcarBoca(bb.dataset.boca); return; }
       var b = e.target.closest('[data-denticion],[data-modo],[data-herr]');
       if (b) {
         if (b.dataset.denticion) { datos.denticion = b.dataset.denticion; avisar(); }
@@ -1135,8 +1168,8 @@
       });
       if (agregado.length || quitado.length || procs.length) {
         out.push({
-          clave: String(n), pieza: +n,
-          descripcion: [agregado.length ? 'Agregado: ' + agregado.join(', ') : '', quitado.length ? 'Quitado: ' + quitado.join(', ') : '',
+          clave: String(n), pieza: +n === BOCA ? null : +n,
+          descripcion: (+n === BOCA ? 'Toda la boca · ' : '') + [agregado.length ? 'Agregado: ' + agregado.join(', ') : '', quitado.length ? 'Quitado: ' + quitado.join(', ') : '',
             procs.length ? 'Procedimiento: ' + procs.join(', ') : ''].filter(Boolean).join(' · ')
         });
       }
