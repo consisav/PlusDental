@@ -447,6 +447,8 @@
   window.PD_ODONTOGRAMA_ACTUAL = function () { return typeof odg !== 'undefined' && odg ? odg.valor() : null; };
   var odg = window.Odontograma.crear($('odoComp'), {
     onCambio: function () { revisarCambios(); },
+    // Botón «Presupuesto» del odontograma: también muestra u oculta el historial de cambios
+    verPresupuesto: function (ver) { $('odoHistCaja').hidden = !ver; },
     paciente: function () { return actual ? actual.nombre : ''; },
     // Solo el Super Administrador modifica procedimientos, precios y datos del presupuesto
     esSuper: function () { return !!(window.PD_SESION && window.PD_SESION.esSuper()); },

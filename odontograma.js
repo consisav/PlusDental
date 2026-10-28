@@ -167,6 +167,8 @@
       '.odg-det-c td small{display:block;font-size:12px;color:#5A6D7A;font-weight:500;margin-top:2px}',
       '.odg-det-c td.odg-c-pz strong{font-size:15px}',
       '.odg-det-c tfoot td small{font-weight:600}',
+      '.odg-ver-pre{font:inherit;font-size:13px;font-weight:800;letter-spacing:.3px;padding:7px 14px;border-radius:999px;border:1px solid #0B2B40;background:#0B2B40;color:#FFFFFF;cursor:pointer;white-space:nowrap}',
+      '.odg-ver-pre:hover{background:#005A87;border-color:#005A87}.odg-ver-pre[aria-expanded="true"]{background:#FFFFFF;color:#0B2B40}',
       '.odg-det-c select.odg-ie{width:100%;max-width:150px}',
       '.odg-det .odg-mod{font:inherit;font-size:12.5px;font-weight:700;border:1px solid #C4D4DF;border-radius:999px;padding:5px 10px;min-height:32px;background:#FFFFFF;color:#0B2B40;cursor:pointer;white-space:nowrap}',
       '.odg-det .odg-mod:hover{border-color:#0B2B40}',
@@ -434,7 +436,7 @@
       }).join('');
       var pie = conTotal && filas.length ? '<tfoot><tr><td colspan="2">TOTAL ESTIMADO' +
         ([sinProc ? sinProc + ' sin procedimiento' : '', sinPrecio ? sinPrecio + ' sin precio' : ''].filter(Boolean).length ? '<small>' + [sinProc ? sinProc + ' sin procedimiento' : '', sinPrecio ? sinPrecio + ' sin precio' : ''].filter(Boolean).join(' · ') + '</small>' : '') +
-        '</td><td class="num">' + q(total) + '</td>' + (conEstado ? '<td></td>' : '') + '<td></td></tr></tfoot>' : '';
+        '</td><td class="num">' + q(total) + '</td>' + (conEstado ? '<td>' + botonVerPre() + '</td><td></td>' : '<td>' + botonVerPre() + '</td>') + '</tr></tfoot>' : '';
       return (conEstado ? avisoEstado() : '') + '<div class="odg-det-wrap"><table class="odg-det odg-det-c"><thead><tr><th class="odg-c-pz">Pieza · hallazgo</th><th>Procedimiento</th><th class="num odg-c-val">Valor</th>' +
         (conEstado ? '<th class="odg-c-est">Estado · fecha</th>' : '') + '<th class="odg-c-acc"><span class="sr-only">Acciones</span></th></tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table></div>';
     }
@@ -503,6 +505,13 @@
       opciones.imprimir({ info: info, lineas: lineas });
     }
     var verSinProc = false;
+    // «Presupuesto»: muestra u oculta los datos del presupuesto y el historial de cambios
+    var verPre = false;
+    function botonVerPre() {
+      if (!opciones.crearPresupuesto) return '';
+      return '<button type="button" class="odg-ver-pre" data-ver-pre aria-expanded="' + verPre + '">' + (verPre ? 'Ocultar presupuesto' : 'Presupuesto') + '</button>';
+    }
+    function avisarVerPre() { if (opciones.verPresupuesto) opciones.verPresupuesto(verPre); }
     // Datos del presupuesto que se creará desde el odontograma
     var FORMAS = [['efectivo', 'Efectivo'], ['transferencia', 'Transferencia'], ['tarjeta', 'Tarjeta de crédito'], ['otro', 'Otro']];
     var CUOTAS = [1, 2, 3, 6, 10, 12, 18, 24];
@@ -595,7 +604,7 @@
         (f.req.length && catalogo.length ? '<div class="odg-acc">' + selTipo + crearPre + '</div>' : '') + '</div>' +
         (msgPre && preActual && !modoNuevo && !(opciones.crearPresupuesto && (conProc.length || preActual)) ? '<p class="odg-pre-msg' + (msgPre.error ? ' error' : '') + '">' + esc(msgPre.texto) + '</p>' : '') +
         (visibles.length ? tablaDetalle(visibles, true) : f.req.length ? '<p class="odg-vacio">Aún no hay hallazgos con procedimiento elegido.</p>' : 'Sin tratamientos pendientes.') + enlace +
-        (opciones.crearPresupuesto && (conProc.length || (preActual && !modoNuevo)) ? bloquePresupuesto(totalPre) : '') + '</div>' +
+        ((verPre || modoNuevo) && opciones.crearPresupuesto && (conProc.length || (preActual && !modoNuevo)) ? bloquePresupuesto(totalPre) : '') + '</div>' +
         '<div><div class="odg-cab"><h4 style="color:' + AZUL + '">Realizado / existente (' + f.hecho.length + ')</h4></div>' +
         (f.hecho.length ? tablaDetalle(f.hecho, false) : 'Sin registros.') + '</div>';
     }
@@ -927,13 +936,18 @@
     raiz.addEventListener('click', function (e) {
       if (e.target.closest('select')) return;
       if (e.target.closest('[data-ver-sin]')) { verSinProc = !verSinProc; pintar(); return; }
+      if (e.target.closest('[data-ver-pre]')) {
+        verPre = !verPre; pintar(); avisarVerPre();
+        if (verPre) { var bp = raiz.querySelector('.odg-pre'); if (bp) bp.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+        return;
+      }
       var fm = e.target.closest('[data-fila-mod]');
       if (fm && esSuper()) { editandoFila = fm.dataset.filaMod; pintar(); var pf = raiz.querySelector('.odg-edit [data-ed="proc"]'); if (pf) pf.focus(); return; }
       if (e.target.closest('[data-fila-guardar]')) { guardarFila(e.target.closest('tr')); return; }
       if (e.target.closest('[data-fila-cancelar]')) { editandoFila = null; pintar(); return; }
       if (e.target.closest('[data-datos-mod]') && esSuper()) { editandoDatos = true; copiaDatos = { d: JSON.parse(JSON.stringify(datosPre)), t: tipoPrecio }; pintar(); return; }
       if (e.target.closest('[data-datos-guardar]')) { editandoDatos = false; copiaDatos = null; pintar(); return; }
-      if (e.target.closest('[data-pre-nuevo]') && esSuper()) { modoNuevo = true; editandoDatos = true; msgPre = null; datosPre = { forma: 'efectivo', cuotas: 1, sinRecargo: false, citas: '', estado: 'activo' }; copiaDatos = { d: JSON.parse(JSON.stringify(datosPre)), t: tipoPrecio }; pintar(); return; }
+      if (e.target.closest('[data-pre-nuevo]') && esSuper()) { verPre = true; avisarVerPre(); modoNuevo = true; editandoDatos = true; msgPre = null; datosPre = { forma: 'efectivo', cuotas: 1, sinRecargo: false, citas: '', estado: 'activo' }; copiaDatos = { d: JSON.parse(JSON.stringify(datosPre)), t: tipoPrecio }; pintar(); return; }
       if (e.target.closest('[data-pre-volver]')) { modoNuevo = false; editandoDatos = false; pintar(); return; }
       if (e.target.closest('[data-ex-mod]') && esSuper() && preActual) {
         editandoExist = true; msgPre = null;
