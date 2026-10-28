@@ -467,6 +467,9 @@
     '<p id="cpPagosMsg" class="dlg-msg" role="status"></p>';
 
   var verLineas = 'aut';
+  // Solo el médico principal o el Super Administrador pueden pagar (Supabase también lo valida)
+  var puedePagar = false;
+  async function permisoPago() { var r = await sb.rpc('puede_pagar_comisiones'); puedePagar = !r.error && r.data === true; }
   (function () { var h = new Date(); $('cpDesde').value = iso(new Date(h.getFullYear(), h.getMonth(), 1)); $('cpHasta').value = iso(h); })();
   function textoValor(l) { return l.tipo === 'valor' ? q(l.valor) + ' c/u' : pct(l.valor); }
   function opcionesBanco(elegido) {
@@ -489,6 +492,7 @@
     catch (e) { $('cpResultado').hidden = true; aviso('cpMsg', traducir(e), true); return; }
     lineas.sort(function (x, y) { return ordenBen({ benef: x.beneficiario, nombre: nombreBen(x.beneficiario, idBen(x)) }, { benef: y.beneficiario, nombre: nombreBen(y.beneficiario, idBen(y)) }) || ordenLinea(x, y); });
     calculo = { agente: ag, inst: ins, desde: d, hasta: h };
+    await permisoPago();
     aviso('cpMsg', lineas.length ? '' : 'No hay comisiones generadas para esos parámetros. Genéralas primero en «Generar comisiones».');
     $('cpResultado').hidden = !lineas.length;
     await cargarPagos();
@@ -519,7 +523,7 @@
     aut.forEach(function (l) { if (Number(l.comision) <= 0) return; var k = claveBen(l); if (!porB[k]) { porB[k] = { benef: l.beneficiario, id: idBen(l), nombre: nombreBen(l.beneficiario, idBen(l)), ls: [] }; orden.push(porB[k]); } porB[k].ls.push(l); });
     if (!orden.length) { $('cpVendedores').innerHTML = '<p class="dlg-msg">No hay comisiones autorizadas por pagar con estos parámetros.</p>'; return; }
     var hoyIso = iso(new Date());
-    $('cpVendedores').innerHTML = orden.sort(ordenBen).map(function (b) {
+    $('cpVendedores').innerHTML = (puedePagar ? '' : '<p class="com-sin-permiso">Solo el <b>médico principal</b> o el <b>Super Administrador</b> pueden pagar comisiones.</p>') + orden.sort(ordenBen).map(function (b) {
       var total = b.ls.reduce(function (t, l) { return t + Number(l.comision); }, 0);
       var ult = pagos.filter(function (p) { return p.beneficiario === b.benef && (b.benef === 'agente' ? p.agente_id : p.institucion_id) === b.id && !p.anulado && (p.banco || p.cuenta_bancaria); })[0] || {};
       var pacs = {}; b.ls.forEach(function (l) { pacs[l.paciente_id] = 1; });
@@ -536,7 +540,7 @@
         '<label><small>Referencia / No. de operación</small><input type="text" data-v="referencia" maxlength="80" autocomplete="off"></label>' +
         '<label class="com-vend-obs"><small>Observaciones</small><input type="text" data-v="observaciones" maxlength="300" autocomplete="off"></label>' +
         '</div>' +
-        '<div class="com-vend-acc"><p class="dlg-msg" role="status" data-vmsg></p><button type="button" class="com-pagar" data-pagar="' + b.id + '">Pagar ' + q(total) + '</button></div></div>';
+        '<div class="com-vend-acc"><p class="dlg-msg" role="status" data-vmsg></p><button type="button" class="com-pagar" data-pagar="' + b.id + '"' + (puedePagar ? '' : ' disabled title="Solo el médico principal o el Super Administrador pueden pagar"') + '>Pagar ' + q(total) + '</button></div></div>';
     }).join('');
   }
   async function cargarPagos() {
@@ -591,7 +595,7 @@
   document.querySelectorAll('[data-cpver]').forEach(function (b) { b.addEventListener('click', function () { verLineas = b.dataset.cpver; pintarLineas(); }); });
   $('cpVendedores').addEventListener('click', async function (e) {
     var b = e.target.closest('[data-pagar]');
-    if (!b || !calculo) return;
+    if (!b || !calculo || !puedePagar) return;
     var card = b.closest('[data-vend]'), msg = card.querySelector('[data-vmsg]');
     function campo(k) { var x = card.querySelector('[data-v="' + k + '"]'); return x ? x.value.trim() : ''; }
     function av(t, err) { msg.textContent = t; msg.style.color = err ? '#9A3B2E' : '#475B68'; }
@@ -623,7 +627,7 @@
 
   var t1 = $('tabComReglas'), t2 = $('tabComPago'), t3 = $('tabRepComisiones');
   if (t1) t1.addEventListener('click', function () { verReglas('crLista'); cargarReglas(); });
-  if (t2) t2.addEventListener('click', function () { cargarApoyo().then(cargarPagos); });
+  if (t2) t2.addEventListener('click', function () { permisoPago(); cargarApoyo().then(cargarPagos); });
   if (t3) t3.addEventListener('click', function () { cargarApoyo(); });
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { cargarReglas(); },

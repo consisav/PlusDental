@@ -7116,6 +7116,7 @@ returns bigint language plpgsql security definer set search_path = public as $$
 declare v_id bigint; v_base numeric; v_monto numeric; v_n int; v_metodo text := coalesce(nullif(p_datos ->> 'metodo', ''), 'transferencia');
 begin
   if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if not public.puede_pagar_comisiones() then raise exception 'Solo el médico principal o el Super Administrador pueden pagar comisiones'; end if;
   if p_beneficiario not in ('agente', 'institucion') or p_id is null or p_desde is null or p_hasta is null or p_hasta < p_desde then raise exception 'Revisa el beneficiario y el rango de fechas'; end if;
   if v_metodo in ('transferencia', 'deposito') and coalesce(nullif(trim(p_datos ->> 'banco'), ''), '') = '' then raise exception 'Elige el banco del pago'; end if;
   perform pg_advisory_xact_lock(hashtext('comisiones_pago_' || p_beneficiario), p_id::int);
@@ -7159,6 +7160,17 @@ begin
   perform set_config('pd.pago_comision', '', true);
 end;
 $$;
+
+-- ===== Pagar comisiones: solo el médico principal o el Super Administrador =====
+create or replace function public.puede_pagar_comisiones()
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.es_super_administrador() or exists (
+    select 1 from public.dentistas d join public.perfiles p on p.usuario = d.usuario
+    where p.id = auth.uid() and d.estado = 'activo' and d.rol_sala = 'principal');
+$$;
+revoke execute on function public.puede_pagar_comisiones() from public, anon;
+grant execute on function public.puede_pagar_comisiones() to authenticated;
+-- (registrar_pago_comision, arriba, valida: if not public.puede_pagar_comisiones() then raise exception ...)
 
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
