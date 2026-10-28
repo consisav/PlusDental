@@ -164,7 +164,7 @@
     },
 
     comisiones: {
-      panel: 'admRepComisiones', titulo: 'Comisiones generadas', agenteInst: true, boton: 'Generar Comisiones',
+      panel: 'admRepComisiones', titulo: 'Comisiones generadas', agenteInst: true, boton: 'Generar Comisiones', detalle: true,
       nota: 'Comisión de cada agente comercial entre las dos fechas según el Catálogo de comisiones (sin regla: su % general) sobre lo cobrado (no anulado) y las órdenes de laboratorio recibidas de sus pacientes. Incluye lo ya pagado y lo pendiente.',
       estados: { activo: ['Activo', 'verde'], suspendido: ['Suspendido', 'ambar'], inactivo: ['Inactivo', 'gris'] },
       columnas: [
@@ -190,10 +190,10 @@
           var ra = await sb.from('agentes').select('id,codigo,nombre,estado');
           if (ra.error) throw ra.error;
           var g = {};
-          (ra.data || []).forEach(function (a) { if (a.codigo !== '0' && (!ag || a.id === ag)) g[a.id] = { codigo: a.codigo, nombre: a.nombre, estado: a.estado, total: 0, cobros: 0, monto: 0, pagado: 0, pac: {} }; });
+          (ra.data || []).forEach(function (a) { if (a.codigo !== '0' && (!ag || a.id === ag)) g[a.id] = { id: a.id, lineas: [], codigo: a.codigo, nombre: a.nombre, estado: a.estado, total: 0, cobros: 0, monto: 0, pagado: 0, pac: {} }; });
           (rl.data || []).forEach(function (l) {
             var a = g[l.agente_id]; if (!a) return;
-            a.total += Number(l.base); a.monto += Number(l.comision); a.cobros++; a.pac[l.paciente_id] = 1;
+            a.total += Number(l.base); a.monto += Number(l.comision); a.cobros++; a.pac[l.paciente_id] = 1; a.lineas.push(l);
             if (l.pago_comision_id) a.pagado += Number(l.comision);
           });
           var ord = function (c) { return /^\d+$/.test(c) ? +c : Infinity; };
@@ -265,8 +265,9 @@
       '<div class="rep-chips" data-rep-chips="' + clave + '" aria-label="Filtrar por estado"></div>' +
       '<div class="rep-totales" data-rep-totales="' + clave + '"></div>' +
       '<div class="roles-wrap"><table class="rep-tabla"><thead><tr>' +
-      def.columnas.map(function (c) { return '<th' + (c[2] ? ' class="num"' : '') + '>' + esc(c[0]) + '</th>'; }).join('') + '<th>Estado</th></tr></thead>' +
+      def.columnas.map(function (c) { return '<th' + (c[2] ? ' class="num"' : '') + '>' + esc(c[0]) + '</th>'; }).join('') + '<th>Estado</th>' + (def.detalle ? '<th><span class="sr-only">Detalle</span></th>' : '') + '</tr></thead>' +
       '<tbody data-rep-body="' + clave + '"></tbody></table></div>' +
+      (def.detalle ? '<div class="rep-det" data-rep-det="' + clave + '" hidden></div>' : '') +
       '<p class="dlg-msg" role="status" data-rep-msg="' + clave + '"></p>';
     estadoRep[clave] = { filas: null, ocultos: {}, generado: false };
     if (def.cliente) llenarClientes(p.querySelector('select[name=cliente]'));
@@ -333,7 +334,8 @@
   }
 
   function filaHtml(def, f) {
-    return '<tr>' + def.columnas.map(function (c) { return '<td' + (c[2] ? ' class="num"' : '') + '>' + esc(texto(c, f)) + '</td>'; }).join('') + '<td>' + pill(def, f.estado) + '</td></tr>';
+    return '<tr>' + def.columnas.map(function (c) { return '<td' + (c[2] ? ' class="num"' : '') + '>' + esc(texto(c, f)) + '</td>'; }).join('') + '<td>' + pill(def, f.estado) + '</td>' +
+      (def.detalle ? '<td>' + (f.lineas ? '<button type="button" class="adm-btn rep-det-btn" data-rep-detalle="' + f.id + '"' + (f.lineas.length ? '' : ' disabled') + '>Detalle</button>' : '') + '</td>' : '') + '</tr>';
   }
   function filaSuma(def, filas, etiqueta, clase) {
     var cuenta = def.cuenta ? filas.filter(def.cuenta) : filas;
@@ -346,7 +348,7 @@
       }
       if (primera) { primera = false; return '<td>' + esc(etiqueta) + '</td>'; }
       return '<td></td>';
-    }).join('') + '<td></td></tr>';
+    }).join('') + '<td></td>' + (def.detalle ? '<td></td>' : '') + '</tr>';
   }
 
   function pintar(clave) {
@@ -362,7 +364,8 @@
     }).join('');
     p.querySelector('[data-rep-totales]').innerHTML = !s.generado ? '' :
       def.totales(filas).map(function (t) { return '<div class="rep-total-caja"><span>' + esc(t[0]) + '</span><b>' + esc(String(t[1])) + '</b></div>'; }).join('');
-    var cols = def.columnas.length + 1, cuerpo;
+    var cols = def.columnas.length + 1 + (def.detalle ? 1 : 0), cuerpo;
+    var caja = p.querySelector('[data-rep-det]'); if (caja) { caja.hidden = true; caja.innerHTML = ''; }
     if (!s.generado) cuerpo = '';
     else if (!filas.length) cuerpo = '<tr><td colspan="' + cols + '">No hay datos para esas fechas' + (todas.length ? ' con los estados elegidos' : '') + '.</td></tr>';
     else if (def.grupo) {
@@ -376,11 +379,65 @@
     p.querySelector('[data-rep-excel]').disabled = !s.generado || !filas.length;
   }
 
+  // ---------- Detalle de comisiones de un agente ----------
+  var CATEGORIA = { procedimientos: 'Procedimiento', medicamentos: 'Medicamento', laboratorio: 'Laboratorio', otros: 'Otro cobro' };
+  function reglaTxt(l) { return !l.regla_id ? pct(l.valor) + ' (general)' : l.tipo === 'valor' ? q(l.valor) + ' c/u' : pct(l.valor); }
+  function detalleHtml(clave, a) {
+    var s = estadoRep[clave];
+    var ls = a.lineas.slice().sort(function (x, y) {
+      return String(x.paciente || '').localeCompare(String(y.paciente || ''), 'es') || (x.paciente_id - y.paciente_id) || (x.fecha < y.fecha ? -1 : x.fecha > y.fecha ? 1 : 0) || (x.ref_id - y.ref_id);
+    });
+    var grupos = [], porPac = {};
+    ls.forEach(function (l) { var k = l.paciente_id; if (!porPac[k]) { porPac[k] = []; grupos.push(k); } porPac[k].push(l); });
+    function suma(x, k) { return x.reduce(function (t, l) { return t + Number(l[k]); }, 0); }
+    var cuerpo = grupos.map(function (k) {
+      var g = porPac[k];
+      return '<tr class="rep-det-pac"><td colspan="8">' + esc(g[0].paciente) + ' <small>· ' + g.length + (g.length === 1 ? ' línea' : ' líneas') + '</small></td></tr>' +
+        g.map(function (l) {
+          return '<tr><td>' + fechaCorta(l.fecha) + '</td><td>' + esc(l.documento) + '</td><td>' + esc(l.concepto) + (Number(l.cantidad) !== 1 ? ' × ' + Number(l.cantidad) : '') + '</td>' +
+            '<td>' + esc(CATEGORIA[l.categoria] || l.categoria) + '</td><td class="num">' + q(l.base) + '</td><td class="num">' + esc(reglaTxt(l)) + '</td>' +
+            '<td class="num">' + q(l.comision) + '</td><td>' + (l.pago_comision_id ? '<span class="estado rep-e-verde">Pagada · No. ' + l.pago_comision_id + '</span>' : '<span class="estado rep-e-ambar">Pendiente</span>') + '</td></tr>';
+        }).join('') +
+        '<tr class="rep-sub"><td colspan="4">Subtotal ' + esc(g[0].paciente) + '</td><td class="num">' + q(suma(g, 'base')) + '</td><td></td><td class="num">' + q(suma(g, 'comision')) + '</td><td></td></tr>';
+    }).join('');
+    return '<div class="rep-det-head"><div><h4>Detalle de comisiones · ' + esc(a.codigo + ' · ' + a.nombre) + '</h4>' +
+      '<p class="dlg-msg">' + rango(s) + ' · ' + grupos.length + (grupos.length === 1 ? ' paciente' : ' pacientes') + ' · ' + ls.length + (ls.length === 1 ? ' línea' : ' líneas') + '. Ordenado por paciente y fecha.</p></div>' +
+      '<div class="hi-botones"><button type="button" class="adm-btn" data-rep-det-imprimir="' + clave + '">Imprimir detalle</button><button type="button" class="adm-btn" data-rep-det-cerrar="' + clave + '">Cerrar</button></div></div>' +
+      '<div class="roles-wrap"><table class="rep-tabla"><thead><tr><th>Fecha</th><th>Documento</th><th>Concepto</th><th>Tipo</th><th class="num">Base</th><th class="num">Regla</th><th class="num">Comisión</th><th>Estado</th></tr></thead><tbody>' +
+      cuerpo + '<tr class="rep-total"><td colspan="4">TOTAL</td><td class="num">' + q(suma(ls, 'base')) + '</td><td></td><td class="num">' + q(suma(ls, 'comision')) + '</td><td></td></tr></tbody></table></div>';
+  }
+  function verDetalle(clave, id) {
+    var def = REPORTES[clave], s = estadoRep[clave], caja = $(def.panel).querySelector('[data-rep-det]');
+    var a = (s.filas || []).filter(function (f) { return String(f.id) === String(id); })[0];
+    if (!a || !caja) return;
+    caja.innerHTML = detalleHtml(clave, a); caja.hidden = false; caja.dataset.agente = a.id;
+    caja.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function imprimirDetalle(clave) {
+    var def = REPORTES[clave], caja = $(def.panel).querySelector('[data-rep-det]');
+    var tabla = caja.querySelector('table').cloneNode(true), titulo = caja.querySelector('h4').textContent, sub = caja.querySelector('.dlg-msg').textContent;
+    var celda = 'padding:5px 5px;border-bottom:1px solid #D9E4EC;text-align:left';
+    tabla.setAttribute('style', 'width:100%;border-collapse:collapse;font-size:11px');
+    tabla.querySelectorAll('th,td').forEach(function (c) { c.setAttribute('style', celda + (c.classList.contains('num') ? ';text-align:right' : '')); });
+    tabla.querySelectorAll('tr.rep-det-pac td').forEach(function (c) { c.style.fontWeight = '800'; c.style.paddingTop = '10px'; c.style.borderBottom = '1px solid #0B2B40'; });
+    tabla.querySelectorAll('tr.rep-sub td').forEach(function (c) { c.style.fontWeight = '700'; c.style.background = '#F5F9FC'; });
+    tabla.querySelectorAll('tr.rep-total td').forEach(function (c) { c.style.fontWeight = '800'; c.style.borderTop = '2px solid #0B2B40'; });
+    $('impresion').innerHTML = '<div style="font-family:Manrope,system-ui,sans-serif;color:#0B2B40;max-width:1000px;margin:0 auto;padding:20px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid #0B2B40;padding-bottom:12px;margin-bottom:14px">' +
+      '<div><div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:28px">' + CLINICA.nombre + '</div><div style="font-size:12px;color:#475B68">' + CLINICA.direccion + ' · ' + CLINICA.telefono + '</div></div>' +
+      '<div style="text-align:right;font-size:12.5px;color:#475B68"><div style="font-size:17px;font-weight:700;color:#0B2B40">' + esc(titulo) + '</div>' + esc(sub) + '<br>Impreso el ' + fechaCorta(hoy()) + '</div></div>' +
+      '<div style="font-size:12px;color:#475B68;margin-bottom:8px">Parámetros: ' + parametros(estadoRep[clave]).map(function (x) { return esc(x[0]) + ' <b>' + esc(x[1]) + '</b>'; }).join(' · ') + '</div>' +
+      tabla.outerHTML + '</div>';
+    document.body.classList.add('imprimir');
+    window.print();
+  }
+
   // ---------- Imprimir y exportar ----------
   function rango(s) { return 'Del ' + fechaCorta(s.desde) + ' al ' + fechaCorta(s.hasta); }
   function imprimir(clave) {
     var def = REPORTES[clave], s = estadoRep[clave], tabla = $(def.panel).querySelector('.rep-tabla').cloneNode(true);
     var celda = 'padding:6px 5px;border-bottom:1px solid #D9E4EC;text-align:left';
+    tabla.querySelectorAll('.rep-det-btn').forEach(function (b) { b.remove(); });
     tabla.setAttribute('style', 'width:100%;border-collapse:collapse;font-size:11.5px');
     tabla.querySelectorAll('th,td').forEach(function (c) { c.setAttribute('style', celda + (c.classList.contains('num') ? ';text-align:right' : '')); });
     tabla.querySelectorAll('tr.rep-sub td').forEach(function (c) { c.style.fontWeight = '700'; c.style.background = '#F5F9FC'; });
@@ -445,6 +502,13 @@
     generar(f.dataset.repForm);
   });
   document.addEventListener('click', function (e) {
+    var dt = e.target.closest('[data-rep-detalle],[data-rep-det-cerrar],[data-rep-det-imprimir]');
+    if (dt) {
+      var cl = dt.closest('[data-rep-det]') ? dt.closest('[data-rep-det]').dataset.repDet : null;
+      if (dt.dataset.repDetalle) { var tb = dt.closest('[data-rep-body]'); verDetalle(tb.dataset.repBody, dt.dataset.repDetalle); return; }
+      if (dt.dataset.repDetCerrar) { var cj = dt.closest('[data-rep-det]'); cj.hidden = true; cj.innerHTML = ''; return; }
+      if (dt.dataset.repDetImprimir) { imprimirDetalle(cl); return; }
+    }
     var b = e.target.closest('[data-rep-estado],[data-rep-imprimir],[data-rep-excel]');
     if (!b) return;
     if (b.dataset.repImprimir) { imprimir(b.dataset.repImprimir); return; }
