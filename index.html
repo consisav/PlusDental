@@ -51,7 +51,7 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .adm-primary{background:#005A87;color:#FFFFFF;border-color:#005A87}
 .adm-primary:hover:not(:disabled){background:#00476B;color:#FFFFFF}
 .adm-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:36px;align-items:start}
-.adm-menu{display:flex;flex-direction:column;gap:4px;position:sticky;top:96px;border-right:1px solid #D9E4EC;padding-right:20px}
+.adm-menu{display:flex;flex-direction:column;gap:4px;position:sticky;top:var(--pd-menu-top,150px);max-height:calc(100vh - var(--pd-menu-top,150px) - 16px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;border-right:1px solid #D9E4EC;padding-right:20px}
 .adm-menu button{font:inherit;font-size:15px;font-weight:600;text-align:left;color:#475B68;background:transparent;border:0;border-radius:12px;padding:12px 14px;min-height:44px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .adm-menu button:hover{background:#EEF5FA;color:#0B2B40}
 .adm-menu button[aria-selected="true"]{background:#0B2B40;color:#FFFFFF}
@@ -65,7 +65,7 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .pronto-pill{background:#EBF0F4;color:#5A6D7A;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700}
 @media (max-width:960px){
 .adm-layout{grid-template-columns:minmax(0,1fr);gap:20px}
-.adm-menu{position:static;border-right:0;border:1px solid #D9E4EC;border-radius:18px;padding:6px 10px;background:#FFFFFF}
+.adm-menu{position:static;max-height:none;overflow:visible;border-right:0;border:1px solid #D9E4EC;border-radius:18px;padding:6px 10px;background:#FFFFFF}
 }
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .exp-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
@@ -653,6 +653,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .hi-vista{aspect-ratio:4/3;border:1px dashed #C4D4DF;border-radius:14px;background:#F5F9FC;overflow:hidden;display:grid;place-items:center;color:#5A6D7A;font-size:14px}
 .hi-vista img,.hi-vista video{width:100%;height:100%;object-fit:contain;display:block;background:#0B2B40}
 .hi-botones{display:flex;gap:8px;flex-wrap:wrap}
+.com-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}.com-filtros label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}.com-resumen{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.com-resumen>div{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}.com-resumen small{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:#5A6D7A;font-weight:700}.com-resumen b{font-size:20px;color:#0B2B40}.com-resumen .com-dest{background:#0B2B40;border-color:#0B2B40}.com-resumen .com-dest small,.com-resumen .com-dest b{color:#FFFFFF}.exp-form label.com-todos{flex-direction:row;align-items:center;gap:8px;font-weight:600;min-height:44px}.exp-form label.com-todos input{width:20px;min-height:0;height:20px;padding:0}.com-elems{display:flex;flex-direction:column;gap:8px}.com-elem-lista{max-height:260px;overflow:auto;border:1px solid #C4D4DF;border-radius:12px;padding:6px 10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:2px 12px}.exp-form .com-elem-lista label{flex-direction:row;align-items:center;gap:8px;font-weight:400;font-size:14px;padding:6px 0}.exp-form .com-elem-lista input{width:18px;height:18px;min-height:0;padding:0;flex:none}.com-total td{font-weight:700;background:#F5F9FC}.com-anulado td{color:#8A9AA5}.com-sub{margin:8px 0 0;font-size:18px;color:#0B2B40}
 @media (max-width:640px){.hi-subidas{grid-template-columns:minmax(0,1fr)}}
 .mainmenu{flex-wrap:wrap;justify-content:flex-end;row-gap:8px}
 .mainmenu .btn,.mainmenu .menu-login{order:-2}
@@ -1528,6 +1529,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="idioma-fila" data-no-traducir><div class="idioma" role="group" aria-label="Idioma / Language"><button type="button" data-idioma="es" lang="es" aria-pressed="true" aria-label="Español" class="on"><svg class="bandera" viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#FFFFFF"/><rect width="10" height="20" fill="#4997D0"/><rect x="20" width="10" height="20" fill="#4997D0"/><circle cx="15" cy="10" r="3.6" fill="none" stroke="#5B8C3A" stroke-width="1.1"/><circle cx="15" cy="10" r="1.6" fill="#C9A227"/></svg>ES</button><button type="button" data-idioma="en" lang="en" aria-pressed="false" aria-label="English"><svg class="bandera" viewBox="0 0 38 20" preserveAspectRatio="none" aria-hidden="true"><rect width="38" height="20" fill="#FFFFFF"/><g fill="#B22234"><rect width="38" height="1.54"/><rect y="3.08" width="38" height="1.54"/><rect y="6.15" width="38" height="1.54"/><rect y="9.23" width="38" height="1.54"/><rect y="12.3" width="38" height="1.54"/><rect y="15.4" width="38" height="1.54"/><rect y="18.46" width="38" height="1.54"/></g><rect width="15.2" height="10.77" fill="#3C3B6E"/><g fill="#FFFFFF"><circle cx="2.5" cy="2" r=".6"/><circle cx="6" cy="2" r=".6"/><circle cx="9.5" cy="2" r=".6"/><circle cx="13" cy="2" r=".6"/><circle cx="4.2" cy="4.3" r=".6"/><circle cx="7.7" cy="4.3" r=".6"/><circle cx="11.2" cy="4.3" r=".6"/><circle cx="2.5" cy="6.6" r=".6"/><circle cx="6" cy="6.6" r=".6"/><circle cx="9.5" cy="6.6" r=".6"/><circle cx="13" cy="6.6" r=".6"/><circle cx="4.2" cy="8.9" r=".6"/><circle cx="7.7" cy="8.9" r=".6"/><circle cx="11.2" cy="8.9" r=".6"/></g></svg>EN</button></div><a class="tel-wa" href="https://wa.me/call/50237565739" title="Llamar a Plus Dental por WhatsApp · +502 3756-5739" aria-label="Llamar a Plus Dental por WhatsApp al +502 3756-5739"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2Zm0 18.15a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.24 8.24 0 1 1 6.98 3.86Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.230-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.43-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.230 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.29Z"/></svg><span>Llamar</span></a></div>
 </nav>
 </header>
+<script>(function(){function f(){var t=document.querySelector(".topbar");if(t)document.documentElement.style.setProperty("--pd-menu-top",(t.offsetHeight+16)+"px");}f();addEventListener("load",f);addEventListener("resize",f);})();</script>
 <script>document.addEventListener("DOMContentLoaded",function(){if(matchMedia("(pointer:coarse)").matches)return;document.querySelectorAll(".tel-wa").forEach(function(a){a.href="https://wa.me/50237565739";a.target="_blank";a.rel="noopener";a.title="Escribir o llamar a Plus Dental por WhatsApp · +502 3756-5739";});});</script>
 </div>
 
@@ -1608,7 +1610,6 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios" class="adm-sub-item">Administración de usuarios</button>
 <button type="button" role="tab" id="tabGenUsuario" data-tab="admGenUsuario" aria-selected="false" aria-controls="admGenUsuario" class="adm-sub-item">Generación Usuario</button>
 <hr class="adm-sep" role="separator">
-<button type="button" role="tab" id="tabAgentes" data-tab="admAgentes" aria-selected="false" aria-controls="admAgentes" class="adm-sub-item">Agentes comerciales</button>
 <button type="button" role="tab" id="tabRecargos" data-tab="admRecargos" aria-selected="false" aria-controls="admRecargos" class="adm-sub-item">Recargo de tarjetas</button>
 </div>
 </div>
@@ -1662,13 +1663,22 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 </div>
 <div class="adm-g">
+<button type="button" class="adm-grupo" id="grpComisiones" aria-expanded="false" aria-controls="grpComisionesItems">Comisiones<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-g-items" id="grpComisionesItems" role="presentation">
+<button type="button" role="tab" id="tabAgentes" data-tab="admAgentes" aria-selected="false" aria-controls="admAgentes">Agentes comerciales</button>
+<button type="button" role="tab" id="tabComReglas" data-tab="admComReglas" aria-selected="false" aria-controls="admComReglas">Catálogo de comisiones</button>
+<hr class="adm-sep" role="separator">
+<button type="button" role="tab" id="tabRepComisiones" data-tab="admRepComisiones" aria-selected="false" aria-controls="admRepComisiones">Comisiones generadas</button>
+<button type="button" role="tab" id="tabComPago" data-tab="admComPago" aria-selected="false" aria-controls="admComPago">Pago de comisiones</button>
+</div>
+</div>
+<div class="adm-g">
 <button type="button" class="adm-grupo" id="grpReportes" aria-expanded="false" aria-controls="grpReportesItems">Reportes<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-g-items" id="grpReportesItems" role="presentation">
 <button type="button" role="tab" id="tabRepPacientes" data-tab="admRepPacientes" aria-selected="false" aria-controls="admRepPacientes">Listado de pacientes</button>
 <button type="button" role="tab" id="tabRepCuentas" data-tab="admRepCuentas" aria-selected="false" aria-controls="admRepCuentas">Estados de cuenta</button>
 <button type="button" role="tab" id="tabRepCitas" data-tab="admRepCitas" aria-selected="false" aria-controls="admRepCitas">Citas agendadas</button>
 <button type="button" role="tab" id="tabRepCobros" data-tab="admRepCobros" aria-selected="false" aria-controls="admRepCobros">Cobros por paciente</button>
-<button type="button" role="tab" id="tabRepComisiones" data-tab="admRepComisiones" aria-selected="false" aria-controls="admRepComisiones">Comisiones generadas</button>
 <button type="button" role="tab" id="tabRepConstancia" data-tab="admRepConstancia" aria-selected="false" aria-controls="admRepConstancia">Constancia médica</button>
 </div>
 </div>
@@ -2383,6 +2393,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="admRepCitas" role="tabpanel" aria-labelledby="tabRepCitas" hidden class="adm-pane"></div>
 <div id="admRepCobros" role="tabpanel" aria-labelledby="tabRepCobros" hidden class="adm-pane"></div>
 <div id="admRepComisiones" role="tabpanel" aria-labelledby="tabRepComisiones" hidden class="adm-pane"></div>
+<div id="admComReglas" role="tabpanel" aria-labelledby="tabComReglas" hidden class="adm-pane"></div>
+<div id="admComPago" role="tabpanel" aria-labelledby="tabComPago" hidden class="adm-pane"></div>
 <div id="admRepConstancia" role="tabpanel" aria-labelledby="tabRepConstancia" hidden class="adm-pane"></div>
 <div id="admJorInstituciones" role="tabpanel" aria-labelledby="tabJorInstituciones" hidden class="adm-pane"></div>
 <div id="admJorJornadas" role="tabpanel" aria-labelledby="tabJorJornadas" hidden class="adm-pane"></div>
@@ -3093,18 +3105,19 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="dentistas.js"></script>
 <script src="agenda.js?v=20261028a"></script>
 <script src="agentes.js"></script>
-<script src="reportes.js?v=20261028a"></script>
+<script src="reportes.js?v=20261028b"></script>
 <script src="constancias.js"></script>
 <script src="tipos.js"></script>
 <script src="precios.js?v=20261027"></script>
 <script src="paquetes.js"></script>
 <script src="recargos.js"></script>
 <script src="usuarios-pacientes.js?v=20261028b"></script>
+<script src="comisiones.js?v=20261028a"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="chatbot.js?v=20261028a"></script>
 <script src="portal.js"></script>
-<script src="idiomas-admin.js?v=20261028c"></script>
+<script src="idiomas-admin.js?v=20261028d"></script>
 <script src="movil.js"></script>
 <script src="idiomas.js?v=20261028b"></script>
 </body>

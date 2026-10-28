@@ -165,18 +165,37 @@
 
     comisiones: {
       panel: 'admRepComisiones', titulo: 'Comisiones generadas',
-      nota: 'Comisión de cada agente comercial sobre los pagos cobrados (no anulados) entre las dos fechas a los pacientes que tiene asignados.',
+      nota: 'Comisión de cada agente comercial entre las dos fechas según el Catálogo de comisiones (sin regla: su % general) sobre lo cobrado (no anulado) y las órdenes de laboratorio recibidas de sus pacientes. Incluye lo ya pagado y lo pendiente.',
       estados: { activo: ['Activo', 'verde'], suspendido: ['Suspendido', 'ambar'], inactivo: ['Inactivo', 'gris'] },
       columnas: [
         ['Código', function (f) { return f.codigo; }],
         ['Agente comercial', function (f) { return f.nombre; }],
         ['Pacientes', function (f) { return f.pacientes; }, 'n'],
-        ['Cobros', function (f) { return f.cobros; }, 'n'],
-        ['Total cobrado', function (f) { return f.total; }, 'q'],
-        ['% comisión', function (f) { return f.comision; }, 'pct'],
-        ['Comisión', function (f) { return f.monto; }, 'q']
+        ['Líneas', function (f) { return f.cobros; }, 'n'],
+        ['Base', function (f) { return f.total; }, 'q'],
+        ['Comisión', function (f) { return f.monto; }, 'q'],
+        ['Pagado', function (f) { return f.pagado; }, 'q'],
+        ['Pendiente', function (f) { return f.pendiente; }, 'q']
       ],
       cargar: async function (d, h) {
+        var rl = await sb.rpc('comisiones_lineas', { p_desde: d, p_hasta: h, p_agente: null });
+        if (!rl.error) {
+          var ra = await sb.from('agentes').select('id,codigo,nombre,estado');
+          if (ra.error) throw ra.error;
+          var g = {};
+          ra.data.forEach(function (a) { if (a.codigo !== '0') g[a.id] = { codigo: a.codigo, nombre: a.nombre, estado: a.estado, total: 0, cobros: 0, monto: 0, pagado: 0, pac: {} }; });
+          rl.data.forEach(function (l) {
+            var a = g[l.agente_id]; if (!a) return;
+            a.total += Number(l.base); a.monto += Number(l.comision); a.cobros++; a.pac[l.paciente_id] = 1;
+            if (l.pago_comision_id) a.pagado += Number(l.comision);
+          });
+          var ord = function (c) { return /^\d+$/.test(c) ? +c : Infinity; };
+          return Object.keys(g).map(function (k) {
+            var a = g[k]; a.total = num(a.total); a.monto = num(a.monto); a.pagado = num(a.pagado); a.pendiente = num(a.monto - a.pagado); a.pacientes = Object.keys(a.pac).length;
+            return a;
+          }).filter(function (a) { return a.cobros > 0 || a.estado === 'activo'; }).sort(function (a, b) { return ord(a.codigo) - ord(b.codigo); });
+        }
+        // Sin el SQL de comisiones: % general del agente sobre lo cobrado
         var r = await Promise.all([
           sb.from('pagos').select('monto,paciente_id,pac:pacientes(agente_id)').eq('anulado', false).gte('fecha', d).lte('fecha', h),
           sb.from('agentes').select('id,codigo,nombre,comision,estado')
@@ -192,16 +211,16 @@
         function orden(c) { return /^\d+$/.test(c) ? +c : Infinity; }
         return Object.keys(ag).map(function (k) {
           var a = ag[k];
-          a.total = num(a.total); a.pacientes = Object.keys(a.pac).length; a.monto = num(a.total * a.comision / 100);
+          a.total = num(a.total); a.pacientes = Object.keys(a.pac).length; a.monto = num(a.total * a.comision / 100); a.pagado = 0; a.pendiente = a.monto;
           return a;
         }).filter(function (a) { return a.cobros > 0 || a.estado === 'activo'; })
           .sort(function (a, b) { return orden(a.codigo) - orden(b.codigo); });
       },
       totales: function (filas) {
         var s = function (k) { return filas.reduce(function (t, f) { return t + f[k]; }, 0); };
-        return [['Agentes', filas.length], ['Total cobrado', q(s('total'))], ['Comisiones', q(s('monto'))]];
+        return [['Agentes', filas.length], ['Base', q(s('total'))], ['Comisiones', q(s('monto'))], ['Pendiente de pago', q(s('pendiente'))]];
       },
-      sumar: ['pacientes', 'cobros', 'total', 'monto']
+      sumar: ['pacientes', 'cobros', 'total', 'monto', 'pagado', 'pendiente']
     }
   };
 

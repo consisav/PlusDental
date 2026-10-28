@@ -6605,6 +6605,212 @@ alter table public.pacientes add column if not exists emergencia_parentesco text
 -- ===== Código del paciente en el sistema anterior =====
 alter table public.pacientes add column if not exists codigo_anterior text check (char_length(codigo_anterior) <= 40);
 
+-- ===== Comisiones: catálogo de reglas, cálculo y pago de comisiones a agentes comerciales =====
+-- Regla: agente (vacío = todos), a qué aplica (todo, procedimientos, medicamentos o laboratorio), cuáles elementos
+-- (vacío = todos: tipos de procedimiento, productos o laboratorios), institución (vacío = todas), % o valor fijo.
+-- Base: lo cobrado (líneas de pagos no anulados) y el costo de las órdenes de laboratorio recibidas o colocadas.
+-- Si a una línea le aplican varias reglas, gana la más específica. Sin regla: el % general del agente (solo cobros).
+create table if not exists public.comisiones_reglas (
+  id              bigint generated always as identity primary key,
+  agente_id       bigint references public.agentes (id) on delete cascade,
+  aplica          text not null default 'todo' check (aplica in ('todo', 'procedimientos', 'medicamentos', 'laboratorio')),
+  elementos       bigint[] not null default '{}',
+  institucion_id  bigint references public.jor_instituciones (id) on delete cascade,
+  tipo            text not null default 'porcentaje' check (tipo in ('porcentaje', 'valor')),
+  valor           numeric(12,2) not null check (valor >= 0),
+  vigente_desde   date,
+  vigente_hasta   date,
+  estado          text not null default 'activo' check (estado in ('activo', 'inactivo')),
+  observaciones   text check (char_length(observaciones) <= 300),
+  registrado_por  text,
+  creado          timestamptz not null default now(),
+  modificado_por  text,
+  modificado      timestamptz,
+  constraint comisiones_reglas_pct check (tipo <> 'porcentaje' or valor <= 100),
+  constraint comisiones_reglas_vigencia check (vigente_hasta is null or vigente_desde is null or vigente_hasta >= vigente_desde)
+);
+alter table public.comisiones_reglas enable row level security;
+drop policy if exists "personal ve reglas de comision" on public.comisiones_reglas;
+create policy "personal ve reglas de comision" on public.comisiones_reglas for select using (public.es_personal());
+drop policy if exists "personal crea reglas de comision" on public.comisiones_reglas;
+create policy "personal crea reglas de comision" on public.comisiones_reglas for insert with check (public.es_personal());
+drop policy if exists "personal cambia reglas de comision" on public.comisiones_reglas;
+create policy "personal cambia reglas de comision" on public.comisiones_reglas for update using (public.es_personal()) with check (public.es_personal());
+drop policy if exists "personal borra reglas de comision" on public.comisiones_reglas;
+create policy "personal borra reglas de comision" on public.comisiones_reglas for delete using (public.es_personal());
+grant select, insert, update, delete on public.comisiones_reglas to authenticated;
+
+create or replace function public.comisiones_reglas_quien() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    new.registrado_por := (select usuario from public.perfiles where id = auth.uid()); new.creado := now();
+  else
+    new.modificado_por := (select usuario from public.perfiles where id = auth.uid()); new.modificado := now();
+    new.registrado_por := old.registrado_por; new.creado := old.creado;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists comisiones_reglas_quien on public.comisiones_reglas;
+create trigger comisiones_reglas_quien before insert or update on public.comisiones_reglas for each row execute function public.comisiones_reglas_quien();
+
+-- Pagos de comisiones y las líneas que cubre cada pago (una línea no se puede pagar dos veces)
+create table if not exists public.comisiones_pagos (
+  id              bigint generated always as identity primary key,
+  agente_id       bigint not null references public.agentes (id),
+  desde           date not null,
+  hasta           date not null,
+  fecha_pago      date not null default current_date,
+  base            numeric(12,2) not null default 0,
+  monto           numeric(12,2) not null check (monto >= 0),
+  lineas          int not null default 0,
+  metodo          text not null default 'transferencia' check (metodo in ('efectivo', 'transferencia', 'cheque', 'deposito', 'otro')),
+  referencia      text check (char_length(referencia) <= 80),
+  observaciones   text check (char_length(observaciones) <= 300),
+  registrado_por  text,
+  creado          timestamptz not null default now(),
+  anulado         boolean not null default false,
+  anulado_motivo  text check (char_length(anulado_motivo) <= 300),
+  anulado_por     text,
+  anulado_en      timestamptz
+);
+create index if not exists comisiones_pagos_agente on public.comisiones_pagos (agente_id, fecha_pago desc);
+-- Al anular un pago se borran sus líneas (quedan libres para pagarse otra vez); el pago anulado queda como historial
+create table if not exists public.comisiones_pago_lineas (
+  id         bigint generated always as identity primary key,
+  pago_id    bigint not null references public.comisiones_pagos (id) on delete cascade,
+  origen     text not null check (origen in ('cobro', 'pago', 'laboratorio')),
+  ref_id     bigint not null,
+  base       numeric(12,2) not null default 0,
+  comision   numeric(12,2) not null default 0
+);
+create unique index if not exists comisiones_pago_lineas_unica on public.comisiones_pago_lineas (origen, ref_id);
+alter table public.comisiones_pagos enable row level security;
+alter table public.comisiones_pago_lineas enable row level security;
+drop policy if exists "personal ve pagos de comision" on public.comisiones_pagos;
+create policy "personal ve pagos de comision" on public.comisiones_pagos for select using (public.es_personal());
+drop policy if exists "personal ve lineas de pagos de comision" on public.comisiones_pago_lineas;
+create policy "personal ve lineas de pagos de comision" on public.comisiones_pago_lineas for select using (public.es_personal());
+grant select on public.comisiones_pagos, public.comisiones_pago_lineas to authenticated;
+
+-- Líneas de comisión entre dos fechas (agente vacío = todos): una fila por línea cobrada o por orden de laboratorio
+create or replace function public.comisiones_lineas(p_desde date, p_hasta date, p_agente bigint default null)
+returns table (origen text, ref_id bigint, fecha date, agente_id bigint, paciente_id bigint, paciente text, documento text,
+  categoria text, concepto text, cantidad numeric, base numeric, regla_id bigint, tipo text, valor numeric, comision numeric,
+  pago_comision_id bigint)
+language plpgsql stable security definer set search_path = public as $
+#variable_conflict use_column
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  return query
+  with l as (
+    -- Líneas de cobro con detalle
+    select 'cobro'::text as origen, d.id as ref_id, p.fecha, pa.agente_id, pa.id as paciente_id, pa.nombre as paciente, pa.institucion_id,
+      coalesce(nullif(concat_ws(' ', p.serie, p.numero_factura), ''), p.correlativo, 'Pago ' || p.id) as documento,
+      case when d.producto_id is not null then 'medicamentos' when d.tipo_procedimiento_id is not null then 'procedimientos' else 'otros' end as categoria,
+      coalesce(d.producto_id, d.tipo_procedimiento_id) as elemento,
+      coalesce(pr.nombre, tp.nombre, p.concepto, 'Cobro') as concepto, coalesce(d.cantidad, 1)::numeric as cantidad, d.monto::numeric as base
+    from public.pago_detalle d
+    join public.pagos p on p.id = d.pago_id and not p.anulado and p.fecha between p_desde and p_hasta
+    join public.pacientes pa on pa.id = p.paciente_id
+    left join public.inv_productos pr on pr.id = d.producto_id
+    left join public.tipos_procedimiento tp on tp.id = d.tipo_procedimiento_id
+    union all
+    -- Pagos sin detalle (registrados antes del detalle por línea)
+    select 'pago', p.id, p.fecha, pa.agente_id, pa.id, pa.nombre, pa.institucion_id,
+      coalesce(nullif(concat_ws(' ', p.serie, p.numero_factura), ''), p.correlativo, 'Pago ' || p.id),
+      'otros', null::bigint, coalesce(p.concepto, 'Pago'), 1::numeric, p.monto::numeric
+    from public.pagos p join public.pacientes pa on pa.id = p.paciente_id
+    where not p.anulado and p.fecha between p_desde and p_hasta and not exists (select 1 from public.pago_detalle d where d.pago_id = p.id)
+    union all
+    -- Órdenes de laboratorio recibidas o colocadas (base: costo de la orden)
+    select 'laboratorio', o.id, coalesce(o.fecha_recibida, o.estado_fecha::date, o.creada::date), pa.agente_id, pa.id, pa.nombre, pa.institucion_id,
+      coalesce(o.numero, 'Orden ' || o.id), 'laboratorio', o.laboratorio_id,
+      o.trabajo || coalesce(' · ' || lb.nombre, ''), 1::numeric, coalesce(o.costo, 0)::numeric
+    from public.ordenes_lab o join public.pacientes pa on pa.id = o.paciente_id
+    left join public.laboratorios lb on lb.id = o.laboratorio_id
+    where o.estado in ('recibida', 'colocada') and coalesce(o.fecha_recibida, o.estado_fecha::date, o.creada::date) between p_desde and p_hasta
+  ),
+  la as (
+    select l.*, a.comision as pct_agente from l join public.agentes a on a.id = l.agente_id and a.codigo <> '0'
+    where p_agente is null or l.agente_id = p_agente
+  ),
+  r as (
+    select la.*, rg.id as regla_id, rg.tipo as regla_tipo, rg.valor as regla_valor from la
+    left join lateral (
+      select x.id, x.tipo, x.valor from public.comisiones_reglas x
+      where x.estado = 'activo'
+        and (x.agente_id is null or x.agente_id = la.agente_id)
+        and (x.institucion_id is null or x.institucion_id = la.institucion_id)
+        and (x.aplica = 'todo' or x.aplica = la.categoria)
+        and (cardinality(x.elementos) = 0 or (x.aplica <> 'todo' and la.elemento = any (x.elementos)))
+        and (x.vigente_desde is null or la.fecha >= x.vigente_desde)
+        and (x.vigente_hasta is null or la.fecha <= x.vigente_hasta)
+      order by (x.agente_id is not null)::int * 8 + (x.institucion_id is not null)::int * 4
+             + (cardinality(x.elementos) > 0)::int * 2 + (x.aplica <> 'todo')::int desc, x.id desc
+      limit 1
+    ) rg on true
+  )
+  select r.origen, r.ref_id, r.fecha, r.agente_id, r.paciente_id, r.paciente, r.documento, r.categoria, r.concepto, r.cantidad, r.base,
+    r.regla_id,
+    coalesce(r.regla_tipo, 'porcentaje'),
+    coalesce(r.regla_valor, r.pct_agente)::numeric,
+    round(case when r.regla_id is null then r.base * r.pct_agente / 100
+               when r.regla_tipo = 'porcentaje' then r.base * r.regla_valor / 100
+               else r.regla_valor * r.cantidad end, 2)::numeric,
+    pl.pago_id
+  from r left join public.comisiones_pago_lineas pl on pl.origen = r.origen and pl.ref_id = r.ref_id
+  where r.regla_id is not null or (r.origen <> 'laboratorio' and r.pct_agente > 0)
+  order by r.agente_id, r.fecha, r.ref_id;
+end;
+$$;
+revoke execute on function public.comisiones_lineas(date, date, bigint) from public, anon;
+grant execute on function public.comisiones_lineas(date, date, bigint) to authenticated;
+
+-- Registra el pago de las comisiones pendientes de un agente entre dos fechas
+create or replace function public.registrar_pago_comision(p_agente bigint, p_desde date, p_hasta date, p_datos jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint; v_base numeric; v_monto numeric; v_n int;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if p_agente is null or p_desde is null or p_hasta is null or p_hasta < p_desde then raise exception 'Revisa el agente y el rango de fechas'; end if;
+  perform pg_advisory_xact_lock(hashtext('comisiones_pago'), p_agente::int);
+  create temp table if not exists _com_pend (origen text, ref_id bigint, base numeric, comision numeric) on commit drop;
+  delete from _com_pend;
+  insert into _com_pend
+    select x.origen, x.ref_id, x.base, x.comision from public.comisiones_lineas(p_desde, p_hasta, p_agente) x
+    where x.pago_comision_id is null and x.comision > 0;
+  select count(*), coalesce(sum(c.base), 0), coalesce(sum(c.comision), 0) into v_n, v_base, v_monto from _com_pend c;
+  if v_n = 0 then raise exception 'No hay comisiones pendientes de pago para ese agente en esas fechas'; end if;
+  insert into public.comisiones_pagos (agente_id, desde, hasta, fecha_pago, base, monto, lineas, metodo, referencia, observaciones, registrado_por)
+  values (p_agente, p_desde, p_hasta, coalesce(nullif(p_datos ->> 'fecha_pago', '')::date, current_date), v_base, v_monto, v_n,
+    coalesce(nullif(p_datos ->> 'metodo', ''), 'transferencia'), nullif(p_datos ->> 'referencia', ''), nullif(p_datos ->> 'observaciones', ''),
+    (select usuario from public.perfiles where id = auth.uid()))
+  returning id into v_id;
+  insert into public.comisiones_pago_lineas (pago_id, origen, ref_id, base, comision)
+    select v_id, c.origen, c.ref_id, c.base, c.comision from _com_pend c;
+  return v_id;
+end;
+$$;
+revoke execute on function public.registrar_pago_comision(bigint, date, date, jsonb) from public, anon;
+grant execute on function public.registrar_pago_comision(bigint, date, date, jsonb) to authenticated;
+
+-- Anula un pago de comisiones: sus líneas quedan otra vez pendientes
+create or replace function public.anular_pago_comision(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escribe el motivo de la anulación'; end if;
+  update public.comisiones_pagos set anulado = true, anulado_motivo = left(trim(p_motivo), 300), anulado_en = now(),
+    anulado_por = (select usuario from public.perfiles where id = auth.uid())
+  where id = p_id and not anulado;
+  if not found then raise exception 'El pago no existe o ya estaba anulado'; end if;
+  delete from public.comisiones_pago_lineas where pago_id = p_id;
+end;
+$$;
+revoke execute on function public.anular_pago_comision(bigint, text) from public, anon;
+grant execute on function public.anular_pago_comision(bigint, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
