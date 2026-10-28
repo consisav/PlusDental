@@ -1,4 +1,4 @@
-// Plus Dental — Comisiones (grupo «Comisiones»): catálogo de reglas y pago de comisiones a agentes comerciales.
+// Plus Dental — Comisiones (grupo «Comisiones»): catálogo de reglas y pago de comisiones a agentes comerciales (por vendedor).
 // Regla: agente (o todos), a qué aplica (todo, procedimientos, medicamentos o laboratorio), cuáles (uno, varios o todos),
 // institución (o todas), porcentaje o valor fijo por unidad y vigencia. El cálculo lo hace Supabase (comisiones_lineas):
 // base = lo cobrado y el costo de las órdenes de laboratorio recibidas; gana la regla más específica.
@@ -63,7 +63,8 @@
     catalogo.laboratorio = (r[4].data || []).map(function (x) { return { id: x.id, nombre: x.nombre, activo: x.activo !== false }; });
     var opAg = agentes.map(function (a) { return '<option value="' + a.id + '">' + esc(a.codigo + ' · ' + a.nombre) + (a.estado !== 'activo' ? ' (' + a.estado + ')' : '') + '</option>'; }).join('');
     ['crAgente', 'crFiltroAg'].forEach(function (id) { var v = $(id).value; $(id).innerHTML = '<option value="">Todos los agentes</option>' + opAg; $(id).value = v; });
-    var v = $('cpAgente').value; $('cpAgente').innerHTML = '<option value="">Elige el agente…</option>' + opAg; $('cpAgente').value = v;
+    var v = $('cpAgente').value; $('cpAgente').innerHTML = '<option value="">Todos los agentes</option>' + opAg; $('cpAgente').value = v;
+    var vc = $('cpInst').value; $('cpInst').innerHTML = '<option value="">Todas las instituciones</option>' + instituciones.map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join(''); $('cpInst').value = vc;
     var vi = $('crInst').value; $('crInst').innerHTML = '<option value="">Todas las instituciones</option>' + instituciones.map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join(''); $('crInst').value = vi;
   }
 
@@ -222,25 +223,27 @@
   });
 
   // ======================= Pago de comisiones =======================
+  // Parámetros: fechas, agente (o todos) e institución (o todas). Detalle de cada comisión y resumen de pago por vendedor:
+  // cada vendedor se paga por separado con su forma de pago, fecha, banco, cuenta bancaria y fecha de operación.
   $('admComPago').innerHTML =
     '<div class="adm-pane-head"><h3 class="adm-h">Pago de comisiones</h3></div>' +
-    '<p class="dlg-msg">Elige el agente y el rango de fechas, pulsa «Calcular» y registra el pago. Las líneas pagadas quedan marcadas y no se vuelven a pagar; si anulas un pago, quedan otra vez pendientes.</p>' +
+    '<p class="dlg-msg">Elige las fechas, el agente y la institución y pulsa «Calcular». Abajo verás el detalle de cada comisión y el resumen de pago por vendedor: llena la forma de pago y pulsa «Pagar». ' +
+    'Las comisiones pagadas quedan marcadas y no se vuelven a pagar; si anulas un pago, quedan otra vez pendientes.</p>' +
     '<div class="com-filtros"><label>Fecha inicial<input id="cpDesde" type="date" class="adm-input"></label><label>Fecha final<input id="cpHasta" type="date" class="adm-input"></label>' +
-    '<label>Agente comercial<select id="cpAgente" class="adm-input"></select></label><button type="button" id="cpCalcular" class="adm-btn adm-primary">Calcular</button></div>' +
+    '<label>Agente comercial<select id="cpAgente" class="adm-input"><option value="">Todos los agentes</option></select></label>' +
+    '<label>Institución<select id="cpInst" class="adm-input"><option value="">Todas las instituciones</option></select></label>' +
+    '<button type="button" id="cpCalcular" class="adm-btn adm-primary">Calcular</button></div>' +
     '<p id="cpMsg" class="dlg-msg" role="status"></p>' +
     '<div id="cpResultado" class="adm-pane" hidden>' +
     '<div id="cpResumen" class="com-resumen"></div>' +
-    '<div class="com-filtros" role="group" aria-label="Mostrar líneas"><button type="button" class="adm-btn" data-cpver="pend" aria-pressed="true">Pendientes</button><button type="button" class="adm-btn" data-cpver="pag" aria-pressed="false">Pagadas</button><button type="button" class="adm-btn" data-cpver="todas" aria-pressed="false">Todas</button></div>' +
-    '<div class="roles-wrap"><table><thead><tr><th>Fecha</th><th>Documento</th><th>Paciente</th><th>Concepto</th><th class="num">Base</th><th class="num">Regla</th><th class="num">Comisión</th><th>Estado</th></tr></thead><tbody id="cpBody"></tbody></table></div>' +
-    '<fieldset id="cpPagar" class="pos-sec"><legend>Registrar pago</legend><div class="exp-form">' +
-    '<label>Fecha de pago<input id="cpFecha" type="date"></label>' +
-    '<label>Forma de pago<select id="cpMetodo">' + Object.keys(METODOS).map(function (k) { return '<option value="' + k + '">' + METODOS[k] + '</option>'; }).join('') + '</select></label>' +
-    '<label>Referencia / No. de documento<input id="cpRef" type="text" maxlength="80" autocomplete="off"></label>' +
-    '<label>Observaciones<input id="cpObs" type="text" maxlength="300" autocomplete="off"></label>' +
-    '</div><div class="exp-actions"><button type="button" id="cpRegistrar" class="adm-btn adm-primary">Registrar pago</button><p id="cpPagoMsg" class="dlg-msg" role="status"></p></div></fieldset>' +
+    '<h4 class="com-sub">Detalle del pago</h4>' +
+    '<div class="com-filtros" role="group" aria-label="Mostrar comisiones"><button type="button" class="adm-btn" data-cpver="pend" aria-pressed="true">Pendientes de pago</button><button type="button" class="adm-btn" data-cpver="pag" aria-pressed="false">Pagadas</button><button type="button" class="adm-btn" data-cpver="todas" aria-pressed="false">Todas</button></div>' +
+    '<div class="roles-wrap"><table><thead><tr><th>Paciente · concepto</th><th>Vendedor</th><th>Fecha generada</th><th class="num">Base</th><th class="num">% comisión</th><th class="num">Valor de comisión</th><th>Estado</th></tr></thead><tbody id="cpBody"></tbody></table></div>' +
+    '<h4 class="com-sub">Resumen de pago por vendedor</h4>' +
+    '<div id="cpVendedores" class="com-vends"></div>' +
     '</div>' +
-    '<h4 class="com-sub">Pagos registrados del agente</h4>' +
-    '<div class="roles-wrap"><table><thead><tr><th>No.</th><th>Fecha de pago</th><th>Período</th><th class="num">Líneas</th><th class="num">Base</th><th class="num">Comisión pagada</th><th>Forma de pago</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody id="cpPagosBody"><tr><td colspan="9">Elige un agente.</td></tr></tbody></table></div>' +
+    '<h4 class="com-sub">Pagos registrados</h4>' +
+    '<div class="roles-wrap"><table><thead><tr><th>No.</th><th>Vendedor</th><th>Fecha de pago</th><th>Período</th><th class="num">Líneas</th><th class="num">Comisión pagada</th><th>Forma de pago</th><th>Usuario que paga</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody id="cpPagosBody"></tbody></table></div>' +
     '<p id="cpPagosMsg" class="dlg-msg" role="status"></p>';
 
   var verLineas = 'pend';
@@ -248,92 +251,144 @@
     var h = new Date();
     $('cpDesde').value = iso(new Date(h.getFullYear(), h.getMonth(), 1));
     $('cpHasta').value = iso(h);
-    $('cpFecha').value = iso(h);
   })();
-
+  function usuarioActual() { return (window.PD_SESION && window.PD_SESION.usuario()) || '—'; }
+  function agentePorId(id) { return agentes.filter(function (a) { return a.id === id; })[0]; }
   function textoRegla(l) { return l.regla_id ? textoComision(l.tipo, l.valor) : pct(l.valor) + ' <span class="hi-desc">(general)</span>'; }
+  function opcionesBanco(elegido) {
+    var l = (window.PD_BANCOS_GT || []).slice();
+    if (elegido && l.indexOf(elegido) < 0) l.push(elegido);
+    return '<option value="">Selecciona…</option>' + l.map(function (b) { return '<option' + (b === elegido ? ' selected' : '') + '>' + esc(b) + '</option>'; }).join('');
+  }
+  function formaPagoTxt(p) {
+    return (METODOS[p.metodo] || p.metodo) + (p.banco ? '<br><span class="hi-desc">' + esc(p.banco) + (p.cuenta_bancaria ? ' · ' + esc(p.cuenta_bancaria) : '') + '</span>' : '') +
+      (p.fecha_operacion ? '<br><span class="hi-desc">Operación ' + fechaCorta(p.fecha_operacion) + '</span>' : '') + (p.referencia ? '<br><span class="hi-desc">Ref. ' + esc(p.referencia) + '</span>' : '');
+  }
+
   async function calcular() {
-    var ag = $('cpAgente').value, d = $('cpDesde').value, h = $('cpHasta').value;
-    aviso('cpPagoMsg', '');
-    if (!ag) { aviso('cpMsg', 'Elige el agente comercial.', true); $('cpAgente').focus(); return; }
+    var ag = $('cpAgente').value, ins = $('cpInst').value, d = $('cpDesde').value, h = $('cpHasta').value;
     if (!d || !h || h < d) { aviso('cpMsg', 'Revisa el rango de fechas.', true); return; }
     aviso('cpMsg', 'Calculando…');
-    var r = await sb.rpc('comisiones_lineas', { p_desde: d, p_hasta: h, p_agente: +ag });
+    var r = await sb.rpc('comisiones_lineas', { p_desde: d, p_hasta: h, p_agente: ag ? +ag : null, p_institucion: ins ? +ins : null });
     if (r.error) { $('cpResultado').hidden = true; aviso('cpMsg', traducir(r.error), true); return; }
-    lineas = r.data || [];
-    calculo = { agente: +ag, desde: d, hasta: h };
-    aviso('cpMsg', lineas.length ? '' : 'No hay cobros ni órdenes de laboratorio con comisión para ese agente entre esas fechas.');
+    lineas = (r.data || []).slice().sort(function (a, b) {
+      var na = (agentePorId(a.agente_id) || {}).codigo, nb = (agentePorId(b.agente_id) || {}).codigo;
+      return (+na || 0) - (+nb || 0) || String(a.paciente).localeCompare(String(b.paciente), 'es') || (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0) || a.ref_id - b.ref_id;
+    });
+    calculo = { agente: ag ? +ag : null, inst: ins ? +ins : null, desde: d, hasta: h };
+    aviso('cpMsg', lineas.length ? '' : 'No hay comisiones para esos parámetros.');
     $('cpResultado').hidden = !lineas.length;
+    await cargarPagos();
     pintarLineas();
-    cargarPagos();
   }
   function pintarLineas() {
     var pend = lineas.filter(function (l) { return !l.pago_comision_id; }), pag = lineas.filter(function (l) { return l.pago_comision_id; });
     function s(a, k) { return a.reduce(function (t, l) { return t + Number(l[k]); }, 0); }
-    $('cpResumen').innerHTML = [['Líneas', lineas.length], ['Base total', q(s(lineas, 'base'))], ['Comisión total', q(s(lineas, 'comision'))], ['Ya pagado', q(s(pag, 'comision'))], ['Pendiente de pago', q(s(pend, 'comision')), 1]]
+    $('cpResumen').innerHTML = [['Comisiones', lineas.length], ['Base total', q(s(lineas, 'base'))], ['Comisión total', q(s(lineas, 'comision'))], ['Ya pagado', q(s(pag, 'comision'))], ['Pendiente de pago', q(s(pend, 'comision')), 1]]
       .map(function (x) { return '<div' + (x[2] ? ' class="com-dest"' : '') + '><small>' + x[0] + '</small><b>' + x[1] + '</b></div>'; }).join('');
     document.querySelectorAll('[data-cpver]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.cpver === verLineas); });
     var lista = verLineas === 'pend' ? pend : verLineas === 'pag' ? pag : lineas;
+    var pagoDe = {}; pagos.forEach(function (p) { pagoDe[p.id] = p; });
     $('cpBody').innerHTML = lista.length ? lista.map(function (l) {
-      return '<tr><td class="fecha">' + fechaCorta(l.fecha) + '</td><td>' + esc(l.documento) + '</td><td>' + esc(l.paciente) + '</td>' +
-        '<td>' + esc(l.concepto) + (Number(l.cantidad) !== 1 ? ' × ' + Number(l.cantidad) : '') + '<br><span class="hi-desc">' + (APLICA[l.categoria] || 'Otros cobros') + '</span></td>' +
+      var a = agentePorId(l.agente_id), p = pagoDe[l.pago_comision_id];
+      return '<tr><td><strong>' + esc(l.paciente) + '</strong><br><span class="hi-desc">' + esc(l.concepto) + (Number(l.cantidad) !== 1 ? ' × ' + Number(l.cantidad) : '') + ' · ' + esc(l.documento) + ' · ' + (APLICA[l.categoria] || 'Otros cobros') + '</span></td>' +
+        '<td>' + esc(a ? a.nombre : '—') + '</td><td class="fecha">' + fechaCorta(l.fecha) + '</td>' +
         '<td class="num">' + q(l.base) + '</td><td class="num">' + textoRegla(l) + '</td><td class="num"><strong>' + q(l.comision) + '</strong></td>' +
-        '<td>' + (l.pago_comision_id ? '<span class="estado estado-finalizado">Pagada · No. ' + l.pago_comision_id + '</span>' : '<span class="estado estado-proceso">Pendiente</span>') + '</td></tr>';
-    }).join('') + '<tr class="com-total"><td colspan="4">Total</td><td class="num">' + q(s(lista, 'base')) + '</td><td></td><td class="num">' + q(s(lista, 'comision')) + '</td><td></td></tr>'
-      : '<tr><td colspan="8">' + (verLineas === 'pend' ? 'No hay comisiones pendientes de pago.' : 'No hay líneas pagadas.') + '</td></tr>';
-    var total = s(pend.filter(function (l) { return Number(l.comision) > 0; }), 'comision');
-    $('cpPagar').hidden = !(total > 0);
-    $('cpRegistrar').textContent = 'Registrar pago de ' + q(total);
+        '<td>' + (l.pago_comision_id ? '<span class="estado estado-finalizado">Pagada · No. ' + l.pago_comision_id + '</span>' + (p ? '<br><span class="hi-desc">' + fechaCorta(p.fecha_pago) + ' · ' + (METODOS[p.metodo] || p.metodo) + '</span>' : '') : '<span class="estado estado-proceso">Pendiente de pago</span>') + '</td></tr>';
+    }).join('') + '<tr class="com-total"><td colspan="3">Total</td><td class="num">' + q(s(lista, 'base')) + '</td><td></td><td class="num">' + q(s(lista, 'comision')) + '</td><td></td></tr>'
+      : '<tr><td colspan="7">' + (verLineas === 'pend' ? 'No hay comisiones pendientes de pago.' : 'No hay comisiones pagadas.') + '</td></tr>';
+    pintarVendedores(pend);
+  }
+  // Una tarjeta por vendedor con saldo pendiente; banco y cuenta se proponen con los de su último pago
+  function pintarVendedores(pend) {
+    var porAg = {}, orden = [];
+    pend.forEach(function (l) { if (Number(l.comision) <= 0) return; if (!porAg[l.agente_id]) { porAg[l.agente_id] = []; orden.push(l.agente_id); } porAg[l.agente_id].push(l); });
+    if (!orden.length) { $('cpVendedores').innerHTML = '<p class="dlg-msg">No hay comisiones pendientes de pago con estos parámetros.</p>'; return; }
+    var hoyIso = iso(new Date());
+    $('cpVendedores').innerHTML = orden.map(function (id) {
+      var a = agentePorId(id), ls = porAg[id], total = ls.reduce(function (t, l) { return t + Number(l.comision); }, 0);
+      var ult = pagos.filter(function (p) { return p.agente_id === id && !p.anulado && (p.banco || p.cuenta_bancaria); })[0] || {};
+      var pacs = {}; ls.forEach(function (l) { pacs[l.paciente_id] = 1; });
+      return '<div class="com-vend" data-vend="' + id + '">' +
+        '<div class="com-vend-head"><h5>' + esc(a ? a.codigo + ' · ' + a.nombre : 'Agente ' + id) + '</h5><span class="hi-desc">' + ls.length + (ls.length === 1 ? ' comisión' : ' comisiones') + ' · ' + Object.keys(pacs).length + (Object.keys(pacs).length === 1 ? ' paciente' : ' pacientes') + '</span></div>' +
+        '<div class="com-vend-grid">' +
+        '<div><small>Total pendiente</small><b>' + q(total) + '</b></div>' +
+        '<label><small>Forma de pago</small><select data-v="metodo">' + Object.keys(METODOS).map(function (k) { return '<option value="' + k + '">' + METODOS[k] + '</option>'; }).join('') + '</select></label>' +
+        '<label><small>Fecha de pago</small><input type="date" data-v="fecha_pago" value="' + hoyIso + '"></label>' +
+        '<label><small>Fecha operación</small><input type="date" data-v="fecha_operacion" value="' + hoyIso + '"></label>' +
+        '<div><small>Usuario que paga</small><span>' + esc(usuarioActual()) + '</span></div>' +
+        '<label><small>Banco</small><select data-v="banco">' + opcionesBanco(ult.banco || '') + '</select></label>' +
+        '<label><small>Cuenta bancaria</small><input type="text" data-v="cuenta_bancaria" maxlength="40" placeholder="Número de cuenta" value="' + esc(ult.cuenta_bancaria || '') + '"></label>' +
+        '<label><small>Referencia / No. de operación</small><input type="text" data-v="referencia" maxlength="80" autocomplete="off"></label>' +
+        '<label class="com-vend-obs"><small>Observaciones</small><input type="text" data-v="observaciones" maxlength="300" autocomplete="off"></label>' +
+        '</div>' +
+        '<div class="com-vend-acc"><p class="dlg-msg" role="status" data-vmsg></p><button type="button" class="com-pagar" data-pagar="' + id + '">Pagar ' + q(total) + '</button></div></div>';
+    }).join('');
   }
   async function cargarPagos() {
     var ag = $('cpAgente').value;
     aviso('cpPagosMsg', '');
-    if (!ag) { $('cpPagosBody').innerHTML = '<tr><td colspan="9">Elige un agente.</td></tr>'; return; }
-    var r = await sb.from('comisiones_pagos').select('*').eq('agente_id', +ag).order('id', { ascending: false });
-    if (r.error) { $('cpPagosBody').innerHTML = ''; aviso('cpPagosMsg', traducir(r.error), true); return; }
+    var qy = sb.from('comisiones_pagos').select('*').order('id', { ascending: false }).limit(100);
+    if (ag) qy = qy.eq('agente_id', +ag);
+    var r = await qy;
+    if (r.error) { pagos = []; $('cpPagosBody').innerHTML = ''; aviso('cpPagosMsg', traducir(r.error), true); return; }
     pagos = r.data || [];
     $('cpPagosBody').innerHTML = pagos.length ? pagos.map(function (p) {
-      return '<tr' + (p.anulado ? ' class="com-anulado"' : '') + '><td>' + p.id + '</td><td class="fecha">' + fechaCorta(p.fecha_pago) + '</td><td class="fecha">' + fechaCorta(p.desde) + ' – ' + fechaCorta(p.hasta) + '</td>' +
-        '<td class="num">' + p.lineas + '</td><td class="num">' + q(p.base) + '</td><td class="num"><strong>' + q(p.monto) + '</strong></td>' +
-        '<td>' + (METODOS[p.metodo] || p.metodo) + (p.referencia ? '<br><span class="hi-desc">' + esc(p.referencia) + '</span>' : '') + '</td>' +
+      var a = agentePorId(p.agente_id);
+      return '<tr' + (p.anulado ? ' class="com-anulado"' : '') + '><td>' + p.id + '</td><td>' + esc(a ? a.nombre : '—') + (p.institucion_id ? '<br><span class="hi-desc">' + esc(nombreInst(p.institucion_id)) + '</span>' : '') + '</td>' +
+        '<td class="fecha">' + fechaCorta(p.fecha_pago) + '</td><td class="fecha">' + fechaCorta(p.desde) + ' – ' + fechaCorta(p.hasta) + '</td>' +
+        '<td class="num">' + p.lineas + '</td><td class="num"><strong>' + q(p.monto) + '</strong></td><td>' + formaPagoTxt(p) + '</td><td>' + esc(p.registrado_por || '—') + '</td>' +
         '<td>' + (p.anulado ? '<span class="estado estado-no_aprobado" title="' + esc(p.anulado_motivo || '') + '">Anulado</span>' : '<span class="estado estado-activo">Pagado</span>') + '</td>' +
         '<td><div class="hi-botones"><button type="button" class="adm-btn" data-cpimp="' + p.id + '">Imprimir</button>' + (p.anulado ? '' : '<button type="button" class="adm-btn" data-cpanular="' + p.id + '">Anular</button>') + '</div></td></tr>';
-    }).join('') : '<tr><td colspan="9">Este agente todavía no tiene pagos de comisiones.</td></tr>';
+    }).join('') : '<tr><td colspan="10">' + (ag ? 'Este agente todavía no tiene pagos de comisiones.' : 'Todavía no hay pagos de comisiones.') + '</td></tr>';
   }
 
   async function imprimirPago(id) {
     var p = pagos.filter(function (x) { return String(x.id) === String(id); })[0];
     if (!p || !window.PD_IMPRESION) return;
-    var r = await sb.rpc('comisiones_lineas', { p_desde: p.desde, p_hasta: p.hasta, p_agente: p.agente_id });
-    var ls = r.error ? [] : (r.data || []).filter(function (l) { return String(l.pago_comision_id) === String(p.id); });
-    var a = agentes.filter(function (x) { return x.id === p.agente_id; })[0];
+    var r = await sb.rpc('comisiones_lineas', { p_desde: p.desde, p_hasta: p.hasta, p_agente: p.agente_id, p_institucion: p.institucion_id || null });
+    var ls = r.error ? [] : (r.data || []).filter(function (l) { return String(l.pago_comision_id) === String(p.id); })
+      .sort(function (a, b) { return String(a.paciente).localeCompare(String(b.paciente), 'es') || (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0); });
+    var a = agentePorId(p.agente_id);
     var td = 'padding:6px 8px;border-bottom:1px solid #D9E4EC;font-size:12px', tdn = td + ';text-align:right';
+    var dato = function (t, v) { return '<div><b>' + t + ':</b> ' + v + '</div>'; };
     var html = window.PD_IMPRESION.encabezado('Comprobante de pago de comisiones No. ' + p.id) +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;font-size:13px;margin-bottom:16px">' +
-      '<div><b>Agente comercial:</b> ' + esc(a ? a.codigo + ' · ' + a.nombre : '#' + p.agente_id) + '</div><div><b>Fecha de pago:</b> ' + fechaCorta(p.fecha_pago) + '</div>' +
-      '<div><b>Período:</b> ' + fechaCorta(p.desde) + ' – ' + fechaCorta(p.hasta) + '</div><div><b>Forma de pago:</b> ' + (METODOS[p.metodo] || p.metodo) + (p.referencia ? ' · ' + esc(p.referencia) : '') + '</div>' +
+      dato('Vendedor', esc(a ? a.codigo + ' · ' + a.nombre : '#' + p.agente_id)) + dato('Período', fechaCorta(p.desde) + ' – ' + fechaCorta(p.hasta)) +
+      dato('Institución', esc(p.institucion_id ? nombreInst(p.institucion_id) : 'Todas')) + dato('Fecha de pago', fechaCorta(p.fecha_pago)) +
+      dato('Forma de pago', METODOS[p.metodo] || p.metodo) + dato('Fecha de operación', p.fecha_operacion ? fechaCorta(p.fecha_operacion) : '—') +
+      dato('Banco', esc(p.banco || '—')) + dato('Cuenta bancaria', esc(p.cuenta_bancaria || '—')) +
+      dato('Referencia', esc(p.referencia || '—')) + dato('Usuario que paga', esc(p.registrado_por || '—')) +
       (p.anulado ? '<div style="grid-column:1/-1;color:#9A3B2E"><b>ANULADO:</b> ' + esc(p.anulado_motivo || '') + '</div>' : '') + '</div>' +
-      '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="' + td + ';text-align:left">Fecha</th><th style="' + td + ';text-align:left">Documento</th><th style="' + td + ';text-align:left">Paciente</th><th style="' + td + ';text-align:left">Concepto</th><th style="' + tdn + '">Base</th><th style="' + tdn + '">Comisión</th></tr></thead><tbody>' +
-      (ls.length ? ls.map(function (l) { return '<tr><td style="' + td + '">' + fechaCorta(l.fecha) + '</td><td style="' + td + '">' + esc(l.documento) + '</td><td style="' + td + '">' + esc(l.paciente) + '</td><td style="' + td + '">' + esc(l.concepto) + '</td><td style="' + tdn + '">' + q(l.base) + '</td><td style="' + tdn + '">' + q(l.comision) + '</td></tr>'; }).join('')
-        : '<tr><td colspan="6" style="' + td + '">' + p.lineas + ' líneas (detalle no disponible' + (p.anulado ? ': el pago está anulado' : '') + ').</td></tr>') +
-      '<tr><td colspan="4" style="' + td + ';font-weight:700">Total pagado</td><td style="' + tdn + ';font-weight:700">' + q(p.base) + '</td><td style="' + tdn + ';font-weight:700">' + q(p.monto) + '</td></tr></tbody></table>' +
+      '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="' + td + ';text-align:left">Paciente</th><th style="' + td + ';text-align:left">Fecha</th><th style="' + td + ';text-align:left">Documento</th><th style="' + td + ';text-align:left">Concepto</th><th style="' + tdn + '">Base</th><th style="' + tdn + '">% comisión</th><th style="' + tdn + '">Comisión</th></tr></thead><tbody>' +
+      (ls.length ? ls.map(function (l) { return '<tr><td style="' + td + '">' + esc(l.paciente) + '</td><td style="' + td + '">' + fechaCorta(l.fecha) + '</td><td style="' + td + '">' + esc(l.documento) + '</td><td style="' + td + '">' + esc(l.concepto) + '</td><td style="' + tdn + '">' + q(l.base) + '</td><td style="' + tdn + '">' + (l.regla_id ? textoComision(l.tipo, l.valor) : pct(l.valor)) + '</td><td style="' + tdn + '">' + q(l.comision) + '</td></tr>'; }).join('')
+        : '<tr><td colspan="7" style="' + td + '">' + p.lineas + ' líneas (detalle no disponible' + (p.anulado ? ': el pago está anulado' : '') + ').</td></tr>') +
+      '<tr><td colspan="4" style="' + td + ';font-weight:700">Total pagado · ' + (METODOS[p.metodo] || p.metodo) + (p.banco ? ' · ' + esc(p.banco) : '') + '</td><td style="' + tdn + ';font-weight:700">' + q(p.base) + '</td><td style="' + tdn + '"></td><td style="' + tdn + ';font-weight:700">' + q(p.monto) + '</td></tr></tbody></table>' +
       (p.observaciones ? '<p style="font-size:13px;margin-top:12px"><b>Observaciones:</b> ' + esc(p.observaciones) + '</p>' : '') +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:64px;font-size:13px;text-align:center"><div style="border-top:1px solid #0B2B40;padding-top:6px">Entregado por · ' + esc(p.registrado_por || '') + '</div><div style="border-top:1px solid #0B2B40;padding-top:6px">Recibido · ' + esc(a ? a.nombre : '') + '</div></div>';
     window.PD_IMPRESION.imprimir(html);
   }
 
   $('cpCalcular').addEventListener('click', calcular);
-  $('cpAgente').addEventListener('change', function () { $('cpResultado').hidden = true; lineas = []; calculo = null; aviso('cpMsg', ''); cargarPagos(); });
-  ['cpDesde', 'cpHasta'].forEach(function (id) { $(id).addEventListener('change', function () { if (calculo) { $('cpResultado').hidden = true; calculo = null; aviso('cpMsg', 'Cambiaste las fechas: pulsa «Calcular».'); } }); });
+  ['cpAgente', 'cpInst', 'cpDesde', 'cpHasta'].forEach(function (id) {
+    $(id).addEventListener('change', function () { if (calculo) { $('cpResultado').hidden = true; calculo = null; aviso('cpMsg', 'Cambiaste los parámetros: pulsa «Calcular».'); } if (id === 'cpAgente') cargarPagos(); });
+  });
   document.querySelectorAll('[data-cpver]').forEach(function (b) { b.addEventListener('click', function () { verLineas = b.dataset.cpver; pintarLineas(); }); });
-  $('cpRegistrar').addEventListener('click', async function () {
-    if (!calculo || !pedirConfirmacion(this)) return;
-    this.disabled = true; aviso('cpPagoMsg', 'Registrando…');
-    var r = await sb.rpc('registrar_pago_comision', { p_agente: calculo.agente, p_desde: calculo.desde, p_hasta: calculo.hasta,
-      p_datos: { fecha_pago: $('cpFecha').value, metodo: $('cpMetodo').value, referencia: $('cpRef').value.trim(), observaciones: $('cpObs').value.trim() } });
-    this.disabled = false;
-    if (r.error) { aviso('cpPagoMsg', traducir(r.error), true); return; }
-    $('cpRef').value = ''; $('cpObs').value = '';
+  $('cpVendedores').addEventListener('click', async function (e) {
+    var b = e.target.closest('[data-pagar]');
+    if (!b || !calculo) return;
+    var card = b.closest('[data-vend]'), msg = card.querySelector('[data-vmsg]');
+    function campo(k) { var x = card.querySelector('[data-v="' + k + '"]'); return x ? x.value.trim() : ''; }
+    function av(t, err) { msg.textContent = t; msg.style.color = err ? '#9A3B2E' : '#475B68'; }
+    var metodo = campo('metodo');
+    if ((metodo === 'transferencia' || metodo === 'deposito') && !campo('banco')) { av('Elige el banco del pago.', true); card.querySelector('[data-v="banco"]').focus(); return; }
+    if (!campo('fecha_pago')) { av('Indica la fecha de pago.', true); return; }
+    if (!pedirConfirmacion(b)) return;
+    b.disabled = true; av('Registrando…');
+    var r = await sb.rpc('registrar_pago_comision', { p_agente: +card.dataset.vend, p_desde: calculo.desde, p_hasta: calculo.hasta, p_institucion: calculo.inst,
+      p_datos: { metodo: metodo, fecha_pago: campo('fecha_pago'), fecha_operacion: campo('fecha_operacion'), banco: campo('banco'), cuenta_bancaria: campo('cuenta_bancaria'), referencia: campo('referencia'), observaciones: campo('observaciones') } });
+    b.disabled = false;
+    if (r.error) { av(traducir(r.error), true); return; }
     await calcular();
     aviso('cpMsg', 'Se registró el pago de comisiones No. ' + r.data + '.');
     imprimirPago(r.data);
@@ -348,7 +403,7 @@
     var r = await sb.rpc('anular_pago_comision', { p_id: +ba.dataset.cpanular, p_motivo: motivo.trim() });
     if (r.error) { aviso('cpPagosMsg', traducir(r.error), true); return; }
     if (calculo) await calcular(); else await cargarPagos();
-    aviso('cpPagosMsg', 'Se anuló el pago No. ' + ba.dataset.cpanular + '; sus líneas quedan pendientes otra vez.');
+    aviso('cpPagosMsg', 'Se anuló el pago No. ' + ba.dataset.cpanular + '; sus comisiones quedan pendientes otra vez.');
   });
 
   var t1 = $('tabComReglas'), t2 = $('tabComPago');
@@ -358,7 +413,7 @@
     cargar: function () { cargarReglas(); },
     limpiar: function () {
       reglas = []; lineas = []; pagos = []; calculo = null;
-      $('crBody').innerHTML = ''; $('cpBody').innerHTML = ''; $('cpPagosBody').innerHTML = '<tr><td colspan="9">Elige un agente.</td></tr>';
+      $('crBody').innerHTML = ''; $('cpBody').innerHTML = ''; $('cpPagosBody').innerHTML = ''; $('cpVendedores').innerHTML = '';
       $('cpResultado').hidden = true; verReglas('crLista'); aviso('cpMsg', ''); aviso('crMsg', '');
     }
   });

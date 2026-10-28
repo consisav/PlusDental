@@ -6828,6 +6828,117 @@ $$;
 update public.dentistas set horario = horario || jsonb_build_object('6', jsonb_build_object('abre', '08:00', 'cierra', '15:00'))
 where horario -> '6' is distinct from jsonb_build_object('abre', '08:00', 'cierra', '15:00');
 
+-- ===== Pago de comisiones: institución, banco, cuenta bancaria y fecha de operación =====
+alter table public.comisiones_pagos add column if not exists banco text check (char_length(banco) <= 80);
+alter table public.comisiones_pagos add column if not exists cuenta_bancaria text check (char_length(cuenta_bancaria) <= 40);
+alter table public.comisiones_pagos add column if not exists fecha_operacion date;
+alter table public.comisiones_pagos add column if not exists institucion_id bigint references public.jor_instituciones (id) on delete set null;
+
+-- Líneas de comisión: ahora con la institución del paciente y el filtro por institución (vacío = todas)
+drop function if exists public.comisiones_lineas(date, date, bigint);
+create or replace function public.comisiones_lineas(p_desde date, p_hasta date, p_agente bigint default null, p_institucion bigint default null)
+returns table (origen text, ref_id bigint, fecha date, agente_id bigint, paciente_id bigint, paciente text, documento text,
+  categoria text, concepto text, cantidad numeric, base numeric, regla_id bigint, tipo text, valor numeric, comision numeric,
+  pago_comision_id bigint, institucion_id bigint)
+language plpgsql stable security definer set search_path = public as $$
+#variable_conflict use_column
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  return query
+  with l as (
+    select 'cobro'::text as origen, d.id as ref_id, p.fecha, pa.agente_id, pa.id as paciente_id, pa.nombre as paciente, pa.institucion_id,
+      coalesce(nullif(concat_ws(' ', p.serie, p.numero_factura), ''), p.correlativo, 'Pago ' || p.id) as documento,
+      case when d.producto_id is not null then 'medicamentos' when d.tipo_procedimiento_id is not null then 'procedimientos' else 'otros' end as categoria,
+      coalesce(d.producto_id, d.tipo_procedimiento_id) as elemento,
+      coalesce(pr.nombre, tp.nombre, p.concepto, 'Cobro') as concepto, coalesce(d.cantidad, 1)::numeric as cantidad, d.monto::numeric as base
+    from public.pago_detalle d
+    join public.pagos p on p.id = d.pago_id and not p.anulado and p.fecha between p_desde and p_hasta
+    join public.pacientes pa on pa.id = p.paciente_id
+    left join public.inv_productos pr on pr.id = d.producto_id
+    left join public.tipos_procedimiento tp on tp.id = d.tipo_procedimiento_id
+    union all
+    select 'pago', p.id, p.fecha, pa.agente_id, pa.id, pa.nombre, pa.institucion_id,
+      coalesce(nullif(concat_ws(' ', p.serie, p.numero_factura), ''), p.correlativo, 'Pago ' || p.id),
+      'otros', null::bigint, coalesce(p.concepto, 'Pago'), 1::numeric, p.monto::numeric
+    from public.pagos p join public.pacientes pa on pa.id = p.paciente_id
+    where not p.anulado and p.fecha between p_desde and p_hasta and not exists (select 1 from public.pago_detalle d where d.pago_id = p.id)
+    union all
+    select 'laboratorio', o.id, coalesce(o.fecha_recibida, o.estado_fecha::date, o.creada::date), pa.agente_id, pa.id, pa.nombre, pa.institucion_id,
+      coalesce(o.numero, 'Orden ' || o.id), 'laboratorio', o.laboratorio_id,
+      o.trabajo || coalesce(' · ' || lb.nombre, ''), 1::numeric, coalesce(o.costo, 0)::numeric
+    from public.ordenes_lab o join public.pacientes pa on pa.id = o.paciente_id
+    left join public.laboratorios lb on lb.id = o.laboratorio_id
+    where o.estado in ('recibida', 'colocada') and coalesce(o.fecha_recibida, o.estado_fecha::date, o.creada::date) between p_desde and p_hasta
+  ),
+  la as (
+    select l.*, a.comision as pct_agente from l join public.agentes a on a.id = l.agente_id and a.codigo <> '0'
+    where (p_agente is null or l.agente_id = p_agente) and (p_institucion is null or l.institucion_id = p_institucion)
+  ),
+  r as (
+    select la.*, rg.id as regla_id, rg.tipo as regla_tipo, rg.valor as regla_valor from la
+    left join lateral (
+      select x.id, x.tipo, x.valor from public.comisiones_reglas x
+      where x.estado = 'activo'
+        and (x.agente_id is null or x.agente_id = la.agente_id)
+        and (x.institucion_id is null or x.institucion_id = la.institucion_id)
+        and (x.aplica = 'todo' or x.aplica = la.categoria)
+        and (cardinality(x.elementos) = 0 or (x.aplica <> 'todo' and la.elemento = any (x.elementos)))
+        and (x.vigente_desde is null or la.fecha >= x.vigente_desde)
+        and (x.vigente_hasta is null or la.fecha <= x.vigente_hasta)
+      order by (x.agente_id is not null)::int * 8 + (x.institucion_id is not null)::int * 4
+             + (cardinality(x.elementos) > 0)::int * 2 + (x.aplica <> 'todo')::int desc, x.id desc
+      limit 1
+    ) rg on true
+  )
+  select r.origen, r.ref_id, r.fecha, r.agente_id, r.paciente_id, r.paciente, r.documento, r.categoria, r.concepto, r.cantidad, r.base,
+    r.regla_id,
+    coalesce(r.regla_tipo, 'porcentaje'),
+    coalesce(r.regla_valor, r.pct_agente)::numeric,
+    round(case when r.regla_id is null then r.base * r.pct_agente / 100
+               when r.regla_tipo = 'porcentaje' then r.base * r.regla_valor / 100
+               else r.regla_valor * r.cantidad end, 2)::numeric,
+    pl.pago_id,
+    r.institucion_id
+  from r left join public.comisiones_pago_lineas pl on pl.origen = r.origen and pl.ref_id = r.ref_id
+  where r.regla_id is not null or (r.origen <> 'laboratorio' and r.pct_agente > 0)
+  order by r.agente_id, r.fecha, r.ref_id;
+end;
+$$;
+revoke execute on function public.comisiones_lineas(date, date, bigint, bigint) from public, anon;
+grant execute on function public.comisiones_lineas(date, date, bigint, bigint) to authenticated;
+
+-- Registrar el pago de un agente: con institución (vacío = todas), banco, cuenta bancaria y fecha de operación
+drop function if exists public.registrar_pago_comision(bigint, date, date, jsonb);
+create or replace function public.registrar_pago_comision(p_agente bigint, p_desde date, p_hasta date, p_datos jsonb, p_institucion bigint default null)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint; v_base numeric; v_monto numeric; v_n int; v_metodo text := coalesce(nullif(p_datos ->> 'metodo', ''), 'transferencia');
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if p_agente is null or p_desde is null or p_hasta is null or p_hasta < p_desde then raise exception 'Revisa el agente y el rango de fechas'; end if;
+  if v_metodo in ('transferencia', 'deposito') and coalesce(nullif(trim(p_datos ->> 'banco'), ''), '') = '' then raise exception 'Elige el banco del pago'; end if;
+  perform pg_advisory_xact_lock(hashtext('comisiones_pago'), p_agente::int);
+  create temp table if not exists _com_pend (origen text, ref_id bigint, base numeric, comision numeric) on commit drop;
+  delete from _com_pend;
+  insert into _com_pend
+    select x.origen, x.ref_id, x.base, x.comision from public.comisiones_lineas(p_desde, p_hasta, p_agente, p_institucion) x
+    where x.pago_comision_id is null and x.comision > 0;
+  select count(*), coalesce(sum(c.base), 0), coalesce(sum(c.comision), 0) into v_n, v_base, v_monto from _com_pend c;
+  if v_n = 0 then raise exception 'No hay comisiones pendientes de pago para ese agente en esas fechas'; end if;
+  insert into public.comisiones_pagos (agente_id, desde, hasta, fecha_pago, base, monto, lineas, metodo, referencia, observaciones,
+    banco, cuenta_bancaria, fecha_operacion, institucion_id, registrado_por)
+  values (p_agente, p_desde, p_hasta, coalesce(nullif(p_datos ->> 'fecha_pago', '')::date, current_date), v_base, v_monto, v_n,
+    v_metodo, nullif(trim(p_datos ->> 'referencia'), ''), nullif(trim(p_datos ->> 'observaciones'), ''),
+    nullif(trim(p_datos ->> 'banco'), ''), nullif(trim(p_datos ->> 'cuenta_bancaria'), ''), nullif(p_datos ->> 'fecha_operacion', '')::date,
+    p_institucion, (select usuario from public.perfiles where id = auth.uid()))
+  returning id into v_id;
+  insert into public.comisiones_pago_lineas (pago_id, origen, ref_id, base, comision)
+    select v_id, c.origen, c.ref_id, c.base, c.comision from _com_pend c;
+  return v_id;
+end;
+$$;
+revoke execute on function public.registrar_pago_comision(bigint, date, date, jsonb, bigint) from public, anon;
+grant execute on function public.registrar_pago_comision(bigint, date, date, jsonb, bigint) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
