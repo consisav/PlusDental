@@ -6776,7 +6776,7 @@ begin
   if p_agente is null or p_desde is null or p_hasta is null or p_hasta < p_desde then raise exception 'Revisa el agente y el rango de fechas'; end if;
   perform pg_advisory_xact_lock(hashtext('comisiones_pago'), p_agente::int);
   create temp table if not exists _com_pend (origen text, ref_id bigint, base numeric, comision numeric) on commit drop;
-  delete from _com_pend;
+  delete from _com_pend where true;
   insert into _com_pend
     select x.origen, x.ref_id, x.base, x.comision from public.comisiones_lineas(p_desde, p_hasta, p_agente) x
     where x.pago_comision_id is null and x.comision > 0;
@@ -6918,7 +6918,7 @@ begin
   if v_metodo in ('transferencia', 'deposito') and coalesce(nullif(trim(p_datos ->> 'banco'), ''), '') = '' then raise exception 'Elige el banco del pago'; end if;
   perform pg_advisory_xact_lock(hashtext('comisiones_pago'), p_agente::int);
   create temp table if not exists _com_pend (origen text, ref_id bigint, base numeric, comision numeric) on commit drop;
-  delete from _com_pend;
+  delete from _com_pend where true;
   insert into _com_pend
     select x.origen, x.ref_id, x.base, x.comision from public.comisiones_lineas(p_desde, p_hasta, p_agente, p_institucion) x
     where x.pago_comision_id is null and x.comision > 0;
@@ -7018,7 +7018,7 @@ begin
   if p_desde is null or p_hasta is null or p_hasta < p_desde then raise exception 'Revisa el rango de fechas'; end if;
   create temp table if not exists _com_fuente (origen text, ref_id bigint, fecha date, agente_id bigint, paciente_id bigint, paciente text,
     institucion_id bigint, documento text, categoria text, elemento bigint, concepto text, cantidad numeric, base numeric) on commit drop;
-  delete from _com_fuente;
+  delete from _com_fuente where true;   -- con WHERE: Supabase no permite DELETE sin WHERE desde la página
   insert into _com_fuente
     select 'cobro', d.id, p.fecha, pa.agente_id, pa.id, pa.nombre, pa.institucion_id,
       coalesce(nullif(concat_ws(' ', p.serie, p.numero_factura), ''), p.correlativo, 'Pago ' || p.id),
