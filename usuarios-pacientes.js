@@ -6,7 +6,7 @@
   var panel = document.getElementById('admGenUsuario');
   if (!sb || !panel) return;
 
-  var pacientes = [], actual = null, acceso = null;
+  var pacientes = [], actual = null, acceso = null, cargando = null;
   var PARTICULAS = ['de', 'del', 'la', 'las', 'los', 'y', 'da', 'das', 'do', 'dos', 'van', 'von', 'san'];
 
   function $(id) { return document.getElementById(id); }
@@ -36,7 +36,7 @@
     return (ini + w.slice(desde, iApe + 1).join('')).slice(0, 30);
   }
 
-  panel.innerHTML = '<div class="adm-pane-head"><h3 class="adm-h">Generación Usuario</h3></div>' +
+  panel.innerHTML = '<div class="adm-pane-head"><h3 class="adm-h">Generación Usuario</h3><button type="button" id="guVolver" class="adm-btn" hidden>← Volver al expediente</button></div>' +
     '<p class="dlg-msg">Crea el usuario y la clave con los que el paciente entra a «Mi expediente». Si el paciente ya tiene clave generada, solo se muestra.</p>' +
     '<div class="gu-caja">' +
     '<label>Buscar paciente<input id="guBuscar" type="search" class="adm-input" placeholder="Nombre, DPI o usuario" autocomplete="off"></label>' +
@@ -133,7 +133,7 @@
     $('guUsuario').value = acceso.usuario; $('guUsuario').readOnly = true;
     $('guUsuarioNota').textContent = 'El paciente ya tiene usuario.';
     pintarClave(true);
-    if (cambio) opciones();
+    if (cambio) { opciones(); window.dispatchEvent(new CustomEvent('pd-usuario-generado', { detail: { paciente_id: actual.id, usuario: acceso.usuario } })); }
     aviso(acceso.nuevo ? 'Listo. Se guardaron el usuario y la clave en el paciente. Entrégaselos para que entre a «Mi expediente».' : 'Este paciente ya tenía clave generada; se muestra la misma.');
   });
 
@@ -151,8 +151,20 @@
     window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(textoEntrega()), '_blank', 'noopener');
   });
 
+  function recargar() { $('guVolver').hidden = true; return (cargando = cargar()); }
   var tab = $('tabGenUsuario');
-  if (tab) tab.addEventListener('click', cargar);
+  if (tab) tab.addEventListener('click', recargar);
+  $('guVolver').addEventListener('click', function () { if ($('tabExpedientes')) $('tabExpedientes').click(); });
+  // Desde el expediente del paciente: abre esta pantalla con el paciente ya elegido
+  window.PD_GEN_USUARIO_ABRIR = async function (id) {
+    tab.click();
+    $('guVolver').hidden = false;
+    await cargando;
+    $('guBuscar').value = ''; opciones();
+    $('guPaciente').value = String(id);
+    await elegir();
+    panel.scrollIntoView({ block: 'start' });
+  };
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { if (!panel.hidden) cargar(); },
     limpiar: function () { pacientes = []; actual = null; acceso = null; $('guBuscar').value = ''; $('guPaciente').innerHTML = '<option value="">Elige el paciente…</option>'; $('guFicha').hidden = true; aviso(''); }

@@ -6,11 +6,14 @@
   var BUCKET = 'expedientes';
   var CAMPOS = {
     nombre: 'pNombre', dpi: 'pDpi', nit: 'pNit', fecha_nacimiento: 'pNacimiento', telefono: 'pTelefono', direccion: 'pDireccion',
-    emergencia_nombre: 'pEmNombre', emergencia_telefono: 'pEmTelefono', estado: 'pEstado', correo: 'pCorreo', tipo_cliente: 'pTipoCliente'
+    emergencia_nombre: 'pEmNombre', emergencia_parentesco: 'pEmParentesco', emergencia_telefono: 'pEmTelefono', estado: 'pEstado', correo: 'pCorreo', tipo_cliente: 'pTipoCliente'
   };
   // Tipo de cliente: el mismo catálogo de tipos de precio (Inventarios › Precios por tipo de cliente)
   var TIPOS_CLIENTE = { directo: 'Cliente directo', institucional: 'Institucional', vip: 'VIP', referido: 'Referido', paquete: 'Paquete', especial: 'Especial' };
 
+  // Parentesco del contacto de emergencia; «Otro…» permite escribir uno nuevo, que se agrega a la lista
+  var PARENTESCOS = ['Esposa', 'Esposo', 'Hijo(a)', 'Padre', 'Madre', 'Hermano(a)', 'Abuelo(a)', 'Nieto(a)', 'Tío(a)', 'Sobrino(a)', 'Primo(a)',
+    'Suegro(a)', 'Yerno', 'Nuera', 'Cuñado(a)', 'Pareja', 'Novio(a)', 'Amigo(a)', 'Tutor(a) / Encargado(a)', 'Compañero(a) de trabajo'];
   var ESTADOS_PAC = { activo: 'Activo', inactivo: 'Inactivo', suspendido: 'Suspendido', baja: 'Baja' };
   var pacientes = [], actual = null, odontoCambiado = false;
   var filtroEstado = 'activo', editando = false, fotos = {}, medicos = [], agentesCat = [], clientes = [], usuariosTomados = {}, hayUsuario = false;
@@ -178,6 +181,24 @@
     (r[1].data || []).forEach(function (p) { usuariosTomados[p.usuario] = p.id; });
     (r[2].error ? [] : r[2].data || []).forEach(function (d) { usuariosTomados[d.usuario] = 'dentista'; });
   }
+  $('pEmParentesco').addEventListener('change', function () {
+    if (this.value !== '__otro') return;
+    var t = (prompt('Escribe el parentesco:') || '').trim().slice(0, 40);
+    opcionesParentesco(t ? t.charAt(0).toUpperCase() + t.slice(1) : '');
+  });
+  $('pGenUsuario').addEventListener('click', function (e) {
+    e.preventDefault();
+    if (!actual) return;
+    if (editando) { aviso('fDatosMsg', 'Guarda o cancela los cambios antes de generar el usuario.', true); return; }
+    if (window.PD_GEN_USUARIO_ABRIR) window.PD_GEN_USUARIO_ABRIR(actual.id);
+  });
+  window.addEventListener('pd-usuario-generado', async function (e) {
+    var d = e.detail || {};
+    pacientes.forEach(function (p) { if (p.id === d.paciente_id) p.usuario = d.usuario; });
+    if (actual && actual.id === d.paciente_id) actual.usuario = d.usuario;
+    await cargarUsuarios();
+    if (actual) opcionesUsuarios(actual);
+  });
   function opcionesUsuarios(p) {
     var sel = $('pUsuario'), elegido = (p && p.usuario) || '';
     if (!hayUsuario) {
@@ -204,7 +225,13 @@
     $('pAgente').value = elegido && lista.some(function (a) { return a.id === elegido; }) ? String(elegido) : agenteCero();
   }
 
+  function opcionesParentesco(elegido) {
+    if (elegido && PARENTESCOS.indexOf(elegido) < 0) PARENTESCOS.push(elegido);
+    $('pEmParentesco').innerHTML = '<option value="">Elige el parentesco…</option>' + PARENTESCOS.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '<option value="__otro">Otro…</option>';
+    $('pEmParentesco').value = elegido || '';
+  }
   function rellenar(p) {
+    opcionesParentesco((p && p.emergencia_parentesco) || '');
     Object.keys(CAMPOS).forEach(function (k) { $(CAMPOS[k]).value = (p && p[k]) || ''; });
     $('pEstado').value = (p && p.estado) || 'activo';
     $('pTipoCliente').value = (p && TIPOS_CLIENTE[p.tipo_cliente]) ? p.tipo_cliente : 'directo';
@@ -226,6 +253,7 @@
   // Modo consulta / modo edición ("Modificar registro")
   function aplicarModo() {
     $('pDatosCampos').disabled = !editando;
+    $('pGenUsuario').hidden = !actual || !hayUsuario;
     document.querySelectorAll('[data-exp-accion]').forEach(function (b) {
       var a = b.dataset.expAccion;
       b.hidden = a === 'editar' ? (editando || !actual) : !editando;
@@ -388,7 +416,7 @@
       ? await sb.from('pacientes').update(datos).eq('id', actual.id).select('*,medico:dentistas(nombre)').single()
       : await sb.from('pacientes').insert(datos).select('*,medico:dentistas(nombre)').single();
     // Si aún no se ejecutó el SQL de pacientes institucionales, se graba sin institución ni sucursal
-    if (r.error && /institucion_id|sucursal_id/.test(r.error.message || '')) { delete datos.institucion_id; delete datos.sucursal_id; r = actual ? await sb.from('pacientes').update(datos).eq('id', actual.id).select('*,medico:dentistas(nombre)').single() : await sb.from('pacientes').insert(datos).select('*,medico:dentistas(nombre)').single(); }
+    if (r.error && /institucion_id|sucursal_id|emergencia_parentesco/.test(r.error.message || '')) { delete datos.institucion_id; delete datos.sucursal_id; delete datos.emergencia_parentesco; r = actual ? await sb.from('pacientes').update(datos).eq('id', actual.id).select('*,medico:dentistas(nombre)').single() : await sb.from('pacientes').insert(datos).select('*,medico:dentistas(nombre)').single(); }
     boton.disabled = false;
     if (r.error) { aviso(msgId, traducir(r.error), true); return; }
     var eraNuevo = !actual;
@@ -778,7 +806,7 @@
   $('fDatos').addEventListener('submit', function (e) {
     e.preventDefault();
     if (!editando) return;
-    guardar(['nombre', 'dpi', 'nit', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'emergencia_nombre', 'emergencia_telefono', 'estado', 'tipo_cliente'], 'fDatosMsg', this.querySelector('[type=submit]'));
+    guardar(['nombre', 'dpi', 'nit', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'emergencia_nombre', 'emergencia_parentesco', 'emergencia_telefono', 'estado', 'tipo_cliente'], 'fDatosMsg', this.querySelector('[type=submit]'));
   });
 
   $('odoGuardar').addEventListener('click', function () { guardarOdonto(this); });

@@ -6599,6 +6599,9 @@ revoke execute on function public.generar_acceso_paciente(bigint, text) from pub
 grant execute on function public.generar_acceso_paciente(bigint, text) to authenticated;
 
 
+-- ===== Parentesco del contacto de emergencia del paciente =====
+alter table public.pacientes add column if not exists emergencia_parentesco text check (char_length(emergencia_parentesco) <= 40);
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

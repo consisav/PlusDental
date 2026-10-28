@@ -379,7 +379,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .pac-perfil-foto .adm-btn:hover:not(:disabled){background:rgba(255,255,255,.12)}
 .pac-perfil-foto .dlg-msg{color:#B9D5E6;margin:0;max-width:240px;text-align:right}
 .pac-secciones{display:flex;flex-direction:column;gap:14px}
-.pac-s3{grid-column:span 3}
+.pac-s3{grid-column:span 3}.pac-usr{display:flex;gap:6px;align-items:stretch}.pac-usr select{flex:1;min-width:0}.pac-usr .adm-btn{flex:none;display:inline-flex;align-items:center;white-space:nowrap;text-decoration:none;padding:0 10px;font-size:13px}.pac-usr .adm-btn[hidden]{display:none}
 .campos:disabled select.pac-estado[data-estado="activo"]{background:#DCF2EC;color:#08504C;-webkit-text-fill-color:#08504C;font-weight:700}
 .campos:disabled select.pac-estado[data-estado="suspendido"]{background:#FEF3C7;color:#92400E;-webkit-text-fill-color:#92400E;font-weight:700}
 .campos:disabled select.pac-estado[data-estado="baja"]{background:#FDE2E4;color:#9F1239;-webkit-text-fill-color:#9F1239;font-weight:700}
@@ -1760,9 +1760,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label class="pg-s2">Nombre completo *<input id="pNombre" type="text" maxlength="150" required></label>
 <label>Fecha de nacimiento<input id="pNacimiento" type="date"></label>
 <label>Edad<output id="pEdad" class="pg-auto pg-out">—</output></label>
-<label class="pg-s2">DPI<input id="pDpi" type="text" inputmode="numeric" maxlength="20" placeholder="0000 00000 0000"></label>
+<label>DPI<input id="pDpi" type="text" inputmode="numeric" maxlength="20" placeholder="0000 00000 0000"></label>
 <label>NIT<input id="pNit" type="text" maxlength="20" placeholder="Ej.: 1234567-8 o CF" autocomplete="off"></label>
-<label>Usuario del portal<select id="pUsuario"><option value="">Sin usuario</option></select></label>
+<label class="pg-s2">Usuario del portal<span class="pac-usr"><select id="pUsuario"><option value="">Sin usuario</option></select><a href="#" id="pGenUsuario" class="adm-btn" role="button" hidden title="Abre Catálogos › Generación Usuario con este paciente">Generar usuario</a></span></label>
 </div>
 <div class="pg-sec"><b aria-hidden="true">2</b>Contacto</div>
 <div class="pg-grid">
@@ -1772,7 +1772,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 <div class="pg-sec"><b aria-hidden="true">3</b>Contacto de emergencia</div>
 <div class="pg-grid">
-<label class="pac-s3">Nombre y parentesco<input id="pEmNombre" type="text" maxlength="150" placeholder="Ej.: María López (esposa)"></label>
+<label class="pg-s2">Nombre del contacto<input id="pEmNombre" type="text" maxlength="150" placeholder="Ej.: María López"></label>
+<label>Parentesco<select id="pEmParentesco"><option value="">Elige el parentesco…</option></select></label>
 <label>Teléfono<input id="pEmTelefono" type="tel" maxlength="40"></label>
 </div>
 <div class="pg-sec"><b aria-hidden="true">4</b>Atención y seguimiento</div>
@@ -3063,7 +3064,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="voz-historia.js"></script>
 <script src="voz-odontograma.js"></script>
 <script src="odontograma.js"></script>
-<script src="expedientes.js?v=20261027c"></script>
+<script src="expedientes.js?v=20261028a"></script>
 <script src="presupuestos.js"></script>
 <script src="cuentas.js?v=20261028a"></script>
 <script src="tratamientos-paciente.js"></script>
@@ -3093,7 +3094,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="precios.js?v=20261027"></script>
 <script src="paquetes.js"></script>
 <script src="recargos.js"></script>
-<script src="usuarios-pacientes.js?v=20261028a"></script>
+<script src="usuarios-pacientes.js?v=20261028b"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="chatbot.js"></script>
