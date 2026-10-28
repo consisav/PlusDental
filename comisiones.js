@@ -293,8 +293,7 @@
     '<div id="gcRes" class="adm-pane" hidden>' +
     '<div class="rep-params" id="gcParams"></div>' +
     '<div id="gcResumen" class="com-resumen"></div>' +
-    '<div class="roles-wrap"><table class="rep-tabla"><thead><tr><th class="com-chk">Autorizar pago</th><th>Beneficiario</th><th>Tipo</th><th class="num">Líneas</th><th class="num">Base</th><th class="num">Comisión</th><th class="num">Autorizado</th><th class="num">En Pagar Comisiones</th><th class="num">Pagado</th><th class="num">Pendiente</th><th><span class="sr-only">Acciones</span></th></tr></thead>' +
-    '<tbody id="gcBody"></tbody><tfoot id="gcPie"></tfoot></table></div>' +
+    '<div id="gcBody" class="com-bens"></div><div id="gcPie"></div>' +
     '<div id="gcDet" class="rep-det" hidden></div>' +
     '</div>';
   (function () { var h = new Date(); $('gcDesde').value = iso(new Date(h.getFullYear(), h.getMonth(), 1)); $('gcHasta').value = iso(h); })();
@@ -344,18 +343,24 @@
     $('gcResumen').innerHTML = [['Beneficiarios', bs.length], ['Base', q(s('base'))], ['Comisiones', q(s('comision'))], ['En Pagar Comisiones', q(s('enPago'))], ['Pagado', q(s('pagado'))], ['Total autorizado', q(s('autorizado')), 1]]
       .map(function (x) { return '<div' + (x[2] ? ' class="com-dest"' : '') + '><small>' + x[0] + '</small><b>' + x[1] + '</b></div>'; }).join('');
     var sinPermiso = puedePagar ? '' : ' disabled title="Solo el médico principal o el Super Administrador"';
+    function cifras(b) {
+      return '<dl class="com-ben-cifras">' + [['Base', b.base], ['Comisión', b.comision], ['Autorizado', b.autorizado, 'dest'], ['En Pagar Comisiones', b.enPago], ['Pagado', b.pagado], ['Pendiente', b.pendiente]]
+        .map(function (x) { return '<div' + (x[2] ? ' class="com-ben-dest"' : '') + '><dt>' + x[0] + '</dt><dd>' + q(x[1]) + '</dd></div>'; }).join('') + '</dl>';
+    }
     $('gcBody').innerHTML = bs.length ? bs.map(function (b) {
       var todo = b.libres > 0 && b.aut === b.libres, parte = b.aut > 0 && b.aut < b.libres;
-      return '<tr' + (genAbierto === b.clave ? ' class="com-sel"' : '') + '><td class="com-chk"><input type="checkbox" data-gc-aut="' + b.clave + '"' + (todo ? ' checked' : '') + (parte ? ' data-parte="1"' : '') + (b.libres ? '' : ' disabled') +
-        ' aria-label="Autorizar el pago de ' + esc(b.nombre) + '" title="' + (b.libres ? b.aut + ' de ' + b.libres + ' comisiones pendientes autorizadas' : 'Sin comisiones pendientes por autorizar') + '"></td>' +
-        '<td><strong>' + esc(b.nombre) + '</strong></td><td>' + etiquetaBen(b.benef) + '</td><td class="num">' + b.n + '</td><td class="num">' + q(b.base) + '</td><td class="num">' + q(b.comision) + '</td>' +
-        '<td class="num"><strong>' + q(b.autorizado) + '</strong></td><td class="num">' + q(b.enPago) + '</td><td class="num">' + q(b.pagado) + '</td><td class="num">' + q(b.pendiente) + '</td>' +
-        '<td><div class="com-acc"><button type="button" class="adm-btn rep-det-btn" data-gc-det="' + b.clave + '">Detalle</button>' +
+      return '<article class="com-ben' + (genAbierto === b.clave ? ' com-sel' : '') + '">' +
+        '<div class="com-ben-id"><label class="com-ben-aut" title="' + (b.libres ? b.aut + ' de ' + b.libres + ' comisiones pendientes autorizadas' : 'Sin comisiones pendientes por autorizar') + '"><input type="checkbox" data-gc-aut="' + b.clave + '"' + (todo ? ' checked' : '') + (parte ? ' data-parte="1"' : '') + (b.libres ? '' : ' disabled') +
+        ' aria-label="Autorizar el pago de ' + esc(b.nombre) + '"><span>Autorizar pago</span></label>' +
+        '<div class="com-ben-nom"><strong>' + esc(b.nombre) + '</strong><span>' + etiquetaBen(b.benef) + ' · ' + b.n + (b.n === 1 ? ' línea' : ' líneas') + '</span></div></div>' +
+        cifras(b) +
+        '<div class="com-acc"><button type="button" class="adm-btn rep-det-btn" data-gc-det="' + b.clave + '">Detalle</button>' +
         '<button type="button" class="adm-btn rep-det-btn com-btn-pagar" data-gc-pagar-ben="' + b.clave + '"' + (b.porTrasladar ? sinPermiso : ' disabled title="No hay comisiones autorizadas por trasladar"') + '>Pagar</button>' +
-        '<button type="button" class="adm-btn rep-det-btn com-btn-rev" data-gc-revertir="' + b.clave + '"' + (b.trasladadas ? sinPermiso : ' disabled title="No hay comisiones sin pagar en Pagar Comisiones"') + '>Revertir</button></div></td></tr>';
-    }).join('') : '<tr><td colspan="11">No hay comisiones para esos parámetros.</td></tr>';
+        '<button type="button" class="adm-btn rep-det-btn com-btn-rev" data-gc-revertir="' + b.clave + '"' + (b.trasladadas ? sinPermiso : ' disabled title="No hay comisiones sin pagar en Pagar Comisiones"') + '>Revertir</button></div></article>';
+    }).join('') : '<p class="dlg-msg">No hay comisiones para esos parámetros.</p>';
     document.querySelectorAll('#gcBody [data-parte]').forEach(function (c) { c.indeterminate = true; });
-    $('gcPie').innerHTML = bs.length ? '<tr class="rep-total"><td></td><td>TOTAL</td><td></td><td class="num">' + s('n') + '</td><td class="num">' + q(s('base')) + '</td><td class="num">' + q(s('comision')) + '</td><td class="num">' + q(s('autorizado')) + '</td><td class="num">' + q(s('enPago')) + '</td><td class="num">' + q(s('pagado')) + '</td><td class="num">' + q(s('pendiente')) + '</td><td></td></tr>' : '';
+    $('gcPie').innerHTML = bs.length > 1 ? '<div class="com-ben com-ben-total"><div class="com-ben-id"><div class="com-ben-nom"><strong>TOTAL</strong><span>' + bs.length + ' beneficiarios · ' + s('n') + ' líneas</span></div></div>' +
+      cifras({ base: s('base'), comision: s('comision'), autorizado: s('autorizado'), enPago: s('enPago'), pagado: s('pagado'), pendiente: s('pendiente') }) + '<div></div></div>' : '';
     pintarGenDet(bs);
   }
   function pintarGenDet(bs) {
@@ -366,7 +371,7 @@
     $('gcDet').hidden = false;
     $('gcDet').innerHTML = '<div class="rep-det-head"><div><h4>Detalle · ' + esc(b.nombre) + ' ' + etiquetaBen(b.benef) + '</h4><p class="dlg-msg">' + ls.length + (ls.length === 1 ? ' comisión' : ' comisiones') + ', por paciente y fecha. Haz tus cambios y pulsa «Confirmar y actualizar maestro».</p></div>' +
       '<div class="hi-botones"><button type="button" class="adm-btn" data-gc-cerrar>Cerrar</button></div></div>' +
-      '<div class="roles-wrap"><table class="rep-tabla com-det"><thead><tr><th>Paciente · concepto</th><th>Fecha</th><th class="num">Base</th><th class="num">% comisión</th><th class="num">Valor de comisión</th><th>Estado</th><th class="com-chk">Pagar comisión</th></tr></thead><tbody>' +
+      '<div class="roles-wrap com-fit"><table class="rep-tabla com-det com-t7"><colgroup><col class="c-pac"><col class="c-fec"><col class="c-num"><col class="c-pct"><col class="c-num"><col class="c-est"><col class="c-chk"></colgroup><thead><tr><th>Paciente · concepto</th><th>Fecha</th><th class="num">Base</th><th class="num">% comisión</th><th class="num">Comisión</th><th>Estado</th><th class="com-chk">Pagar</th></tr></thead><tbody>' +
       ls.map(function (l) {
         var bloq = !editable(l), nota = l.pago_id ? 'Pago No. ' + l.pago_id : l.trasladado ? 'En Pagar Comisiones' : '';
         var valor = l.tipo === 'valor'
@@ -536,12 +541,12 @@
     '<div id="pqResumen" class="com-resumen"></div>' +
     '<h4 class="com-sub">Detalle del pago</h4>' +
     '<div class="com-filtros" role="group" aria-label="Mostrar comisiones"><button type="button" class="adm-btn" data-pqver="aut" aria-pressed="true">Por pagar</button><button type="button" class="adm-btn" data-pqver="sin" aria-pressed="false">Sin autorizar</button><button type="button" class="adm-btn" data-pqver="pag" aria-pressed="false">Pagadas</button><button type="button" class="adm-btn" data-pqver="todas" aria-pressed="false">Todas</button></div>' +
-    '<div class="roles-wrap"><table><thead><tr><th>Paciente · concepto</th><th>Beneficiario</th><th>Fecha generada</th><th class="num">Base</th><th class="num">% comisión</th><th class="num">Valor de comisión</th><th>Estado</th></tr></thead><tbody id="pqBody"></tbody></table></div>' +
+    '<div class="roles-wrap com-fit"><table class="com-tpq"><colgroup><col class="c-pac"><col class="c-ben"><col class="c-fec"><col class="c-num"><col class="c-pct"><col class="c-num"><col class="c-est"></colgroup><thead><tr><th>Paciente · concepto</th><th>Beneficiario</th><th>Fecha</th><th class="num">Base</th><th class="num">% comisión</th><th class="num">Comisión</th><th>Estado</th></tr></thead><tbody id="pqBody"></tbody></table></div>' +
     '<h4 class="com-sub">Resumen de pago por beneficiario</h4>' +
     '<div id="pqVendedores" class="com-vends"></div>' +
     '</div>' +
     '<h4 class="com-sub">Pagos registrados</h4>' +
-    '<div class="roles-wrap"><table><thead><tr><th>No.</th><th>Beneficiario</th><th>Fecha de pago</th><th>Período</th><th class="num">Líneas</th><th class="num">Comisión pagada</th><th>Forma de pago</th><th>Usuario que paga</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody id="pqPagosBody"></tbody></table></div>' +
+    '<div class="roles-wrap com-fit"><table class="com-tpagos"><colgroup><col class="c-no"><col class="c-ben"><col class="c-fec2"><col class="c-num"><col class="c-forma"><col class="c-est2"><col class="c-acc"></colgroup><thead><tr><th>No.</th><th>Beneficiario</th><th>Fecha · período</th><th class="num">Pagado</th><th>Forma de pago</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody id="pqPagosBody"></tbody></table></div>' +
     '<p id="pqPagosMsg" class="dlg-msg" role="status"></p>';
 
   var verLineas = 'aut';
@@ -642,7 +647,7 @@
     var tot = ls.reduce(function (t, l) { return t + Number(l.comision); }, 0), base = ls.reduce(function (t, l) { return t + Number(l.base); }, 0);
     var vista = { aut: 'por pagar', sin: 'sin autorizar', pag: 'pagadas', todas: 'todas' }[verLineas];
     return '<div class="com-vend-det"><p class="dlg-msg">Comisiones ' + vista + ' (cambia la vista con los botones de «Detalle del pago»).</p>' +
-      '<div class="roles-wrap"><table class="rep-tabla"><thead><tr><th>Paciente · concepto</th><th>Fecha</th><th class="num">Base</th><th class="num">% comisión</th><th class="num">Comisión</th><th>Estado</th></tr></thead><tbody>' +
+      '<div class="roles-wrap com-fit"><table class="rep-tabla com-t6"><colgroup><col class="c-pac"><col class="c-fec"><col class="c-num"><col class="c-pct"><col class="c-num"><col class="c-est"></colgroup><thead><tr><th>Paciente · concepto</th><th>Fecha</th><th class="num">Base</th><th class="num">% comisión</th><th class="num">Comisión</th><th>Estado</th></tr></thead><tbody>' +
       (ls.length ? ls.map(function (l) {
         return '<tr><td><strong>' + esc(l.paciente) + '</strong><br><span class="hi-desc">' + esc(l.concepto) + ' · ' + esc(l.documento) + '</span></td><td class="fecha">' + fechaCorta(l.fecha) + '</td>' +
           '<td class="num">' + q(l.base) + '</td><td class="num">' + textoValor(l) + '</td><td class="num"><strong>' + q(l.comision) + '</strong></td><td>' + estadoLinea(l, pagoDe[l.pago_id]) + '</td></tr>';
@@ -656,17 +661,17 @@
     var cond = [];
     if (ag === 'todos') cond.push('beneficiario.eq.agente'); else if (ag !== 'ninguno') cond.push('agente_id.eq.' + (+ag));
     if (ins === 'todas') cond.push('beneficiario.eq.institucion'); else if (ins !== 'ninguna') cond.push('and(beneficiario.eq.institucion,institucion_id.eq.' + (+ins) + ')');
-    if (!cond.length) { pagos = []; $('pqPagosBody').innerHTML = '<tr><td colspan="10">Elige agentes, instituciones o ambos.</td></tr>'; return; }
+    if (!cond.length) { pagos = []; $('pqPagosBody').innerHTML = '<tr><td colspan="7">Elige agentes, instituciones o ambos.</td></tr>'; return; }
     var r = await qy.or(cond.join(','));
     if (r.error) { pagos = []; $('pqPagosBody').innerHTML = ''; aviso('pqPagosMsg', traducir(r.error), true); return; }
     pagos = r.data || [];
     $('pqPagosBody').innerHTML = pagos.length ? pagos.map(function (p) {
       return '<tr' + (p.anulado ? ' class="com-anulado"' : '') + '><td>' + p.id + '</td><td>' + esc(benDePago(p)) + ' ' + etiquetaBen(p.beneficiario || 'agente') + '</td>' +
-        '<td class="fecha">' + fechaCorta(p.fecha_pago) + '</td><td class="fecha">' + fechaCorta(p.desde) + ' – ' + fechaCorta(p.hasta) + '</td>' +
-        '<td class="num">' + p.lineas + '</td><td class="num"><strong>' + q(p.monto) + '</strong></td><td>' + formaPagoTxt(p) + '</td><td>' + esc(p.registrado_por || '—') + '</td>' +
+        '<td><strong>' + fechaCorta(p.fecha_pago) + '</strong><br><span class="hi-desc">' + fechaCorta(p.desde) + ' – ' + fechaCorta(p.hasta) + '</span></td>' +
+        '<td class="num"><strong>' + q(p.monto) + '</strong><br><span class="hi-desc">' + p.lineas + (p.lineas === 1 ? ' línea' : ' líneas') + '</span></td><td>' + formaPagoTxt(p) + '<br><span class="hi-desc">Pagó: ' + esc(p.registrado_por || '—') + '</span></td>' +
         '<td>' + (p.anulado ? '<span class="estado estado-no_aprobado" title="' + esc(p.anulado_motivo || '') + '">Anulado</span>' : '<span class="estado estado-activo">Pagado</span>') + '</td>' +
         '<td><div class="hi-botones"><button type="button" class="adm-btn" data-pqimp="' + p.id + '">Imprimir</button>' + (p.anulado ? '' : '<button type="button" class="adm-btn" data-pqanular="' + p.id + '">Anular</button>') + '</div></td></tr>';
-    }).join('') : '<tr><td colspan="10">Todavía no hay pagos de comisiones con estos parámetros.</td></tr>';
+    }).join('') : '<tr><td colspan="7">Todavía no hay pagos de comisiones con estos parámetros.</td></tr>';
   }
 
   async function imprimirPago(id) {
