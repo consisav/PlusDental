@@ -238,11 +238,11 @@
     'Lunes a viernes': 'Monday to Friday',
     '8:00 a. m. – 6:00 p. m.': '8:00 a.m. – 6:00 p.m.',
     'Sábados': 'Saturdays',
-    '8:00 a. m. – 12:30 p. m.': '8:00 a.m. – 12:30 p.m.',
+    '8:00 a. m. – 3:00 p. m.': '8:00 a.m. – 3:00 p.m.',
     'Ubicación de Plus Dental en Google Maps': 'Plus Dental location on Google Maps',
     'Reforma Montúfar, zona 10, Nivel 9, Oficina 910, Guatemala': 'Reforma Montúfar, Zone 10, Level 9, Office 910, Guatemala',
     'Lun a vie 8:00 a. m. – 6:00 p. m.': 'Mon–Fri 8:00 a.m. – 6:00 p.m.',
-    'Sáb 8:00 a. m. – 12:30 p. m.': 'Sat 8:00 a.m. – 12:30 p.m.',
+    'Sáb 8:00 a. m. – 3:00 p. m.': 'Sat 8:00 a.m. – 3:00 p.m.',
 
     // ---- Acceso de usuarios ----
     'Acceso': 'Access',

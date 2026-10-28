@@ -6,7 +6,7 @@
   var sb = window.PD_SB || null;
   var WHATSAPP = '50237565739', TELEFONO = '+502 3756-5739';
   var DIRECCION = 'Reforma Montúfar, zona 10, Nivel 9, Oficina 910, Ciudad de Guatemala';
-  var HORARIO = 'Lunes a viernes de 8:00 a. m. a 6:00 p. m. y sábados de 8:00 a. m. a 12:30 p. m.';
+  var HORARIO = 'Lunes a viernes de 8:00 a. m. a 6:00 p. m. y sábados de 8:00 a. m. a 3:00 p. m.';
   var SERVICIOS = ['Evaluación general', 'Limpieza', 'Urgencia / dolor', 'Estética', 'Ortodoncia', 'Implantes'];
   var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
   var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];

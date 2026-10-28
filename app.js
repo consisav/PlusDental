@@ -48,7 +48,7 @@
   function iso(x) { return x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2) + '-' + ('0' + x.getDate()).slice(-2); }
   function slotsDe(i) {
     if (avail) return avail[iso(dayDates[i])] || [];
-    var fijos = dayDates[i].getDay() === 6 ? ['08:00', '09:30', '11:00'] : ['08:00', '09:30', '11:00', '14:00', '15:30', '17:00'];
+    var fijos = dayDates[i].getDay() === 6 ? ['08:00', '09:30', '11:00', '12:30'] : ['08:00', '09:30', '11:00', '14:00', '15:30', '17:00'];
     return fijos.map(function (h) { return { hora: h, libre: aTiempo(dayDates[i], h) }; });
   }
   function slots() { return slotsDe(state.day); }

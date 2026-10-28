@@ -6811,6 +6811,23 @@ $$;
 revoke execute on function public.anular_pago_comision(bigint, text) from public, anon;
 grant execute on function public.anular_pago_comision(bigint, text) to authenticated;
 
+-- ===== Sábados hasta las 3:00 p. m. =====
+-- Turnos públicos del sábado: 08:00, 09:30, 11:00 y 12:30 (el último termina a las 2:00 p. m.)
+create or replace function public.turnos_del_dia(d date)
+returns setof time
+language sql immutable
+as $$
+  select t::time from unnest(
+    case
+      when extract(isodow from d) between 1 and 5 then array['08:00', '09:30', '11:00', '14:00', '15:30', '17:00']
+      when extract(isodow from d) = 6 then array['08:00', '09:30', '11:00', '12:30']
+      else array[]::text[]
+    end) as t;
+$$;
+-- Todos los odontólogos atienden el sábado de 8:00 a. m. a 3:00 p. m.
+update public.dentistas set horario = horario || jsonb_build_object('6', jsonb_build_object('abre', '08:00', 'cierra', '15:00'))
+where horario -> '6' is distinct from jsonb_build_object('abre', '08:00', 'cierra', '15:00');
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

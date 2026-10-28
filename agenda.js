@@ -5,12 +5,12 @@
   var sb = window.PD_SB || null;
   if (!sb) return;
 
-  var TURNOS = { semana: ['08:00', '09:30', '11:00', '14:00', '15:30', '17:00'], sabado: ['08:00', '09:30', '11:00'] };
+  var TURNOS = { semana: ['08:00', '09:30', '11:00', '14:00', '15:30', '17:00'], sabado: ['08:00', '09:30', '11:00', '12:30'] };
   // Jornada de la clínica (inicio y fin de cada bloque) y cada cuántos minutos se ofrece una hora al agendar:
   // Ortodoncia cada 10 minutos; los demás tratamientos cada media hora. Cada cita ocupa ese mismo tiempo.
   // Los TURNOS de 90 minutos solo ordenan las filas del calendario y los bloqueos de horario.
   // Jornada continua (sin corte de almuerzo): las horas reales las limitan el horario de cada odontólogo y de cada sala.
-  var JORNADA = { semana: [['08:00', '18:30']], sabado: [['08:00', '12:30']] };
+  var JORNADA = { semana: [['08:00', '18:30']], sabado: [['08:00', '15:00']] };
   var MINUTOS = { ortodoncia: 10, general: 30 }, BLOQUE = 90;
   var DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -31,6 +31,7 @@
   var ESPECIALIDADES = ['Odontología general', 'Ortodoncia', 'Endodoncia', 'Periodoncia', 'Odontopediatría', 'Prostodoncia', 'Rehabilitación oral', 'Cirugía', 'Implantología', 'Estética', 'Higiene', 'Trastornos temporomandibulares'];
   var SERVICIOS = ['Evaluación general', 'Limpieza', 'Urgencia / dolor', 'Estética', 'Ortodoncia', 'Implantes'];
 
+  var canceladas = [];   // se muestran en la agenda, pero no ocupan horario
   var dentistas = [], salas = [], pacientes = [], citas = [], bloqueos = [], fijo = null, sugerencias = [], diaCitas = [], vista = 'semana';
 
   function $(id) { return document.getElementById(id); }
@@ -547,17 +548,19 @@
     if (fin > hasta) hasta = fin;
     if (inicio < desde) desde = inicio;
     var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada,creada_por,reprogramada_de')
-      .gte('fecha', desde).lte('fecha', hasta).neq('estado', 'cancelada');
+      .gte('fecha', desde).lte('fecha', hasta);
     if (r.error && /creada_por|reprogramada_de/.test(r.error.message)) {
       r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada')
-        .gte('fecha', desde).lte('fecha', hasta).neq('estado', 'cancelada');
+        .gte('fecha', desde).lte('fecha', hasta);
       if (!r.error) aviso('agMsg', 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para los estados de la cita.', true);
     }
     if (r.error && /paciente_id|prioridad|notas/.test(r.error.message)) {
-      r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id').gte('fecha', desde).lte('fecha', hasta).neq('estado', 'cancelada');
+      r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id').gte('fecha', desde).lte('fecha', hasta);
       aviso('agMsg', 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para agendar desde aquí.', true);
     }
-    citas = r.error ? [] : r.data;
+    var todasC = r.error ? [] : r.data;
+    canceladas = todasC.filter(function (c) { return c.estado === 'cancelada'; });
+    citas = todasC.filter(function (c) { return c.estado !== 'cancelada'; });
     $('agFechaM').min = hoy();
     if ($('agHoraM')) opcionesHorario();
     pintar();
@@ -599,9 +602,9 @@
     return !fs || (fs === '0' ? !sucDeCita(c) : sucDeCita(c) === +fs);
   }
   function filtrando() { return !!($('agFInst').value || $('agFMed').value || soloMio()); }
-  // Pinta con las citas que pasan los filtros; los espacios libres se calculan con todas
+  // Pinta con las citas que pasan los filtros (también las canceladas); los espacios libres se calculan con todas las activas
   function conFiltro(fn) {
-    var todas = citas; citasTodas = todas; citas = todas.filter(pasaFiltro);
+    var todas = citas; citasTodas = todas; citas = todas.concat(canceladas).filter(pasaFiltro);
     try { fn(); } finally { citas = todas; citasTodas = null; }
   }
 
@@ -622,14 +625,15 @@
   }
   function pintarResumen() {
     var rv = rangoVista(), d = rv.mesDesde || rv.desde, h = rv.mesHasta || rv.hasta;
-    var en = citas.filter(function (c) { return c.fecha >= d && c.fecha <= h; });
+    var en = citas.filter(function (c) { return c.fecha >= d && c.fecha <= h && c.estado !== 'cancelada'; });
+    var nCanc = citas.filter(function (c) { return c.fecha >= d && c.fecha <= h && c.estado === 'cancelada'; }).length;
     var porConfirmar = en.filter(function (c) { return c.estado === 'pendiente' || c.estado === 'reprogramada'; }).length;
     var urg = en.filter(function (c) { return c.prioridad === 'urgente'; }).length;
     if (vista === 'semana') {
       var a = fecha(d), b = fecha(h);
       $('agTitulo').textContent = 'Semana del ' + a.getDate() + (a.getMonth() !== b.getMonth() ? ' de ' + MESES_LARGO[a.getMonth()] : '') + ' al ' + b.getDate() + ' de ' + MESES_LARGO[b.getMonth()];
     }
-    $('agResumen').innerHTML = '<b>' + en.length + '</b> ' + (en.length === 1 ? 'cita' : 'citas') + (porConfirmar ? ' · <b>' + porConfirmar + '</b> por confirmar' : '') + (urg ? ' · <b>' + urg + '</b> ' + (urg === 1 ? 'urgente' : 'urgentes') : '');
+    $('agResumen').innerHTML = '<b>' + en.length + '</b> ' + (en.length === 1 ? 'cita' : 'citas') + (porConfirmar ? ' · <b>' + porConfirmar + '</b> por confirmar' : '') + (urg ? ' · <b>' + urg + '</b> ' + (urg === 1 ? 'urgente' : 'urgentes') : '') + (nCanc ? ' · <b>' + nCanc + '</b> ' + (nCanc === 1 ? 'cancelada' : 'canceladas') : '');
   }
   var anchoAntes = semanaAngosta();
   window.addEventListener('resize', function () {
@@ -637,7 +641,7 @@
     anchoAntes = semanaAngosta();
     if (vista === 'semana' && $('admVerCitas') && !$('admVerCitas').hidden) pintar();
   });
-  var COLOR_ESTADO = { pendiente: '#B45309', confirmada: '#4D8B1E', reprogramada: '#6D5BD0', atendida: '#2F78C4' };
+  var COLOR_ESTADO = { pendiente: '#B45309', confirmada: '#4D8B1E', reprogramada: '#6D5BD0', atendida: '#2F78C4', cancelada: '#C0263A' };
   function pintarLeyenda() {
     var rv = rangoVista(), d = rv.mesDesde || rv.desde, h = rv.mesHasta || rv.hasta;
     var enRango = citas.filter(function (c) { return c.fecha >= d && c.fecha <= h; });
@@ -832,11 +836,11 @@
   }
 
   function verDetalle(id) {
-    var c = citas.filter(function (x) { return String(x.id) === String(id); })[0];
+    var c = citas.concat(canceladas).filter(function (x) { return String(x.id) === String(id); })[0];
     if (!c) return;
     var pac = pacientes.filter(function (p) { return p.id === c.paciente_id; })[0];
     var conCorreo = Object.assign({}, c, { correo: pac && pac.correo });
-    var activa = c.estado !== 'atendida';
+    var activa = c.estado !== 'atendida' && c.estado !== 'cancelada';
     var campo = function (t, v) { return '<div><dt>' + t + '</dt><dd>' + v + '</dd></div>'; };
     $('agDetalle').hidden = false;
     $('agDetalle').classList.add('ag-det');
@@ -859,7 +863,7 @@
       (activa ? '<button type="button" class="adm-btn' + (c.estado === 'confirmada' ? ' adm-primary' : '') + '" data-det-estado="atendida" data-id="' + c.id + '">Atendido</button>' : '') +
       (activa ? '<button type="button" class="adm-btn" data-det-repro="' + c.id + '">Reprogramar</button>' : '') +
       (c.paciente_id && window.PD_EXPEDIENTE ? '<button type="button" class="adm-btn" data-ir-exp="' + c.paciente_id + '">Ver expediente</button>' : '') +
-      '<button type="button" class="adm-btn ag-det-cancel" data-det-estado="cancelada" data-id="' + c.id + '" data-confirmar="0">Cancelar cita</button>' +
+      (c.estado !== 'cancelada' ? '<button type="button" class="adm-btn ag-det-cancel" data-det-estado="cancelada" data-id="' + c.id + '" data-confirmar="0">Cancelar cita</button>' : '') +
       '</div>' +
       '<details class="ag-det-avisos"><summary>Avisos y recordatorios</summary><div>' + avisosHtml(conCorreo, { paciente: true, medico: true, correo: true }) + '</div></details>';
     $('agDetalle').scrollIntoView({ block: 'nearest' });
@@ -1115,7 +1119,7 @@
     b.disabled = true;
     var r = await sb.from('citas').update({ estado: b.dataset.detEstado }).eq('id', b.dataset.id).select('id');
     if (r.error || !r.data || !r.data.length) { b.disabled = false; aviso('agMsg', r.error ? traducir(r.error) : 'No tienes permiso para esta acción.', true); return; }
-    aviso('agMsg', b.dataset.detEstado === 'cancelada' ? 'Cita cancelada: el horario quedó libre.' : b.dataset.detEstado === 'atendida' ? 'Cita marcada como atendida.' : 'Cita confirmada.');
+    aviso('agMsg', b.dataset.detEstado === 'cancelada' ? 'Cita cancelada: queda en la agenda como «Cancelado» y el horario quedó libre.' : b.dataset.detEstado === 'atendida' ? 'Cita marcada como atendida.' : 'Cita confirmada.');
     $('agDetalle').hidden = true;
     cargarCitas();
   });
@@ -1129,7 +1133,7 @@
       if (!$('admAgenda').hidden || ($('admVerCitas') && !$('admVerCitas').hidden)) cargar();
     },
     limpiar: function () {
-      dentistas = []; salas = []; pacientes = []; citas = []; bloqueos = []; sugerencias = []; fijo = null;
+      dentistas = []; salas = []; pacientes = []; citas = []; canceladas = []; bloqueos = []; sugerencias = []; fijo = null;
       ['agSugerencias', 'agBody', 'agHead'].forEach(function (id) { $(id).innerHTML = ''; });
       $('agDetalle').hidden = true;
     }

@@ -451,6 +451,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-celda.cita.reprogramada,.ag-mini.cita.reprogramada{background:#F0EEFE;border-color:#DAD5FA;border-left-color:#6D5BD0;color:#352C80}
 .ag-celda.cita.atendida,.ag-mini.cita.atendida{background:#E8F1FB;border-color:#C9DDF3;border-left-color:#2F78C4;color:#0C3F72}
 .ag-celda.cita.urgente,.ag-mini.cita.urgente{box-shadow:inset 0 0 0 1.5px #C0263A}
+.ag-celda.cita.cancelada,.ag-mini.cita.cancelada{background:#FDE2E4;border-color:#F7C1C8;border-left-color:#C0263A;color:#9F1239;text-decoration:line-through}
 .ag-celda.cita:hover,.ag-mini.cita:hover{filter:brightness(.97)}
 .ag-celda.cita .ag-trat,.ag-mini.cita .ag-trat,.ag-celda.cita span{color:inherit;opacity:.8}
 .ag-leyenda{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
@@ -511,6 +512,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .ag-grid.semana2 td.libre:hover{background:#D2EAC7}
 #administracion .ag-grid.semana2 .ag2-cita{position:absolute;z-index:2;display:block;text-align:left;font:inherit;font-size:11.5px;line-height:1.25;padding:3px 16px 2px 6px;border-radius:3px;border:1px solid rgba(11,43,64,.12);border-left:3px solid var(--med-linea,var(--med,#2F78C4));background:color-mix(in srgb,var(--med,#2F78C4) 32%,#FFFFFF);color:#0B2B40;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;box-shadow:none}
 #administracion .ag-grid.semana2 .ag2-cita small{display:block;font-size:10.5px;opacity:.75;overflow:hidden;text-overflow:ellipsis}
+#administracion .ag-grid.semana2 .ag2-cita.cancelada{background:#FDE2E4;border-left-color:#C0263A;color:#9F1239;text-decoration:line-through;opacity:.85;z-index:1}
 #administracion .ag-grid.semana2 .ag2-cita.atendida{background:#E3E5E7;border-left-color:#8A9AA5;color:#3D4A53}
 #administracion .ag-grid.semana2 .ag2-cita.urgente{box-shadow:inset 0 0 0 1.5px #C0263A}#administracion .ag-grid.semana2 .ag2-cita:hover{filter:brightness(.96);z-index:4}
 .ag-grid.semana2 .ag2-punto{position:absolute;right:4px;top:5px;width:8px;height:8px;border-radius:50%;box-shadow:0 0 0 1.5px #FFFFFF}
@@ -920,7 +922,7 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 .estado{display:inline-block;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700;white-space:nowrap}
 .estado-pendiente{background:#FEF3C7;color:#92400E}
 .estado-confirmada{background:#DCF2EC;color:#08504C}
-.estado-cancelada{background:#EBF0F4;color:#5A6D7A}
+.estado-cancelada{background:#FDE2E4;color:#9F1239}
 .estado-reprogramada{background:#EDE9FE;color:#5B21B6}
 .estado-atendida{background:#DBEAFE;color:#1E40AF}
 .cita-grab{display:block;font-size:12px;color:#5A6D7A;margin-top:3px;line-height:1.4}
@@ -2948,7 +2950,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div style="background: #FFFFFF; border-radius: 22px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
 <span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #5A6D7A">Horario</span>
 <span style="font-size: 16px; line-height: 1.6"><strong>Lunes a viernes</strong><br>8:00 a. m. – 6:00 p. m.</span>
-<span style="font-size: 16px; line-height: 1.6"><strong>Sábados</strong><br>8:00 a. m. – 12:30 p. m.</span>
+<span style="font-size: 16px; line-height: 1.6"><strong>Sábados</strong><br>8:00 a. m. – 3:00 p. m.</span>
 </div>
 </div>
 <iframe title="Ubicación de Plus Dental en Google Maps" src="https://www.google.com/maps?q=Reforma+Montufar+zona+10+Guatemala&amp;output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade" style="width: 100%; height: 380px; border: 0; border-radius: 22px; display: block; background: #E2EEF6"></iframe>
@@ -2961,7 +2963,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div style="display: flex; flex-direction: column; gap: 8px">
 <div class="pie-marca"><span class="pie-logo"><img src="logo-plusdental-marca.png?v=3" alt="PlusDental · Servicios dentales en Guatemala" width="432" height="360"></span><span class="pie-frase">La tranquilidad también es parte del tratamiento.</span></div>
 <span>Reforma Montúfar, zona 10, Nivel 9, Oficina 910, Guatemala · <a href="tel:+50237565739" style="color: #FFFFFF; white-space: nowrap">+502 3756-5739</a></span>
-<span>Lun a vie 8:00 a. m. – 6:00 p. m. · Sáb 8:00 a. m. – 12:30 p. m.</span>
+<span>Lun a vie 8:00 a. m. – 6:00 p. m. · Sáb 8:00 a. m. – 3:00 p. m.</span>
 </div>
 <div class="pie-links" style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap">
 <a href="#nosotros" style="color: #FFFFFF">Nosotros</a>
@@ -3075,7 +3077,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="config.js"></script>
 <script src="supabase-client.js"></script>
 <script src="firmas.js"></script>
-<script src="app.js?v=20261028a"></script>
+<script src="app.js?v=20261028b"></script>
 <script src="auth.js"></script>
 <script src="voz-citas.js"></script>
 <script src="voz-historia.js"></script>
@@ -3103,7 +3105,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="inventarios-ordenes.js?v=20261027f"></script>
 <script src="asistentes.js"></script>
 <script src="dentistas.js"></script>
-<script src="agenda.js?v=20261028a"></script>
+<script src="agenda.js?v=20261028b"></script>
 <script src="agentes.js"></script>
 <script src="reportes.js?v=20261028b"></script>
 <script src="constancias.js"></script>
@@ -3115,10 +3117,10 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="comisiones.js?v=20261028a"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
-<script src="chatbot.js?v=20261028a"></script>
+<script src="chatbot.js?v=20261028b"></script>
 <script src="portal.js"></script>
 <script src="idiomas-admin.js?v=20261028d"></script>
 <script src="movil.js"></script>
-<script src="idiomas.js?v=20261028b"></script>
+<script src="idiomas.js?v=20261028c"></script>
 </body>
 </html>
