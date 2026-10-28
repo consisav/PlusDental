@@ -695,11 +695,15 @@
       dlg.querySelectorAll('.lista [data-k]').forEach(function (x) { x.setAttribute('aria-pressed', x === o); });
       dlg.querySelector('[data-confirmar]').disabled = false;
     }
-    // Confirmar: aplica el procedimiento con su valor real a la pieza y graba el odontograma
+    // Confirmar: aplica el procedimiento con su valor real a la pieza, graba el odontograma y pasa todos los
+    // procedimientos requeridos al presupuesto (que queda aprobado)
     function confirmarOp() {
       var o = dlg._sel && dlg.querySelector('.lista [data-k="' + dlg._sel + '"]');
       if (!o) return;
-      if (elegirOp(o) && opciones.guardar) opciones.guardar();
+      if (elegirOp(o) && opciones.guardar) {
+        var items = lineasPresupuesto().lineas.map(function (l) { return { tratamiento: l.tratamiento, pieza: l.pieza, cantidad: l.cantidad, precio: l.precio }; });
+        opciones.guardar({ items: items, tipo: tipoPrecio });
+      }
     }
     function elegirOp(o) {
       var item = catalogo.filter(function (c) { return c.k === o.dataset.k; })[0];

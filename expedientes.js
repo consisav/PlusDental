@@ -450,8 +450,21 @@
     paciente: function () { return actual ? actual.nombre : ''; },
     // Solo el Super Administrador modifica procedimientos, precios y datos del presupuesto
     esSuper: function () { return !!(window.PD_SESION && window.PD_SESION.esSuper()); },
-    // «Confirmar» en la ventana del procedimiento: graba el odontograma de inmediato
-    guardar: function () { if (actual) guardarOdonto($('odoGuardar')); else aviso('odoMsg', 'Primero guarda el expediente del paciente para grabar el odontograma.', true); },
+    // «Confirmar» en la ventana del procedimiento: graba el odontograma y pasa los procedimientos requeridos
+    // al presupuesto del odontograma, que queda aprobado (sin tocar los que ya están en proceso o finalizados)
+    guardar: async function (d) {
+      if (!actual) { aviso('odoMsg', 'Primero guarda el expediente del paciente para grabar el odontograma.', true); return; }
+      await guardarOdonto($('odoGuardar'));
+      if (!d || !d.items || !d.items.length) return;
+      var r = await sb.rpc('sincronizar_presupuesto_odontograma', { p_paciente: actual.id, p_items: d.items, p_tipo: d.tipo || 'directo' });
+      if (r.error) { aviso('odoMsg', 'El odontograma se grabó, pero no se pudo actualizar el presupuesto: ' + (/sincronizar_presupuesto|could not find the function/i.test(r.error.message || '') ? 'falta ejecutar en Supabase el script actualizado (supabase.sql).' : traducir(r.error)), true); return; }
+      await cargarCodigoPresupuesto();
+      await cargarPresupuestoActual();
+      var x = r.data || {}, partes = [];
+      if (x.agregados) partes.push(x.agregados + (x.agregados === 1 ? ' procedimiento agregado' : ' procedimientos agregados'));
+      if (x.actualizados) partes.push(x.actualizados + (x.actualizados === 1 ? ' valor actualizado' : ' valores actualizados'));
+      aviso('odoMsg', 'Odontograma grabado. ' + (x.nuevo ? 'Se creó y aprobó' : 'Se actualizó y aprobó') + ' el presupuesto ' + (x.codigo || 'N.º ' + x.id) + (partes.length ? ' (' + partes.join(', ') + ')' : '') + '.');
+    },
     // Presupuesto en borrador con los tratamientos requeridos (d.items) y el tipo de precio elegido (d.tipo)
     crearPresupuesto: async function (d) {
       if (!actual) throw new Error('Primero guarda el expediente del paciente.');

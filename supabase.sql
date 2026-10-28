@@ -7260,6 +7260,71 @@ begin
 end
 $do$;
 
+-- ===== Odontograma: «Confirmar» pasa los procedimientos requeridos al presupuesto y lo aprueba =====
+-- Usa el último presupuesto del odontograma del paciente (si no hay o está «No aprobado», crea uno nuevo).
+-- Agrega los procedimientos que faltan y actualiza precio y cantidad de los que siguen «Pendiente»; nunca borra
+-- ni toca los que ya están en proceso, finalizados o eliminados. Luego deja el presupuesto «Aprobado».
+create or replace function public.sincronizar_presupuesto_odontograma(p_paciente bigint, p_items jsonb, p_tipo text default 'directo')
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_p public.presupuestos;
+  v_tipo text := coalesce(nullif(p_tipo, ''), 'directo');
+  v_nuevo boolean := false;
+  v_tenia boolean;
+  v_agregados int := 0;
+  v_actualizados int := 0;
+  v_orden int;
+  e jsonb;
+  v_trat text; v_pieza text; v_cant int; v_precio numeric;
+  v_item public.presupuesto_items;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if v_tipo not in ('directo', 'institucional', 'vip', 'referido', 'paquete', 'especial') then raise exception 'Tipo de precio no válido'; end if;
+  if jsonb_typeof(coalesce(p_items, '[]'::jsonb)) <> 'array' or jsonb_array_length(coalesce(p_items, '[]'::jsonb)) = 0 then
+    raise exception 'No hay procedimientos requeridos para el presupuesto';
+  end if;
+
+  select * into v_p from public.presupuestos
+   where paciente_id = p_paciente and origen = 'odontograma' order by id desc limit 1 for update;
+  if v_p.id is null or v_p.estado = 'rechazado' then
+    insert into public.presupuestos (paciente_id, origen, tipo_precio) values (p_paciente, 'odontograma', v_tipo) returning * into v_p;
+    v_nuevo := true;
+  end if;
+  select exists (select 1 from public.presupuesto_items where presupuesto_id = v_p.id) into v_tenia;
+  select coalesce(max(orden), 0) into v_orden from public.presupuesto_items where presupuesto_id = v_p.id;
+
+  for e in select * from jsonb_array_elements(p_items) loop
+    v_trat := trim(e ->> 'tratamiento');
+    continue when coalesce(v_trat, '') = '';
+    v_pieza := nullif(trim(e ->> 'pieza'), '');
+    v_cant := greatest(coalesce((e ->> 'cantidad')::int, 1), 1);
+    v_precio := greatest(coalesce((e ->> 'precio')::numeric, 0), 0);
+    select * into v_item from public.presupuesto_items
+     where presupuesto_id = v_p.id and lower(tratamiento) = lower(v_trat) and coalesce(pieza, '') = coalesce(v_pieza, '') and estado <> 'eliminado'
+     order by id limit 1;
+    if v_item.id is null then
+      v_orden := v_orden + 1;
+      insert into public.presupuesto_items (presupuesto_id, orden, tratamiento, pieza, cantidad, precio)
+      values (v_p.id, v_orden, v_trat, v_pieza, v_cant, v_precio);
+      v_agregados := v_agregados + 1;
+    elsif v_item.estado = 'pendiente' and not v_item.realizado and (v_item.precio <> v_precio or v_item.cantidad <> v_cant) then
+      update public.presupuesto_items set precio = v_precio, cantidad = v_cant where id = v_item.id;
+      v_actualizados := v_actualizados + 1;
+    end if;
+  end loop;
+
+  update public.presupuestos
+     set estado = 'aprobado',
+         tipo_precio = case when v_nuevo then v_tipo else tipo_precio end,
+         version = case when v_tenia and (v_agregados + v_actualizados) > 0 then version + 1 else version end
+   where id = v_p.id
+  returning * into v_p;
+  return jsonb_build_object('id', v_p.id, 'codigo', v_p.codigo, 'nuevo', v_nuevo, 'agregados', v_agregados, 'actualizados', v_actualizados);
+end;
+$$;
+revoke execute on function public.sincronizar_presupuesto_odontograma(bigint, jsonb, text) from public, anon;
+grant execute on function public.sincronizar_presupuesto_odontograma(bigint, jsonb, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
