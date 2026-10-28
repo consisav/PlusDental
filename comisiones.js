@@ -10,7 +10,7 @@
   var APLICA = { todo: 'Todo lo cobrado', procedimientos: 'Procedimientos', medicamentos: 'Medicamentos', laboratorio: 'Laboratorio' };
   var METODOS = { transferencia: 'Transferencia', efectivo: 'Efectivo', cheque: 'Cheque', deposito: 'Depósito', otro: 'Otro' };
   var agentes = [], instituciones = [], catalogo = { procedimientos: [], medicamentos: [], laboratorio: [] };
-  var reglas = [], regla = null, elegidos = {}, lineas = [], pagos = [], calculo = null, faltaSql = false;   // lineas: comisiones de Pago de comisiones
+  var reglas = [], regla = null, elegidos = {}, lineas = [], pagos = [], calculo = null, faltaSql = false;   // lineas: comisiones de Pagar Comisiones
 
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -282,7 +282,7 @@
     '<div class="adm-pane-head"><h3 class="adm-h">Generar comisiones</h3>' +
     '<div class="hi-botones"><button type="button" class="adm-btn" id="gcImprimir" disabled>Imprimir</button><button type="button" class="adm-btn" id="gcExcel" disabled>Exportar a Excel</button></div></div>' +
     '<p class="dlg-msg">Elige las fechas y de quién generar comisiones: agentes comerciales, instituciones o ambos. Al generar se graban las nuevas; las ya generadas conservan tus cambios. ' +
-    'Marca «Autorizar pago» para que se puedan pagar en Pago de comisiones; en «Detalle» puedes cambiar el %, el estado y autorizar línea por línea.</p>' +
+    'Marca «Autorizar pago» para que se puedan pagar en Pagar Comisiones; en «Detalle» puedes cambiar el %, el estado y autorizar línea por línea.</p>' +
     '<div class="com-filtros"><label>Fecha inicial<input id="gcDesde" type="date" class="adm-input"></label><label>Fecha final<input id="gcHasta" type="date" class="adm-input"></label>' +
     '<label>Agente comercial<select id="gcAgente" class="adm-input"><option value="ninguno">Ninguno</option></select></label>' +
     '<label>Institución<select id="gcInst" class="adm-input"><option value="ninguna">Ninguna</option></select></label>' +
@@ -401,7 +401,7 @@
     var ids = gen.filter(function (l) { return claveBen(l) === c.dataset.gcAut && l.estado === 'pendiente'; }).map(function (l) { return l.id; });
     if (!ids.length) return;
     c.disabled = true; aviso('gcMsg', 'Guardando…');
-    if (await actualizarLineas(ids, { autorizado: c.checked }, 'gcMsg')) aviso('gcMsg', c.checked ? 'Pago autorizado: ya se puede pagar en Pago de comisiones.' : 'Se quitó la autorización de pago.');
+    if (await actualizarLineas(ids, { autorizado: c.checked }, 'gcMsg')) aviso('gcMsg', c.checked ? 'Pago autorizado: ya se puede pagar en Pagar Comisiones.' : 'Se quitó la autorización de pago.');
   });
   $('gcDet').addEventListener('click', function (e) { if (e.target.closest('[data-gc-cerrar]')) { genAbierto = null; pintarGen(); } });
   $('gcDet').addEventListener('change', async function (e) {
@@ -442,11 +442,11 @@
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   });
 
-  // ======================= Pago de comisiones =======================
+  // ======================= Pagar Comisiones =======================
   // Paga lo autorizado en «Generar comisiones»: detalle de cada comisión y resumen de pago por beneficiario
   // (agente o institución) con forma de pago, fecha, banco, cuenta bancaria y fecha de operación.
   $('admComPago').innerHTML =
-    '<div class="adm-pane-head"><h3 class="adm-h">Pago de comisiones</h3></div>' +
+    '<div class="adm-pane-head"><h3 class="adm-h">Pagar Comisiones</h3></div>' +
     '<p class="dlg-msg">Aquí se pagan las comisiones <b>autorizadas</b> en «Generar comisiones». Elige las fechas, el agente y la institución y pulsa «Calcular»; en el resumen por beneficiario llena la forma de pago y pulsa «Pagar». ' +
     'Si anulas un pago, sus comisiones vuelven a quedar pendientes.</p>' +
     '<div class="com-filtros"><label>Fecha inicial<input id="cpDesde" type="date" class="adm-input"></label><label>Fecha final<input id="cpHasta" type="date" class="adm-input"></label>' +
