@@ -37,8 +37,8 @@
   // ---------- Definición de los reportes ----------
   var REPORTES = {
     pacientes: {
-      panel: 'admRepPacientes', titulo: 'Listado de pacientes',
-      nota: 'Pacientes registrados entre las dos fechas.',
+      panel: 'admRepPacientes', titulo: 'Listado de pacientes', medicoInst: true,
+      nota: 'Pacientes registrados entre las dos fechas; se puede filtrar por odontólogo asignado e institución.',
       estados: { activo: ['Activo', 'verde'], suspendido: ['Suspendido', 'ambar'], inactivo: ['Inactivo', 'gris'], baja: ['Baja', 'rojo'] },
       columnas: [
         ['Registro', function (f) { return fechaCorta(f.creado); }],
@@ -51,12 +51,13 @@
         ['Tipo de cliente', function (f) { return TIPOS_CLIENTE[f.tipo_cliente] || 'Cliente directo'; }],
         ['Institución · sucursal', function (f) { return f.tipo_cliente === 'institucional' && f.institucion ? f.institucion.nombre + (f.sucursal ? ' · ' + f.sucursal.nombre : '') : '—'; }]
       ],
-      cargar: async function (d, h) {
+      cargar: async function (d, h, o) {
         var campos = 'id,nombre,dpi,telefono,correo,creado,estado,medico:dentistas(nombre),agente:agentes(codigo,nombre)';
-        var r = await sb.from('pacientes').select(campos + ',tipo_cliente,institucion:jor_instituciones(nombre),sucursal:jor_sucursales(nombre)')
-          .gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado');
+        // Filtros: odontólogo asignado e institución (vacío = todos)
+        function filtrar(x, conInst) { x = x.gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado'); if (o && o.medico) x = x.eq('dentista_id', +o.medico); if (conInst && o && o.inst) x = x.eq('institucion_id', +o.inst); return x; }
+        var r = await filtrar(sb.from('pacientes').select(campos + ',tipo_cliente,institucion:jor_instituciones(nombre),sucursal:jor_sucursales(nombre)'), true);
         // Sin el SQL de pacientes institucionales: el listado sale sin institución ni sucursal
-        if (r.error && /institucion|sucursal|tipo_cliente|jor_/i.test(r.error.message || '')) r = await sb.from('pacientes').select(campos).gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado');
+        if (r.error && /institucion|sucursal|tipo_cliente|jor_/i.test(r.error.message || '')) r = await filtrar(sb.from('pacientes').select(campos), false);
         if (r.error) throw r.error;
         return r.data;
       },
@@ -197,6 +198,8 @@
       (def.cliente ? '<label class="rep-cliente">Cliente<select name="cliente"><option value="">Todos los clientes</option></select></label>' : '') +
       (def.tipoBanco ? '<label>Tipo de cliente<select name="tipo"><option value="">Todos</option><option value="institucional">Institucional</option><option value="privado">Cliente privado</option></select></label>' +
         '<label>Banco<select name="banco"><option value="">Todos los bancos</option></select></label>' : '') +
+      (def.medicoInst ? '<label>Odontólogo<select name="medico"><option value="">Todos los odontólogos</option></select></label>' +
+        '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>' : '') +
       (def.agenteInst ? '<label>Agente comercial<select name="agente"><option value="">Todos los agentes</option></select></label>' +
         '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>' : '') +
       '<button type="submit" class="dlg-submit">' + esc(def.boton || 'Generar reporte') + '</button></form>' +
@@ -212,6 +215,17 @@
     if (def.cliente) llenarClientes(p.querySelector('select[name=cliente]'));
     if (def.tipoBanco) llenarBancos(p.querySelector('select[name=banco]'));
     if (def.agenteInst) llenarAgentesInst(p);
+    if (def.medicoInst) llenarMedicoInst(p);
+  }
+  // Listas de odontólogos e instituciones para el listado de pacientes
+  async function llenarMedicoInst(p) {
+    var r = await Promise.all([sb.from('dentistas').select('id,nombre,estado').order('nombre'), sb.from('jor_instituciones').select('id,nombre').order('nombre')]);
+    var sm = p.querySelector('select[name=medico]'), si = p.querySelector('select[name=inst]');
+    if (!sm || !sm.isConnected) return;
+    var vm = sm.value, vi = si.value;
+    sm.innerHTML = '<option value="">Todos los odontólogos</option>' + (r[0].error ? [] : r[0].data).map(function (x) { return '<option value="' + x.id + '">' + esc(x.nombre) + (x.estado && x.estado !== 'activo' ? ' (' + x.estado + ')' : '') + '</option>'; }).join('');
+    si.innerHTML = '<option value="">Todas las instituciones</option>' + (r[1].error ? [] : r[1].data).map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
+    sm.value = vm; si.value = vi;
   }
   // Listas de agentes comerciales e instituciones para el reporte de comisiones
   async function llenarAgentesInst(p) {
@@ -257,10 +271,11 @@
     form.querySelector('button').disabled = true;
     try {
       var tipo = form.tipo ? form.tipo.value : '', banco = form.banco ? form.banco.value : '';
-      var agente = form.agente ? form.agente.value : '', inst = form.inst ? form.inst.value : '';
-      s.filas = await def.cargar(d, h, { cliente: cli, tipo: tipo, banco: banco, agente: agente, inst: inst });
+      var agente = form.agente ? form.agente.value : '', inst = form.inst ? form.inst.value : '', medico = form.medico ? form.medico.value : '';
+      s.filas = await def.cargar(d, h, { cliente: cli, tipo: tipo, banco: banco, agente: agente, inst: inst, medico: medico });
       s.extras = def.tipoBanco ? [['Tipo de cliente', form.tipo.selectedOptions[0].textContent], ['Banco', banco || 'Todos los bancos']]
-        : def.agenteInst ? [['Agente comercial', form.agente.selectedOptions[0].textContent], ['Institución', form.inst.selectedOptions[0].textContent]] : null;
+        : def.agenteInst ? [['Agente comercial', form.agente.selectedOptions[0].textContent], ['Institución', form.inst.selectedOptions[0].textContent]]
+        : def.medicoInst ? [['Odontólogo', form.medico.selectedOptions[0].textContent], ['Institución', form.inst.selectedOptions[0].textContent]] : null;
       s.desde = d; s.hasta = h; s.generado = true;
       s.cliente = cli; s.clienteNombre = cli ? form.cliente.selectedOptions[0].textContent : '';
       msg.textContent = '';
@@ -431,6 +446,7 @@
       if (def.cliente) llenarClientes($(def.panel).querySelector('select[name=cliente]'));
       if (def.tipoBanco) llenarBancos($(def.panel).querySelector('select[name=banco]'));
       if (def.agenteInst) llenarAgentesInst($(def.panel));
+      if (def.medicoInst) llenarMedicoInst($(def.panel));
       if (!estadoRep[TABS[t]].generado) generar(TABS[t]);
     });
   });
