@@ -500,9 +500,9 @@
   function limpiarFormulario() {
     lineas = [lineaNueva()];
     $('pgNitNota').hidden = true;
-    ['pgNit', 'pgSerie', 'pgNumFactura', 'pgDte', 'pgReferencia', 'pgCuota', 'pgConcepto', 'pgObservaciones'].forEach(function (id) { $(id).value = ''; });
+    ['pgNit', 'pgSerie', 'pgNumFactura', 'pgDte', 'pgCuota', 'pgConcepto', 'pgObservaciones'].forEach(function (id) { $(id).value = ''; });
     $('pgTipoDoc').value = 'factura'; $('pgMetodo').value = 'efectivo'; $('pgEstado').value = 'emitido'; pintarEstadoNuevo();
-    $('pgFecha').value = hoy(); $('pgRefWrap').hidden = true;
+    $('pgFecha').value = hoy();
     $('pgBanco').value = ''; $('pgDocBanco').value = ''; $('pgComprobante').value = ''; pintarBancario();
     $('pgUsuario').textContent = (window.PD_SESION && window.PD_SESION.usuario()) || '—';
     pintarDetalle();
@@ -563,7 +563,7 @@
 
   $('pgPaciente').addEventListener('change', alElegirPaciente);
   $('pgPresupuesto').addEventListener('change', cargarItemsPresupuesto);
-  $('pgMetodo').addEventListener('change', function () { $('pgRefWrap').hidden = this.value === 'efectivo'; pintarBancario(); });
+  $('pgMetodo').addEventListener('change', pintarBancario);
   $('pgComprobante').addEventListener('change', function () { var f = this.files[0]; if (f && f.size > 10 * 1024 * 1024) { this.value = ''; aviso('pgMsg', 'El comprobante pesa más de 10 MB.', true); } });
   // Detalle: cambios en las líneas, agregar y quitar
   $('pgDetalle').addEventListener('input', function (e) {
@@ -632,7 +632,7 @@
       presupuesto_id: $('pgPresupuesto').value ? +$('pgPresupuesto').value : null,
       fecha: $('pgFecha').value || hoy(),
       metodo: $('pgMetodo').value,
-      referencia: $('pgMetodo').value === 'efectivo' ? null : ($('pgReferencia').value.trim() || null),
+      referencia: null,
       concepto: $('pgConcepto').value.trim() || null,
       nit: $('pgNit').value.trim(), tipo_documento: $('pgTipoDoc').value, serie: $('pgSerie').value.trim(),
       numero_factura: $('pgNumFactura').value.trim(), numero_dte: $('pgDte').value.trim(),
