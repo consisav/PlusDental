@@ -548,7 +548,9 @@
         ? '<span>Al guardar, el presupuesto sube de versión.</span><div class="odg-fila-acc"><button type="button" class="odg-imp" data-ex-cancelar>Cancelar</button><button type="button" class="odg-crear" data-ex-guardar>Guardar cambios</button></div>'
         : '<span>Fechas y usuario se registran solos y no se pueden modificar.</span><div class="odg-fila-acc">' +
           '<button type="button" class="odg-imp" data-ex-mod' + (editable ? '' : ' disabled title="Un presupuesto aprobado o no aprobado ya no se puede modificar"') + '>Modificar presupuesto</button>' +
-          '<button type="button" class="odg-imp" data-ex-estado>Cambiar estado</button><button type="button" class="odg-crear" data-pre-nuevo>Nuevo presupuesto</button></div>') + '</div>';
+          '<button type="button" class="odg-imp" data-ex-estado>Cambiar estado</button>' +
+          (opciones.crearPresupuesto ? '<button type="button" class="odg-imp" data-crear-presupuesto>Crear presupuesto</button>' : '') +
+          '<button type="button" class="odg-crear" data-pre-nuevo>Nuevo presupuesto</button></div>') + '</div>';
       return '<div class="odg-pre' + (ed ? ' odg-pre-ed' : '') + '"><div class="odg-pre-cab"><div class="odg-pre-tit">Datos del presupuesto</div><span class="odg-est odg-est-' + ev + '" aria-hidden="true">' + nomEst + '</span></div>' +
         '<div class="odg-pre-g">' +
         '<div class="odg-pre-campo"><span>Código del presupuesto</span><div class="odg-cod"><small>ASIGNADO</small>' + esc(p.codigo || 'N.º ' + p.id) + '</div></div>' +
@@ -590,8 +592,8 @@
       var selTipo = '<label class="odg-tp">Tipo de precio <select data-tipo-precio' + (sup && editandoDatos ? '' : ' disabled title="Pulsa «Modificar información del presupuesto» para cambiarlo"') + '>' + TIPOS_PRECIO.map(function (t) {
         return '<option value="' + t[0] + '"' + (t[0] === tipoPrecio ? ' selected' : '') + '>' + t[1] + '</option>';
       }).join('') + '</select></label>';
-      var crearPre = (opciones.imprimir ? '<button type="button" class="odg-imp" data-imprimir-odg>Imprimir</button>' : '') +
-        (opciones.crearPresupuesto && sup ? '<button type="button" class="odg-crear" data-crear-presupuesto>Crear presupuesto</button>' : '');
+      // «Crear presupuesto» está en el bloque «Datos del presupuesto» (botón «Presupuesto»)
+      var crearPre = opciones.imprimir ? '<button type="button" class="odg-imp" data-imprimir-odg>Imprimir</button>' : '';
       // En el detalle «Requerido» solo se ven los hallazgos con procedimiento elegido;
       // el Super Administrador puede mostrar los demás para elegirles uno.
       var conProc = f.req.filter(function (x) { return x.proc; }), sinN = f.req.length - conProc.length;
