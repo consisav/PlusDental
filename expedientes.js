@@ -450,6 +450,8 @@
     paciente: function () { return actual ? actual.nombre : ''; },
     // Solo el Super Administrador modifica procedimientos, precios y datos del presupuesto
     esSuper: function () { return !!(window.PD_SESION && window.PD_SESION.esSuper()); },
+    // «Confirmar» en la ventana del procedimiento: graba el odontograma de inmediato
+    guardar: function () { if (actual) guardarOdonto($('odoGuardar')); else aviso('odoMsg', 'Primero guarda el expediente del paciente para grabar el odontograma.', true); },
     // Presupuesto en borrador con los tratamientos requeridos (d.items) y el tipo de precio elegido (d.tipo)
     crearPresupuesto: async function (d) {
       if (!actual) throw new Error('Primero guarda el expediente del paciente.');
