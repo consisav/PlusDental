@@ -474,7 +474,12 @@
   $('goPortalBtn').addEventListener('click', function () { dlg.close(); window.PD_PORTAL.abrir(); });
   $('myPassBtn').addEventListener('click', function () { abrirClave(null); });
 
-  $('admRecargar').addEventListener('click', cargarPanel);
+  // Actualizar: recarga los datos y cierra todas las opciones abiertas del menú (grupos y subgrupos)
+  $('admRecargar').addEventListener('click', function () {
+    document.querySelectorAll('.adm-menu .adm-g').forEach(function (g) { abrirSubgrupo(null, g); });
+    abrirGrupo(null);
+    cargarPanel();
+  });
   document.querySelectorAll('.adm-menu [data-tab]').forEach(function (b) {
     b.addEventListener('click', function () { pestana(b.dataset.tab); });
   });
