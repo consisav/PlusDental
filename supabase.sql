@@ -6939,6 +6939,227 @@ $$;
 revoke execute on function public.registrar_pago_comision(bigint, date, date, jsonb, bigint) from public, anon;
 grant execute on function public.registrar_pago_comision(bigint, date, date, jsonb, bigint) to authenticated;
 
+-- ===== Generar comisiones: agentes e instituciones, grabadas línea por línea, editables y con autorización de pago =====
+-- % de comisión de cada institución (sobre lo cobrado a sus pacientes) y beneficiario de cada regla del catálogo
+alter table public.jor_instituciones add column if not exists comision numeric(5,2) not null default 0 check (comision between 0 and 100);
+alter table public.comisiones_reglas add column if not exists beneficiario text not null default 'agente' check (beneficiario in ('agente', 'institucion'));
+
+-- Una fila por comisión generada (beneficiario + línea de origen). Al volver a generar solo se agregan las nuevas;
+-- las ya grabadas conservan sus cambios (% o valor, estado y autorización).
+create table if not exists public.comisiones_generadas (
+  id              bigint generated always as identity primary key,
+  beneficiario    text not null check (beneficiario in ('agente', 'institucion')),
+  agente_id       bigint references public.agentes (id) on delete cascade,
+  institucion_id  bigint references public.jor_instituciones (id) on delete cascade,
+  origen          text not null check (origen in ('cobro', 'pago', 'laboratorio')),
+  ref_id          bigint not null,
+  fecha           date not null,
+  paciente_id     bigint references public.pacientes (id) on delete set null,
+  paciente        text,
+  documento       text,
+  categoria       text,
+  concepto        text,
+  cantidad        numeric(12,2) not null default 1,
+  base            numeric(12,2) not null default 0,
+  regla_id        bigint references public.comisiones_reglas (id) on delete set null,
+  tipo            text not null default 'porcentaje' check (tipo in ('porcentaje', 'valor')),
+  valor_original  numeric(12,2) not null default 0,
+  valor           numeric(12,2) not null default 0 check (valor >= 0),
+  comision        numeric(12,2) not null default 0,
+  estado          text not null default 'pendiente' check (estado in ('pendiente', 'pagado', 'suspendido', 'anulado')),
+  autorizado      boolean not null default false,
+  pago_id         bigint references public.comisiones_pagos (id) on delete set null,
+  generado        timestamptz not null default now(),
+  generado_por    text,
+  modificado      timestamptz,
+  modificado_por  text,
+  constraint comisiones_generadas_benef check ((beneficiario = 'agente' and agente_id is not null) or (beneficiario = 'institucion' and institucion_id is not null)),
+  constraint comisiones_generadas_pct check (tipo <> 'porcentaje' or valor <= 100)
+);
+create unique index if not exists comisiones_generadas_unica on public.comisiones_generadas (beneficiario, origen, ref_id);
+create index if not exists comisiones_generadas_fecha on public.comisiones_generadas (fecha);
+create index if not exists comisiones_generadas_pago on public.comisiones_generadas (pago_id) where pago_id is not null;
+alter table public.comisiones_generadas enable row level security;
+drop policy if exists "personal ve comisiones generadas" on public.comisiones_generadas;
+create policy "personal ve comisiones generadas" on public.comisiones_generadas for select using (public.es_personal());
+drop policy if exists "personal cambia comisiones generadas" on public.comisiones_generadas;
+create policy "personal cambia comisiones generadas" on public.comisiones_generadas for update using (public.es_personal()) with check (public.es_personal());
+grant select, update on public.comisiones_generadas to authenticated;
+
+-- Al modificar: solo cambian % o valor, estado y autorización; la comisión se recalcula. Lo pagado no se toca
+-- (salvo desde el pago o su anulación).
+create or replace function public.comisiones_generadas_cambio() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(current_setting('pd.pago_comision', true), '') <> '1' then
+    if old.pago_id is not null then raise exception 'Esta comisión ya está pagada (pago No. %): anula el pago para modificarla', old.pago_id; end if;
+    new.pago_id := old.pago_id;
+    new.modificado := now(); new.modificado_por := (select usuario from public.perfiles where id = auth.uid());
+  end if;
+  new.beneficiario := old.beneficiario; new.agente_id := old.agente_id; new.institucion_id := old.institucion_id;
+  new.origen := old.origen; new.ref_id := old.ref_id; new.fecha := old.fecha; new.base := old.base; new.cantidad := old.cantidad;
+  new.tipo := old.tipo; new.valor_original := old.valor_original; new.generado := old.generado; new.generado_por := old.generado_por;
+  new.comision := round(case when new.tipo = 'porcentaje' then new.base * new.valor / 100 else new.valor * new.cantidad end, 2);
+  if new.estado <> 'pendiente' then new.autorizado := false; end if;
+  return new;
+end;
+$$;
+drop trigger if exists comisiones_generadas_cambio on public.comisiones_generadas;
+create trigger comisiones_generadas_cambio before update on public.comisiones_generadas for each row execute function public.comisiones_generadas_cambio();
+
+-- Genera (graba) las comisiones entre dos fechas.
+-- p_agentes: 'ninguno' (no se generan de agentes), 'todos' o el id de un agente.
+-- p_instituciones: 'ninguna' (no se generan de instituciones), 'todas' o el id de una institución.
+create or replace function public.generar_comisiones(p_desde date, p_hasta date, p_agentes text, p_instituciones text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+#variable_conflict use_column
+declare v_quien text := (select usuario from public.perfiles where id = auth.uid()); v_ag int := 0; v_in int := 0; v_anul int := 0;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if p_desde is null or p_hasta is null or p_hasta < p_desde then raise exception 'Revisa el rango de fechas'; end if;
+  create temp table if not exists _com_fuente (origen text, ref_id bigint, fecha date, agente_id bigint, paciente_id bigint, paciente text,
+    institucion_id bigint, documento text, categoria text, elemento bigint, concepto text, cantidad numeric, base numeric) on commit drop;
+  delete from _com_fuente;
+  insert into _com_fuente
+    select 'cobro', d.id, p.fecha, pa.agente_id, pa.id, pa.nombre, pa.institucion_id,
+      coalesce(nullif(concat_ws(' ', p.serie, p.numero_factura), ''), p.correlativo, 'Pago ' || p.id),
+      case when d.producto_id is not null then 'medicamentos' when d.tipo_procedimiento_id is not null then 'procedimientos' else 'otros' end,
+      coalesce(d.producto_id, d.tipo_procedimiento_id), coalesce(pr.nombre, tp.nombre, p.concepto, 'Cobro'), coalesce(d.cantidad, 1), d.monto
+    from public.pago_detalle d
+    join public.pagos p on p.id = d.pago_id and not p.anulado and p.fecha between p_desde and p_hasta
+    join public.pacientes pa on pa.id = p.paciente_id
+    left join public.inv_productos pr on pr.id = d.producto_id
+    left join public.tipos_procedimiento tp on tp.id = d.tipo_procedimiento_id
+    union all
+    select 'pago', p.id, p.fecha, pa.agente_id, pa.id, pa.nombre, pa.institucion_id,
+      coalesce(nullif(concat_ws(' ', p.serie, p.numero_factura), ''), p.correlativo, 'Pago ' || p.id), 'otros', null, coalesce(p.concepto, 'Pago'), 1, p.monto
+    from public.pagos p join public.pacientes pa on pa.id = p.paciente_id
+    where not p.anulado and p.fecha between p_desde and p_hasta and not exists (select 1 from public.pago_detalle d where d.pago_id = p.id)
+    union all
+    select 'laboratorio', o.id, coalesce(o.fecha_recibida, o.estado_fecha::date, o.creada::date), pa.agente_id, pa.id, pa.nombre, pa.institucion_id,
+      coalesce(o.numero, 'Orden ' || o.id), 'laboratorio', o.laboratorio_id, o.trabajo || coalesce(' · ' || lb.nombre, ''), 1, coalesce(o.costo, 0)
+    from public.ordenes_lab o join public.pacientes pa on pa.id = o.paciente_id
+    left join public.laboratorios lb on lb.id = o.laboratorio_id
+    where o.estado in ('recibida', 'colocada') and coalesce(o.fecha_recibida, o.estado_fecha::date, o.creada::date) between p_desde and p_hasta;
+
+  -- Agentes comerciales: regla más específica (beneficiario agente) o el % general del agente (no laboratorio)
+  if coalesce(p_agentes, 'ninguno') <> 'ninguno' then
+    insert into public.comisiones_generadas (beneficiario, agente_id, origen, ref_id, fecha, paciente_id, paciente, documento, categoria, concepto,
+      cantidad, base, regla_id, tipo, valor_original, valor, comision, generado_por)
+    select 'agente', f.agente_id, f.origen, f.ref_id, f.fecha, f.paciente_id, f.paciente, f.documento, f.categoria, f.concepto, f.cantidad, f.base,
+      rg.id, coalesce(rg.tipo, 'porcentaje'), coalesce(rg.valor, a.comision), coalesce(rg.valor, a.comision),
+      round(case when rg.id is null then f.base * a.comision / 100 when rg.tipo = 'porcentaje' then f.base * rg.valor / 100 else rg.valor * f.cantidad end, 2), v_quien
+    from _com_fuente f
+    join public.agentes a on a.id = f.agente_id and a.codigo <> '0' and (p_agentes = 'todos' or a.id = nullif(p_agentes, 'todos')::bigint)
+    left join lateral (
+      select x.id, x.tipo, x.valor from public.comisiones_reglas x
+      where x.estado = 'activo' and x.beneficiario = 'agente'
+        and (x.agente_id is null or x.agente_id = f.agente_id)
+        and (x.institucion_id is null or x.institucion_id = f.institucion_id)
+        and (x.aplica = 'todo' or x.aplica = f.categoria)
+        and (cardinality(x.elementos) = 0 or (x.aplica <> 'todo' and f.elemento = any (x.elementos)))
+        and (x.vigente_desde is null or f.fecha >= x.vigente_desde) and (x.vigente_hasta is null or f.fecha <= x.vigente_hasta)
+      order by (x.agente_id is not null)::int * 8 + (x.institucion_id is not null)::int * 4 + (cardinality(x.elementos) > 0)::int * 2 + (x.aplica <> 'todo')::int desc, x.id desc
+      limit 1
+    ) rg on true
+    where (rg.id is not null or (f.origen <> 'laboratorio' and a.comision > 0))
+      and round(case when rg.id is null then f.base * a.comision / 100 when rg.tipo = 'porcentaje' then f.base * rg.valor / 100 else rg.valor * f.cantidad end, 2) > 0
+    on conflict (beneficiario, origen, ref_id) do nothing;
+    get diagnostics v_ag = row_count;
+  end if;
+
+  -- Instituciones: regla más específica (beneficiario institución) o el % de la institución (no laboratorio)
+  if coalesce(p_instituciones, 'ninguna') <> 'ninguna' then
+    insert into public.comisiones_generadas (beneficiario, institucion_id, origen, ref_id, fecha, paciente_id, paciente, documento, categoria, concepto,
+      cantidad, base, regla_id, tipo, valor_original, valor, comision, generado_por)
+    select 'institucion', f.institucion_id, f.origen, f.ref_id, f.fecha, f.paciente_id, f.paciente, f.documento, f.categoria, f.concepto, f.cantidad, f.base,
+      rg.id, coalesce(rg.tipo, 'porcentaje'), coalesce(rg.valor, i.comision), coalesce(rg.valor, i.comision),
+      round(case when rg.id is null then f.base * i.comision / 100 when rg.tipo = 'porcentaje' then f.base * rg.valor / 100 else rg.valor * f.cantidad end, 2), v_quien
+    from _com_fuente f
+    join public.jor_instituciones i on i.id = f.institucion_id and (p_instituciones = 'todas' or i.id = nullif(p_instituciones, 'todas')::bigint)
+    left join lateral (
+      select x.id, x.tipo, x.valor from public.comisiones_reglas x
+      where x.estado = 'activo' and x.beneficiario = 'institucion'
+        and (x.institucion_id is null or x.institucion_id = f.institucion_id)
+        and (x.aplica = 'todo' or x.aplica = f.categoria)
+        and (cardinality(x.elementos) = 0 or (x.aplica <> 'todo' and f.elemento = any (x.elementos)))
+        and (x.vigente_desde is null or f.fecha >= x.vigente_desde) and (x.vigente_hasta is null or f.fecha <= x.vigente_hasta)
+      order by (x.institucion_id is not null)::int * 4 + (cardinality(x.elementos) > 0)::int * 2 + (x.aplica <> 'todo')::int desc, x.id desc
+      limit 1
+    ) rg on true
+    where (rg.id is not null or (f.origen <> 'laboratorio' and i.comision > 0))
+      and round(case when rg.id is null then f.base * i.comision / 100 when rg.tipo = 'porcentaje' then f.base * rg.valor / 100 else rg.valor * f.cantidad end, 2) > 0
+    on conflict (beneficiario, origen, ref_id) do nothing;
+    get diagnostics v_in = row_count;
+  end if;
+
+  -- Si el cobro de origen se anuló, sus comisiones pendientes pasan a «Anulado»
+  update public.comisiones_generadas g set estado = 'anulado', autorizado = false
+  where g.estado = 'pendiente' and g.fecha between p_desde and p_hasta and (
+    (g.origen = 'cobro' and exists (select 1 from public.pago_detalle d join public.pagos p on p.id = d.pago_id where d.id = g.ref_id and p.anulado)) or
+    (g.origen = 'pago' and exists (select 1 from public.pagos p where p.id = g.ref_id and p.anulado)));
+  get diagnostics v_anul = row_count;
+  return jsonb_build_object('agentes', v_ag, 'instituciones', v_in, 'anuladas', v_anul);
+end;
+$$;
+revoke execute on function public.generar_comisiones(date, date, text, text) from public, anon;
+grant execute on function public.generar_comisiones(date, date, text, text) to authenticated;
+
+-- Pagos: el beneficiario puede ser un agente o una institución
+alter table public.comisiones_pagos add column if not exists beneficiario text not null default 'agente' check (beneficiario in ('agente', 'institucion'));
+alter table public.comisiones_pagos alter column agente_id drop not null;
+
+-- Paga las comisiones autorizadas y pendientes de un beneficiario entre dos fechas
+drop function if exists public.registrar_pago_comision(bigint, date, date, jsonb, bigint);
+drop function if exists public.registrar_pago_comision(bigint, date, date, jsonb);
+create or replace function public.registrar_pago_comision(p_beneficiario text, p_id bigint, p_desde date, p_hasta date, p_datos jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint; v_base numeric; v_monto numeric; v_n int; v_metodo text := coalesce(nullif(p_datos ->> 'metodo', ''), 'transferencia');
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if p_beneficiario not in ('agente', 'institucion') or p_id is null or p_desde is null or p_hasta is null or p_hasta < p_desde then raise exception 'Revisa el beneficiario y el rango de fechas'; end if;
+  if v_metodo in ('transferencia', 'deposito') and coalesce(nullif(trim(p_datos ->> 'banco'), ''), '') = '' then raise exception 'Elige el banco del pago'; end if;
+  perform pg_advisory_xact_lock(hashtext('comisiones_pago_' || p_beneficiario), p_id::int);
+  select count(*), coalesce(sum(g.base), 0), coalesce(sum(g.comision), 0) into v_n, v_base, v_monto
+  from public.comisiones_generadas g
+  where g.beneficiario = p_beneficiario and (case when p_beneficiario = 'agente' then g.agente_id else g.institucion_id end) = p_id
+    and g.fecha between p_desde and p_hasta and g.estado = 'pendiente' and g.autorizado and g.pago_id is null and g.comision > 0;
+  if v_n = 0 then raise exception 'No hay comisiones autorizadas pendientes de pago para ese beneficiario en esas fechas'; end if;
+  insert into public.comisiones_pagos (beneficiario, agente_id, institucion_id, desde, hasta, fecha_pago, base, monto, lineas, metodo, referencia, observaciones,
+    banco, cuenta_bancaria, fecha_operacion, registrado_por)
+  values (p_beneficiario, case when p_beneficiario = 'agente' then p_id end, case when p_beneficiario = 'institucion' then p_id end,
+    p_desde, p_hasta, coalesce(nullif(p_datos ->> 'fecha_pago', '')::date, current_date), v_base, v_monto, v_n,
+    v_metodo, nullif(trim(p_datos ->> 'referencia'), ''), nullif(trim(p_datos ->> 'observaciones'), ''),
+    nullif(trim(p_datos ->> 'banco'), ''), nullif(trim(p_datos ->> 'cuenta_bancaria'), ''), nullif(p_datos ->> 'fecha_operacion', '')::date,
+    (select usuario from public.perfiles where id = auth.uid()))
+  returning id into v_id;
+  perform set_config('pd.pago_comision', '1', true);
+  update public.comisiones_generadas g set pago_id = v_id, estado = 'pagado'
+  where g.beneficiario = p_beneficiario and (case when p_beneficiario = 'agente' then g.agente_id else g.institucion_id end) = p_id
+    and g.fecha between p_desde and p_hasta and g.estado = 'pendiente' and g.autorizado and g.pago_id is null and g.comision > 0;
+  perform set_config('pd.pago_comision', '', true);
+  return v_id;
+end;
+$$;
+revoke execute on function public.registrar_pago_comision(text, bigint, date, date, jsonb) from public, anon;
+grant execute on function public.registrar_pago_comision(text, bigint, date, date, jsonb) to authenticated;
+
+-- Anular un pago: sus comisiones vuelven a «Pendiente de pago» (autorizadas)
+create or replace function public.anular_pago_comision(p_id bigint, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escribe el motivo de la anulación'; end if;
+  update public.comisiones_pagos set anulado = true, anulado_motivo = left(trim(p_motivo), 300), anulado_en = now(),
+    anulado_por = (select usuario from public.perfiles where id = auth.uid())
+  where id = p_id and not anulado;
+  if not found then raise exception 'El pago no existe o ya estaba anulado'; end if;
+  delete from public.comisiones_pago_lineas where pago_id = p_id;
+  perform set_config('pd.pago_comision', '1', true);
+  update public.comisiones_generadas set pago_id = null, estado = 'pendiente', autorizado = true where pago_id = p_id;
+  perform set_config('pd.pago_comision', '', true);
+end;
+$$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

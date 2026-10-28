@@ -179,12 +179,13 @@
         { k: 'responsable', label: 'Responsable', max: 150 }, { k: 'cargo', label: 'Cargo', max: 100, placeholder: 'Director(a), alcalde…' },
         { k: 'telefono', label: 'Teléfono / WhatsApp', max: 60 }, { k: 'correo', label: 'Correo', max: 150 },
         { k: 'convenio', label: '¿Tiene convenio?', tipo: 'check' }, { k: 'convenio_desde', label: 'Convenio desde', max: 10 }, { k: 'convenio_hasta', label: 'Convenio hasta', max: 10 },
+        { k: 'comision', label: '% de comisión', tipo: 'number', paso: '0.01', maxNum: 100, ayuda: 'Sobre lo cobrado a sus pacientes (Comisiones)' },
         { k: 'observaciones', label: 'Observaciones', tipo: 'textarea', max: 500 }, { k: 'sucursales', label: 'Sucursales', tipo: 'info' }, { k: 'sede', tipo: 'sede' }],
       secciones: [
         { titulo: 'Identificación', campos: ['codigo', 'estado', 'nombre*', 'tipo', 'nit', 'poblacion*', 'registro*'] },
         { titulo: 'Ubicación', campos: ['estado_id*', 'municipio_id*', 'direccion*'] },
         { titulo: 'Contacto', campos: ['responsable*', 'cargo*', 'telefono', 'correo'] },
-        { titulo: 'Convenio y sucursales', campos: ['convenio*', 'convenio_desde', 'convenio_hasta', 'observaciones*', 'sucursales*'] }
+        { titulo: 'Convenio y sucursales', campos: ['convenio*', 'convenio_desde', 'convenio_hasta', 'comision', 'observaciones*', 'sucursales*'] }
       ],
       alAbrir: async function () {
         $('geoF_codigo').textContent = i ? codigoInst(i) : 'Se asigna al grabar'; $('geoF_registro').textContent = textoRegistro(i);
@@ -211,6 +212,8 @@
         d.estado_id = d.estado_id ? +d.estado_id : null; d.municipio_id = d.municipio_id ? +d.municipio_id : null;
         d.poblacion = d.poblacion == null ? null : Math.max(0, Math.round(d.poblacion));
         if (!d.convenio) { d.convenio_desde = null; d.convenio_hasta = null; }
+        if (d.comision != null && (d.comision < 0 || d.comision > 100)) return 'El % de comisión debe estar entre 0 y 100.';
+        d.comision = d.comision == null ? 0 : Math.round(d.comision * 100) / 100;
         if (d.convenio_desde && d.convenio_hasta && d.convenio_hasta < d.convenio_desde) return 'La fecha final del convenio no puede ser anterior a la inicial.';
         if (d.correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.correo)) return 'Escribe un correo válido.';
         var r = i ? await sb.from('jor_instituciones').update(d).eq('id', i.id).select('id').single() : await sb.from('jor_instituciones').insert(d).select('id').single();

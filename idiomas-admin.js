@@ -14,7 +14,7 @@
     'Expediente de pacientes': 'Patient records', 'Presupuesto': 'Quotes', 'Estados de cuenta': 'Account statements', 'Cobros y pagos': 'Payments',
     'Precios y paquetes': 'Prices and packages', 'Tipos de procedimientos': 'Procedure types', 'Precios': 'Prices', 'Paquetes': 'Packages',
     'Reportes': 'Reports', 'Listado de pacientes': 'Patient list', 'Citas agendadas': 'Scheduled appointments', 'Cobros por paciente': 'Payments by patient',
-    'Comisiones generadas': 'Commissions earned', 'Página web': 'Website', 'Idioma / Language': 'Language', 'Español': 'Español', 'English': 'English',
+    'Comisiones generadas': 'Commissions earned', 'Generar comisiones': 'Generate commissions', 'Autorizar pago': 'Authorize payment', 'Pago de comisiones': 'Commission payments', 'Ninguno': 'None', 'Ninguna': 'None', 'Página web': 'Website', 'Idioma / Language': 'Language', 'Español': 'Español', 'English': 'English',
     'Conectado como': 'Signed in as', 'Puedes cambiar el tipo y la clave de cualquier usuario.': 'You can change the type and password of any user.',
     'Puedes cambiar la clave de los Clientes.': 'You can change the password of Clients.',
 
