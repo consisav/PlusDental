@@ -441,6 +441,14 @@
       if ($('tabExpedientes')) $('tabExpedientes').click();
       abrir(id);
       var p = $('admExpedientes'); if (p) p.scrollIntoView({ block: 'start' });
+    },
+    // Botón «Actualizar» del panel: deja Expedientes en la lista de pacientes (Activos); los datos los recarga el panel
+    lista: function () {
+      var sinGuardar = odontoCambiado && actual ? actual.nombre : '';
+      if ($('tabExpedientes')) $('tabExpedientes').click();
+      actual = null; odontoCambiado = false; filtroEstado = 'activo';
+      $('expFicha').hidden = true; $('expLista').hidden = false;
+      if (sinGuardar) aviso('expMsg', 'Ojo: no se guardaron los cambios del odontograma de ' + sinGuardar + '.', true);
     }
   };
   window.PD_ODG_GET = function () { return typeof odg !== 'undefined' ? odg : null; };

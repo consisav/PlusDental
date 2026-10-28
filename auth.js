@@ -474,11 +474,14 @@
   $('goPortalBtn').addEventListener('click', function () { dlg.close(); window.PD_PORTAL.abrir(); });
   $('myPassBtn').addEventListener('click', function () { abrirClave(null); });
 
-  // Actualizar: recarga los datos y cierra todas las opciones abiertas del menú (grupos y subgrupos)
+  // Actualizar: recarga los datos, cierra todas las opciones abiertas del menú (grupos y subgrupos)
   $('admRecargar').addEventListener('click', function () {
     document.querySelectorAll('.adm-menu .adm-g').forEach(function (g) { abrirSubgrupo(null, g); });
     abrirGrupo(null);
+    // y vuelve a la lista de expedientes de pacientes
+    if (window.PD_EXPEDIENTE && window.PD_EXPEDIENTE.lista) window.PD_EXPEDIENTE.lista();
     cargarPanel();
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   document.querySelectorAll('.adm-menu [data-tab]').forEach(function (b) {
     b.addEventListener('click', function () { pestana(b.dataset.tab); });
