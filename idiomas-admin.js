@@ -283,7 +283,7 @@
     'Pagos con fecha entre las dos fechas, agrupados por paciente. Los recibos anulados no suman al total.': 'Payments dated between the two dates, grouped by patient. Voided receipts do not add to the total.',
     'ANULADO:': 'VOIDED:', 'Cobros válidos': 'Valid payments', 'Total cobrado': 'Total collected',
     'Comisión de cada agente comercial sobre los pagos cobrados (no anulados) entre las dos fechas a los pacientes que tiene asignados.': 'Each sales agent’s commission on the payments collected (not voided) between the two dates from their assigned patients.',
-    'Cobros': 'Payments', '% comisión': '% commission', 'Agentes': 'Agents', 'Comisiones': 'Commissions', 'Generar reporte': 'Generate report', 'Exportar a Excel': 'Export to Excel',
+    'Cobros': 'Payments', '% comisión': '% commission', 'Agentes': 'Agents', 'Comisiones': 'Commissions', 'Generar reporte': 'Generate report', 'Generar Comisiones': 'Generate commissions', 'Todos los agentes': 'All agents', 'Todas las instituciones': 'All institutions', 'Exportar a Excel': 'Export to Excel',
     'Fecha inicial': 'Start date', 'Fecha final': 'End date', 'Indica la fecha inicial y la final.': 'Enter the start and end dates.', 'La fecha inicial no puede ser posterior a la final.': 'The start date cannot be after the end date.',
     'con los estados elegidos': 'with the chosen statuses', 'Impreso el': 'Printed on', 'Sin incluir:': 'Not included:', 'Subtotal ': 'Subtotal', 'No hay datos para esas fechas': 'There is no data for those dates',
     'Teléfono ': 'Phone',

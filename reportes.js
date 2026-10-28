@@ -164,7 +164,7 @@
     },
 
     comisiones: {
-      panel: 'admRepComisiones', titulo: 'Comisiones generadas',
+      panel: 'admRepComisiones', titulo: 'Comisiones generadas', agenteInst: true, boton: 'Generar Comisiones',
       nota: 'Comisión de cada agente comercial entre las dos fechas según el Catálogo de comisiones (sin regla: su % general) sobre lo cobrado (no anulado) y las órdenes de laboratorio recibidas de sus pacientes. Incluye lo ya pagado y lo pendiente.',
       estados: { activo: ['Activo', 'verde'], suspendido: ['Suspendido', 'ambar'], inactivo: ['Inactivo', 'gris'] },
       columnas: [
@@ -177,14 +177,21 @@
         ['Pagado', function (f) { return f.pagado; }, 'q'],
         ['Pendiente', function (f) { return f.pendiente; }, 'q']
       ],
-      cargar: async function (d, h) {
-        var rl = await sb.rpc('comisiones_lineas', { p_desde: d, p_hasta: h, p_agente: null });
+      cargar: async function (d, h, o) {
+        var ag = o && o.agente ? +o.agente : null, ins = o && o.inst ? +o.inst : null;
+        var rl = await sb.rpc('comisiones_lineas', { p_desde: d, p_hasta: h, p_agente: ag });
         if (!rl.error) {
+          if (ins) {
+            var rp = await sb.from('pacientes').select('id').eq('institucion_id', ins);
+            if (rp.error) throw rp.error;
+            var deInst = {}; (rp.data || []).forEach(function (x) { deInst[x.id] = 1; });
+            rl.data = (rl.data || []).filter(function (l) { return deInst[l.paciente_id]; });
+          }
           var ra = await sb.from('agentes').select('id,codigo,nombre,estado');
           if (ra.error) throw ra.error;
           var g = {};
-          ra.data.forEach(function (a) { if (a.codigo !== '0') g[a.id] = { codigo: a.codigo, nombre: a.nombre, estado: a.estado, total: 0, cobros: 0, monto: 0, pagado: 0, pac: {} }; });
-          rl.data.forEach(function (l) {
+          (ra.data || []).forEach(function (a) { if (a.codigo !== '0' && (!ag || a.id === ag)) g[a.id] = { codigo: a.codigo, nombre: a.nombre, estado: a.estado, total: 0, cobros: 0, monto: 0, pagado: 0, pac: {} }; });
+          (rl.data || []).forEach(function (l) {
             var a = g[l.agente_id]; if (!a) return;
             a.total += Number(l.base); a.monto += Number(l.comision); a.cobros++; a.pac[l.paciente_id] = 1;
             if (l.pago_comision_id) a.pagado += Number(l.comision);
@@ -193,7 +200,7 @@
           return Object.keys(g).map(function (k) {
             var a = g[k]; a.total = num(a.total); a.monto = num(a.monto); a.pagado = num(a.pagado); a.pendiente = num(a.monto - a.pagado); a.pacientes = Object.keys(a.pac).length;
             return a;
-          }).filter(function (a) { return a.cobros > 0 || a.estado === 'activo'; }).sort(function (a, b) { return ord(a.codigo) - ord(b.codigo); });
+          }).filter(function (a) { return a.cobros > 0 || (a.estado === 'activo' && !ins); }).sort(function (a, b) { return ord(a.codigo) - ord(b.codigo); });
         }
         // Sin el SQL de comisiones: % general del agente sobre lo cobrado
         var r = await Promise.all([
@@ -251,7 +258,9 @@
       (def.cliente ? '<label class="rep-cliente">Cliente<select name="cliente"><option value="">Todos los clientes</option></select></label>' : '') +
       (def.tipoBanco ? '<label>Tipo de cliente<select name="tipo"><option value="">Todos</option><option value="institucional">Institucional</option><option value="privado">Cliente privado</option></select></label>' +
         '<label>Banco<select name="banco"><option value="">Todos los bancos</option></select></label>' : '') +
-      '<button type="submit" class="dlg-submit">Generar reporte</button></form>' +
+      (def.agenteInst ? '<label>Agente comercial<select name="agente"><option value="">Todos los agentes</option></select></label>' +
+        '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>' : '') +
+      '<button type="submit" class="dlg-submit">' + esc(def.boton || 'Generar reporte') + '</button></form>' +
       '<div class="rep-params" data-rep-params="' + clave + '"></div>' +
       '<div class="rep-chips" data-rep-chips="' + clave + '" aria-label="Filtrar por estado"></div>' +
       '<div class="rep-totales" data-rep-totales="' + clave + '"></div>' +
@@ -262,6 +271,20 @@
     estadoRep[clave] = { filas: null, ocultos: {}, generado: false };
     if (def.cliente) llenarClientes(p.querySelector('select[name=cliente]'));
     if (def.tipoBanco) llenarBancos(p.querySelector('select[name=banco]'));
+    if (def.agenteInst) llenarAgentesInst(p);
+  }
+  // Listas de agentes comerciales e instituciones para el reporte de comisiones
+  async function llenarAgentesInst(p) {
+    var r = await Promise.all([sb.from('agentes').select('id,codigo,nombre,estado').order('codigo'), sb.from('jor_instituciones').select('id,nombre').order('nombre')]);
+    var sa = p.querySelector('select[name=agente]'), si = p.querySelector('select[name=inst]');
+    if (!sa || !sa.isConnected) return;
+    var ord = function (c) { return /^\d+$/.test(c) ? +c : Infinity; };
+    var va = sa.value, vi = si.value;
+    sa.innerHTML = '<option value="">Todos los agentes</option>' + (r[0].error ? [] : r[0].data).filter(function (a) { return a.codigo !== '0'; })
+      .sort(function (a, b) { return ord(a.codigo) - ord(b.codigo); })
+      .map(function (a) { return '<option value="' + a.id + '">' + esc(a.codigo + ' · ' + a.nombre) + (a.estado !== 'activo' ? ' (' + a.estado + ')' : '') + '</option>'; }).join('');
+    si.innerHTML = '<option value="">Todas las instituciones</option>' + (r[1].error ? [] : r[1].data).map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
+    sa.value = va; si.value = vi;
   }
   // Bancos: los del sistema más los que ya tengan pagos registrados
   async function llenarBancos(sel) {
@@ -294,8 +317,10 @@
     form.querySelector('button').disabled = true;
     try {
       var tipo = form.tipo ? form.tipo.value : '', banco = form.banco ? form.banco.value : '';
-      s.filas = await def.cargar(d, h, { cliente: cli, tipo: tipo, banco: banco });
-      s.extras = def.tipoBanco ? [['Tipo de cliente', form.tipo.selectedOptions[0].textContent], ['Banco', banco || 'Todos los bancos']] : null;
+      var agente = form.agente ? form.agente.value : '', inst = form.inst ? form.inst.value : '';
+      s.filas = await def.cargar(d, h, { cliente: cli, tipo: tipo, banco: banco, agente: agente, inst: inst });
+      s.extras = def.tipoBanco ? [['Tipo de cliente', form.tipo.selectedOptions[0].textContent], ['Banco', banco || 'Todos los bancos']]
+        : def.agenteInst ? [['Agente comercial', form.agente.selectedOptions[0].textContent], ['Institución', form.inst.selectedOptions[0].textContent]] : null;
       s.desde = d; s.hasta = h; s.generado = true;
       s.cliente = cli; s.clienteNombre = cli ? form.cliente.selectedOptions[0].textContent : '';
       msg.textContent = '';
@@ -409,6 +434,7 @@
       var def = REPORTES[TABS[t]];
       if (def.cliente) llenarClientes($(def.panel).querySelector('select[name=cliente]'));
       if (def.tipoBanco) llenarBancos($(def.panel).querySelector('select[name=banco]'));
+      if (def.agenteInst) llenarAgentesInst($(def.panel));
       if (!estadoRep[TABS[t]].generado) generar(TABS[t]);
     });
   });
