@@ -225,6 +225,9 @@
       '.odg-dlg .op{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;font:inherit;font-size:14.5px;font-weight:600;color:#0B2B40;background:#FFFFFF;border:1px solid #D9E4EC;border-radius:12px;padding:10px 14px;cursor:pointer}',
       '.odg-dlg .op:hover,.odg-dlg .op:focus-visible{border-color:#005A87;background:#EEF5FA;outline:none}',
       '.odg-dlg .op small{display:block;font-size:12px;color:#5A6D7A;font-weight:500}',
+      '.odg-dlg .pr-ed{display:flex;align-items:center;gap:4px;flex:none;font-weight:700;color:#0B2B40;cursor:text}',
+      '.odg-dlg .pr-ed input{width:104px;text-align:right;font-weight:700;padding:7px 9px;border-color:#C4D4DF;background:#FFFFFF}',
+      '.odg-dlg .pr-ed input:focus{outline:2px solid #188EC0;outline-offset:1px;border-color:#188EC0}',
       '.odg-dlg .pr{font-weight:800;white-space:nowrap}.odg-dlg .sinp{color:#9A3B2E;font-size:12.5px;font-weight:700;white-space:nowrap}',
       '.odg-dlg .pie{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}',
       '.odg-dlg .pie button{font:inherit;font-weight:700;font-size:14px;border:1px solid #C4D4DF;border-radius:999px;padding:9px 16px;background:#FFFFFF;color:#0B2B40;cursor:pointer}',
@@ -655,10 +658,15 @@
       limpiarVacias(n);
       return true;
     }
-    function ponerProc(n, clave, item) {
+    function ponerProc(n, clave, item, precio) {
       var p = datos.piezas[n];
       if (!p) return;
-      if (item) { p.proc = p.proc || {}; p.proc[clave] = { id: item.id || null, n: item.nombre }; }
+      if (item) {
+        p.proc = p.proc || {}; p.proc[clave] = { id: item.id || null, n: item.nombre };
+        // Valor real del procedimiento: el que se escribió al elegirlo (si no es el del catálogo)
+        var base = precioDe(item);
+        if (precio != null && !isNaN(precio) && precio >= 0 && (base == null || Math.round(precio * 100) !== Math.round(base * 100))) p.proc[clave].precio = Math.round(precio * 100) / 100;
+      }
       else quitarProc(p, clave);
       avisar();
       pintar();
@@ -675,9 +683,17 @@
       dlg.querySelector('[data-todos]').hidden = !!(bus || lista === todos);
       dlg.querySelector('.lista').innerHTML = lista.length ? lista.map(function (c) {
         var pr = precioDe(c);
-        return '<button type="button" class="op" data-k="' + c.k + '"><span>' + esc(c.nombre) + (c.tipo ? '<small>' + esc(c.tipo) + '</small>' : '') + '</span>' +
-          (pr != null ? '<span class="pr">' + q(pr) + '</span>' : '<span class="sinp">Sin precio definido</span>') + '</button>';
+        return '<div class="op" role="button" tabindex="0" data-k="' + c.k + '"><span>' + esc(c.nombre) + (c.tipo ? '<small>' + esc(c.tipo) + '</small>' : '') + '</span>' +
+          '<label class="pr-ed" title="Valor real del procedimiento: cámbialo si es necesario y luego elige el procedimiento"><span>Q</span><input type="number" min="0" step="0.01" inputmode="decimal" data-precio value="' + (pr != null ? pr.toFixed(2) : '') + '" placeholder="' + (pr != null ? '' : 'Sin precio') + '" aria-label="Valor de ' + esc(c.nombre) + '"></label></div>';
       }).join('') : '<p>No hay procedimientos con ese nombre.</p>';
+    }
+    function elegirOp(o) {
+      var item = catalogo.filter(function (c) { return c.k === o.dataset.k; })[0];
+      var inp = o.querySelector('[data-precio]'), val = inp && inp.value.trim() !== '' ? Number(inp.value) : null;
+      if (val != null && (isNaN(val) || val < 0)) { inp.focus(); inp.select(); return; }
+      var inf = dlg._info;
+      dlg.close();
+      if (item && inf) inf.elegir(inf.n, inf.clave, item, val);
     }
     function abrirVentana(info) {
       if (!esSuper() || !disponibles().length || typeof HTMLDialogElement === 'undefined') return;
@@ -689,24 +705,24 @@
         document.body.appendChild(dlg);
         dlg.addEventListener('click', function (e) {
           if (e.target === dlg) { dlg.close(); return; }
+          if (e.target.closest('.pr-ed')) return;
           var o = e.target.closest('[data-k]');
-          if (o) {
-            e.preventDefault();
-            var item = catalogo.filter(function (c) { return c.k === o.dataset.k; })[0];
-            var inf = dlg._info;
-            dlg.close();
-            if (item && inf) inf.elegir(inf.n, inf.clave, item);
-            return;
-          }
+          if (o) { e.preventDefault(); elegirOp(o); return; }
           if (e.target.closest('[data-todos]')) { dlg._todos = true; llenarVentana(); dlg.querySelector('input').focus(); }
         });
         dlg.querySelector('input').addEventListener('input', llenarVentana);
+        // Enter en el valor (o Enter/espacio sobre el procedimiento) lo elige
+        dlg.addEventListener('keydown', function (e) {
+          var o = e.target.closest && e.target.closest('[data-k]');
+          if (!o) return;
+          if (e.key === 'Enter' || (e.key === ' ' && e.target === o)) { e.preventDefault(); elegirOp(o); }
+        });
       }
       info.elegir = ponerProc;
       dlg._info = info; dlg._todos = false;
       dlg.querySelector('h4').textContent = 'Pieza ' + info.n + ' · ' + info.texto;
       var tp = TIPOS_PRECIO.filter(function (t) { return t[0] === tipoPrecio; })[0];
-      dlg.querySelector('p').innerHTML = '¿Qué procedimiento se hará? Precios de <b>' + (tp ? tp[1] : '') + '</b>.';
+      dlg.querySelector('p').innerHTML = '¿Qué procedimiento se hará? Precios de <b>' + (tp ? tp[1] : '') + '</b>. Puedes cambiar el valor antes de elegirlo: ese será el valor real del procedimiento.';
       dlg.querySelector('input').value = '';
       llenarVentana();
       dlg.showModal();
