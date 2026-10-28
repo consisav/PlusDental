@@ -142,7 +142,7 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 @media (max-width:640px){.de-firmas{grid-template-columns:minmax(0,1fr)}}
 .tr-barra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#F5F9FC;border:1px solid #D9E4EC;border-radius:16px;padding:9px 12px}
 .tr-fecha{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#5A6D7A}
-.tr-fecha select{min-height:38px;min-width:0;width:168px;border-radius:999px;padding:6px 14px;font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:#0B2B40;background:#FFFFFF}
+.tr-fecha select,.tr-fecha input{min-height:38px;min-width:0;width:168px;border-radius:999px;padding:6px 14px;font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:#0B2B40;background:#FFFFFF}
 .tr-sep{width:1px;height:24px;background:#D9E4EC;margin:0 2px}
 .tr-filtros{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tr-segmentado{display:inline-flex;background:#FFFFFF;border:1px solid #C4D4DF;border-radius:999px;padding:3px;gap:2px}
@@ -153,7 +153,7 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .tr-barra .adm-btn{min-height:38px;padding:6px 11px;font-size:13.5px}
 .tr-filtros{gap:6px}
 @media (max-width:1200px){.tr-sep{display:none}}
-@media (max-width:640px){.tr-fecha{width:100%}.tr-fecha select{flex:1;max-width:none;min-width:0}.tr-filtros .tr-sep{display:none}.tr-segmentado{width:100%}.tr-segmentado button{flex:1;padding:7px 6px;font-size:13px}}
+@media (max-width:640px){.tr-fecha{width:100%}.tr-fecha select,.tr-fecha input{flex:1;max-width:none;min-width:0}.tr-filtros .tr-sep{display:none}.tr-segmentado{width:100%}.tr-segmentado button{flex:1;padding:7px 6px;font-size:13px}}
 .tr-seg-btn{border-color:#9CC3DA;color:#00476B}.tr-seg-btn[aria-pressed="true"]{background:#005A87;border-color:#005A87;color:#FFFFFF}
 .tr-seg{display:flex;flex-direction:column;gap:12px}
 .tr-seg-cab{display:flex;justify-content:space-between;align-items:center;gap:10px 16px;flex-wrap:wrap;background:#F2F8FC;border:1px solid #9CC3DA;border-radius:16px;padding:14px 16px}
@@ -1865,7 +1865,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="kpi"><span>Pendiente y en proceso</span><b id="trPendiente">Q0.00</b></div>
 </div>
 <div class="tr-barra">
-<label class="tr-fecha"><span>Fecha</span><select id="trFecha" class="adm-input" aria-label="Fecha de los tratamientos"></select></label>
+<label class="tr-fecha"><span>Fecha inicial</span><input type="date" id="trDesde" class="adm-input"></label><label class="tr-fecha"><span>Fecha final</span><input type="date" id="trHasta" class="adm-input"></label>
 <div id="trFiltros" class="tr-filtros" aria-label="Filtrar tratamientos">
 <div class="tr-segmentado" role="group" aria-label="Estado">
 <button type="button" data-trfiltro="finalizado" aria-pressed="true">Finalizados <span>(0)</span></button>
@@ -3087,7 +3087,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="expedientes.js?v=20261028f"></script>
 <script src="presupuestos.js"></script>
 <script src="cuentas.js?v=20261028c"></script>
-<script src="tratamientos-paciente.js"></script>
+<script src="tratamientos-paciente.js?v=20261028a"></script>
 <script src="recetas.js"></script>
 <script src="laboratorio.js"></script>
 <script src="historias-medicas.js"></script>

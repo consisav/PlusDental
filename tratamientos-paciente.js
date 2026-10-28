@@ -14,12 +14,17 @@
 
   var ESTADOS = { pendiente: 'Pendiente', proceso: 'Proceso', finalizado: 'Finalizado', eliminado: 'Eliminado' };
   var FORMAS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta de crédito', otro: 'Otro' };
-  var paciente = null, items = [], saldo = null, filtro = 'finalizado', fechaSel = null; // fechaSel: null = la última fecha; 'todas'
+  var paciente = null, items = [], saldo = null, filtro = 'finalizado';
   function isoLocal(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   // Fecha del tratamiento: la de su último cambio de estado (o la de realizado, en los anteriores)
   function fechaDe(i) { return i.estado_fecha ? isoLocal(new Date(i.estado_fecha)) : i.realizado_en || ''; }
-  function fechas() { return trasladados().map(fechaDe).filter(function (f, k, a) { return f && a.indexOf(f) === k; }).sort().reverse(); }
-  function porFecha(lista) { var f = fechaSel || fechas()[0]; return !f || f === 'todas' ? lista : lista.filter(function (i) { return fechaDe(i) === f; }); }
+  // Rango de fechas: por defecto del primer al último día del mes actual
+  function rangoMes() { var h = new Date(); return { desde: isoLocal(new Date(h.getFullYear(), h.getMonth(), 1)), hasta: isoLocal(new Date(h.getFullYear(), h.getMonth() + 1, 0)) }; }
+  function rangoMesActual() { var r = rangoMes(); $('trDesde').value = r.desde; $('trHasta').value = r.hasta; }
+  function porFecha(lista) {
+    var d = $('trDesde').value, h = $('trHasta').value;
+    return lista.filter(function (i) { var f = fechaDe(i); return f && (!d || f >= d) && (!h || f <= h); });
+  }
   function textoFecha(f) { return new Date(f + 'T12:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }); }
 
   // Estado de un procedimiento (los anteriores al estado por procedimiento: realizado = Finalizado)
@@ -33,7 +38,7 @@
   }
 
   async function cargar(p) {
-    paciente = p; items = []; saldo = null; fechaSel = null;
+    paciente = p; items = []; saldo = null; rangoMesActual();
     if (!p) return;
     $('trBody').innerHTML = '<tr><td colspan="8">Cargando…</td></tr>';
     aviso('');
@@ -72,12 +77,6 @@
     $('trSaldo').textContent = sal < -0.004 ? q(-sal) + ' a favor' : q(Math.max(sal, 0));
     $('trSaldo').parentElement.classList.toggle('tr-debe', sal > 0.004);
     $('trPendiente').textContent = q(tPorHacer);
-    // Fechas de tratamiento (por defecto la última)
-    var fs = fechas(), fActual = fechaSel || fs[0] || 'todas';
-    $('trFecha').innerHTML = fs.map(function (f, k) { return '<option value="' + f + '"' + (k === 0 ? ' title="Última fecha de tratamientos"' : '') + '>' + textoFecha(f) + '</option>'; }).join('') +
-      '<option value="todas">Todas las fechas</option>';
-    $('trFecha').value = fActual;
-    $('trFecha').disabled = !fs.length;
     var enFecha = porFecha(trasladados());
     var nFin = enFecha.filter(function (i) { return estadoDe(i) === 'finalizado'; }).length, nProc = enFecha.filter(function (i) { return estadoDe(i) === 'proceso'; }).length;
     document.querySelectorAll('#trFiltros [data-trfiltro]').forEach(function (b) {
@@ -126,7 +125,7 @@
     var lista = filas();
     var celda = 'padding:7px 6px;border-bottom:1px solid #D9E4EC';
     var titulo = (filtro === 'proceso' ? 'Tratamientos en proceso' : filtro === 'todos' ? 'Tratamientos' : 'Tratamientos finalizados') +
-      ($('trFecha').value && $('trFecha').value !== 'todas' ? ' · ' + textoFecha($('trFecha').value) : '');
+      ($('trDesde').value || $('trHasta').value ? ' · ' + ($('trDesde').value ? textoFecha($('trDesde').value) : '…') + ' al ' + ($('trHasta').value ? textoFecha($('trHasta').value) : '…') : '');
     var medico = paciente.medico && paciente.medico.nombre ? paciente.medico.nombre : 'Sin asignar';
     var grupos = [], porId = {};
     lista.forEach(function (i) {
@@ -180,9 +179,15 @@
     if (b) { filtro = b.dataset.trfiltro; pintar(); }
   });
   $('trImprimir').addEventListener('click', imprimirLista);
-  $('trFecha').addEventListener('change', function () {
-    fechaSel = this.value; pintar();
-    if (window.PD_SEGUIMIENTOS && window.PD_SEGUIMIENTOS.refrescar) window.PD_SEGUIMIENTOS.refrescar();
+  rangoMesActual();
+  ['trDesde', 'trHasta'].forEach(function (id) {
+    $(id).addEventListener('change', function () {
+      var d = $('trDesde'), h = $('trHasta');
+      // Si la inicial queda después de la final, se mueve la otra para que el rango sea válido
+      if (d.value && h.value && d.value > h.value) { if (id === 'trDesde') h.value = d.value; else d.value = h.value; }
+      pintar();
+      if (window.PD_SEGUIMIENTOS && window.PD_SEGUIMIENTOS.refrescar) window.PD_SEGUIMIENTOS.refrescar();
+    });
   });
 
   window.PD_TRATAMIENTOS = { cargar: function (p) { if (window.PD_SEGUIMIENTOS) window.PD_SEGUIMIENTOS.reiniciar(); return cargar(p); }, items: function () { return porFecha(trasladados()); }, paciente: function () { return paciente; } };
