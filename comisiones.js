@@ -360,7 +360,7 @@
     }).join('') : '<p class="dlg-msg">No hay comisiones para esos parámetros.</p>';
     document.querySelectorAll('#gcBody [data-parte]').forEach(function (c) { c.indeterminate = true; });
     $('gcPie').innerHTML = bs.length > 1 ? '<div class="com-ben com-ben-total"><div class="com-ben-id"><div class="com-ben-nom"><strong>TOTAL</strong><span>' + bs.length + ' beneficiarios · ' + s('n') + ' líneas</span></div></div>' +
-      cifras({ base: s('base'), comision: s('comision'), autorizado: s('autorizado'), enPago: s('enPago'), pagado: s('pagado'), pendiente: s('pendiente') }) + '<div></div></div>' : '';
+      cifras({ base: s('base'), comision: s('comision'), autorizado: s('autorizado'), enPago: s('enPago'), pagado: s('pagado'), pendiente: s('pendiente') }) + '</div>' : '';
     pintarGenDet(bs);
   }
   function pintarGenDet(bs) {
