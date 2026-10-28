@@ -114,8 +114,10 @@
       $(b.dataset.tab).hidden = b.dataset.tab !== id;
     });
     var elegido = document.querySelector('.adm-menu [data-tab="' + id + '"]');
-    if (elegido) { abrirGrupo(elegido.closest('.adm-g')); abrirSubgrupo(elegido.closest('.adm-sg')); }
+    if (elegido) { abrirSubgrupo(elegido.closest('.adm-sg')); abrirGrupo(menuArriba() ? null : elegido.closest('.adm-g')); }
   }
+  // En pantallas anchas el menú va en la barra fija de arriba y cada grupo se despliega como lista
+  function menuArriba() { return window.matchMedia('(min-width: 961px)').matches; }
   // Subgrupos dentro de un grupo (p. ej. Catálogos iniciales): solo uno abierto a la vez dentro de su grupo
   function abrirSubgrupo(s, cerrarGrupo) {
     var g = s ? s.closest('.adm-g') : cerrarGrupo;
@@ -492,7 +494,9 @@
   });
   // Al empezar, se abre el grupo (y el subgrupo) de la opción seleccionada
   var inicial = document.querySelector('.adm-menu [data-tab][aria-selected="true"]');
-  if (inicial) { abrirGrupo(inicial.closest('.adm-g')); abrirSubgrupo(inicial.closest('.adm-sg')); }
+  if (inicial) { abrirSubgrupo(inicial.closest('.adm-sg')); abrirGrupo(menuArriba() ? null : inicial.closest('.adm-g')); }
+  document.addEventListener('click', function (e) { if (menuArriba() && !e.target.closest('.adm-menu')) abrirGrupo(null); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && menuArriba() && document.querySelector('.adm-menu .adm-g.abierto')) abrirGrupo(null); });
   $('citaFiltros').addEventListener('click', function (e) {
     var b = e.target.closest('[data-filtro]');
     if (b) { filtro = b.dataset.filtro; pintarCitas(); }

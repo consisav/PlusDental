@@ -67,6 +67,20 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .adm-layout{grid-template-columns:minmax(0,1fr);gap:20px}
 .adm-menu{position:static;max-height:none;overflow:visible;border-right:0;border:1px solid #D9E4EC;border-radius:18px;padding:6px 10px;background:#FFFFFF}
 }
+.adm-barra-tit{margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:44px;line-height:1.05;color:#0B2B40}
+@media (min-width:961px){
+.adm-barra{position:sticky;top:calc(var(--pd-menu-top,150px) - 16px);z-index:15;display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;background:rgba(255,255,255,.97);border:1px solid #D9E4EC;border-radius:18px;padding:8px 10px 8px 18px;box-shadow:0 10px 26px rgba(11,43,64,.07);backdrop-filter:blur(6px)}
+.adm-barra-tit{font-size:24px;white-space:nowrap}
+.adm-layout{grid-template-columns:minmax(0,1fr)}
+.adm-barra .adm-menu{flex:1;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:0;position:static;max-height:none;overflow:visible;border:0;padding:0}
+.adm-barra .adm-g{position:relative}
+.adm-barra .adm-menu .adm-grupo{width:auto;min-height:40px;padding:9px 8px;font-size:11px;letter-spacing:.6px;border-radius:10px;gap:5px;white-space:nowrap}.adm-barra .adm-menu .adm-grupo .adm-chev{margin-left:2px}
+.adm-barra .adm-g.abierto>.adm-grupo{background:#EEF5FA}
+.adm-barra .adm-g:has([aria-selected="true"])>.adm-grupo{background:#0B2B40;color:#FFFFFF}
+.adm-barra .adm-g:has([aria-selected="true"])>.adm-grupo .adm-chev{border-color:#FFFFFF}
+.adm-barra .adm-g-items{position:absolute;top:calc(100% + 8px);left:0;z-index:30;min-width:300px;max-height:calc(100vh - var(--pd-menu-top,150px) - 90px);overflow:auto;background:#FFFFFF;border:1px solid #D9E4EC;border-radius:16px;box-shadow:0 20px 44px rgba(11,43,64,.18);padding:8px}
+.adm-barra .adm-g:nth-last-child(-n+3) .adm-g-items{left:auto;right:0}
+}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .exp-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .exp-form .full{grid-column:1/-1}
@@ -1555,7 +1569,6 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap">
 <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
 <span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #005A87">Administración</span>
-<h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 48px; line-height: 1.05">Panel de la clínica</h2>
 <p id="admQuien" style="margin: 0; font-size: 16px; color: #475B68"></p>
 </div>
 <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
@@ -1564,8 +1577,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 </div>
 
-<div class="adm-layout">
-<div class="adm-menu" role="tablist" aria-label="Menú de administración" aria-orientation="vertical">
+<div class="adm-barra">
+<h2 class="sec-h adm-barra-tit">Panel de la clínica</h2>
+<div class="adm-menu" role="tablist" aria-label="Menú de administración" aria-orientation="horizontal">
 <div class="adm-g">
 <button type="button" class="adm-grupo" id="grpPacientes" aria-expanded="false" aria-controls="grpPacientesItems">Pacientes<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-g-items" id="grpPacientesItems" role="presentation">
@@ -1702,6 +1716,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 </div>
 </div>
+</div>
+
+<div class="adm-layout">
 <div class="adm-main">
 
 <!-- 1. Administración de usuarios -->
@@ -3079,7 +3096,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="supabase-client.js"></script>
 <script src="firmas.js"></script>
 <script src="app.js?v=20261028b"></script>
-<script src="auth.js"></script>
+<script src="auth.js?v=20261028a"></script>
 <script src="voz-citas.js"></script>
 <script src="voz-historia.js"></script>
 <script src="voz-odontograma.js"></script>
