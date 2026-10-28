@@ -31,6 +31,7 @@
     return m || 'No se pudo generar el reporte.';
   }
 
+  var TIPOS_CLIENTE = { directo: 'Cliente directo', institucional: 'Institucional', vip: 'VIP', referido: 'Referido', paquete: 'Paquete', especial: 'Especial' };
   function bancario(f) { return f.metodo === 'transferencia' || f.metodo === 'deposito'; }
 
   // ---------- Definición de los reportes ----------
@@ -46,11 +47,16 @@
         ['Teléfono', function (f) { return f.telefono || '—'; }],
         ['Correo', function (f) { return f.correo || '—'; }],
         ['Médico asignado', function (f) { return f.medico ? f.medico.nombre : '—'; }],
-        ['Agente comercial', function (f) { return f.agente ? f.agente.codigo + ' · ' + f.agente.nombre : '—'; }]
+        ['Agente comercial', function (f) { return f.agente ? f.agente.codigo + ' · ' + f.agente.nombre : '—'; }],
+        ['Tipo de cliente', function (f) { return TIPOS_CLIENTE[f.tipo_cliente] || 'Cliente directo'; }],
+        ['Institución · sucursal', function (f) { return f.tipo_cliente === 'institucional' && f.institucion ? f.institucion.nombre + (f.sucursal ? ' · ' + f.sucursal.nombre : '') : '—'; }]
       ],
       cargar: async function (d, h) {
-        var r = await sb.from('pacientes').select('id,nombre,dpi,telefono,correo,creado,estado,medico:dentistas(nombre),agente:agentes(codigo,nombre)')
+        var campos = 'id,nombre,dpi,telefono,correo,creado,estado,medico:dentistas(nombre),agente:agentes(codigo,nombre)';
+        var r = await sb.from('pacientes').select(campos + ',tipo_cliente,institucion:jor_instituciones(nombre),sucursal:jor_sucursales(nombre)')
           .gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado');
+        // Sin el SQL de pacientes institucionales: el listado sale sin institución ni sucursal
+        if (r.error && /institucion|sucursal|tipo_cliente|jor_/i.test(r.error.message || '')) r = await sb.from('pacientes').select(campos).gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado');
         if (r.error) throw r.error;
         return r.data;
       },
