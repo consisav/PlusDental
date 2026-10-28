@@ -6508,6 +6508,97 @@ $$;
 revoke execute on function public.datos_bancarios_pago(bigint, text, text, text) from public, anon;
 grant execute on function public.datos_bancarios_pago(bigint, text, text, text) to authenticated;
 
+-- ===== Generación de usuario del portal para pacientes =====
+-- El personal genera el usuario (iniciales de los nombres + primer apellido) y una clave aleatoria para entregarla al paciente.
+-- La clave entregada se guarda aparte (sin políticas: solo se lee con las funciones de abajo) para poder mostrarla de nuevo.
+create table if not exists public.pacientes_acceso (
+  paciente_id  bigint primary key references public.pacientes (id) on delete cascade,
+  usuario      text not null,
+  clave        text not null,
+  generado     timestamptz not null default now(),
+  generado_por text
+);
+alter table public.pacientes_acceso enable row level security;
+revoke all on public.pacientes_acceso from anon, authenticated;
+
+-- Consulta: usuario del paciente y la clave entregada (si se generó con esta pantalla)
+create or replace function public.ver_acceso_paciente(p_id bigint)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_usuario text; a record;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select usuario into v_usuario from public.pacientes where id = p_id;
+  select * into a from public.pacientes_acceso where paciente_id = p_id;
+  return jsonb_build_object('usuario', v_usuario,
+    'clave', case when a.paciente_id is not null and a.usuario = v_usuario then a.clave end,
+    'generado', a.generado, 'generado_por', a.generado_por);
+end;
+$$;
+revoke execute on function public.ver_acceso_paciente(bigint) from public, anon;
+grant execute on function public.ver_acceso_paciente(bigint) to authenticated;
+
+-- Generar: si ya tiene clave entregada solo la devuelve; si no, crea el usuario (tipo Cliente) con una clave
+-- aleatoria y actualiza el paciente. Si el paciente ya tenía un usuario Cliente sin clave entregada, le pone la clave nueva.
+create or replace function public.generar_acceso_paciente(p_id bigint, p_usuario text)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare
+  p record; a record; v_usuario text; v_base text; v_clave text := ''; v_uid uuid; v_correo text; v_rol public.rol_usuario; n int := 1;
+  letras constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  v_quien text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select * into p from public.pacientes where id = p_id for update;
+  if p.id is null then raise exception 'Paciente no encontrado'; end if;
+
+  select * into a from public.pacientes_acceso where paciente_id = p_id;
+  if a.paciente_id is not null and a.usuario = p.usuario then
+    return jsonb_build_object('nuevo', false, 'usuario', a.usuario, 'clave', a.clave, 'generado', a.generado, 'generado_por', a.generado_por);
+  end if;
+
+  -- Clave aleatoria de 10 caracteres (sin 0/O, 1/l/I) con al menos una mayúscula, una minúscula y un número
+  loop
+    v_clave := '';
+    for i in 1..10 loop v_clave := v_clave || substr(letras, 1 + (get_byte(gen_random_bytes(1), 0) % length(letras)), 1); end loop;
+    exit when v_clave ~ '[A-Z]' and v_clave ~ '[a-z]' and v_clave ~ '[0-9]';
+  end loop;
+
+  if p.usuario is not null then
+    -- Ya tenía usuario (asignado a mano): se le pone la clave nueva, solo si es de tipo Cliente
+    select id, rol into v_uid, v_rol from public.perfiles where usuario = p.usuario;
+    if v_uid is null then raise exception 'El usuario % ya no existe', p.usuario; end if;
+    if v_rol <> 'cliente' then raise exception 'El usuario % no es de tipo Cliente; no se le puede generar clave aquí', p.usuario; end if;
+    update auth.users set encrypted_password = crypt(v_clave, gen_salt('bf')), updated_at = now() where id = v_uid;
+    v_usuario := p.usuario;
+  else
+    v_base := left(regexp_replace(lower(coalesce(p_usuario, '')), '[^a-z0-9._-]', '', 'g'), 28);
+    if length(v_base) < 3 then raise exception 'El usuario debe tener al menos 3 letras'; end if;
+    v_usuario := v_base;
+    while exists (select 1 from public.perfiles where usuario = v_usuario)
+       or exists (select 1 from auth.users where email = v_usuario || '@usuarios.plusdental.com') loop
+      n := n + 1; v_usuario := v_base || n;
+    end loop;
+    v_uid := gen_random_uuid(); v_correo := v_usuario || '@usuarios.plusdental.com';
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+        raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
+      values ('00000000-0000-0000-0000-000000000000', v_uid, 'authenticated', 'authenticated', v_correo, crypt(v_clave, gen_salt('bf')), now(),
+        '{"provider":"email","providers":["email"]}'::jsonb, jsonb_build_object('usuario', v_usuario, 'nombre', p.nombre), now(), now(), '', '', '', '');
+    insert into auth.identities (provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+      values (v_uid::text, v_uid, jsonb_build_object('sub', v_uid::text, 'email', v_correo, 'email_verified', true), 'email', now(), now(), now());
+    -- El perfil lo crea el disparador al_crear_usuario (tipo Cliente)
+    update public.pacientes set usuario = v_usuario where id = p_id;
+  end if;
+
+  insert into public.pacientes_acceso (paciente_id, usuario, clave, generado, generado_por)
+    values (p_id, v_usuario, v_clave, now(), v_quien)
+  on conflict (paciente_id) do update set usuario = excluded.usuario, clave = excluded.clave, generado = excluded.generado, generado_por = excluded.generado_por;
+
+  return jsonb_build_object('nuevo', true, 'usuario', v_usuario, 'clave', v_clave, 'generado', now(), 'generado_por', v_quien);
+end;
+$$;
+revoke execute on function public.generar_acceso_paciente(bigint, text) from public, anon;
+grant execute on function public.generar_acceso_paciente(bigint, text) to authenticated;
+
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

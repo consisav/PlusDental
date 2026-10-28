@@ -9,7 +9,7 @@
     // ---- Panel y menú ----
     'Panel de la clínica': 'Clinic dashboard', 'Actualizar': 'Refresh', 'Cerrar panel': 'Close dashboard',
     'Menú de administración': 'Administration menu', 'Catálogos iniciales': 'Master data', 'Catálogos': 'Catalogs', 'Jornadas': 'Outreach days', 'Instituciones': 'Institutions', 'Jornadas dentales': 'Dental outreach days', 'Odontólogos': 'Dentists',
-    'Posiciones y clínicas': 'Chairs and clinics', 'Administración de usuarios': 'User management', 'Agente comercial': 'Sales agents',
+    'Posiciones y clínicas': 'Chairs and clinics', 'Administración de usuarios': 'User management', 'Generación Usuario': 'User generation', 'Generar usuario': 'Generate user', 'Generar clave': 'Generate password', 'Buscar paciente': 'Search patient', 'Copiar usuario y clave': 'Copy user and password', 'Agente comercial': 'Sales agents',
     'Agendas': 'Schedules', 'Agendas clínicas': 'Clinic schedules', 'Historial de citas': 'Appointment history', 'Pacientes': 'Patients',
     'Expediente de pacientes': 'Patient records', 'Presupuesto': 'Quotes', 'Estados de cuenta': 'Account statements', 'Cobros y pagos': 'Payments',
     'Precios y paquetes': 'Prices and packages', 'Tipos de procedimientos': 'Procedure types', 'Precios': 'Prices', 'Paquetes': 'Packages',

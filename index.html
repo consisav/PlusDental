@@ -80,6 +80,7 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .nota-lista li{border-top:1px solid #D9E4EC;padding:16px 0;display:flex;flex-direction:column;gap:6px}
 .nota-lista .meta{font-size:13px;color:#5A6D7A;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
 .nota-lista .texto{font-size:15px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.gu-caja{display:flex;flex-direction:column;gap:14px;max-width:620px}.gu-caja>label{display:flex;flex-direction:column;gap:6px;font-weight:600;color:#0B2B40}.gu-caja select{font:inherit;padding:10px 12px;border:1px solid #CBD8E1;border-radius:12px;background:#fff}#guFicha{display:flex;flex-direction:column;gap:12px}#guFicha[hidden]{display:none}.gu-paso{display:flex;gap:12px;align-items:flex-start;border:1px solid #D9E4EC;border-radius:16px;padding:14px;background:#fff}.gu-num{flex:none;width:28px;height:28px;border-radius:50%;background:#2F78C4;color:#fff;display:grid;place-items:center;font-weight:700}.gu-cuerpo{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;color:#0B2B40}.gu-cuerpo small{color:#5B6E7B}.gu-fila{display:flex;gap:8px;flex-wrap:wrap;align-items:center}#guUsuario{flex:1;min-width:160px;font:inherit;font-size:18px;font-family:ui-monospace,Consolas,monospace;padding:9px 12px;border:1px solid #CBD8E1;border-radius:12px}#guUsuario[readonly]{background:#F3F7FA}.gu-clave{flex:1;min-width:160px;font-size:22px;font-weight:700;letter-spacing:2px;font-family:ui-monospace,Consolas,monospace;padding:8px 12px;border:1px dashed #2F78C4;border-radius:12px;background:#EEF5FC;color:#0B2B40}.gu-clave.vacia{color:#94A6B2;border-color:#CBD8E1;background:#F3F7FA}
 .rc-layout{display:grid;grid-template-columns:minmax(200px,250px) minmax(0,1fr);gap:18px;align-items:start}
 .rc-lado{display:flex;flex-direction:column;gap:10px;border:1px solid #D9E4EC;border-radius:16px;padding:12px;background:#FFFFFF}
 .rc-lado #rcNueva{width:100%;justify-content:center}
@@ -1603,6 +1604,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" class="adm-subgrupo" id="subAdmin" aria-expanded="false" aria-controls="subAdminItems">4 · Administración<span class="adm-chev" aria-hidden="true"></span></button>
 <div class="adm-sg-items" id="subAdminItems" role="presentation">
 <button type="button" role="tab" id="tabUsuarios" data-tab="admUsuarios" aria-selected="false" aria-controls="admUsuarios" class="adm-sub-item">Administración de usuarios</button>
+<button type="button" role="tab" id="tabGenUsuario" data-tab="admGenUsuario" aria-selected="false" aria-controls="admGenUsuario" class="adm-sub-item">Generación Usuario</button>
 <button type="button" role="tab" id="tabAgentes" data-tab="admAgentes" aria-selected="false" aria-controls="admAgentes" class="adm-sub-item">Agentes comerciales</button>
 <button type="button" role="tab" id="tabRecargos" data-tab="admRecargos" aria-selected="false" aria-controls="admRecargos" class="adm-sub-item">Recargo de tarjetas</button>
 </div>
@@ -1696,6 +1698,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="roles-wrap"><table><thead><tr><th>Usuario</th><th>Tipo</th><th>Sede (organización / localidad)</th><th>Creado</th><th>Clave</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
 <p id="rolesMsg" class="dlg-msg" role="status"></p>
 </div>
+
+<!-- 1b. Generación de usuario del portal para pacientes -->
+<div id="admGenUsuario" role="tabpanel" aria-labelledby="tabGenUsuario" hidden class="adm-pane"></div>
 
 <!-- 2. Expedientes de pacientes -->
 <div id="admExpedientes" role="tabpanel" aria-labelledby="tabExpedientes" hidden class="adm-pane">
@@ -3088,6 +3093,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="precios.js?v=20261027"></script>
 <script src="paquetes.js"></script>
 <script src="recargos.js"></script>
+<script src="usuarios-pacientes.js?v=20261028a"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="chatbot.js"></script>
