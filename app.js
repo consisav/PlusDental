@@ -25,12 +25,18 @@
   var serviceList = ['Evaluación general', 'Limpieza', 'Urgencia / dolor', 'Estética', 'Ortodoncia', 'Implantes'];
   var wd = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-  // Próximos 6 días hábiles (sin domingos)
+  // Hoy y los siguientes días hábiles, 6 en total (sin domingos)
   var dayDates = [];
-  var d = new Date();
+  var hoy0 = new Date(), d = new Date(hoy0.getFullYear(), hoy0.getMonth(), hoy0.getDate() - 1);
   while (dayDates.length < 6) {
     d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
     if (d.getDay() !== 0) dayDates.push(d);
+  }
+  function esHoy(x) { return x.getFullYear() === hoy0.getFullYear() && x.getMonth() === hoy0.getMonth() && x.getDate() === hoy0.getDate(); }
+  // Hoy solo sirven las horas que empiezan al menos 1 hora después (igual que en Supabase)
+  function aTiempo(x, h) {
+    if (!esHoy(x)) return true;
+    var a = new Date(); return +h.slice(0, 2) * 60 + +h.slice(3, 5) > a.getHours() * 60 + a.getMinutes() + 60;
   }
 
   function $(id) { return document.getElementById(id); }
@@ -43,12 +49,17 @@
   function slotsDe(i) {
     if (avail) return avail[iso(dayDates[i])] || [];
     var fijos = dayDates[i].getDay() === 6 ? ['08:00', '09:30', '11:00'] : ['08:00', '09:30', '11:00', '14:00', '15:30', '17:00'];
-    return fijos.map(function (h) { return { hora: h, libre: true }; });
+    return fijos.map(function (h) { return { hora: h, libre: aTiempo(dayDates[i], h) }; });
   }
   function slots() { return slotsDe(state.day); }
   function libre(t) { return slots().some(function (s) { return s.hora === t && s.libre; }); }
   function primerLibre() { var s = slots().filter(function (x) { return x.libre; })[0]; return s ? s.hora : ''; }
-  function fechaTexto() { var dd = dayDates[state.day]; return wd[dd.getDay()] + ' ' + dd.getDate(); }
+  function fechaTexto() { var dd = dayDates[state.day]; return (esHoy(dd) ? 'Hoy' : wd[dd.getDay()]) + ' ' + dd.getDate(); }
+  // Si el día elegido ya no tiene horas libres (p. ej. hoy por la tarde), pasa al primer día que sí tenga
+  function diaConLibres() {
+    if (slots().some(function (x) { return x.libre; })) return;
+    for (var i = 0; i < dayDates.length; i++) if (slotsDe(i).some(function (x) { return x.libre; })) { state.day = i; return; }
+  }
   function summary() {
     return state.service + ' · ' + fechaTexto() + ' · ' + (state.time || 'elige una hora');
   }
@@ -62,7 +73,7 @@
   function pintarProximo() {
     for (var i = 0; i < dayDates.length; i++) {
       var s = slotsDe(i).filter(function (x) { return x.libre; })[0];
-      if (s) { $('firstDay').textContent = wd[dayDates[i].getDay()] + ' ' + dayDates[i].getDate() + ' · ' + s.hora; return; }
+      if (s) { $('firstDay').textContent = (esHoy(dayDates[i]) ? 'Hoy' : wd[dayDates[i].getDay()]) + ' ' + dayDates[i].getDate() + ' · ' + s.hora; return; }
     }
     $('firstDay').textContent = 'Consúltanos por WhatsApp';
   }
@@ -73,6 +84,7 @@
     if (r.error) { console.warn('Plus Dental: no se pudo leer la disponibilidad', r.error.message); return; }
     avail = {};
     r.data.forEach(function (x) { (avail[x.fecha] = avail[x.fecha] || []).push({ hora: x.hora, libre: x.libre }); });
+    diaConLibres();
     if (!libre(state.time)) state.time = primerLibre();
     pintarProximo();
     render();
@@ -99,7 +111,7 @@
     $('days').innerHTML = dayDates.map(function (x, i) {
       var on = state.day === i;
       return '<button type="button" data-day="' + i + '" aria-pressed="' + on + '" style="display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;padding:10px 0;min-height:60px;border-radius:14px;cursor:pointer;' + pill(on) + '">' +
-        '<span style="font-size:12px;text-transform:uppercase;letter-spacing:1px">' + wd[x.getDay()] + '</span>' +
+        '<span style="font-size:12px;text-transform:uppercase;letter-spacing:1px">' + (esHoy(x) ? 'Hoy' : wd[x.getDay()]) + '</span>' +
         '<span style="font-size:20px;font-weight:700">' + x.getDate() + '</span></button>';
     }).join('');
 
@@ -210,6 +222,8 @@
     $('equipoWrap').hidden = false;
   }
 
+  diaConLibres();
+  if (!libre(state.time)) state.time = primerLibre();
   pintarProximo();
   render();
   cargarDisponibilidad();

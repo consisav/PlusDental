@@ -964,6 +964,7 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .wa-float:hover{background:#178F47;transform:translateY(-2px)}
 .bot{font-family:'Manrope',system-ui,sans-serif}
 .bot-fab{position:fixed;right:20px;bottom:calc(88px + env(safe-area-inset-bottom, 0px));z-index:31;display:inline-flex;align-items:center;gap:9px;background:#0B2B40;color:#FFFFFF;border:0;font:inherit;font-weight:700;font-size:14.5px;padding:13px 18px 13px 15px;border-radius:999px;box-shadow:0 14px 30px rgba(11,43,64,.28);cursor:pointer;transition:transform .2s ease}
+.bot-en-agenda{display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-size:16px;color:#475B68}.bot-en-agenda button{display:inline-flex;align-items:center;gap:9px;background:#0B2B40;color:#FFFFFF;border:0;font:inherit;font-weight:700;font-size:14.5px;padding:12px 18px 12px 15px;min-height:44px;border-radius:999px;cursor:pointer;box-shadow:0 10px 24px rgba(11,43,64,.18)}.bot-en-agenda button:hover{background:#005A87}.bot-en-agenda button:focus-visible{outline:2px solid #188EC0;outline-offset:2px}
 .bot-fab:hover{transform:translateY(-2px)}.bot.abierto .bot-fab{display:none}
 .bot-panel{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:40;width:380px;max-width:calc(100vw - 24px);height:min(600px,calc(100vh - 110px));background:#FFFFFF;border-radius:22px;box-shadow:0 24px 60px rgba(11,43,64,.3);display:flex;flex-direction:column;overflow:hidden;border:1px solid #D9E4EC}
 .bot-panel[hidden]{display:none}
@@ -2843,6 +2844,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05">Reserva tu cita en menos de un minuto.</h2>
 <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #475B68">Elige el servicio, el día y la hora. Te confirmamos por WhatsApp y te enviamos un recordatorio el día anterior.</p>
 <span style="font-size: 16px; color: #475B68">¿Prefieres llamar? <a href="#contacto" style="font-weight: 600">Ver datos de contacto</a></span>
+<div class="bot-en-agenda"><span>¿Tienes dudas antes de reservar?</span><button type="button" onclick="window.PD_BOT &amp;&amp; window.PD_BOT.abrir()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path><circle cx="9" cy="12" r=".6" fill="currentColor"></circle><circle cx="12.5" cy="12" r=".6" fill="currentColor"></circle><circle cx="16" cy="12" r=".6" fill="currentColor"></circle></svg>Asistente 24/7</button></div>
 </div>
 <div style="background: #FFFFFF; border: 1px solid #D9E4EC; border-radius: 24px; padding: 32px; display: flex; flex-direction: column; gap: 24px">
 <div id="formView">
@@ -3060,7 +3062,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="config.js"></script>
 <script src="supabase-client.js"></script>
 <script src="firmas.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=20261028a"></script>
 <script src="auth.js"></script>
 <script src="voz-citas.js"></script>
 <script src="voz-historia.js"></script>
@@ -3103,6 +3105,6 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="portal.js"></script>
 <script src="idiomas-admin.js?v=20261027b"></script>
 <script src="movil.js"></script>
-<script src="idiomas.js?v=20261027"></script>
+<script src="idiomas.js?v=20261028a"></script>
 </body>
 </html>

@@ -184,7 +184,7 @@
     'Elige el servicio, el día y la hora. Te confirmamos por WhatsApp y te enviamos un recordatorio el día anterior.':
       'Choose the service, day and time. We will confirm by WhatsApp and send you a reminder the day before.',
     '¿Prefieres llamar?': 'Prefer to call?',
-    'Ver datos de contacto': 'See contact details',
+    'Ver datos de contacto': 'See contact details', '¿Tienes dudas antes de reservar?': 'Questions before booking?', 'Hoy': 'Today',
     '1. Servicio': '1. Service',
     '2. Día': '2. Day',
     '3. Hora': '3. Time',
