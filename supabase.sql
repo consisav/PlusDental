@@ -7419,6 +7419,11 @@ grant execute on function public.marca_localidad(bigint) to anon, authenticated;
 update public.posiciones set horario = coalesce(horario, '{}'::jsonb) || jsonb_build_object('6', jsonb_build_object('abre', '08:00', 'cierra', '15:00'))
 where codigo in ('1', '2') and horario -> '6' is distinct from jsonb_build_object('abre', '08:00', 'cierra', '15:00');
 
+-- ===== Marca por defecto de la página pública: empresa 2, localidad 01 (PLUS DENTAL ZONA 1O) =====
+update public.org_localidades l set marca_web = true
+  from public.organizaciones o
+ where o.id = l.organizacion_id and o.codigo = '2' and l.codigo::int = 1 and not l.marca_web;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

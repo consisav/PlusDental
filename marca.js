@@ -72,6 +72,6 @@
   refrescar();
   // Al iniciar o cerrar sesión cambia la localidad (la del usuario o la de la página web)
   if (sb) sb.auth.onAuthStateChange(function (evento) {
-    if (evento === 'SIGNED_IN' || evento === 'SIGNED_OUT') setTimeout(refrescar, 0);
+    if (evento === 'INITIAL_SESSION' || evento === 'SIGNED_IN' || evento === 'SIGNED_OUT') setTimeout(refrescar, 0);
   });
 })();
