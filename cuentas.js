@@ -343,10 +343,34 @@
       '<button type="button" class="ia-pag" data-cppag="' + (cpPag + 1) + '"' + (cpPag === paginas ? ' disabled' : '') + ' aria-label="Página siguiente">›</button></nav>' : '');
   }
 
+  // Institución y sucursal del pago (por defecto todas): reducen la lista de pacientes y se guardan con el pago
+  var instPago = [], sucPago = [], pacInstDe = {};
+  async function cargarInstPago() {
+    var r = await Promise.all([sb.from('jor_instituciones').select('id,nombre').order('nombre'), sb.from('jor_sucursales').select('id,nombre,institucion_id').order('nombre'),
+      sb.from('pacientes').select('id,institucion_id,sucursal_id')]);
+    instPago = r[0].error ? [] : r[0].data || []; sucPago = r[1].error ? [] : r[1].data || [];
+    pacInstDe = {}; (r[2].error ? [] : r[2].data || []).forEach(function (p) { pacInstDe[p.id] = p; });
+    var v = $('pgInst').value;
+    $('pgInst').innerHTML = '<option value="">Todas las instituciones</option>' + instPago.map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
+    $('pgInst').value = instPago.some(function (i) { return String(i.id) === v; }) ? v : '';
+    opcionesSucPago();
+  }
+  function opcionesSucPago(sel) {
+    var ins = $('pgInst').value, v = sel !== undefined ? String(sel || '') : $('pgSuc').value;
+    var nomInst = {}; instPago.forEach(function (i) { nomInst[i.id] = i.nombre; });
+    var l = ins ? sucPago.filter(function (s) { return String(s.institucion_id) === ins; }) : sucPago;
+    $('pgSuc').innerHTML = '<option value="">Todas las sucursales</option>' + l.map(function (s) { return '<option value="' + s.id + '">' + esc(s.nombre) + (ins ? '' : ' · ' + esc(nomInst[s.institucion_id] || '')) + '</option>'; }).join('');
+    $('pgSuc').value = l.some(function (s) { return String(s.id) === v; }) ? v : '';
+  }
+  function pasaFiltroPago(s) {
+    var ins = $('pgInst').value, suc = $('pgSuc').value, p = pacInstDe[s.paciente_id] || {};
+    return (!ins || String(p.institucion_id) === ins) && (!suc || String(p.sucursal_id) === suc);
+  }
   function pintarSelectorPacientes(elegido) {
     var anterior = elegido || $('pgPaciente').value;
+    var lista = saldos.filter(pasaFiltroPago);
     $('pgPaciente').innerHTML = saldos.length
-      ? '<option value="">Elige un paciente…</option>' + saldos.map(function (s) {
+      ? '<option value="">' + (lista.length ? 'Elige un paciente…' : 'Ningún paciente con esa institución o sucursal') + '</option>' + lista.map(function (s) {
         return '<option value="' + s.paciente_id + '"' + (String(s.paciente_id) === String(anterior) ? ' selected' : '') + '>' + esc(s.nombre) +
           (s.saldo > 0.004 ? ' · debe ' + q(s.saldo) : '') + '</option>';
       }).join('')
@@ -356,6 +380,9 @@
 
   async function alElegirPaciente() {
     var pid = $('pgPaciente').value;
+    // Paciente institucional con «Todas»: se proponen su institución y su sucursal
+    var pi = pacInstDe[pid];
+    if (pid && pi && pi.institucion_id && !$('pgInst').value) { $('pgInst').value = String(pi.institucion_id); opcionesSucPago(pi.sucursal_id || ''); }
     var s = saldoDe[pid];
     $('pgSaldo').hidden = !s;
     if (s) {
@@ -507,6 +534,7 @@
     ['pgNit', 'pgSerie', 'pgNumFactura', 'pgDte', 'pgCuota', 'pgConcepto', 'pgObservaciones'].forEach(function (id) { $(id).value = ''; });
     $('pgTipoDoc').value = 'factura'; $('pgMetodo').value = 'efectivo'; $('pgEstado').value = 'emitido'; pintarEstadoNuevo(); pintarTipoDoc();
     $('pgFecha').value = hoy();
+    $('pgInst').value = ''; opcionesSucPago('');
     $('pgBanco').value = ''; $('pgDocBanco').value = ''; $('pgComprobante').value = ''; pintarBancario();
     $('pgUsuario').textContent = (window.PD_SESION && window.PD_SESION.usuario()) || '—';
     pintarDetalle();
@@ -525,7 +553,7 @@
     if (!tiposProc.length) cargarTiposProc();
     cargarProductosInv();
     cargarCorrelativo();
-    if (await cargarSaldos()) { pintarSaldos(); pintarSelectorPacientes(); }
+    if (await cargarSaldos()) { await cargarInstPago(); pintarSaldos(); pintarSelectorPacientes(); }
     cargarResumen();
     cargarPacientesLista();
     cargarPagos();
@@ -566,6 +594,12 @@
   });
 
   $('pgPaciente').addEventListener('change', alElegirPaciente);
+  $('pgInst').addEventListener('change', function () { opcionesSucPago(); pintarSelectorPacientes(); });
+  $('pgSuc').addEventListener('change', function () {
+    var s = sucPago.filter(function (x) { return String(x.id) === $('pgSuc').value; })[0];
+    if (s && !$('pgInst').value) { $('pgInst').value = String(s.institucion_id); opcionesSucPago(s.id); }
+    pintarSelectorPacientes();
+  });
   $('pgPresupuesto').addEventListener('change', cargarItemsPresupuesto);
   $('pgMetodo').addEventListener('change', pintarBancario);
   $('pgComprobante').addEventListener('change', function () { var f = this.files[0]; if (f && f.size > 10 * 1024 * 1024) { this.value = ''; aviso('pgMsg', 'El comprobante pesa más de 10 MB.', true); } });
@@ -641,7 +675,8 @@
       nit: $('pgNit').value.trim(), tipo_documento: $('pgTipoDoc').value, serie: esFactura() ? $('pgSerie').value.trim() : '',
       numero_factura: esFactura() ? $('pgNumFactura').value.trim() : '', numero_dte: esFactura() ? $('pgDte').value.trim() : '',
       numero_cuota: $('pgCuota').value ? +$('pgCuota').value : null, estado_doc: $('pgEstado').value,
-      observaciones: $('pgObservaciones').value.trim()
+      observaciones: $('pgObservaciones').value.trim(),
+      institucion_id: $('pgInst').value ? +$('pgInst').value : null, sucursal_id: $('pgSuc').value ? +$('pgSuc').value : null
     };
     var detalle = usadas.map(function (l) {
       if (l.tipo === 'producto') return { producto_id: +l.producto_id, cantidad: Number(l.cantidad), bodega_id: invBodega, clasificacion: l.clasificacion, monto: redondear(l.monto), monto_usd: redondear(l.monto_usd) };

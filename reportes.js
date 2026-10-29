@@ -130,8 +130,8 @@
     },
 
     cobros: {
-      panel: 'admRepCobros', titulo: 'Cobros por paciente', cliente: true, tipoBanco: true,
-      nota: 'Pagos con fecha entre las dos fechas, de un cliente o de todos (institucionales o privados) y de un banco o de todos, agrupados por paciente. Los recibos anulados no suman al total.',
+      panel: 'admRepCobros', titulo: 'Cobros por paciente', cliente: true, tipoBanco: true, instSuc: true,
+      nota: 'Pagos con fecha entre las dos fechas, de un cliente o de todos (institucionales o privados), de una institución y sucursal o de todas, y de un banco o de todos, agrupados por paciente. Los recibos anulados no suman al total.',
       estados: { valido: ['Válido', 'verde'], anulado: ['Anulado', 'rojo'] },
       columnas: [
         ['Paciente', function (f) { return f.paciente; }],
@@ -152,13 +152,20 @@
           if (x && x.banco) c = c.eq('banco', x.banco);
           return c.order('fecha');
         }
-        var r = await consulta('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,banco,documento_banco,pac:pacientes(nombre,tipo_cliente)');
-        if (r.error && /banco|tipo_cliente/.test(r.error.message || '')) {
-          if ((x && x.banco) || (x && x.tipo)) throw new Error('Falta ejecutar en Supabase el script actualizado (supabase.sql) para filtrar por banco o tipo de cliente.');
+        var r = await consulta('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,banco,documento_banco,institucion_id,sucursal_id,pac:pacientes(nombre,tipo_cliente,institucion_id,sucursal_id)');
+        // Sin la institución y sucursal del pago: se usa la del paciente
+        if (r.error && /institucion_id|sucursal_id/.test(r.error.message || '')) r = await consulta('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,banco,documento_banco,pac:pacientes(nombre,tipo_cliente,institucion_id,sucursal_id)');
+        if (r.error && /banco|tipo_cliente|institucion|sucursal/.test(r.error.message || '')) {
+          if ((x && x.banco) || (x && x.tipo) || (x && x.inst) || (x && x.suc)) throw new Error('Falta ejecutar en Supabase el script actualizado (supabase.sql) para filtrar por banco, tipo de cliente, institución o sucursal.');
           r = await consulta('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,pac:pacientes(nombre)');
         }
         if (r.error) throw r.error;
         var datos = r.data.filter(function (p) { var ins = p.pac && p.pac.tipo_cliente === 'institucional'; return !(x && x.tipo) || (x.tipo === 'institucional' ? ins : !ins); });
+        // Institución y sucursal: las del pago (o, en los pagos anteriores, las del paciente)
+        datos = datos.filter(function (p) {
+          var pi = p.institucion_id || (p.pac && p.pac.institucion_id), ps = p.sucursal_id || (p.pac && p.pac.sucursal_id);
+          return (!(x && x.inst) || String(pi) === String(x.inst)) && (!(x && x.suc) || String(ps) === String(x.suc));
+        });
         return datos.map(function (p) { p.paciente = p.pac ? p.pac.nombre : '—'; p.estado = p.anulado ? 'anulado' : 'valido'; return p; })
           .sort(function (a, b) { return a.paciente.localeCompare(b.paciente) || String(a.fecha).localeCompare(String(b.fecha)) || a.id - b.id; });
       },
@@ -198,6 +205,8 @@
       (def.cliente ? '<label class="rep-cliente">Cliente<select name="cliente"><option value="">Todos los clientes</option></select></label>' : '') +
       (def.tipoBanco ? '<label>Tipo de cliente<select name="tipo"><option value="">Todos</option><option value="institucional">Institucional</option><option value="privado">Cliente privado</option></select></label>' +
         '<label>Banco<select name="banco"><option value="">Todos los bancos</option></select></label>' : '') +
+      (def.instSuc ? '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>' +
+        '<label>Sucursal<select name="suc"><option value="">Todas las sucursales</option></select></label>' : '') +
       (def.medicoInst ? '<label>Odontólogo<select name="medico"><option value="">Todos los odontólogos</option></select></label>' +
         '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>' : '') +
       (def.agenteInst ? '<label>Agente comercial<select name="agente"><option value="">Todos los agentes</option></select></label>' +
@@ -216,6 +225,26 @@
     if (def.tipoBanco) llenarBancos(p.querySelector('select[name=banco]'));
     if (def.agenteInst) llenarAgentesInst(p);
     if (def.medicoInst) llenarMedicoInst(p);
+    if (def.instSuc) llenarInstSuc(p);
+  }
+  // Listas de instituciones y sucursales (la sucursal se filtra por la institución elegida)
+  async function llenarInstSuc(p) {
+    var r = await Promise.all([sb.from('jor_instituciones').select('id,nombre').order('nombre'), sb.from('jor_sucursales').select('id,nombre,institucion_id').order('nombre')]);
+    var si = p.querySelector('select[name=inst]'), ss = p.querySelector('select[name=suc]');
+    if (!si || !si.isConnected) return;
+    var insts = r[0].error ? [] : r[0].data || [], sucs = r[1].error ? [] : r[1].data || [], nom = {};
+    insts.forEach(function (i) { nom[i.id] = i.nombre; });
+    var vi = si.value;
+    si.innerHTML = '<option value="">Todas las instituciones</option>' + insts.map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
+    si.value = insts.some(function (i) { return String(i.id) === vi; }) ? vi : '';
+    function sucursales() {
+      var ins = si.value, vs = ss.value, l = ins ? sucs.filter(function (s) { return String(s.institucion_id) === ins; }) : sucs;
+      ss.innerHTML = '<option value="">Todas las sucursales</option>' + l.map(function (s) { return '<option value="' + s.id + '">' + esc(s.nombre) + (ins ? '' : ' · ' + esc(nom[s.institucion_id] || '')) + '</option>'; }).join('');
+      ss.value = l.some(function (s) { return String(s.id) === vs; }) ? vs : '';
+    }
+    sucursales();
+    si.onchange = sucursales;
+    ss.onchange = function () { var s = sucs.filter(function (x) { return String(x.id) === ss.value; })[0]; if (s && !si.value) { si.value = String(s.institucion_id); sucursales(); ss.value = String(s.id); } };
   }
   // Listas de odontólogos e instituciones para el listado de pacientes
   async function llenarMedicoInst(p) {
@@ -271,9 +300,10 @@
     form.querySelector('button').disabled = true;
     try {
       var tipo = form.tipo ? form.tipo.value : '', banco = form.banco ? form.banco.value : '';
-      var agente = form.agente ? form.agente.value : '', inst = form.inst ? form.inst.value : '', medico = form.medico ? form.medico.value : '';
-      s.filas = await def.cargar(d, h, { cliente: cli, tipo: tipo, banco: banco, agente: agente, inst: inst, medico: medico });
+      var agente = form.agente ? form.agente.value : '', inst = form.inst ? form.inst.value : '', medico = form.medico ? form.medico.value : '', suc = form.suc ? form.suc.value : '';
+      s.filas = await def.cargar(d, h, { cliente: cli, tipo: tipo, banco: banco, agente: agente, inst: inst, medico: medico, suc: suc });
       s.extras = def.tipoBanco ? [['Tipo de cliente', form.tipo.selectedOptions[0].textContent], ['Banco', banco || 'Todos los bancos']]
+          .concat(def.instSuc ? [['Institución', form.inst.selectedOptions[0] ? form.inst.selectedOptions[0].textContent : 'Todas las instituciones'], ['Sucursal', form.suc.selectedOptions[0] ? form.suc.selectedOptions[0].textContent : 'Todas las sucursales']] : [])
         : def.agenteInst ? [['Agente comercial', form.agente.selectedOptions[0].textContent], ['Institución', form.inst.selectedOptions[0].textContent]]
         : def.medicoInst ? [['Odontólogo', form.medico.selectedOptions[0].textContent], ['Institución', form.inst.selectedOptions[0].textContent]] : null;
       s.desde = d; s.hasta = h; s.generado = true;
@@ -447,6 +477,7 @@
       if (def.tipoBanco) llenarBancos($(def.panel).querySelector('select[name=banco]'));
       if (def.agenteInst) llenarAgentesInst($(def.panel));
       if (def.medicoInst) llenarMedicoInst($(def.panel));
+      if (def.instSuc) llenarInstSuc($(def.panel));
       if (!estadoRep[TABS[t]].generado) generar(TABS[t]);
     });
   });

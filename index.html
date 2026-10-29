@@ -2222,6 +2222,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="pg-corr"><small>Correlativo interno</small><span id="pgCorrelativo">—</span></div></div>
 <div class="pg-sec"><b aria-hidden="true">1</b>Paciente</div>
 <div class="pg-grid">
+<label>Institución<select id="pgInst" title="Institución que paga (por defecto todas)"><option value="">Todas las instituciones</option></select></label>
+<label>Sucursal<select id="pgSuc" title="Sucursal que paga (por defecto todas)"><option value="">Todas las sucursales</option></select></label>
 <label class="pg-s2">Paciente *<select id="pgPaciente" required></select><small id="pgSaldo" class="pg-saldo" hidden></small></label>
 <label>NIT del paciente<input id="pgNit" type="text" readonly tabindex="-1" class="pg-auto" placeholder="Se llena al elegir el paciente"><small id="pgNitNota" class="pg-nota" hidden>El expediente no tiene NIT; se usa CF (consumidor final). Para cambiarlo, edítalo en Expediente de pacientes.</small></label>
 <label>Usuario que registra<output id="pgUsuario" class="pg-auto pg-out">—</output></label>
@@ -3103,7 +3105,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="odontograma.js?v=20261028f"></script>
 <script src="expedientes.js?v=20261028g"></script>
 <script src="presupuestos.js"></script>
-<script src="cuentas.js?v=20261028c"></script>
+<script src="cuentas.js?v=20261028d"></script>
 <script src="tratamientos-paciente.js?v=20261028a"></script>
 <script src="recetas.js"></script>
 <script src="laboratorio.js"></script>
@@ -3125,7 +3127,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="dentistas.js"></script>
 <script src="agenda.js?v=20261028b"></script>
 <script src="agentes.js"></script>
-<script src="reportes.js?v=20261028g"></script>
+<script src="reportes.js?v=20261028h"></script>
 <script src="constancias.js"></script>
 <script src="tipos.js"></script>
 <script src="precios.js?v=20261027"></script>

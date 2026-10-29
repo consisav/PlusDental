@@ -7325,6 +7325,24 @@ $$;
 revoke execute on function public.sincronizar_presupuesto_odontograma(bigint, jsonb, text) from public, anon;
 grant execute on function public.sincronizar_presupuesto_odontograma(bigint, jsonb, text) to authenticated;
 
+-- ===== Pagos de una institución o sucursal =====
+-- El pago guarda la institución y la sucursal que lo hacen (vacías = cliente directo / todas)
+alter table public.pagos add column if not exists institucion_id bigint references public.jor_instituciones (id) on delete set null;
+alter table public.pagos add column if not exists sucursal_id bigint references public.jor_sucursales (id) on delete set null;
+create index if not exists pagos_institucion on public.pagos (institucion_id) where institucion_id is not null;
+do $do$
+declare d text;
+begin
+  d := pg_get_functiondef('public.registrar_pago(jsonb, jsonb)'::regprocedure);
+  if position('institucion_id' in d) = 0 then
+    d := replace(d, 'numero_cuota, estado_doc, observaciones)', 'numero_cuota, estado_doc, observaciones, institucion_id, sucursal_id)');
+    d := replace(d, 'v_estado, nullif(trim(p_datos ->> ''observaciones''), ''''))',
+                    'v_estado, nullif(trim(p_datos ->> ''observaciones''), ''''), nullif(p_datos ->> ''institucion_id'', '''')::bigint, nullif(p_datos ->> ''sucursal_id'', '''')::bigint)');
+    execute d;
+  end if;
+end
+$do$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
