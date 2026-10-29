@@ -30,6 +30,11 @@
     // ---- Portada ----
     'Odontología integral': 'Comprehensive dentistry',
     'Zona 10, Guatemala': 'Zone 10, Guatemala',
+    'Odontología de': 'Dentistry of',
+    'excelencia': 'excellence',
+    ', con el trato que mereces.': ', with the care you deserve.',
+    'Prevención, estética, ortodoncia e implantes en un solo lugar. Te explicamos cada paso y recibes tu presupuesto por escrito antes de empezar.':
+      'Prevention, aesthetics, orthodontics and implants in one place. We explain every step and you get a written quote before we start.',
     'Una sonrisa sana,': 'A healthy smile,',
     'planificada': 'planned',
     'a tu medida.': 'just for you.',
