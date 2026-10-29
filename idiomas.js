@@ -30,6 +30,10 @@
     // ---- Portada ----
     'Odontología integral': 'Comprehensive dentistry',
     'Zona 10, Guatemala': 'Zone 10, Guatemala',
+    'Bienvenido a Plus Dental': 'Welcome to Plus Dental',
+    'Tu sonrisa,': 'Your smile,',
+    'en buenas manos.': 'in good hands.',
+    'Agenda en minutos y recibe tu plan con presupuesto por escrito.': 'Book in minutes and get your plan with a written quote.',
     'Odontología de': 'Dentistry of',
     'excelencia': 'excellence',
     ', con el trato que mereces.': ', with the care you deserve.',
