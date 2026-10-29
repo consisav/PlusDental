@@ -112,8 +112,8 @@
     },
 
     citas: {
-      panel: 'admRepCitas', titulo: 'Citas agendadas', instSuc: true,
-      nota: 'Citas con fecha entre las dos fechas; de pacientes de una institución y sucursal o de todas.',
+      panel: 'admRepCitas', titulo: 'Citas agendadas', medicoInst: true, instSuc: true,
+      nota: 'Citas con fecha entre las dos fechas; de un odontólogo o de todos, y de pacientes de una institución y sucursal o de todas.',
       estados: { pendiente: ['Programado', 'ambar'], confirmada: ['Confirmado', 'verde'], reprogramada: ['Reprogramado', 'azul'], atendida: ['Atendido', 'azul'], cancelada: ['Cancelado', 'gris'] },
       columnas: [
         ['Fecha', function (f) { return fechaCorta(f.fecha); }],
@@ -126,8 +126,10 @@
       ],
       cargar: async function (d, h, o) {
         var filtra = o && (o.inst || o.suc);
-        var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista:dentistas(nombre),sala:posiciones(codigo,nombre)' + (filtra ? ',pac:pacientes(institucion_id,sucursal_id)' : ''))
-          .gte('fecha', d).lte('fecha', h).order('fecha').order('hora');
+        var c = sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista:dentistas(nombre),sala:posiciones(codigo,nombre)' + (filtra ? ',pac:pacientes(institucion_id,sucursal_id)' : ''))
+          .gte('fecha', d).lte('fecha', h);
+        if (o && o.medico) c = c.eq('dentista_id', +o.medico);   // odontólogo de la cita
+        var r = await c.order('fecha').order('hora');
         if (r.error) throw r.error;
         if (!filtra) return r.data;
         return r.data.filter(function (c) { var p = c.pac || {}; return (!o.inst || String(p.institucion_id) === String(o.inst)) && (!o.suc || String(p.sucursal_id) === String(o.suc)); });
