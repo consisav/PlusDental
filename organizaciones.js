@@ -69,9 +69,12 @@
     if (l) $('locFicha').innerHTML = registro(l, 'loc') + '<div class="org-loc"><div class="geo-ficha-grid">' + dato('Código de localidad', codigoLoc(l)) + dato('Organización', (orgs.filter(function (x) { return x.id === l.organizacion_id; })[0] || {}).nombre) + dato('Razón social', l.razon_social, 1) + dato('Nombre comercial', l.nombre_comercial) +
       dato('Representante legal', l.representante) + dato('NIT', l.nit) + dato('Código patronal', l.codigo_patrono) + dato('Teléfonos', l.telefonos) + dato('Correos', l.correos) +
       dato('Dirección', l.direccion, 1) + dato('País', l.pais && l.pais.nombre) + dato('Estado / Departamento', l.depto && l.depto.nombre) + dato('Ciudad / Municipio', l.municipio && l.municipio.nombre) + '</div>' +
-      '<div class="org-marca"><div class="org-logo">' + (l.logo ? '<img src="' + esc(logoUrl(l.logo)) + '" alt="Logo de ' + esc(l.nombre_comercial || l.razon_social) + '">' : '<span>Sin logo</span>') + '</div>' +
-      '<p class="org-slogan">' + (l.slogan ? esc(l.slogan) : '<span>Sin slogan</span>') + '</p>' +
-      (l.slogan_imagen ? '<div class="org-logo org-slogan-img"><img src="' + esc(logoUrl(l.slogan_imagen)) + '" alt="Imagen del slogan"></div>' : '') + '</div></div>';
+      // Identidad de la localidad: logo, slogan e imagen del slogan, uno debajo del otro
+      '<div class="org-marca">' +
+      '<figure class="org-marca-item"><figcaption>Logo</figcaption><div class="org-logo">' + (l.logo ? '<img src="' + esc(logoUrl(l.logo)) + '" alt="Logo de ' + esc(l.nombre_comercial || l.razon_social) + '">' : '<span>Sin logo</span>') + '</div></figure>' +
+      '<figure class="org-marca-item"><figcaption>Slogan</figcaption><p class="org-slogan">' + (l.slogan ? esc(l.slogan) : '<span>Sin slogan</span>') + '</p></figure>' +
+      '<figure class="org-marca-item"><figcaption>Imagen slogan</figcaption><div class="org-logo org-slogan-img">' + (l.slogan_imagen ? '<img src="' + esc(logoUrl(l.slogan_imagen)) + '" alt="Imagen del slogan">' : '<span>Sin imagen</span>') + '</div></figure>' +
+      '</div></div>';
   }
 
   async function cargar() {
