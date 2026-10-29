@@ -7364,6 +7364,11 @@ drop function if exists public.generar_comisiones(date, date, text, text);
 revoke execute on function public.generar_comisiones(date, date, text, text, bigint) from public, anon;
 grant execute on function public.generar_comisiones(date, date, text, text, bigint) to authenticated;
 
+-- ===== Slogan de cada localidad (acompaña al logo) =====
+alter table public.org_localidades add column if not exists slogan text check (char_length(slogan) <= 150);
+-- El de la portada de la página para las localidades que aún no tienen
+update public.org_localidades set slogan = 'La tranquilidad también es parte del tratamiento.' where slogan is null;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

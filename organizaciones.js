@@ -13,6 +13,7 @@
 
   function $(id) { return document.getElementById(id); }
   function aviso(texto, error) { $('orgMsg').textContent = texto || ''; $('orgMsg').style.color = error ? '#9A3B2E' : '#475B68'; }
+  var SLOGAN = 'La tranquilidad también es parte del tratamiento.';   // el de la portada de la página
   function logoUrl(ruta) { return ruta ? sb.storage.from('publico').getPublicUrl(ruta).data.publicUrl : ''; }
   function ubicacion(x) { return [x.municipio && x.municipio.nombre, x.depto && x.depto.nombre, x.pais && ((x.pais.bandera ? x.pais.bandera + ' ' : '') + x.pais.nombre)].filter(Boolean).join(', ') || '—'; }
   function pill(e) { e = e || 'activo'; return '<span class="estado estado-' + e + '">' + (ESTADOS[e] || e) + '</span>'; }
@@ -68,7 +69,8 @@
     if (l) $('locFicha').innerHTML = registro(l, 'loc') + '<div class="org-loc"><div class="geo-ficha-grid">' + dato('Código de localidad', codigoLoc(l)) + dato('Organización', (orgs.filter(function (x) { return x.id === l.organizacion_id; })[0] || {}).nombre) + dato('Razón social', l.razon_social, 1) + dato('Nombre comercial', l.nombre_comercial) +
       dato('Representante legal', l.representante) + dato('NIT', l.nit) + dato('Código patronal', l.codigo_patrono) + dato('Teléfonos', l.telefonos) + dato('Correos', l.correos) +
       dato('Dirección', l.direccion, 1) + dato('País', l.pais && l.pais.nombre) + dato('Estado / Departamento', l.depto && l.depto.nombre) + dato('Ciudad / Municipio', l.municipio && l.municipio.nombre) + '</div>' +
-      '<div class="org-logo">' + (l.logo ? '<img src="' + esc(logoUrl(l.logo)) + '" alt="Logo de ' + esc(l.nombre_comercial || l.razon_social) + '">' : '<span>Sin logo</span>') + '</div></div>';
+      '<div class="org-marca"><div class="org-logo">' + (l.logo ? '<img src="' + esc(logoUrl(l.logo)) + '" alt="Logo de ' + esc(l.nombre_comercial || l.razon_social) + '">' : '<span>Sin logo</span>') + '</div>' +
+      '<p class="org-slogan">' + (l.slogan ? esc(l.slogan) : '<span>Sin slogan</span>') + '</p></div></div>';
   }
 
   async function cargar() {
@@ -140,7 +142,7 @@
     if (!orgSel) { aviso('Primero elige o crea una organización.', true); return; }
     try { window.PD_GEO_PAISES = await G.paises(); } catch (e) { aviso(G.traducir(e), true); return; }
     var o = orgs.filter(function (x) { return x.id === orgSel; })[0];
-    var v = l ? Object.assign({}, l, { codigo: codigoLoc(l) }) : { codigo: o.codigo + '-' + String(locs.reduce(function (m, x) { return Math.max(m, parseInt(x.codigo, 10) || 0); }, 0) + 1).padStart(2, '0') + ' (se confirma al grabar)', estado: 'activo', pais_id: o.pais_id || guatemala(), estado_id: o.estado_id, municipio_id: o.municipio_id };
+    var v = l ? Object.assign({}, l, { codigo: codigoLoc(l) }) : { codigo: o.codigo + '-' + String(locs.reduce(function (m, x) { return Math.max(m, parseInt(x.codigo, 10) || 0); }, 0) + 1).padStart(2, '0') + ' (se confirma al grabar)', estado: 'activo', slogan: SLOGAN, pais_id: o.pais_id || guatemala(), estado_id: o.estado_id, municipio_id: o.municipio_id };
     G.dialogo({
       eyebrow: 'Organizaciones · ' + o.nombre, titulo: l ? (l.nombre_comercial || l.razon_social) : 'Nueva localidad', valores: v,
       campos: [{ k: 'codigo', label: 'Código', tipo: 'info' }, { k: 'estado', label: 'Estado', tipo: 'select', opciones: OPC_ESTADO },
@@ -149,11 +151,12 @@
         { k: 'representante', label: 'Representante legal', max: 150 }, { k: 'codigo_patrono', label: 'Código patronal', max: 30 }, { k: 'telefonos', label: 'Teléfonos', max: 120 },
         { k: 'correos', label: 'Correos', max: 200, ancho: 'full' }].concat(camposUbicacion()).concat([
         { k: 'direccion', label: 'Detalle de dirección', tipo: 'textarea', max: 300, ancho: 'full' },
-        { k: 'logo_archivo', label: l && l.logo ? 'Cambiar logo' : 'Logo', tipo: 'file', accept: 'image/png,image/jpeg,image/webp', ayuda: 'PNG, JPG o WEBP de hasta 2 MB.', ancho: 'full' }]),
+        { k: 'logo_archivo', label: l && l.logo ? 'Cambiar logo' : 'Logo', tipo: 'file', accept: 'image/png,image/jpeg,image/webp', ayuda: 'PNG, JPG o WEBP de hasta 2 MB.', ancho: 'full' },
+        { k: 'slogan', label: 'Slogan', max: 150, ancho: 'full', placeholder: SLOGAN, ayuda: 'Frase que acompaña al logo.' }]),
       secciones: [
         { titulo: 'Identificación', campos: ['codigo', 'estado', 'razon_social', 'nombre_comercial*', 'nit', 'codigo_patrono', 'representante*'] },
         { titulo: 'Contacto y ubicación', campos: ['telefonos*', 'correos', 'pais_id*', 'estado_id', 'municipio_id', 'direccion'] },
-        { titulo: 'Logo', campos: ['logo_archivo'] }
+        { titulo: 'Logo y slogan', campos: ['logo_archivo', 'slogan'] }
       ],
       alAbrir: function () { G.encadenar('pais_id', 'estado_id', 'municipio_id')(v); colorEstado(); },
       guardar: async function (d) {
