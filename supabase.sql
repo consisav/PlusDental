@@ -7343,6 +7343,27 @@ begin
 end
 $do$;
 
+-- ===== Generar comisiones por sucursal de la institución =====
+-- Cada comisión guarda la sucursal del paciente; al generar se puede elegir una sucursal (vacío = todas)
+alter table public.comisiones_generadas add column if not exists sucursal_id bigint references public.jor_sucursales (id) on delete set null;
+do $do$
+declare d text;
+begin
+  d := pg_get_functiondef('public.generar_comisiones(date, date, text, text)'::regprocedure);
+  d := replace(d, 'p_instituciones text)', 'p_instituciones text, p_sucursal bigint DEFAULT NULL::bigint)');
+  d := replace(d, 'institucion_id bigint, documento text', 'institucion_id bigint, sucursal_id bigint, documento text');
+  d := replace(d, 'pa.nombre, pa.institucion_id,', 'pa.nombre, pa.institucion_id, pa.sucursal_id,');
+  d := replace(d, 'valor_original, valor, comision, generado_por)', 'valor_original, valor, comision, generado_por, sucursal_id)');
+  d := replace(d, ', v_quien' || chr(10) || '    from _com_fuente f', ', v_quien, f.sucursal_id' || chr(10) || '    from _com_fuente f');
+  d := replace(d, '(p_instituciones = ''todas'' or i.id = nullif(p_instituciones, ''todas'')::bigint)',
+                  '(p_instituciones = ''todas'' or i.id = nullif(p_instituciones, ''todas'')::bigint) and (p_sucursal is null or f.sucursal_id = p_sucursal)');
+  execute d;
+end
+$do$;
+drop function if exists public.generar_comisiones(date, date, text, text);
+revoke execute on function public.generar_comisiones(date, date, text, text, bigint) from public, anon;
+grant execute on function public.generar_comisiones(date, date, text, text, bigint) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

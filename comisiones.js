@@ -9,6 +9,7 @@
 
   var APLICA = { todo: 'Todo lo cobrado', procedimientos: 'Procedimientos', medicamentos: 'Medicamentos', laboratorio: 'Laboratorio' };
   var METODOS = { transferencia: 'Transferencia', efectivo: 'Efectivo', cheque: 'Cheque', deposito: 'Depósito', otro: 'Otro' };
+  var sucursales = [];   // sucursales de las instituciones (Generar comisiones)
   var agentes = [], instituciones = [], catalogo = { procedimientos: [], medicamentos: [], laboratorio: [] };
   var reglas = [], regla = null, elegidos = {}, lineas = [], pagos = [], calculo = null, faltaSql = false;   // lineas: comisiones de Pagar Comisiones
 
@@ -54,7 +55,8 @@
       sb.from('jor_instituciones').select('id,nombre,comision').order('nombre'),
       sb.from('tipos_procedimiento').select('id,nombre,estado').order('nombre'),
       sb.from('inv_productos').select('id,codigo,nombre,presentacion,estado').order('nombre'),
-      sb.from('laboratorios').select('id,nombre,activo').order('nombre')
+      sb.from('laboratorios').select('id,nombre,activo').order('nombre'),
+      sb.from('jor_sucursales').select('id,nombre,institucion_id').order('nombre')
     ]);
     function orden(c) { return /^\d+$/.test(c) ? +c : Infinity; }
     agentes = (r[0].data || []).filter(function (a) { return a.codigo !== '0'; }).sort(function (a, b) { return orden(a.codigo) - orden(b.codigo); });
@@ -62,9 +64,11 @@
     catalogo.procedimientos = (r[2].data || []).map(function (x) { return { id: x.id, nombre: x.nombre, activo: x.estado !== 'inactivo' }; });
     catalogo.medicamentos = (r[3].data || []).map(function (x) { return { id: x.id, nombre: [x.codigo, x.nombre, x.presentacion].filter(Boolean).join(' · '), activo: x.estado === 'activo' }; });
     catalogo.laboratorio = (r[4].data || []).map(function (x) { return { id: x.id, nombre: x.nombre, activo: x.activo !== false }; });
+    sucursales = r[5] && !r[5].error ? r[5].data || [] : [];
     var opAg = agentes.map(function (a) { return '<option value="' + a.id + '">' + esc(a.codigo + ' · ' + a.nombre) + (a.estado !== 'activo' ? ' (' + a.estado + ')' : '') + '</option>'; }).join('');
     ['crAgente', 'crFiltroAg'].forEach(function (id) { var v = $(id).value; $(id).innerHTML = '<option value="">Todos los agentes</option>' + opAg; $(id).value = v; });
     llenarBen('gcAgente', 'gcInst', ['ninguno', 'ninguna']);
+    opcionesSucGen();
     llenarBen('pqAgente', 'pqInst', ['todos', 'todas']);
     var vi = $('crInst').value; $('crInst').innerHTML = '<option value="">Todas las instituciones</option>' + instituciones.map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join(''); $('crInst').value = vi;
   }
@@ -261,14 +265,14 @@
     if (!$(idIn).value) $(idIn).value = porDefecto[1];
   }
   // Lee las comisiones grabadas de un rango según la elección de agente e institución
-  async function leerGeneradas(d, h, ag, ins, estados) {
+  async function leerGeneradas(d, h, ag, ins, estados, suc) {
     var consultas = [];
     function base(benef) {
       var x = sb.from('comisiones_generadas').select('*').eq('beneficiario', benef).gte('fecha', d).lte('fecha', h).order('fecha').limit(5000);
       return estados ? x.in('estado', estados) : x;
     }
     if (ag !== 'ninguno') consultas.push(ag === 'todos' ? base('agente') : base('agente').eq('agente_id', +ag));
-    if (ins !== 'ninguna') consultas.push(ins === 'todas' ? base('institucion') : base('institucion').eq('institucion_id', +ins));
+    if (ins !== 'ninguna') { var bi = ins === 'todas' ? base('institucion') : base('institucion').eq('institucion_id', +ins); consultas.push(suc ? bi.eq('sucursal_id', +suc) : bi); }
     var rs = await Promise.all(consultas), l = [];
     for (var k = 0; k < rs.length; k++) { if (rs[k].error) throw rs[k].error; l = l.concat(rs[k].data || []); }
     return l;
@@ -288,6 +292,7 @@
     '<div class="com-filtros"><label>Fecha inicial<input id="gcDesde" type="date" class="adm-input"></label><label>Fecha final<input id="gcHasta" type="date" class="adm-input"></label>' +
     '<label>Agente comercial<select id="gcAgente" class="adm-input"><option value="ninguno">Ninguno</option></select></label>' +
     '<label>Institución<select id="gcInst" class="adm-input"><option value="ninguna">Ninguna</option></select></label>' +
+    '<label>Sucursal<select id="gcSuc" class="adm-input" disabled title="Elige primero una institución"><option value="">Todas las sucursales</option></select></label>' +
     '<button type="button" id="gcGenerar" class="dlg-submit">Generar comisiones</button></div>' +
     '<p id="gcMsg" class="dlg-msg" role="status"></p>' +
     '<div id="gcRes" class="adm-pane" hidden>' +
@@ -307,6 +312,15 @@
     x.comision = Math.round((x.tipo === 'porcentaje' ? x.base * x.valor / 100 : x.valor * x.cantidad) * 100) / 100;
     if (x.estado !== 'pendiente') x.autorizado = false;
     return x;
+  }
+  // Sucursal: se elige cuando hay una institución elegida (Todas = todas sus sucursales)
+  function opcionesSucGen() {
+    var ins = $('gcInst').value, uno = ins !== 'ninguna' && ins !== 'todas', v = $('gcSuc').value;
+    var l = uno ? sucursales.filter(function (s) { return String(s.institucion_id) === ins; }) : [];
+    $('gcSuc').innerHTML = '<option value="">Todas las sucursales</option>' + l.map(function (s) { return '<option value="' + s.id + '">' + esc(s.nombre) + '</option>'; }).join('');
+    $('gcSuc').value = l.some(function (s) { return String(s.id) === v; }) ? v : '';
+    $('gcSuc').disabled = !uno || !l.length;
+    $('gcSuc').title = !uno ? 'Elige primero una institución' : l.length ? 'Una o todas las sucursales de la institución' : 'Esta institución no tiene sucursales';
   }
   function resumir(lineasBen) {
     function s(a, k) { return a.reduce(function (t, l) { return t + Number(l[k]); }, 0); }
@@ -337,7 +351,7 @@
     $('gcRes').hidden = !genParams;
     $('gcImprimir').disabled = $('gcExcel').disabled = !gen.length;
     if (!genParams) return;
-    $('gcParams').innerHTML = '<span class="rep-params-t">Parámetros</span>' + [['Fecha inicial', fechaCorta(genParams.desde)], ['Fecha final', fechaCorta(genParams.hasta)], ['Agente comercial', genParams.agTxt], ['Institución', genParams.inTxt]]
+    $('gcParams').innerHTML = '<span class="rep-params-t">Parámetros</span>' + [['Fecha inicial', fechaCorta(genParams.desde)], ['Fecha final', fechaCorta(genParams.hasta)], ['Agente comercial', genParams.agTxt], ['Institución', genParams.inTxt]].concat(genParams.inst !== 'ninguna' ? [['Sucursal', genParams.sucTxt]] : [])
       .map(function (x) { return '<span class="rep-param-i">' + esc(x[0]) + ' <b>' + esc(x[1]) + '</b></span>'; }).join('');
     function s(k) { return bs.reduce(function (t, b) { return t + b[k]; }, 0); }
     $('gcResumen').innerHTML = [['Beneficiarios', bs.length], ['Base', q(s('base'))], ['Comisiones', q(s('comision'))], ['En Pagar Comisiones', q(s('enPago'))], ['Pagado', q(s('pagado'))], ['Total autorizado', q(s('autorizado')), 1]]
@@ -390,17 +404,18 @@
       '<button type="button" class="dlg-submit" data-gc-confirmar' + (nCambios ? '' : ' disabled') + '>Confirmar y actualizar maestro</button></div>';
   }
   async function generarCom() {
-    var d = $('gcDesde').value, h = $('gcHasta').value, ag = $('gcAgente').value, ins = $('gcInst').value;
+    var d = $('gcDesde').value, h = $('gcHasta').value, ag = $('gcAgente').value, ins = $('gcInst').value, suc = $('gcSuc').disabled ? '' : $('gcSuc').value;
     if (!d || !h || h < d) { aviso('gcMsg', 'Revisa el rango de fechas.', true); return; }
     if (ag === 'ninguno' && ins === 'ninguna') { aviso('gcMsg', 'Elige de quién generar comisiones: agentes comerciales, instituciones o ambos.', true); $('gcAgente').focus(); return; }
     $('gcGenerar').disabled = true; aviso('gcMsg', 'Generando…');
     try {
       await permisoPago();
-      var r = await sb.rpc('generar_comisiones', { p_desde: d, p_hasta: h, p_agentes: ag, p_instituciones: ins });
+      var r = await sb.rpc('generar_comisiones', { p_desde: d, p_hasta: h, p_agentes: ag, p_instituciones: ins, p_sucursal: suc ? +suc : null });
       if (r.error) throw r.error;
-      gen = await leerGeneradas(d, h, ag, ins);
+      gen = await leerGeneradas(d, h, ag, ins, null, suc);
       borrador = {};
-      genParams = { desde: d, hasta: h, agente: ag, inst: ins, agTxt: $('gcAgente').selectedOptions[0].textContent, inTxt: $('gcInst').selectedOptions[0].textContent };
+      genParams = { desde: d, hasta: h, agente: ag, inst: ins, suc: suc, agTxt: $('gcAgente').selectedOptions[0].textContent, inTxt: $('gcInst').selectedOptions[0].textContent,
+        sucTxt: suc ? $('gcSuc').selectedOptions[0].textContent : 'Todas las sucursales' };
       var n = (r.data.agentes || 0) + (r.data.instituciones || 0);
       aviso('gcMsg', (n ? 'Se generaron ' + n + (n === 1 ? ' comisión nueva' : ' comisiones nuevas') : 'No había comisiones nuevas') + (r.data.anuladas ? '; ' + r.data.anuladas + ' pasaron a «Anulado» porque se anuló su cobro' : '') + '.');
     } catch (e) { aviso('gcMsg', traducir(e), true); }
@@ -408,7 +423,7 @@
     if (genAbierto && !gen.some(function (l) { return claveBen(l) === genAbierto; })) genAbierto = null;
     pintarGen();
   }
-  async function recargarGen() { if (genParams) gen = await leerGeneradas(genParams.desde, genParams.hasta, genParams.agente, genParams.inst); pintarGen(); }
+  async function recargarGen() { if (genParams) gen = await leerGeneradas(genParams.desde, genParams.hasta, genParams.agente, genParams.inst, null, genParams.suc); pintarGen(); }
   async function actualizarLineas(ids, cambios, msgId) {
     var r = await sb.from('comisiones_generadas').update(cambios).in('id', ids).select('*');
     if (r.error) { aviso(msgId, traducir(r.error), true); pintarGen(); return false; }
@@ -418,7 +433,8 @@
   }
   function benDeClave(k) { return resumirGen().filter(function (b) { return b.clave === k; })[0]; }
   $('gcGenerar').addEventListener('click', generarCom);
-  ['gcDesde', 'gcHasta', 'gcAgente', 'gcInst'].forEach(function (id) { $(id).addEventListener('change', function () { if (genParams) aviso('gcMsg', 'Cambiaste los parámetros: pulsa «Generar comisiones».'); }); });
+  $('gcInst').addEventListener('change', opcionesSucGen);
+  ['gcDesde', 'gcHasta', 'gcAgente', 'gcInst', 'gcSuc'].forEach(function (id) { $(id).addEventListener('change', function () { if (genParams) aviso('gcMsg', 'Cambiaste los parámetros: pulsa «Generar comisiones».'); }); });
   $('gcBody').addEventListener('click', async function (e) {
     var d = e.target.closest('[data-gc-det]'), p = e.target.closest('[data-gc-pagar-ben]'), rv = e.target.closest('[data-gc-revertir]');
     if (d) {
@@ -515,7 +531,7 @@
   $('gcExcel').addEventListener('click', function () {
     if (!gen.length) return;
     function c(v) { v = String(v == null ? '' : v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
-    var filas = [['Comisiones generadas del ' + genParams.desde + ' al ' + genParams.hasta], ['Agente comercial', genParams.agTxt], ['Institución', genParams.inTxt], [],
+    var filas = [['Comisiones generadas del ' + genParams.desde + ' al ' + genParams.hasta], ['Agente comercial', genParams.agTxt], ['Institución', genParams.inTxt], ['Sucursal', genParams.sucTxt || 'Todas las sucursales'], [],
       ['Beneficiario', 'Tipo', 'Paciente', 'Fecha', 'Documento', 'Concepto', 'Base', 'Tipo de comisión', '% o valor', 'Comisión', 'Estado', 'Autorizado', 'Pago No.']];
     gen.slice().sort(function (x, y) { return ordenBen({ benef: x.beneficiario, nombre: nombreBen(x.beneficiario, idBen(x)) }, { benef: y.beneficiario, nombre: nombreBen(y.beneficiario, idBen(y)) }) || ordenLinea(x, y); }).forEach(function (l) {
       filas.push([nombreBen(l.beneficiario, idBen(l)), l.beneficiario === 'agente' ? 'Agente' : 'Institución', l.paciente, l.fecha, l.documento, l.concepto, Number(l.base).toFixed(2), l.tipo === 'valor' ? 'Valor por unidad' : 'Porcentaje', Number(l.valor).toFixed(2), Number(l.comision).toFixed(2), ESTADOS_COM[l.estado], l.autorizado ? 'Sí' : 'No', l.pago_id || '']);
