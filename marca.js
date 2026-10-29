@@ -49,13 +49,15 @@
     return cargando;
   }
 
-  // Para las impresiones: logo + imagen del slogan (o null si la localidad no tiene logo)
+  // Para las impresiones: logo y, a la par, el slogan (imagen de la localidad o, si no tiene, el texto con el estilo
+  // del encabezado de la página). Sin logo de la localidad se usa el logo fijo de Plus Dental.
+  var LOGO_FIJO = 'logo-plusdental-marca.png?v=3', SLOGAN_FIJO = 'La tranquilidad también es parte del tratamiento.';
   function htmlImpresion(alto) {
-    var lg = logo(), si = sloganImg(), h = alto || 64;
-    if (!lg) return null;
-    return '<div style="display:flex;align-items:center;gap:10px">' +
-      '<img src="' + esc(lg) + '" alt="' + esc(marca.nombre || '') + '" style="height:' + h + 'px;width:auto">' +
-      (si ? '<img src="' + esc(si) + '" alt="' + esc(marca.slogan || '') + '" style="height:' + Math.round(h * 0.78) + 'px;width:auto">' : '') + '</div>';
+    var lg = logo() || LOGO_FIJO, si = sloganImg(), h = alto || 64, nombre = marca && marca.nombre ? marca.nombre : 'Plus Dental';
+    var slogan = si ? '<img src="' + esc(si) + '" alt="' + esc(marca.slogan || '') + '" style="height:' + Math.round(h * 0.78) + 'px;width:auto">'
+      : '<div style="border-left:2px solid #188EC0;padding-left:10px;max-width:230px"><span style="display:block;font-family:Manrope,system-ui,sans-serif;font-size:9px;font-weight:700;letter-spacing:.22em;color:#188EC0;margin-bottom:3px">ODONTOLOGÍA INTEGRAL</span>' +
+        '<span style="font-family:\'Playfair Display\',Georgia,serif;font-style:italic;font-weight:600;font-size:' + Math.max(12, Math.round(h * 0.24)) + 'px;line-height:1.3;color:#0B2B40">' + esc((marca && marca.slogan) || SLOGAN_FIJO) + '</span></div>';
+    return '<div style="display:flex;align-items:center;gap:12px"><img src="' + esc(lg) + '" alt="' + esc(nombre) + '" style="height:' + h + 'px;width:auto">' + slogan + '</div>';
   }
 
   window.PD_MARCA = { refrescar: refrescar, aplicar: aplicar, htmlImpresion: htmlImpresion, actual: function () { return marca; } };
