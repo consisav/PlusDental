@@ -37,8 +37,8 @@
   // ---------- Definición de los reportes ----------
   var REPORTES = {
     pacientes: {
-      panel: 'admRepPacientes', titulo: 'Listado de pacientes', medicoInst: true,
-      nota: 'Pacientes registrados entre las dos fechas; se puede filtrar por odontólogo asignado e institución.',
+      panel: 'admRepPacientes', titulo: 'Listado de pacientes', medicoInst: true, instSuc: true,
+      nota: 'Pacientes registrados entre las dos fechas; se puede filtrar por odontólogo asignado, institución y sucursal.',
       estados: { activo: ['Activo', 'verde'], suspendido: ['Suspendido', 'ambar'], inactivo: ['Inactivo', 'gris'], baja: ['Baja', 'rojo'] },
       columnas: [
         ['Registro', function (f) { return fechaCorta(f.creado); }],
@@ -54,7 +54,7 @@
       cargar: async function (d, h, o) {
         var campos = 'id,nombre,dpi,telefono,correo,creado,estado,medico:dentistas(nombre),agente:agentes(codigo,nombre)';
         // Filtros: odontólogo asignado e institución (vacío = todos)
-        function filtrar(x, conInst) { x = x.gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado'); if (o && o.medico) x = x.eq('dentista_id', +o.medico); if (conInst && o && o.inst) x = x.eq('institucion_id', +o.inst); return x; }
+        function filtrar(x, conInst) { x = x.gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado'); if (o && o.medico) x = x.eq('dentista_id', +o.medico); if (conInst && o && o.inst) x = x.eq('institucion_id', +o.inst); if (conInst && o && o.suc) x = x.eq('sucursal_id', +o.suc); return x; }
         var r = await filtrar(sb.from('pacientes').select(campos + ',tipo_cliente,institucion:jor_instituciones(nombre),sucursal:jor_sucursales(nombre)'), true);
         // Sin el SQL de pacientes institucionales: el listado sale sin institución ni sucursal
         if (r.error && /institucion|sucursal|tipo_cliente|jor_/i.test(r.error.message || '')) r = await filtrar(sb.from('pacientes').select(campos), false);
@@ -65,8 +65,8 @@
     },
 
     cuentas: {
-      panel: 'admRepCuentas', titulo: 'Estados de cuenta',
-      nota: 'Saldo de cada paciente al inicio y al final del período, con los cargos (tratamientos realizados) y pagos entre las dos fechas.',
+      panel: 'admRepCuentas', titulo: 'Estados de cuenta', instSuc: true,
+      nota: 'Saldo de cada paciente al inicio y al final del período, con los cargos (tratamientos realizados) y pagos entre las dos fechas; de una institución y sucursal o de todas.',
       estados: { pendiente: ['Saldo pendiente', 'ambar'], aldia: ['Al día', 'verde'], favor: ['Saldo a favor', 'azul'] },
       columnas: [
         ['Paciente', function (f) { return f.nombre; }],
@@ -76,15 +76,19 @@
         ['Pagos', function (f) { return f.abonos; }, 'q'],
         ['Saldo final', function (f) { return f.final; }, 'q']
       ],
-      cargar: async function (d, h) {
+      cargar: async function (d, h, o) {
         var r = await Promise.all([
           sb.from('movimientos_cuenta').select('fecha,paciente_id,cargo,abono').lte('fecha', h),
-          sb.from('pacientes').select('id,nombre,telefono')
+          sb.from('pacientes').select('id,nombre,telefono,institucion_id,sucursal_id')
         ]);
+        if (r[1].error && /institucion_id|sucursal_id/.test(r[1].error.message || '')) {
+          if (o && (o.inst || o.suc)) throw new Error('Falta ejecutar en Supabase el script actualizado (supabase.sql) para filtrar por institución o sucursal.');
+          r[1] = await sb.from('pacientes').select('id,nombre,telefono');
+        }
         if (r[0].error) throw r[0].error;
         if (r[1].error) throw r[1].error;
         var pac = {};
-        r[1].data.forEach(function (p) { pac[p.id] = { nombre: p.nombre, telefono: p.telefono, anterior: 0, cargos: 0, abonos: 0, mov: 0 }; });
+        r[1].data.filter(function (p) { return (!(o && o.inst) || String(p.institucion_id) === String(o.inst)) && (!(o && o.suc) || String(p.sucursal_id) === String(o.suc)); }).forEach(function (p) { pac[p.id] = { nombre: p.nombre, telefono: p.telefono, anterior: 0, cargos: 0, abonos: 0, mov: 0 }; });
         r[0].data.forEach(function (m) {
           var p = pac[m.paciente_id]; if (!p) return;
           var f = String(m.fecha).slice(0, 10), c = Number(m.cargo) || 0, a = Number(m.abono) || 0;
@@ -108,8 +112,8 @@
     },
 
     citas: {
-      panel: 'admRepCitas', titulo: 'Citas agendadas',
-      nota: 'Citas con fecha entre las dos fechas.',
+      panel: 'admRepCitas', titulo: 'Citas agendadas', instSuc: true,
+      nota: 'Citas con fecha entre las dos fechas; de pacientes de una institución y sucursal o de todas.',
       estados: { pendiente: ['Programado', 'ambar'], confirmada: ['Confirmado', 'verde'], reprogramada: ['Reprogramado', 'azul'], atendida: ['Atendido', 'azul'], cancelada: ['Cancelado', 'gris'] },
       columnas: [
         ['Fecha', function (f) { return fechaCorta(f.fecha); }],
@@ -120,11 +124,13 @@
         ['Odontólogo', function (f) { return f.dentista ? f.dentista.nombre : '—'; }],
         ['Sala', function (f) { return f.sala ? f.sala.codigo + ' · ' + f.sala.nombre : '—'; }]
       ],
-      cargar: async function (d, h) {
-        var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista:dentistas(nombre),sala:posiciones(codigo,nombre)')
+      cargar: async function (d, h, o) {
+        var filtra = o && (o.inst || o.suc);
+        var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista:dentistas(nombre),sala:posiciones(codigo,nombre)' + (filtra ? ',pac:pacientes(institucion_id,sucursal_id)' : ''))
           .gte('fecha', d).lte('fecha', h).order('fecha').order('hora');
         if (r.error) throw r.error;
-        return r.data;
+        if (!filtra) return r.data;
+        return r.data.filter(function (c) { var p = c.pac || {}; return (!o.inst || String(p.institucion_id) === String(o.inst)) && (!o.suc || String(p.sucursal_id) === String(o.suc)); });
       },
       totales: function (filas) { return [['Citas', filas.length]]; }
     },
@@ -205,10 +211,10 @@
       (def.cliente ? '<label class="rep-cliente">Cliente<select name="cliente"><option value="">Todos los clientes</option></select></label>' : '') +
       (def.tipoBanco ? '<label>Tipo de cliente<select name="tipo"><option value="">Todos</option><option value="institucional">Institucional</option><option value="privado">Cliente privado</option></select></label>' +
         '<label>Banco<select name="banco"><option value="">Todos los bancos</option></select></label>' : '') +
+      (def.medicoInst ? '<label>Odontólogo<select name="medico"><option value="">Todos los odontólogos</option></select></label>' +
+        (def.instSuc ? '' : '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>') : '') +
       (def.instSuc ? '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>' +
         '<label>Sucursal<select name="suc"><option value="">Todas las sucursales</option></select></label>' : '') +
-      (def.medicoInst ? '<label>Odontólogo<select name="medico"><option value="">Todos los odontólogos</option></select></label>' +
-        '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>' : '') +
       (def.agenteInst ? '<label>Agente comercial<select name="agente"><option value="">Todos los agentes</option></select></label>' +
         '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>' : '') +
       '<button type="submit" class="dlg-submit">' + esc(def.boton || 'Generar reporte') + '</button></form>' +
@@ -249,13 +255,15 @@
   // Listas de odontólogos e instituciones para el listado de pacientes
   async function llenarMedicoInst(p) {
     var r = await Promise.all([sb.from('dentistas').select('id,nombre,estado').order('nombre'), sb.from('jor_instituciones').select('id,nombre').order('nombre')]);
-    var sm = p.querySelector('select[name=medico]'), si = p.querySelector('select[name=inst]');
+    var sm = p.querySelector('select[name=medico]'), si = tieneSucursal(p) ? null : p.querySelector('select[name=inst]');
     if (!sm || !sm.isConnected) return;
-    var vm = sm.value, vi = si.value;
+    var vm = sm.value, vi = si ? si.value : '';
     sm.innerHTML = '<option value="">Todos los odontólogos</option>' + (r[0].error ? [] : r[0].data).map(function (x) { return '<option value="' + x.id + '">' + esc(x.nombre) + (x.estado && x.estado !== 'activo' ? ' (' + x.estado + ')' : '') + '</option>'; }).join('');
-    si.innerHTML = '<option value="">Todas las instituciones</option>' + (r[1].error ? [] : r[1].data).map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
-    sm.value = vm; si.value = vi;
+    if (si) si.innerHTML = '<option value="">Todas las instituciones</option>' + (r[1].error ? [] : r[1].data).map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
+    sm.value = vm; if (si) si.value = vi;
   }
+  // ¿El panel es de un reporte con institución y sucursal? (entonces esas listas las llena llenarInstSuc)
+  function tieneSucursal(p) { return !!p.querySelector('select[name=suc]'); }
   // Listas de agentes comerciales e instituciones para el reporte de comisiones
   async function llenarAgentesInst(p) {
     var r = await Promise.all([sb.from('agentes').select('id,codigo,nombre,estado').order('codigo'), sb.from('jor_instituciones').select('id,nombre').order('nombre')]);
@@ -302,10 +310,14 @@
       var tipo = form.tipo ? form.tipo.value : '', banco = form.banco ? form.banco.value : '';
       var agente = form.agente ? form.agente.value : '', inst = form.inst ? form.inst.value : '', medico = form.medico ? form.medico.value : '', suc = form.suc ? form.suc.value : '';
       s.filas = await def.cargar(d, h, { cliente: cli, tipo: tipo, banco: banco, agente: agente, inst: inst, medico: medico, suc: suc });
-      s.extras = def.tipoBanco ? [['Tipo de cliente', form.tipo.selectedOptions[0].textContent], ['Banco', banco || 'Todos los bancos']]
-          .concat(def.instSuc ? [['Institución', form.inst.selectedOptions[0] ? form.inst.selectedOptions[0].textContent : 'Todas las instituciones'], ['Sucursal', form.suc.selectedOptions[0] ? form.suc.selectedOptions[0].textContent : 'Todas las sucursales']] : [])
-        : def.agenteInst ? [['Agente comercial', form.agente.selectedOptions[0].textContent], ['Institución', form.inst.selectedOptions[0].textContent]]
-        : def.medicoInst ? [['Odontólogo', form.medico.selectedOptions[0].textContent], ['Institución', form.inst.selectedOptions[0].textContent]] : null;
+      var txt = function (sel, def0) { return sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : def0; };
+      var ex = [];
+      if (def.tipoBanco) ex.push(['Tipo de cliente', txt(form.tipo, 'Todos')], ['Banco', banco || 'Todos los bancos']);
+      if (def.agenteInst) ex.push(['Agente comercial', txt(form.agente, 'Todos los agentes')], ['Institución', txt(form.inst, 'Todas las instituciones')]);
+      if (def.medicoInst) ex.push(['Odontólogo', txt(form.medico, 'Todos los odontólogos')]);
+      if (def.medicoInst && !def.instSuc) ex.push(['Institución', txt(form.inst, 'Todas las instituciones')]);
+      if (def.instSuc) ex.push(['Institución', txt(form.inst, 'Todas las instituciones')], ['Sucursal', txt(form.suc, 'Todas las sucursales')]);
+      s.extras = ex.length ? ex : null;
       s.desde = d; s.hasta = h; s.generado = true;
       s.cliente = cli; s.clienteNombre = cli ? form.cliente.selectedOptions[0].textContent : '';
       msg.textContent = '';
