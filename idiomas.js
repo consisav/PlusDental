@@ -237,6 +237,9 @@
     // ---- Contacto y pie ----
     'Estamos en zona 10.': 'We are in Zone 10.',
     'Teléfono y WhatsApp': 'Phone and WhatsApp',
+    'Teléfono, WhatsApp y correo': 'Phone, WhatsApp and email',
+    'Teléfono': 'Phone',
+    'Correo electrónico': 'Email',
     'Llamar': 'Call',
     'Escribir por WhatsApp': 'Message on WhatsApp',
     'Escribir por WhatsApp a Plus Dental': 'Message Plus Dental on WhatsApp',
