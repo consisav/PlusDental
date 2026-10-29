@@ -644,6 +644,7 @@
   // Lo que otros módulos del panel necesitan saber de la sesión
   window.PD_SESION = {
     esSuper: esSuper,
+    rol: function () { return perfil ? perfil.rol : ''; },
     usuario: function () { return perfil ? nombreDe(perfil) : ''; }
   };
 

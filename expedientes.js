@@ -453,6 +453,9 @@
   };
   window.PD_ODG_GET = function () { return typeof odg !== 'undefined' ? odg : null; };
   window.PD_ODONTOGRAMA_ACTUAL = function () { return typeof odg !== 'undefined' && odg ? odg.valor() : null; };
+  // ¿El usuario es el médico principal? (lo responde Supabase: odontólogo activo con rol de sala «Principal»)
+  var medicoPrincipal = false;
+  function revisarMedicoPrincipal() { sb.rpc('puede_pagar_comisiones').then(function (r) { medicoPrincipal = !r.error && r.data === true; }); }
   var odg = window.Odontograma.crear($('odoComp'), {
     onCambio: function () { revisarCambios(); },
     // Botón «Presupuesto» del odontograma: también muestra u oculta el historial de cambios
@@ -460,6 +463,8 @@
     paciente: function () { return actual ? actual.nombre : ''; },
     // Solo el Super Administrador modifica procedimientos, precios y datos del presupuesto
     esSuper: function () { return !!(window.PD_SESION && window.PD_SESION.esSuper()); },
+    // Elegir procedimientos y cambiar precios en el odontograma: Super Administrador, Administrador y médico principal
+    puedePrecios: function () { var r = window.PD_SESION && window.PD_SESION.rol ? window.PD_SESION.rol() : ''; return r === 'super_administrador' || r === 'administrador' || medicoPrincipal; },
     // «Confirmar» en la ventana del procedimiento: graba el odontograma y pasa los procedimientos requeridos
     // al presupuesto del odontograma, que queda aprobado (sin tocar los que ya están en proceso o finalizados)
     guardar: async function (d) {
@@ -893,9 +898,9 @@
   });
 
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
-    cargar: function () { if ($('expFicha').hidden) cargar(); },
+    cargar: function () { revisarMedicoPrincipal(); if ($('expFicha').hidden) cargar(); },
     limpiar: function () {
-      pacientes = []; actual = null; odontoCambiado = false;
+      pacientes = []; actual = null; odontoCambiado = false; medicoPrincipal = false;
       odg.cargar(null);
       base = odg.valor(); meta = {}; historial = [];
       revisarCambios();

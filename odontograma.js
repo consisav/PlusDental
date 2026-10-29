@@ -372,6 +372,8 @@
     }
     // Solo el Super Administrador modifica el detalle y los datos del presupuesto; el resto del personal solo ve e imprime
     function esSuper() { return opciones.esSuper ? !!opciones.esSuper() : true; }
+    // Elegir procedimientos y cambiar sus precios: Super Administrador, Administrador y médico principal
+    function puedePrecios() { return opciones.puedePrecios ? !!opciones.puedePrecios() : esSuper(); }
     var editandoFila = null;            // 'pieza|clave' de la fila en modificación
     var editandoDatos = false, copiaDatos = null;
     // Valor de una fila: precio unitario (el escrito a mano o el del catálogo), cantidad y total
@@ -440,7 +442,7 @@
           : f.proc ? '<span class="sinp">Sin precio</span>' : '—';
         var estado = conEstado ? '<td class="odg-c-est">' + (f.proc ? celdaEstado(f, it) : '—') +
           (it && it.estado_fecha ? '<small>' + fechaHora(it.estado_fecha) + (it.estado_por ? ' · ' + esc(it.estado_por) : '') + '</small>' : '') + '</td>' : '';
-        var mod = sup && f.h !== 'ausente' && !editandoFila ? '<button type="button" class="odg-mod" data-fila-mod="' + clave + '" title="Modificar" aria-label="Modificar pieza ' + esc(piezaDe(f)) + '">✎ Modificar</button>' : '';
+        var mod = puedePrecios() && f.h !== 'ausente' && !editandoFila ? '<button type="button" class="odg-mod" data-fila-mod="' + clave + '" title="Modificar" aria-label="Modificar pieza ' + esc(piezaDe(f)) + '">✎ Modificar</button>' : '';
         return '<tr' + (eliminado ? ' class="odg-elim"' : '') + '><td class="odg-c-pz"><strong>' + esc(piezaDe(f)) + '</strong><small>' + esc(textoDe(f)) + '</small></td>' +
           '<td class="proc">' + proc + '</td><td class="num odg-c-val">' + valor + '</td>' + estado + '<td class="odg-c-acc">' + mod + '</td></tr>';
       }).join('');
@@ -607,9 +609,9 @@
       // En el detalle «Requerido» solo se ven los hallazgos con procedimiento elegido;
       // el Super Administrador puede mostrar los demás para elegirles uno.
       var conProc = f.req.filter(function (x) { return x.proc; }), sinN = f.req.length - conProc.length;
-      if (!sup) verSinProc = false;
+      if (!puedePrecios()) verSinProc = false;
       var visibles = verSinProc ? f.req : conProc;
-      var enlace = sinN && sup ? '<button type="button" class="odg-ver-sin" data-ver-sin>' + (verSinProc ? 'Ocultar los hallazgos sin procedimiento'
+      var enlace = sinN && puedePrecios() ? '<button type="button" class="odg-ver-sin" data-ver-sin>' + (verSinProc ? 'Ocultar los hallazgos sin procedimiento'
         : 'Elegir procedimiento para ' + sinN + (sinN === 1 ? ' hallazgo' : ' hallazgos') + ' sin procedimiento') + '</button>' : '';
       var totalPre = conProc.reduce(function (t, x) { var v = valorFila(x); return t + (v.total || 0); }, 0);
       return '<div><div class="odg-cab"><h4 style="color:' + ROJO + '">Requerido (' + visibles.length + ')</h4>' +
@@ -659,7 +661,7 @@
     function marcarBoca(id) {
       var h = POR_ID[id], p = datos.piezas[BOCA], actualC = p && p.estados[id];
       if (actualC) {
-        if (actualC === 'r' && p.proc && p.proc[id] && esSuper() && !confirm('La ' + h.nombre.toLowerCase() + ' de toda la boca ya está marcada. Aceptar = quitarla · Cancelar = cambiar su procedimiento')) {
+        if (actualC === 'r' && p.proc && p.proc[id] && puedePrecios() && !confirm('La ' + h.nombre.toLowerCase() + ' de toda la boca ya está marcada. Aceptar = quitarla · Cancelar = cambiar su procedimiento')) {
           abrirVentana({ n: BOCA, clave: id, h: id, texto: h.nombre + ' · toda la boca' }); return;
         }
         delete p.estados[id]; quitarProc(p, id); limpiarVacias(BOCA);
@@ -757,7 +759,7 @@
       return false;
     }
     function abrirVentana(info) {
-      if (!esSuper() || !disponibles().length || typeof HTMLDialogElement === 'undefined') return;
+      if (!puedePrecios() || !disponibles().length || typeof HTMLDialogElement === 'undefined') return;
       if (!dlg) {
         dlg = document.createElement('dialog');
         dlg.className = 'odg-dlg';
@@ -975,7 +977,7 @@
         return;
       }
       var fm = e.target.closest('[data-fila-mod]');
-      if (fm && esSuper()) { editandoFila = fm.dataset.filaMod; pintar(); var pf = raiz.querySelector('.odg-edit [data-ed="proc"]'); if (pf) pf.focus(); return; }
+      if (fm && puedePrecios()) { editandoFila = fm.dataset.filaMod; pintar(); var pf = raiz.querySelector('.odg-edit [data-ed="proc"]'); if (pf) pf.focus(); return; }
       if (e.target.closest('[data-fila-guardar]')) { guardarFila(e.target.closest('tr')); return; }
       if (e.target.closest('[data-fila-cancelar]')) { editandoFila = null; pintar(); return; }
       if (e.target.closest('[data-datos-mod]') && esSuper()) { editandoDatos = true; copiaDatos = { d: JSON.parse(JSON.stringify(datosPre)), t: tipoPrecio }; pintar(); return; }
