@@ -97,6 +97,11 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 @media (min-width:641px) and (max-width:1279px){#contacto .cols3{grid-template-columns:repeat(2,minmax(0,1fr)) !important}#contacto .cols3>:first-child{grid-column:1/-1}#contacto .ct-lista{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}}
 @media (max-width:420px){.ct-fila{padding:9px 10px;gap:10px}.ct-ir{display:none}}
 @media (prefers-reduced-motion:reduce){.ct-fila{transition:none}}
+.asis-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:24px 40px;flex-wrap:wrap}
+.asis-faq{flex:0 0 auto;margin-top:40px;display:inline-flex;align-items:center;gap:10px;padding:13px 22px;border-radius:999px;border:1px solid rgba(108,196,238,.55);background:rgba(255,255,255,.06);color:#FFFFFF;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:1.4px;text-transform:uppercase;transition:background .2s,border-color .2s,color .2s}
+.asis-faq svg{width:20px;height:20px;color:#6CC4EE;flex:0 0 auto}
+.asis-faq:hover{background:#FFFFFF;border-color:#FFFFFF;color:#0B2B40}.asis-faq:hover svg{color:#005A87}.asis-faq:focus-visible{outline:2px solid #6CC4EE;outline-offset:3px}
+@media (max-width:960px){.asis-faq{margin-top:0}}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .exp-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .exp-form .full{grid-column:1/-1}
@@ -2833,10 +2838,13 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <!-- SMART GUIDE -->
 <section id="asistente" style="background: #0B2B40; color: #FFFFFF">
 <div class="pad" style="max-width: 1280px; margin: 0 auto; padding: 96px 48px; display: flex; flex-direction: column; gap: 48px">
+<div class="asis-cab">
 <div style="display: flex; flex-direction: column; gap: 16px; max-width: 720px">
 <span style="font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: #6CC4EE">Asistente de tratamiento</span>
 <h2 class="sec-h" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 54px; line-height: 1.05">¿Qué te gustaría resolver?</h2>
 <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #C2D8E6">Elige lo que más se parece a tu caso. Te mostramos el tratamiento más probable, cuánto suele tomar y qué esperar. La confirmación siempre la da el odontólogo en tu evaluación.</p>
+</div>
+<a href="#preguntas" class="asis-faq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.5-2.7 4"/><circle cx="12" cy="17.4" r=".6" fill="currentColor"/></svg><span>Preguntas frecuentes</span></a>
 </div>
 <div class="cols2" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; align-items: start">
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
