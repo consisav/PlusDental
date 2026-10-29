@@ -7413,6 +7413,11 @@ end;
 $$;
 grant execute on function public.marca_localidad(bigint) to anon, authenticated;
 
+-- ===== Salas: sábado de 8:00 a. m. a 3:00 p. m. (igual que la jornada del sábado y los odontólogos) =====
+-- Solo las salas que ya atienden el sábado; las que no lo tienen en su horario siguen cerradas ese día.
+update public.posiciones set horario = horario || jsonb_build_object('6', jsonb_build_object('abre', '08:00', 'cierra', '15:00'))
+where horario ? '6' and horario -> '6' is distinct from jsonb_build_object('abre', '08:00', 'cierra', '15:00');
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
