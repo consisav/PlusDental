@@ -7369,6 +7369,9 @@ alter table public.org_localidades add column if not exists slogan text check (c
 -- El de la portada de la página para las localidades que aún no tienen
 update public.org_localidades set slogan = 'La tranquilidad también es parte del tratamiento.' where slogan is null;
 
+-- ===== Imagen del slogan de cada localidad (archivo en el almacenamiento público, carpeta logos/) =====
+alter table public.org_localidades add column if not exists slogan_imagen text;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

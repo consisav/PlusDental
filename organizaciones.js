@@ -70,7 +70,8 @@
       dato('Representante legal', l.representante) + dato('NIT', l.nit) + dato('Código patronal', l.codigo_patrono) + dato('Teléfonos', l.telefonos) + dato('Correos', l.correos) +
       dato('Dirección', l.direccion, 1) + dato('País', l.pais && l.pais.nombre) + dato('Estado / Departamento', l.depto && l.depto.nombre) + dato('Ciudad / Municipio', l.municipio && l.municipio.nombre) + '</div>' +
       '<div class="org-marca"><div class="org-logo">' + (l.logo ? '<img src="' + esc(logoUrl(l.logo)) + '" alt="Logo de ' + esc(l.nombre_comercial || l.razon_social) + '">' : '<span>Sin logo</span>') + '</div>' +
-      '<p class="org-slogan">' + (l.slogan ? esc(l.slogan) : '<span>Sin slogan</span>') + '</p></div></div>';
+      '<p class="org-slogan">' + (l.slogan ? esc(l.slogan) : '<span>Sin slogan</span>') + '</p>' +
+      (l.slogan_imagen ? '<div class="org-logo org-slogan-img"><img src="' + esc(logoUrl(l.slogan_imagen)) + '" alt="Imagen del slogan"></div>' : '') + '</div></div>';
   }
 
   async function cargar() {
@@ -128,16 +129,20 @@
 
   function colorEstado() { var sel = $('geoF_estado'); if (!sel) return; sel.classList.add('org-estado-sel'); var pinta = function () { sel.dataset.estado = sel.value; }; sel.addEventListener('change', pinta); pinta(); }
 
-  async function subirLogo(id, archivo) {
+  // Sube una imagen de la localidad (campo 'logo' o 'slogan_imagen') al almacenamiento público
+  async function subirImagen(id, archivo, campo, nombre) {
     if (!archivo) return null;
-    if (!/^image\/(png|jpeg|webp)$/.test(archivo.type)) return 'El logo debe ser una imagen PNG, JPG o WEBP.';
-    if (archivo.size > 2 * 1024 * 1024) return 'El logo pesa más de 2 MB.';
-    var ruta = 'logos/localidad-' + id + '-' + Date.now() + '.' + (archivo.type.split('/')[1] === 'jpeg' ? 'jpg' : archivo.type.split('/')[1]);
+    if (!/^image\/(png|jpeg|webp)$/.test(archivo.type)) return 'La ' + nombre + ' debe ser una imagen PNG, JPG o WEBP.';
+    if (archivo.size > 2 * 1024 * 1024) return 'La ' + nombre + ' pesa más de 2 MB.';
+    var ruta = 'logos/localidad-' + id + (campo === 'logo' ? '' : '-slogan') + '-' + Date.now() + '.' + (archivo.type.split('/')[1] === 'jpeg' ? 'jpg' : archivo.type.split('/')[1]);
     var up = await sb.storage.from('publico').upload(ruta, archivo, { contentType: archivo.type, upsert: true, cacheControl: '300' });
-    if (up.error) return 'La localidad se grabó, pero el logo no se pudo subir: ' + G.traducir(up.error);
-    var r = await sb.from('org_localidades').update({ logo: ruta }).eq('id', id);
+    if (up.error) return 'La localidad se grabó, pero la ' + nombre + ' no se pudo subir: ' + G.traducir(up.error);
+    var cambio = {}; cambio[campo] = ruta;
+    var r = await sb.from('org_localidades').update(cambio).eq('id', id);
+    if (r.error && /slogan_imagen/.test(r.error.message || '')) return 'La localidad se grabó, pero falta ejecutar en Supabase el script actualizado (supabase.sql) para la imagen del slogan.';
     return r.error || null;
   }
+  function subirLogo(id, archivo) { return subirImagen(id, archivo, 'logo', 'imagen del logo'); }
   async function editarLoc(l) {
     if (!orgSel) { aviso('Primero elige o crea una organización.', true); return; }
     try { window.PD_GEO_PAISES = await G.paises(); } catch (e) { aviso(G.traducir(e), true); return; }
@@ -152,22 +157,24 @@
         { k: 'correos', label: 'Correos', max: 200, ancho: 'full' }].concat(camposUbicacion()).concat([
         { k: 'direccion', label: 'Detalle de dirección', tipo: 'textarea', max: 300, ancho: 'full' },
         { k: 'logo_archivo', label: l && l.logo ? 'Cambiar logo' : 'Logo', tipo: 'file', accept: 'image/png,image/jpeg,image/webp', ayuda: 'PNG, JPG o WEBP de hasta 2 MB.', ancho: 'full' },
-        { k: 'slogan', label: 'Slogan', max: 150, ancho: 'full', placeholder: SLOGAN, ayuda: 'Frase que acompaña al logo.' }]),
+        { k: 'slogan', label: 'Slogan', max: 150, ancho: 'full', placeholder: SLOGAN, ayuda: 'Frase que acompaña al logo.' },
+        { k: 'slogan_archivo', label: l && l.slogan_imagen ? 'Cambiar imagen slogan' : 'Imagen slogan', tipo: 'file', accept: 'image/png,image/jpeg,image/webp', ayuda: 'El slogan como imagen: PNG, JPG o WEBP de hasta 2 MB.', ancho: 'full' }]),
       secciones: [
         { titulo: 'Identificación', campos: ['codigo', 'estado', 'razon_social', 'nombre_comercial*', 'nit', 'codigo_patrono', 'representante*'] },
         { titulo: 'Contacto y ubicación', campos: ['telefonos*', 'correos', 'pais_id*', 'estado_id', 'municipio_id', 'direccion'] },
-        { titulo: 'Logo y slogan', campos: ['logo_archivo', 'slogan'] }
+        { titulo: 'Logo y slogan', campos: ['logo_archivo', 'slogan', 'slogan_archivo'] }
       ],
       alAbrir: function () { G.encadenar('pais_id', 'estado_id', 'municipio_id')(v); colorEstado(); },
       guardar: async function (d) {
-        var archivo = d.logo_archivo; delete d.logo_archivo;
+        var archivo = d.logo_archivo, archSlogan = d.slogan_archivo; delete d.logo_archivo; delete d.slogan_archivo;
         d = ids(d); d.organizacion_id = orgSel;
         var r = l ? await sb.from('org_localidades').update(d).eq('id', l.id).select('id').single() : await sb.from('org_localidades').insert(d).select('id').single();
         if (r.error) return r.error;
         locSel = r.data.id;
         var e = await subirLogo(r.data.id, archivo);
+        var e2 = await subirImagen(r.data.id, archSlogan, 'slogan_imagen', 'imagen del slogan');
         await cargarLocs();
-        return e;
+        return e || e2;
       },
       eliminar: l ? async function () { var r = await sb.from('org_localidades').delete().eq('id', l.id); if (r.error) return r.error; locSel = null; await cargarLocs(); return null; } : null
     });
