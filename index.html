@@ -20,6 +20,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #005A87;outline-offset:2p
 html{scroll-behavior:smooth;scroll-padding-top:170px}
 .topbar{position:sticky;top:0;z-index:20;background:rgba(245,249,252,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid #D9E4EC}
 .mainmenu{display:flex;align-items:center;gap:18px;font-size:14.5px;font-weight:500}
+.nav-movil{display:none}
 .mainmenu a:not(.btn){color:#0B2B40;text-decoration:none;padding:10px 0;white-space:nowrap}
 .mainmenu a:not(.btn):hover{color:#005A87}
 .menu-login{display:inline-flex;align-items:center;gap:8px;font:inherit;font-weight:600;font-size:15px;color:#0B2B40;background:transparent;border:1px solid #C4D4DF;border-radius:999px;padding:11px 18px;min-height:44px;cursor:pointer}
@@ -854,7 +855,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .hero-c-bot{background:#0B2B40}.hero-c-bot:hover{background:#005A87}.hero-c-wa{background:#1FA855}.hero-c-wa:hover{background:#178F47}
 .wa-float,.bot-fab{transition:opacity .25s,transform .2s ease}body.en-portada .wa-float,body.en-portada .bot-fab{opacity:0;pointer-events:none;transform:translateY(16px)}
 @media (max-width:960px){.hero-marco{grid-template-columns:minmax(0,1fr);width:100%;gap:18px;padding:12px;border-radius:26px}.hero-sec{padding-top:12px !important}.hero-panel{padding:0 4px 4px;gap:10px}.hero-sub{display:none}.hero-titulo{font-size:32px}.hero-btns{flex-direction:row}.hero-b{flex:1 1 0}}
-@media (max-width:640px){.hero-sec{padding-top:12px !important;padding-bottom:28px !important}.hero-marco{padding:10px;gap:12px;border-radius:22px}.hero-intro{display:none}.hero-panel{gap:12px;padding:0}.hero-proximo{padding:9px;gap:10px}.hero-proximo-ico{width:38px;height:38px}.hero-proximo-dia{font-size:16px}.hero-proximo-cta{padding:9px 12px;font-size:13px}.hero-b{font-size:14px;min-height:46px;padding:8px 12px;line-height:1.25}.hero-chips{flex-wrap:nowrap;justify-content:space-between;gap:6px;padding:0 4px}.hero-chips li{font-size:12px;padding:0;gap:4px;background:none;border:0}.hero-chips svg{width:12px;height:12px}.hero-c{min-height:44px;padding:10px 12px;font-size:14px}}
+@media (max-width:640px){.hero-sec{padding-top:6px !important;padding-bottom:28px !important}.hero-marco{padding:10px;gap:10px;border-radius:22px}.hero-intro{display:none}.hero-panel{gap:10px;padding:0}.hero-proximo{padding:9px;gap:10px}.hero-proximo-ico{width:38px;height:38px}.hero-proximo-dia{font-size:16px}.hero-proximo-cta{padding:9px 12px;font-size:13px}.hero-b{font-size:14px;min-height:46px;padding:8px 12px;line-height:1.25}.hero-chips{flex-wrap:nowrap;justify-content:space-between;gap:6px;padding:0 4px}.hero-chips li{font-size:12px;padding:0;gap:4px;background:none;border:0}.hero-chips svg{width:12px;height:12px}.hero-c{min-height:44px;padding:10px 12px;font-size:14px}}
 @media (min-width:961px) and (max-height:860px){.hero-sub{display:none}.hero-panel{gap:12px}}
 @media (min-width:961px) and (max-height:720px){.hero-titulo{font-size:32px}.hero-intro{gap:4px}.hero-b,.hero-c{min-height:42px;padding-top:8px;padding-bottom:8px}}
 @media (prefers-reduced-motion:reduce){.hero-proximo,.hero-b{transition:none}}
@@ -1044,6 +1045,13 @@ table.citas-tabla th.c-acc-th{text-align:right}
 .menu-btn{display:inline-flex}
 .mainmenu{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:0;background:#F5F9FC;padding:8px 20px 24px;border-bottom:1px solid #D9E4EC;box-shadow:0 18px 30px rgba(11,43,64,.08)}
 .mainmenu.open{display:flex}
+.mainmenu>a:not(.btn){display:none}
+.mainmenu.open{z-index:40}
+.nav-movil{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:0 20px 10px;max-width:1440px;margin:0 auto;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.nav-movil::-webkit-scrollbar{display:none}
+.nav-movil a{flex:0 0 auto;font-size:13.5px;font-weight:600;color:#0B2B40;text-decoration:none;background:#F2F7FA;border:1px solid #D9E4EC;border-radius:999px;padding:7px 13px;white-space:nowrap}
+.nav-movil a:hover,.nav-movil a:focus-visible{border-color:#188EC0;color:#005A87}
+.nav-movil a:last-child{margin-right:24px}
 .mainmenu a:not(.btn){padding:14px 0;border-bottom:1px solid #D9E4EC}
 .mainmenu .btn,.mainmenu .menu-login{margin-top:14px;justify-content:center}
 }
@@ -1582,6 +1590,14 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div class="idioma-fila" data-no-traducir><div class="idioma" role="group" aria-label="Idioma / Language"><button type="button" data-idioma="es" lang="es" aria-pressed="true" aria-label="Español" class="on"><svg class="bandera" viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#FFFFFF"/><rect width="10" height="20" fill="#4997D0"/><rect x="20" width="10" height="20" fill="#4997D0"/><circle cx="15" cy="10" r="3.6" fill="none" stroke="#5B8C3A" stroke-width="1.1"/><circle cx="15" cy="10" r="1.6" fill="#C9A227"/></svg>ES</button><button type="button" data-idioma="en" lang="en" aria-pressed="false" aria-label="English"><svg class="bandera" viewBox="0 0 38 20" preserveAspectRatio="none" aria-hidden="true"><rect width="38" height="20" fill="#FFFFFF"/><g fill="#B22234"><rect width="38" height="1.54"/><rect y="3.08" width="38" height="1.54"/><rect y="6.15" width="38" height="1.54"/><rect y="9.23" width="38" height="1.54"/><rect y="12.3" width="38" height="1.54"/><rect y="15.4" width="38" height="1.54"/><rect y="18.46" width="38" height="1.54"/></g><rect width="15.2" height="10.77" fill="#3C3B6E"/><g fill="#FFFFFF"><circle cx="2.5" cy="2" r=".6"/><circle cx="6" cy="2" r=".6"/><circle cx="9.5" cy="2" r=".6"/><circle cx="13" cy="2" r=".6"/><circle cx="4.2" cy="4.3" r=".6"/><circle cx="7.7" cy="4.3" r=".6"/><circle cx="11.2" cy="4.3" r=".6"/><circle cx="2.5" cy="6.6" r=".6"/><circle cx="6" cy="6.6" r=".6"/><circle cx="9.5" cy="6.6" r=".6"/><circle cx="13" cy="6.6" r=".6"/><circle cx="4.2" cy="8.9" r=".6"/><circle cx="7.7" cy="8.9" r=".6"/><circle cx="11.2" cy="8.9" r=".6"/></g></svg>EN</button></div><a class="tel-wa" href="https://wa.me/call/50237565739" title="Llamar a Plus Dental por WhatsApp · +502 3756-5739" aria-label="Llamar a Plus Dental por WhatsApp al +502 3756-5739"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2Zm0 18.15a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.24 8.24 0 1 1 6.98 3.86Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.230-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.43-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.230 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.29Z"/></svg><span>Llamar</span></a></div>
 </nav>
 </header>
+<nav class="nav-movil" aria-label="Secciones">
+<a href="#nosotros">Nosotros</a>
+<a href="#tratamientos">Servicios</a>
+<a href="#preguntas">Ayuda</a>
+<a href="#administracion" data-login="admin">Administración</a>
+<a href="#contacto">Contactarnos</a>
+<a href="#historias">Historias de impacto</a>
+</nav>
 <script>(function(){function f(){var t=document.querySelector(".topbar");if(t)document.documentElement.style.setProperty("--pd-menu-top",(t.offsetHeight+16)+"px");}f();addEventListener("load",f);addEventListener("resize",f);})();</script>
 <script>document.addEventListener("DOMContentLoaded",function(){if(matchMedia("(pointer:coarse)").matches)return;document.querySelectorAll(".tel-wa").forEach(function(a){a.href="https://wa.me/50237565739";a.target="_blank";a.rel="noopener";a.title="Escribir o llamar a Plus Dental por WhatsApp · +502 3756-5739";});});</script>
 </div>
