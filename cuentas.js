@@ -40,6 +40,10 @@
   // ---------- Impresión (recibos y estados de cuenta) ----------
   // Logo y datos de la clínica (izquierda del encabezado de los reportes impresos)
   function logoClinica() {
+    // Marca de la localidad (logo + imagen del slogan); si no tiene logo, la marca fija
+    var m = window.PD_MARCA && window.PD_MARCA.htmlImpresion(62);
+    if (m) return '<div style="display:flex;flex-direction:column;gap:6px">' + m +
+      '<div style="font-size:11px;color:#475B68;line-height:1.5">' + CLINICA.direccion + ' · Tel. ' + CLINICA.telefono + '</div></div>';
     return '<div style="display:flex;align-items:center;gap:16px">' +
       '<img src="logo-plusdental-marca.png?v=3" alt="' + CLINICA.nombre + '" style="width:118px;height:auto">' +
       '<div style="font-size:12px;color:#475B68;line-height:1.55"><b style="display:block;font-size:11px;letter-spacing:.16em;color:#005A87">ODONTOLOGÍA INTEGRAL</b>' +

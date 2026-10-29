@@ -71,6 +71,7 @@
       dato('Dirección', l.direccion, 1) + dato('País', l.pais && l.pais.nombre) + dato('Estado / Departamento', l.depto && l.depto.nombre) + dato('Ciudad / Municipio', l.municipio && l.municipio.nombre) + '</div>' +
       // Identidad de la localidad: logo, slogan e imagen del slogan, uno debajo del otro
       '<div class="org-marca">' +
+      (l.marca_web ? '<p class="org-web">Marca de la página web</p>' : '') +
       '<figure class="org-marca-item"><figcaption>Logo</figcaption><div class="org-logo">' + (l.logo ? '<img src="' + esc(logoUrl(l.logo)) + '" alt="Logo de ' + esc(l.nombre_comercial || l.razon_social) + '">' : '<span>Sin logo</span>') + '</div></figure>' +
       '<figure class="org-marca-item"><figcaption>Slogan</figcaption><p class="org-slogan">' + (l.slogan ? esc(l.slogan) : '<span>Sin slogan</span>') + '</p></figure>' +
       '<figure class="org-marca-item"><figcaption>Imagen slogan</figcaption><div class="org-logo org-slogan-img">' + (l.slogan_imagen ? '<img src="' + esc(logoUrl(l.slogan_imagen)) + '" alt="Imagen del slogan">' : '<span>Sin imagen</span>') + '</div></figure>' +
@@ -161,11 +162,12 @@
         { k: 'direccion', label: 'Detalle de dirección', tipo: 'textarea', max: 300, ancho: 'full' },
         { k: 'logo_archivo', label: l && l.logo ? 'Cambiar logo' : 'Logo', tipo: 'file', accept: 'image/png,image/jpeg,image/webp', ayuda: 'PNG, JPG o WEBP de hasta 2 MB.', ancho: 'full' },
         { k: 'slogan', label: 'Slogan', max: 150, ancho: 'full', placeholder: SLOGAN, ayuda: 'Frase que acompaña al logo.' },
-        { k: 'slogan_archivo', label: l && l.slogan_imagen ? 'Cambiar imagen slogan' : 'Imagen slogan', tipo: 'file', accept: 'image/png,image/jpeg,image/webp', ayuda: 'El slogan como imagen: PNG, JPG o WEBP de hasta 2 MB.', ancho: 'full' }]),
+        { k: 'slogan_archivo', label: l && l.slogan_imagen ? 'Cambiar imagen slogan' : 'Imagen slogan', tipo: 'file', accept: 'image/png,image/jpeg,image/webp', ayuda: 'El slogan como imagen: PNG, JPG o WEBP de hasta 2 MB.', ancho: 'full' },
+        { k: 'marca_web', label: 'Marca de la página web', tipo: 'check', ayuda: 'Su logo e imagen del slogan son los que ve el público en la página y en sus impresiones.' }]),
       secciones: [
         { titulo: 'Identificación', campos: ['codigo', 'estado', 'razon_social', 'nombre_comercial*', 'nit', 'codigo_patrono', 'representante*'] },
         { titulo: 'Contacto y ubicación', campos: ['telefonos*', 'correos', 'pais_id*', 'estado_id', 'municipio_id', 'direccion'] },
-        { titulo: 'Logo y slogan', campos: ['logo_archivo', 'slogan', 'slogan_archivo'] }
+        { titulo: 'Logo y slogan', campos: ['logo_archivo', 'slogan', 'slogan_archivo', 'marca_web'] }
       ],
       alAbrir: function () { G.encadenar('pais_id', 'estado_id', 'municipio_id')(v); colorEstado(); },
       guardar: async function (d) {
@@ -177,6 +179,7 @@
         var e = await subirLogo(r.data.id, archivo);
         var e2 = await subirImagen(r.data.id, archSlogan, 'slogan_imagen', 'imagen del slogan');
         await cargarLocs();
+        if (window.PD_MARCA) window.PD_MARCA.refrescar();
         return e || e2;
       },
       eliminar: l ? async function () { var r = await sb.from('org_localidades').delete().eq('id', l.id); if (r.error) return r.error; locSel = null; await cargarLocs(); return null; } : null

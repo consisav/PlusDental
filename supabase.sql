@@ -7372,6 +7372,47 @@ update public.org_localidades set slogan = 'La tranquilidad también es parte de
 -- ===== Imagen del slogan de cada localidad (archivo en el almacenamiento público, carpeta logos/) =====
 alter table public.org_localidades add column if not exists slogan_imagen text;
 
+-- ===== Marca dinámica: logo e imagen del slogan de la localidad en la página, el panel y las impresiones =====
+-- marca_web: la localidad cuya marca ve el público (solo una a la vez)
+alter table public.org_localidades add column if not exists marca_web boolean not null default false;
+create or replace function public.org_localidades_marca_unica() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.marca_web then
+    update public.org_localidades set marca_web = false where id <> new.id and marca_web;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists org_localidades_marca_unica on public.org_localidades;
+create trigger org_localidades_marca_unica after insert or update of marca_web on public.org_localidades
+  for each row when (new.marca_web) execute function public.org_localidades_marca_unica();
+
+-- Marca a mostrar (solo datos públicos de imagen): la localidad pedida; si no, la del usuario conectado;
+-- si no, la marcada para la página web; si no, la primera activa con logo.
+create or replace function public.marca_localidad(p_localidad bigint default null)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_loc bigint := p_localidad; l public.org_localidades;
+begin
+  if v_loc is null and auth.uid() is not null then
+    v_loc := (select localidad_id from public.perfiles where id = auth.uid());
+  end if;
+  if v_loc is not null then
+    select * into l from public.org_localidades where id = v_loc and estado = 'activo';
+  end if;
+  if l.id is null then
+    select * into l from public.org_localidades where marca_web and estado = 'activo' order by id limit 1;
+  end if;
+  if l.id is null then
+    select x.* into l from public.org_localidades x left join public.organizaciones o on o.id = x.organizacion_id
+     where x.estado = 'activo' and x.logo is not null order by o.codigo, x.codigo limit 1;
+  end if;
+  if l.id is null then return null; end if;
+  return jsonb_build_object('id', l.id, 'nombre', coalesce(l.nombre_comercial, l.razon_social), 'logo', l.logo,
+    'slogan', l.slogan, 'slogan_imagen', l.slogan_imagen);
+end;
+$$;
+grant execute on function public.marca_localidad(bigint) to anon, authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

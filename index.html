@@ -612,7 +612,10 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 @media (prefers-reduced-motion:reduce){.marca-logo,.marca-frase{transition:none}}
 .pie-marca{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:10px}
 .pie-logo{background:#FFFFFF;border-radius:18px;padding:12px 16px;display:inline-flex}
-.pie-logo img{height:84px;width:auto;display:block}
+.pie-logo img{height:84px;width:auto;display:block}.pie-logo{align-items:center;gap:12px}.pie-logo .pie-slogan-img{height:64px}
+.marca-slogan-img{height:78px;width:auto;display:block;flex:0 1 auto;max-width:340px;object-fit:contain;transition:height .25s ease}.topbar.compacta .marca-slogan-img{height:56px}
+@media (max-width:640px){.marca-slogan-img{height:44px;max-width:170px}.topbar.compacta .marca-slogan-img{height:36px}}
+.org-web{margin:0;align-self:flex-start;font-size:11.5px;font-weight:800;letter-spacing:.4px;padding:4px 10px;border-radius:999px;background:#DCF2EC;color:#08504C}
 .pie-frase{font-family:'Playfair Display',Georgia,serif;font-style:italic;font-weight:600;font-size:19px;color:#FFFFFF;max-width:300px;line-height:1.3}
 .his-fil{display:flex;gap:8px;flex-wrap:wrap}
 .his-fil button{font:inherit;font-weight:600;font-size:14px;border:1px solid #D9E4EC;background:#FFFFFF;color:#0B2B40;padding:9px 16px;border-radius:999px;min-height:40px;cursor:pointer}
@@ -3097,6 +3100,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="supabase-client.js"></script>
+<script src="marca.js?v=20261029a"></script>
 <script src="firmas.js"></script>
 <script src="app.js?v=20261028b"></script>
 <script src="auth.js?v=20261029a"></script>
@@ -3106,7 +3110,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="odontograma.js?v=20261029a"></script>
 <script src="expedientes.js?v=20261029a"></script>
 <script src="presupuestos.js"></script>
-<script src="cuentas.js?v=20261028d"></script>
+<script src="cuentas.js?v=20261029a"></script>
 <script src="tratamientos-paciente.js?v=20261028a"></script>
 <script src="recetas.js"></script>
 <script src="laboratorio.js"></script>
@@ -3117,7 +3121,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="colores-medico.js"></script>
 <script src="tipos-dentistas.js"></script>
 <script src="geografia.js?v=20261027"></script>
-<script src="organizaciones.js?v=20261029c"></script>
+<script src="organizaciones.js?v=20261029d"></script>
 <script src="inventarios.js?v=20261027f"></script>
 <script src="inventarios-movimientos.js?v=20261027i"></script>
 <script src="inventarios-traslados.js?v=20261027"></script>
@@ -3128,7 +3132,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="dentistas.js"></script>
 <script src="agenda.js?v=20261028b"></script>
 <script src="agentes.js"></script>
-<script src="reportes.js?v=20261029a"></script>
+<script src="reportes.js?v=20261029b"></script>
 <script src="constancias.js"></script>
 <script src="tipos.js"></script>
 <script src="precios.js?v=20261027"></script>

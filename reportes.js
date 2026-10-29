@@ -40,6 +40,21 @@
     if (o.suc === 'todas' ? suc == null : o.suc && String(suc) !== String(o.suc)) return false;
     return true;
   }
+  // Encabezado impreso: logo e imagen del slogan de la localidad (o el nombre de la clínica si no tiene logo)
+  function marcaImpresion() {
+    var m = window.PD_MARCA && window.PD_MARCA.htmlImpresion(56);
+    return '<div>' + (m || '<div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:28px">' + CLINICA.nombre + '</div>') +
+      '<div style="font-size:12px;color:#475B68;margin-top:4px">' + CLINICA.direccion + ' · ' + CLINICA.telefono + '</div></div>';
+  }
+  // Imprime cuando ya cargaron las imágenes del encabezado
+  function imprimirListo() {
+    document.body.classList.add('imprimir');
+    var imgs = [].slice.call($('impresion').querySelectorAll('img')).filter(function (i) { return !i.complete; });
+    if (!imgs.length) { window.print(); return; }
+    var faltan = imgs.length, listo = false, seguir = function () { if (!listo && --faltan <= 0) { listo = true; window.print(); } };
+    imgs.forEach(function (i) { i.addEventListener('load', seguir); i.addEventListener('error', seguir); });
+    setTimeout(function () { if (!listo) { listo = true; window.print(); } }, 2500);
+  }
   function bancario(f) { return f.metodo === 'transferencia' || f.metodo === 'deposito'; }
 
   // ---------- Definición de los reportes ----------
@@ -432,12 +447,11 @@
     tabla.querySelectorAll('tr.rep-total td').forEach(function (c) { c.style.fontWeight = '800'; c.style.borderTop = '2px solid #0B2B40'; });
     $('impresion').innerHTML = '<div style="font-family:Manrope,system-ui,sans-serif;color:#0B2B40;max-width:1000px;margin:0 auto;padding:20px">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid #0B2B40;padding-bottom:12px;margin-bottom:14px">' +
-      '<div><div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:28px">' + CLINICA.nombre + '</div><div style="font-size:12px;color:#475B68">' + CLINICA.direccion + ' · ' + CLINICA.telefono + '</div></div>' +
+      marcaImpresion() +
       '<div style="text-align:right;font-size:12.5px;color:#475B68"><div style="font-size:17px;font-weight:700;color:#0B2B40">' + esc(titulo) + '</div>' + esc(sub) + '<br>Impreso el ' + fechaCorta(hoy()) + '</div></div>' +
       '<div style="font-size:12px;color:#475B68;margin-bottom:8px">Parámetros: ' + parametros(estadoRep[clave]).map(function (x) { return esc(x[0]) + ' <b>' + esc(x[1]) + '</b>'; }).join(' · ') + '</div>' +
       tabla.outerHTML + '</div>';
-    document.body.classList.add('imprimir');
-    window.print();
+    imprimirListo();
   }
 
   // ---------- Imprimir y exportar ----------
@@ -454,8 +468,7 @@
     $('impresion').innerHTML =
       '<div style="font-family:Manrope,system-ui,sans-serif;color:#0B2B40;max-width:1000px;margin:0 auto;padding:20px">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid #0B2B40;padding-bottom:12px;margin-bottom:14px">' +
-      '<div><div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:28px">' + CLINICA.nombre + '</div>' +
-      '<div style="font-size:12px;color:#475B68">' + CLINICA.direccion + ' · ' + CLINICA.telefono + '</div></div>' +
+      marcaImpresion() +
       '<div style="text-align:right;font-size:12.5px;color:#475B68"><div style="font-size:18px;font-weight:700;color:#0B2B40">' + esc(def.titulo) + '</div>' +
       rango(s) + (s.cliente !== undefined ? '<br>Cliente: ' + esc(s.clienteNombre || 'Todos los clientes') : '') + '<br>Impreso el ' + fechaCorta(hoy()) + '</div></div>' +
       '<div style="font-size:12px;color:#475B68;margin-bottom:8px">Parámetros: ' + parametros(s).map(function (x) { return esc(x[0]) + ' <b>' + esc(x[1]) + '</b>'; }).join(' · ') + '</div>' +
@@ -463,8 +476,7 @@
       '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin-bottom:12px">' +
       def.totales(visibles(clave)).map(function (t) { return '<div>' + esc(t[0]) + ': <b>' + esc(String(t[1])) + '</b></div>'; }).join('') + '</div>' +
       tabla.outerHTML + '</div>';
-    document.body.classList.add('imprimir');
-    window.print();
+    imprimirListo();
   }
   window.addEventListener('afterprint', function () {
     if (!$('impresion').querySelector('table')) return;
