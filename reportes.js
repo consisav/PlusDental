@@ -41,6 +41,7 @@
     return true;
   }
   // Encabezado impreso: logo e imagen del slogan de la localidad (o el nombre de la clínica si no tiene logo)
+  function impreso() { return window.PD_MARCA && window.PD_MARCA.htmlImpreso ? window.PD_MARCA.htmlImpreso() : 'Impreso el ' + fechaCorta(hoy()); }
   function marcaImpresion() {
     var m = window.PD_MARCA && window.PD_MARCA.htmlImpresion(56);
     return '<div>' + (m || '<div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:28px">' + CLINICA.nombre + '</div>') +
@@ -448,7 +449,7 @@
     $('impresion').innerHTML = '<div style="font-family:Manrope,system-ui,sans-serif;color:#0B2B40;max-width:1000px;margin:0 auto;padding:20px">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid #0B2B40;padding-bottom:12px;margin-bottom:14px">' +
       marcaImpresion() +
-      '<div style="text-align:right;font-size:12.5px;color:#475B68"><div style="font-size:17px;font-weight:700;color:#0B2B40">' + esc(titulo) + '</div>' + esc(sub) + '<br>Impreso el ' + fechaCorta(hoy()) + '</div></div>' +
+      '<div style="text-align:right;font-size:12.5px;color:#475B68"><div style="font-size:17px;font-weight:700;color:#0B2B40">' + esc(titulo) + '</div>' + esc(sub) + '<br>' + impreso() + '</div></div>' +
       '<div style="font-size:12px;color:#475B68;margin-bottom:8px">Parámetros: ' + parametros(estadoRep[clave]).map(function (x) { return esc(x[0]) + ' <b>' + esc(x[1]) + '</b>'; }).join(' · ') + '</div>' +
       tabla.outerHTML + '</div>';
     imprimirListo();
@@ -470,7 +471,7 @@
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid #0B2B40;padding-bottom:12px;margin-bottom:14px">' +
       marcaImpresion() +
       '<div style="text-align:right;font-size:12.5px;color:#475B68"><div style="font-size:18px;font-weight:700;color:#0B2B40">' + esc(def.titulo) + '</div>' +
-      rango(s) + (s.cliente !== undefined ? '<br>Cliente: ' + esc(s.clienteNombre || 'Todos los clientes') : '') + '<br>Impreso el ' + fechaCorta(hoy()) + '</div></div>' +
+      rango(s) + (s.cliente !== undefined ? '<br>Cliente: ' + esc(s.clienteNombre || 'Todos los clientes') : '') + '<br>' + impreso() + '</div></div>' +
       '<div style="font-size:12px;color:#475B68;margin-bottom:8px">Parámetros: ' + parametros(s).map(function (x) { return esc(x[0]) + ' <b>' + esc(x[1]) + '</b>'; }).join(' · ') + '</div>' +
       (ocultos.length ? '<div style="font-size:12px;color:#475B68;margin-bottom:8px">Sin incluir: ' + ocultos.map(function (e) { return esc(def.estados[e][0]); }).join(', ') + '</div>' : '') +
       '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin-bottom:12px">' +

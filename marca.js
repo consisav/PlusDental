@@ -60,7 +60,14 @@
     return '<div style="display:flex;align-items:center;gap:12px"><img src="' + esc(lg) + '" alt="' + esc(nombre) + '" style="height:' + h + 'px;width:auto">' + slogan + '</div>';
   }
 
-  window.PD_MARCA = { refrescar: refrescar, aplicar: aplicar, htmlImpresion: htmlImpresion, actual: function () { return marca; } };
+  // Fecha y hora de impresión (con segundos) y, debajo, el usuario que imprime
+  function textoImpreso() {
+    var d = new Date(), dos = function (n) { return ('0' + n).slice(-2); };
+    return 'Impreso el ' + d.toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + dos(d.getHours()) + ':' + dos(d.getMinutes()) + ':' + dos(d.getSeconds());
+  }
+  function usuarioImpresion() { return (window.PD_SESION && window.PD_SESION.usuario && window.PD_SESION.usuario()) || '—'; }
+  function htmlImpreso() { return textoImpreso() + '<br>Usuario: ' + esc(usuarioImpresion()); }
+  window.PD_MARCA = { refrescar: refrescar, aplicar: aplicar, htmlImpresion: htmlImpresion, htmlImpreso: htmlImpreso, textoImpreso: textoImpreso, usuario: usuarioImpresion, actual: function () { return marca; } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', aplicar); else aplicar();
   refrescar();
   // Al iniciar o cerrar sesión cambia la localidad (la del usuario o la de la página web)

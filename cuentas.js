@@ -49,11 +49,13 @@
       '<div style="font-size:12px;color:#475B68;line-height:1.55"><b style="display:block;font-size:11px;letter-spacing:.16em;color:#005A87">ODONTOLOGÍA INTEGRAL</b>' +
       CLINICA.direccion.replace(', Ciudad', '<br>Ciudad') + '<br>Tel. ' + CLINICA.telefono + '</div></div>';
   }
+  // «Impreso el … hh:mm:ss» y el usuario que imprime (marca.js)
+  function impreso() { return window.PD_MARCA && window.PD_MARCA.htmlImpreso ? window.PD_MARCA.htmlImpreso() : 'Impreso el ' + fechaCorta(hoy()); }
   function encabezado(titulo) {
     return '<div style="font-family:Manrope,system-ui,sans-serif;color:#0B2B40;max-width:720px;margin:0 auto;padding:24px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;border-bottom:3px solid #0B2B40;padding-bottom:14px;margin-bottom:18px">' +
       logoClinica() +
-      '<div style="text-align:right;font-size:13px;color:#475B68"><div style="font-size:18px;font-weight:700;color:#0B2B40">' + titulo + '</div>Impreso el ' + fechaCorta(hoy()) + '</div></div>';
+      '<div style="text-align:right;font-size:13px;color:#475B68"><div style="font-size:18px;font-weight:700;color:#0B2B40">' + titulo + '</div>' + impreso() + '</div></div>';
   }
   // Serie, número de factura y DTE solo se muestran (y se graban) cuando el documento es factura
   function esFactura() { return $('pgTipoDoc').value === 'factura'; }
@@ -138,7 +140,7 @@
       '<div style="border-top:1px solid #0B2B40;padding-top:6px">Recibido por: ' + esc(p.registrado_por || '—') + '</div>' +
       '<div style="border-top:1px solid #0B2B40;padding-top:6px">Firma del paciente</div></div>' +
       '<div style="margin-top:26px;font-size:10.5px;color:#7A8C98;display:flex;justify-content:space-between;border-top:1px solid #D9E4EC;padding-top:8px">' +
-      '<span>' + CLINICA.nombre + ' · Comprobante interno</span><span>Impreso el ' + fechaCorta(hoy()) + ', ' + ('0' + ahora.getHours()).slice(-2) + ':' + ('0' + ahora.getMinutes()).slice(-2) + '</span></div>' +
+      '<span>' + CLINICA.nombre + ' · Comprobante interno</span><span style="text-align:right">' + impreso() + '</span></div>' +
       '</div>';
   }
 
