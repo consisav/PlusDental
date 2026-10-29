@@ -32,6 +32,14 @@
   }
 
   var TIPOS_CLIENTE = { directo: 'Cliente directo', institucional: 'Institucional', vip: 'VIP', referido: 'Referido', paquete: 'Paquete', especial: 'Especial' };
+  // Institución: 'ninguna' = sin institución (clientes directos), '' = todas, id = esa institución.
+  // Sucursal: '' = sin filtro, 'todas' = con alguna sucursal, id = esa sucursal.
+  function pasaInstSuc(o, inst, suc) {
+    if (!o) return true;
+    if (o.inst === 'ninguna' ? inst != null : o.inst && String(inst) !== String(o.inst)) return false;
+    if (o.suc === 'todas' ? suc == null : o.suc && String(suc) !== String(o.suc)) return false;
+    return true;
+  }
   function bancario(f) { return f.metodo === 'transferencia' || f.metodo === 'deposito'; }
 
   // ---------- Definición de los reportes ----------
@@ -54,12 +62,12 @@
       cargar: async function (d, h, o) {
         var campos = 'id,nombre,dpi,telefono,correo,creado,estado,medico:dentistas(nombre),agente:agentes(codigo,nombre)';
         // Filtros: odontólogo asignado e institución (vacío = todos)
-        function filtrar(x, conInst) { x = x.gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado'); if (o && o.medico) x = x.eq('dentista_id', +o.medico); if (conInst && o && o.inst) x = x.eq('institucion_id', +o.inst); if (conInst && o && o.suc) x = x.eq('sucursal_id', +o.suc); return x; }
-        var r = await filtrar(sb.from('pacientes').select(campos + ',tipo_cliente,institucion:jor_instituciones(nombre),sucursal:jor_sucursales(nombre)'), true);
+        function filtrar(x, conInst) { x = x.gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado'); if (o && o.medico) x = x.eq('dentista_id', +o.medico); return x; }
+        var r = await filtrar(sb.from('pacientes').select(campos + ',tipo_cliente,institucion_id,sucursal_id,institucion:jor_instituciones(nombre),sucursal:jor_sucursales(nombre)'), true);
         // Sin el SQL de pacientes institucionales: el listado sale sin institución ni sucursal
         if (r.error && /institucion|sucursal|tipo_cliente|jor_/i.test(r.error.message || '')) r = await filtrar(sb.from('pacientes').select(campos), false);
         if (r.error) throw r.error;
-        return r.data;
+        return r.data.filter(function (p) { return !('institucion_id' in p) || pasaInstSuc(o, p.institucion_id, p.sucursal_id); });
       },
       totales: function (filas) { return [['Pacientes', filas.length]]; }
     },
@@ -82,13 +90,13 @@
           sb.from('pacientes').select('id,nombre,telefono,institucion_id,sucursal_id')
         ]);
         if (r[1].error && /institucion_id|sucursal_id/.test(r[1].error.message || '')) {
-          if (o && (o.inst || o.suc)) throw new Error('Falta ejecutar en Supabase el script actualizado (supabase.sql) para filtrar por institución o sucursal.');
+          if (o && ((o.inst && o.inst !== 'ninguna') || o.suc)) throw new Error('Falta ejecutar en Supabase el script actualizado (supabase.sql) para filtrar por institución o sucursal.');
           r[1] = await sb.from('pacientes').select('id,nombre,telefono');
         }
         if (r[0].error) throw r[0].error;
         if (r[1].error) throw r[1].error;
         var pac = {};
-        r[1].data.filter(function (p) { return (!(o && o.inst) || String(p.institucion_id) === String(o.inst)) && (!(o && o.suc) || String(p.sucursal_id) === String(o.suc)); }).forEach(function (p) { pac[p.id] = { nombre: p.nombre, telefono: p.telefono, anterior: 0, cargos: 0, abonos: 0, mov: 0 }; });
+        r[1].data.filter(function (p) { return !('institucion_id' in p) || pasaInstSuc(o, p.institucion_id, p.sucursal_id); }).forEach(function (p) { pac[p.id] = { nombre: p.nombre, telefono: p.telefono, anterior: 0, cargos: 0, abonos: 0, mov: 0 }; });
         r[0].data.forEach(function (m) {
           var p = pac[m.paciente_id]; if (!p) return;
           var f = String(m.fecha).slice(0, 10), c = Number(m.cargo) || 0, a = Number(m.abono) || 0;
@@ -132,7 +140,7 @@
         var r = await c.order('fecha').order('hora');
         if (r.error) throw r.error;
         if (!filtra) return r.data;
-        return r.data.filter(function (c) { var p = c.pac || {}; return (!o.inst || String(p.institucion_id) === String(o.inst)) && (!o.suc || String(p.sucursal_id) === String(o.suc)); });
+        return r.data.filter(function (c) { var p = c.pac || {}; return pasaInstSuc(o, p.institucion_id == null ? null : p.institucion_id, p.sucursal_id == null ? null : p.sucursal_id); });
       },
       totales: function (filas) { return [['Citas', filas.length]]; }
     },
@@ -164,7 +172,7 @@
         // Sin la institución y sucursal del pago: se usa la del paciente
         if (r.error && /institucion_id|sucursal_id/.test(r.error.message || '')) r = await consulta('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,banco,documento_banco,pac:pacientes(nombre,tipo_cliente,institucion_id,sucursal_id)');
         if (r.error && /banco|tipo_cliente|institucion|sucursal/.test(r.error.message || '')) {
-          if ((x && x.banco) || (x && x.tipo) || (x && x.inst) || (x && x.suc)) throw new Error('Falta ejecutar en Supabase el script actualizado (supabase.sql) para filtrar por banco, tipo de cliente, institución o sucursal.');
+          if ((x && x.banco) || (x && x.tipo) || (x && x.inst && x.inst !== 'ninguna') || (x && x.suc)) throw new Error('Falta ejecutar en Supabase el script actualizado (supabase.sql) para filtrar por banco, tipo de cliente, institución o sucursal.');
           r = await consulta('id,fecha,monto,metodo,concepto,anulado,anulado_motivo,paciente_id,pac:pacientes(nombre)');
         }
         if (r.error) throw r.error;
@@ -172,7 +180,7 @@
         // Institución y sucursal: las del pago (o, en los pagos anteriores, las del paciente)
         datos = datos.filter(function (p) {
           var pi = p.institucion_id || (p.pac && p.pac.institucion_id), ps = p.sucursal_id || (p.pac && p.pac.sucursal_id);
-          return (!(x && x.inst) || String(pi) === String(x.inst)) && (!(x && x.suc) || String(ps) === String(x.suc));
+          return pasaInstSuc(x, pi == null ? null : pi, ps == null ? null : ps);
         });
         return datos.map(function (p) { p.paciente = p.pac ? p.pac.nombre : '—'; p.estado = p.anulado ? 'anulado' : 'valido'; return p; })
           .sort(function (a, b) { return a.paciente.localeCompare(b.paciente) || String(a.fecha).localeCompare(String(b.fecha)) || a.id - b.id; });
@@ -215,8 +223,8 @@
         '<label>Banco<select name="banco"><option value="">Todos los bancos</option></select></label>' : '') +
       (def.medicoInst ? '<label>Odontólogo<select name="medico"><option value="">Todos los odontólogos</option></select></label>' +
         (def.instSuc ? '' : '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>') : '') +
-      (def.instSuc ? '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>' +
-        '<label>Sucursal<select name="suc"><option value="">Todas las sucursales</option></select></label>' : '') +
+      (def.instSuc ? '<label>Institución<select name="inst"><option value="ninguna">Ninguna (sin institución)</option><option value="">Todas las instituciones</option></select></label>' +
+        '<label>Sucursal<select name="suc" disabled><option value="">Ninguna</option></select></label>' : '') +
       (def.agenteInst ? '<label>Agente comercial<select name="agente"><option value="">Todos los agentes</option></select></label>' +
         '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>' : '') +
       '<button type="submit" class="dlg-submit">' + esc(def.boton || 'Generar reporte') + '</button></form>' +
@@ -243,16 +251,18 @@
     var insts = r[0].error ? [] : r[0].data || [], sucs = r[1].error ? [] : r[1].data || [], nom = {};
     insts.forEach(function (i) { nom[i.id] = i.nombre; });
     var vi = si.value;
-    si.innerHTML = '<option value="">Todas las instituciones</option>' + insts.map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
-    si.value = insts.some(function (i) { return String(i.id) === vi; }) ? vi : '';
+    si.innerHTML = '<option value="ninguna">Ninguna (sin institución)</option><option value="">Todas las instituciones</option>' + insts.map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
+    si.value = vi === '' || vi === 'ninguna' || insts.some(function (i) { return String(i.id) === vi; }) ? vi : 'ninguna';
+    // Sucursal: con «Ninguna (sin institución)» no aplica; «Ninguna» = sin filtro de sucursal
     function sucursales() {
-      var ins = si.value, vs = ss.value, l = ins ? sucs.filter(function (s) { return String(s.institucion_id) === ins; }) : sucs;
-      ss.innerHTML = '<option value="">Todas las sucursales</option>' + l.map(function (s) { return '<option value="' + s.id + '">' + esc(s.nombre) + (ins ? '' : ' · ' + esc(nom[s.institucion_id] || '')) + '</option>'; }).join('');
-      ss.value = l.some(function (s) { return String(s.id) === vs; }) ? vs : '';
+      var ins = si.value, vs = ss.value, l = ins === 'ninguna' ? [] : ins ? sucs.filter(function (s) { return String(s.institucion_id) === ins; }) : sucs;
+      ss.innerHTML = '<option value="">Ninguna</option>' + (ins === 'ninguna' ? '' : '<option value="todas">Todas las sucursales</option>') + l.map(function (s) { return '<option value="' + s.id + '">' + esc(s.nombre) + (ins ? '' : ' · ' + esc(nom[s.institucion_id] || '')) + '</option>'; }).join('');
+      ss.value = vs === 'todas' && ins !== 'ninguna' ? 'todas' : l.some(function (s) { return String(s.id) === vs; }) ? vs : '';
+      ss.disabled = ins === 'ninguna';
     }
     sucursales();
     si.onchange = sucursales;
-    ss.onchange = function () { var s = sucs.filter(function (x) { return String(x.id) === ss.value; })[0]; if (s && !si.value) { si.value = String(s.institucion_id); sucursales(); ss.value = String(s.id); } };
+    ss.onchange = function () { var s = sucs.filter(function (x) { return String(x.id) === ss.value; })[0]; if (s && (!si.value || si.value === 'ninguna')) { si.value = String(s.institucion_id); sucursales(); ss.value = String(s.id); } };
   }
   // Listas de odontólogos e instituciones para el listado de pacientes
   async function llenarMedicoInst(p) {
@@ -318,7 +328,7 @@
       if (def.agenteInst) ex.push(['Agente comercial', txt(form.agente, 'Todos los agentes')], ['Institución', txt(form.inst, 'Todas las instituciones')]);
       if (def.medicoInst) ex.push(['Odontólogo', txt(form.medico, 'Todos los odontólogos')]);
       if (def.medicoInst && !def.instSuc) ex.push(['Institución', txt(form.inst, 'Todas las instituciones')]);
-      if (def.instSuc) ex.push(['Institución', txt(form.inst, 'Todas las instituciones')], ['Sucursal', txt(form.suc, 'Todas las sucursales')]);
+      if (def.instSuc) ex.push(['Institución', txt(form.inst, 'Ninguna (sin institución)')], ['Sucursal', form.suc.disabled ? 'No aplica' : txt(form.suc, 'Ninguna')]);
       s.extras = ex.length ? ex : null;
       s.desde = d; s.hasta = h; s.generado = true;
       s.cliente = cli; s.clienteNombre = cli ? form.cliente.selectedOptions[0].textContent : '';
