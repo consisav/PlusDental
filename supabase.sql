@@ -7456,6 +7456,9 @@ where exists (select 1 from jsonb_each(p.horario) as e(k, v)
 alter table public.posiciones enable trigger posiciones_datos_admin;
 
 
+-- ===== Todos los odontólogos atienden de lunes a viernes de 7:00 a. m. a 7:00 p. m. (el sábado no cambia) =====
+update public.dentistas set horario = horario || '{"1": {"abre": "07:00", "cierra": "19:00"}, "2": {"abre": "07:00", "cierra": "19:00"}, "3": {"abre": "07:00", "cierra": "19:00"}, "4": {"abre": "07:00", "cierra": "19:00"}, "5": {"abre": "07:00", "cierra": "19:00"}}'::jsonb;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
