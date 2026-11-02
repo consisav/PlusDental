@@ -7424,6 +7424,38 @@ update public.org_localidades l set marca_web = true
   from public.organizaciones o
  where o.id = l.organizacion_id and o.codigo = '2' and l.codigo::int = 1 and not l.marca_web;
 
+-- ===== Atención de lunes a viernes de 7:00 a. m. a 7:00 p. m. =====
+-- Turnos públicos entre semana: se suman 07:00 y 18:30 (la última cita termina a las 7:00 p. m.). Sábado sin cambios.
+create or replace function public.turnos_del_dia(d date)
+returns setof time
+language sql immutable
+as $$
+  select t::time from unnest(
+    case
+      when extract(isodow from d) between 1 and 5 then array['07:00', '08:00', '09:30', '11:00', '14:00', '15:30', '17:00', '18:30']
+      when extract(isodow from d) = 6 then array['08:00', '09:30', '11:00', '12:30']
+      else array[]::text[]
+    end) as t;
+$$;
+-- Odontólogos con el horario general (8:00 a 17:00) y salas con el horario general (8:00 a 18:00) pasan a 7:00 a 19:00
+-- de lunes a viernes. Los horarios personalizados (otras horas o días) se respetan.
+update public.dentistas d set horario = (
+    select jsonb_object_agg(k, case when k in ('1', '2', '3', '4', '5') and v = '{"abre": "08:00", "cierra": "17:00"}'::jsonb
+                                    then '{"abre": "07:00", "cierra": "19:00"}'::jsonb else v end)
+    from jsonb_each(d.horario) as e(k, v))
+where exists (select 1 from jsonb_each(d.horario) as e(k, v)
+              where k in ('1', '2', '3', '4', '5') and v = '{"abre": "08:00", "cierra": "17:00"}'::jsonb);
+-- (El cambio lo aplica el script, no un usuario: se apaga un momento la regla de «solo el Super Administrador».)
+alter table public.posiciones disable trigger posiciones_datos_admin;
+update public.posiciones p set horario = (
+    select jsonb_object_agg(k, case when k in ('1', '2', '3', '4', '5') and v = '{"abre": "08:00", "cierra": "18:00"}'::jsonb
+                                    then '{"abre": "07:00", "cierra": "19:00"}'::jsonb else v end)
+    from jsonb_each(p.horario) as e(k, v))
+where exists (select 1 from jsonb_each(p.horario) as e(k, v)
+              where k in ('1', '2', '3', '4', '5') and v = '{"abre": "08:00", "cierra": "18:00"}'::jsonb);
+alter table public.posiciones enable trigger posiciones_datos_admin;
+
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

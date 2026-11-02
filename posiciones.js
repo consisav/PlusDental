@@ -10,7 +10,7 @@
   var DIAS = [['1', 'Lunes'], ['2', 'Martes'], ['3', 'Miércoles'], ['4', 'Jueves'], ['5', 'Viernes'], ['6', 'Sábado'], ['7', 'Domingo']];
   var DIAS_CORTOS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   // Horario base de la clínica para posiciones nuevas
-  var HORARIO_BASE = { 1: { abre: '08:00', cierra: '18:00' }, 2: { abre: '08:00', cierra: '18:00' }, 3: { abre: '08:00', cierra: '18:00' }, 4: { abre: '08:00', cierra: '18:00' }, 5: { abre: '08:00', cierra: '18:00' }, 6: { abre: '08:00', cierra: '12:30' } };
+  var HORARIO_BASE = { 1: { abre: '07:00', cierra: '19:00' }, 2: { abre: '07:00', cierra: '19:00' }, 3: { abre: '07:00', cierra: '19:00' }, 4: { abre: '07:00', cierra: '19:00' }, 5: { abre: '07:00', cierra: '19:00' }, 6: { abre: '08:00', cierra: '12:30' } };
 
   var posiciones = [], personal = [], actual = null, canal = null, citasHoy = {}, dentistasPorPos = {}, dentistasLista = [], editando = false;
   var ESTADOS_REG = { activo: 'Activo', inactivo: 'Inactivo', baja: 'Baja' };
@@ -165,8 +165,8 @@
     $('poHorario').innerHTML = DIAS.map(function (d) {
       var x = h[d[0]];
       return '<div class="pos-dia" data-dia="' + d[0] + '"><label class="nom"><input type="checkbox" data-abierto' + (x ? ' checked' : '') + '>' + d[1].slice(0, 3) + '</label>' +
-        '<input type="time" data-abre value="' + (x ? x.abre : '08:00') + '" aria-label="' + d[1] + ': abre"' + (x ? '' : ' disabled') + '>' +
-        '<span aria-hidden="true">–</span><input type="time" data-cierra value="' + (x ? x.cierra : '18:00') + '" aria-label="' + d[1] + ': cierra"' + (x ? '' : ' disabled') + '></div>';
+        '<input type="time" data-abre value="' + (x ? x.abre : '07:00') + '" aria-label="' + d[1] + ': abre"' + (x ? '' : ' disabled') + '>' +
+        '<span aria-hidden="true">–</span><input type="time" data-cierra value="' + (x ? x.cierra : '19:00') + '" aria-label="' + d[1] + ': cierra"' + (x ? '' : ' disabled') + '></div>';
     }).join('');
   }
 

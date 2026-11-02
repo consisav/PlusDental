@@ -5,12 +5,12 @@
   var sb = window.PD_SB || null;
   if (!sb) return;
 
-  var TURNOS = { semana: ['08:00', '09:30', '11:00', '14:00', '15:30', '17:00'], sabado: ['08:00', '09:30', '11:00', '12:30'] };
+  var TURNOS = { semana: ['07:00', '08:00', '09:30', '11:00', '14:00', '15:30', '17:00', '18:30'], sabado: ['08:00', '09:30', '11:00', '12:30'] };
   // Jornada de la clínica (inicio y fin de cada bloque) y cada cuántos minutos se ofrece una hora al agendar:
   // Ortodoncia cada 10 minutos; los demás tratamientos cada media hora. Cada cita ocupa ese mismo tiempo.
   // Los TURNOS de 90 minutos solo ordenan las filas del calendario y los bloqueos de horario.
   // Jornada continua (sin corte de almuerzo): las horas reales las limitan el horario de cada odontólogo y de cada sala.
-  var JORNADA = { semana: [['08:00', '18:30']], sabado: [['08:00', '15:00']] };
+  var JORNADA = { semana: [['07:00', '19:00']], sabado: [['08:00', '15:00']] };
   var MINUTOS = { ortodoncia: 10, general: 30 }, BLOQUE = 90;
   var DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];

@@ -11,7 +11,7 @@
   var ESTADOS = { activo: 'Activo', inactivo: 'Inactivo', baja: 'Baja' };
   var EST_POS = { libre: 'Libre', ocupado: 'Ocupado', limpieza: 'En limpieza', mantenimiento: 'Fuera de servicio' };
   var DIAS = [['1', 'Lunes'], ['2', 'Martes'], ['3', 'Miércoles'], ['4', 'Jueves'], ['5', 'Viernes'], ['6', 'Sábado'], ['7', 'Domingo']];
-  var HORARIO_BASE = { 1: { abre: '08:00', cierra: '17:00' }, 2: { abre: '08:00', cierra: '17:00' }, 3: { abre: '08:00', cierra: '17:00' }, 4: { abre: '08:00', cierra: '17:00' }, 5: { abre: '08:00', cierra: '17:00' } };
+  var HORARIO_BASE = { 1: { abre: '07:00', cierra: '19:00' }, 2: { abre: '07:00', cierra: '19:00' }, 3: { abre: '07:00', cierra: '19:00' }, 4: { abre: '07:00', cierra: '19:00' }, 5: { abre: '07:00', cierra: '19:00' } };
   // Especialidades odontológicas (lista preparada para Guatemala) con palabras con las que se suelen buscar
   var ESPECIALIDADES = [
     ['Odontología general', 'general dentista odontologo cirujano dentista'],
@@ -226,8 +226,8 @@
     $('deHorario').innerHTML = DIAS.map(function (d) {
       var x = h[d[0]];
       return '<div class="pos-dia" data-dia="' + d[0] + '"><label class="nom"><input type="checkbox" data-abierto' + (x ? ' checked' : '') + '>' + d[1].slice(0, 3) + '</label>' +
-        '<input type="time" data-abre value="' + (x ? x.abre : '08:00') + '" aria-label="' + d[1] + ': desde"' + (x ? '' : ' disabled') + '>' +
-        '<span aria-hidden="true">–</span><input type="time" data-cierra value="' + (x ? x.cierra : '17:00') + '" aria-label="' + d[1] + ': hasta"' + (x ? '' : ' disabled') + '></div>';
+        '<input type="time" data-abre value="' + (x ? x.abre : '07:00') + '" aria-label="' + d[1] + ': desde"' + (x ? '' : ' disabled') + '>' +
+        '<span aria-hidden="true">–</span><input type="time" data-cierra value="' + (x ? x.cierra : '19:00') + '" aria-label="' + d[1] + ': hasta"' + (x ? '' : ' disabled') + '></div>';
     }).join('');
   }
   function leerHorario() {
