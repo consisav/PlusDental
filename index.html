@@ -103,6 +103,41 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .asis-faq:hover{background:#FFFFFF;border-color:#FFFFFF;color:#0B2B40}.asis-faq:hover svg{color:#005A87}.asis-faq:focus-visible{outline:2px solid #6CC4EE;outline-offset:3px}
 @media (max-width:960px){.asis-faq{margin-top:0}}
 #preguntas,#tratamientos,#historias,#agenda{scroll-margin-top:calc(var(--hdr,132px) + 22px - 170px - 104px)}#contacto,#asistente{scroll-margin-top:calc(var(--hdr,132px) + 22px - 170px - 96px)}#administracion{scroll-margin-top:calc(var(--hdr,132px) + 6px - 170px - 56px)}
+.cc-ver{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#475B68}.cc-ver .adm-input{width:300px;min-height:40px}
+.cc-vacio{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:#F5F9FC;border:1px dashed #9FC3D8;border-radius:20px;padding:20px 22px}
+.cc-vacio>div:first-child{display:flex;flex-direction:column;gap:4px;max-width:560px;font-size:14px;color:#475B68}.cc-vacio b{font-size:16px;color:#0B2B40}
+.cc-vacio-acc{display:flex;gap:10px;flex-wrap:wrap}.cc-vacio-acc .adm-input{width:180px;min-height:44px}
+.cc-corte{display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #D9E4EC;border-radius:22px;padding:22px 24px;box-shadow:0 12px 32px rgba(11,43,64,.05)}
+.cc-cab{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.cc-tit small{font-size:11.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#005A87}
+.cc-tit h4{margin:2px 0 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:34px;line-height:1.1;color:#0B2B40}
+.cc-estado,.cc-tipo{font-family:Manrope,system-ui,sans-serif;font-size:12px;font-weight:700;border-radius:999px;padding:4px 11px;letter-spacing:.3px}
+.cc-estado.abierta{background:#E3F5EA;color:#17713C}.cc-estado.cerrada{background:#EEF2F5;color:#475B68}.cc-tipo{background:#E8F3FA;color:#005A87}
+.cc-acciones{display:flex;gap:8px;flex-wrap:wrap}
+.cc-info{list-style:none;margin:0;padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 18px;background:#F5F9FC;border:1px solid #E1EBF2;border-radius:16px;font-size:13.5px;color:#0B2B40}
+.cc-info li{display:flex;flex-direction:column;gap:2px;min-width:0}.cc-info b{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#5A6D7A}.cc-info-ancho{grid-column:1/-1}.cc-ok{color:#17713C;font-weight:600}
+.cc-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.cc-kpi{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:16px;background:#F5F9FC;border:1px solid #E1EBF2;min-width:0}
+.cc-kpi span{font-size:12px;font-weight:600;color:#5A6D7A}.cc-kpi b{font-size:21px;font-weight:700;color:#0B2B40;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-kpi.ing b{color:#17713C}.cc-kpi.egr b{color:#A15C07}.cc-kpi.fin{background:#0B2B40;border-color:#0B2B40}.cc-kpi.fin span{color:#B9D5E6}.cc-kpi.fin b{color:#FFFFFF}
+.cc-wrap{border:1px solid #E1EBF2;border-radius:16px;overflow-x:auto}
+.cc-tabla{width:100%;min-width:900px;border-collapse:collapse;table-layout:fixed;font-size:13.5px}
+.cc-c-n{width:40px}.cc-c-tipo{width:86px}.cc-c-doc{width:118px}.cc-c-usr{width:96px}.cc-c-m{width:104px}.cc-c-x{width:52px}
+.cc-tabla th{font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#5A6D7A;text-align:left;padding:9px 10px;background:#F5F9FC;border-bottom:1px solid #E1EBF2}
+.cc-tabla th.num,.cc-tabla td.num{text-align:right;font-variant-numeric:tabular-nums}
+.cc-grupos th{padding:6px 10px;border-bottom:0;text-align:center}.cc-g-ing{background:#E3F5EA !important;color:#17713C !important}.cc-g-egr{background:#FDF1DE !important;color:#A15C07 !important}
+.cc-tabla td{padding:9px 10px;border-bottom:1px solid #EEF2F5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0B2B40}
+.cc-tabla td.cc-desc small{color:#5A6D7A;font-size:11.5px}.cc-tabla td.cc-egr{color:#A15C07}.cc-sin{text-align:center;color:#5A6D7A;padding:22px !important}
+.cc-tabla tfoot td{font-weight:700;background:#F5F9FC;border-bottom:0;border-top:2px solid #0B2B40}
+.cc-tipo-mov{font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px}.cc-tipo-mov.ing{background:#E3F5EA;color:#17713C}.cc-tipo-mov.egr{background:#FDF1DE;color:#A15C07}
+.cc-quitar{width:28px;height:28px;border-radius:50%;border:1px solid #E1EBF2;background:#FFFFFF;color:#9A3B2E;cursor:pointer;font-size:12px}.cc-quitar:hover{background:#FBECEA;border-color:#E9B8B1}
+.cc-quitados{margin:0;font-size:13px;color:#475B68;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cc-chip{display:inline-flex;align-items:center;gap:6px;background:#F5F9FC;border:1px solid #E1EBF2;border-radius:999px;padding:3px 4px 3px 10px}.cc-chip button{font:inherit;font-size:12px;font-weight:600;border:0;background:#E8F3FA;color:#005A87;border-radius:999px;padding:3px 9px;cursor:pointer}
+.cc-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;background:#F5F9FC;border:1px solid #E1EBF2;border-radius:16px;padding:14px 16px}
+.cc-form label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:#475B68}.cc-form .adm-input{width:100%;min-height:40px;border-radius:12px}.cc-form-ancho{grid-column:span 2}.cc-form-btns{grid-column:1/-1;display:flex;gap:8px}
+.cc-obs{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:#475B68}.cc-obs textarea{font:inherit;font-size:14px;border:1px solid #C4D4DF;border-radius:14px;padding:10px 12px;resize:vertical;color:#0B2B40}.cc-obs textarea[readonly]{background:#F5F9FC}
+@media (max-width:900px){.cc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.cc-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.cc-corte{padding:16px}.cc-ver .adm-input{width:100%}.cc-ver{flex:1 1 100%}.cc-form{grid-template-columns:minmax(0,1fr)}.cc-form-ancho{grid-column:auto}.cc-kpi b{font-size:17px}}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .exp-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .exp-form .full{grid-column:1/-1}
@@ -1665,6 +1700,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" role="tab" id="tabPresupuestos" data-tab="admPresupuestos" aria-selected="false" aria-controls="admPresupuestos">Presupuesto</button>
 <button type="button" role="tab" id="tabEstados" data-tab="admEstados" aria-selected="false" aria-controls="admEstados">Estados de cuenta</button>
 <button type="button" role="tab" id="tabCobros" data-tab="admCobros" aria-selected="false" aria-controls="admCobros">Cobros y pagos</button>
+<button type="button" role="tab" id="tabCierres" data-tab="admCierres" aria-selected="false" aria-controls="admCierres">Cierres</button>
 </div>
 </div>
 <div class="adm-g">
@@ -2355,6 +2391,50 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="cpPaginas" class="ia-paginas" hidden></div></div>
 <p id="cpMsg" class="dlg-msg" role="status"></p>
 </section>
+</div>
+
+<!-- 6b. Cierres (corte de caja) -->
+<div id="admCierres" role="tabpanel" aria-labelledby="tabCierres" hidden class="adm-pane">
+<div class="adm-pane-head"><h3 class="adm-h">Cierres de caja</h3>
+<label class="cc-ver">Corte<select id="ccSel" class="adm-input"></select></label></div>
+<div id="ccVacio" class="cc-vacio" hidden>
+<div><b>No hay una caja abierta</b><span>Al abrirla, el corte reúne los cobros y pagos de honorarios pendientes. El saldo inicial es el saldo final del último corte cerrado.</span></div>
+<div class="cc-vacio-acc"><select id="ccTipoNuevo" class="adm-input" aria-label="Tipo de caja"><option value="general">Caja general</option><option value="cuenta_ajena">Cuenta ajena</option></select><button type="button" id="ccAbrir" class="adm-btn adm-primary">Abrir caja</button></div>
+</div>
+<section id="ccCorte" class="cc-corte" hidden aria-label="Corte de caja">
+<div class="cc-cab">
+<div class="cc-tit"><small>Corte de caja</small><h4>N.º <span id="ccNumero"></span><span id="ccEstado" class="cc-estado"></span><span id="ccTipo" class="cc-tipo"></span></h4></div>
+<div class="cc-acciones"><button type="button" id="ccImprimir" class="adm-btn">Imprimir</button><button type="button" id="ccAjustar" class="adm-btn" hidden>Ajustar saldo</button><button type="button" id="ccRevisar" class="adm-btn" hidden>Marcar revisado</button><button type="button" id="ccCerrar" class="adm-btn adm-primary" hidden>Cerrar caja</button></div>
+</div>
+<ul id="ccInfo" class="cc-info"></ul>
+<form id="ccAjusteForm" class="cc-form" hidden novalidate>
+<label>Saldo inicial (Q)<input id="ccASaldo" type="number" step="0.01" class="adm-input"></label>
+<label class="cc-form-ancho">Motivo del ajuste<input id="ccAMotivo" type="text" maxlength="200" class="adm-input" placeholder="Ej.: conteo físico al iniciar el sistema"></label>
+<div class="cc-form-btns"><button type="submit" class="adm-btn adm-primary">Guardar ajuste</button><button type="button" id="ccACancelar" class="adm-btn">Cancelar</button></div>
+</form>
+<div class="cc-kpis">
+<div class="cc-kpi"><span>Saldo inicial</span><b id="ccSaldoIni">—</b></div>
+<div class="cc-kpi ing"><span>Ingresos</span><b id="ccIng">—</b></div>
+<div class="cc-kpi egr"><span>Egresos</span><b id="ccEgr">—</b></div>
+<div class="cc-kpi fin"><span id="ccSaldoFinLbl">Saldo final</span><b id="ccSaldoFin">—</b></div>
+</div>
+<div class="roles-wrap cc-wrap"><table class="cc-tabla">
+<colgroup><col class="cc-c-n"><col class="cc-c-tipo"><col class="cc-c-doc"><col><col class="cc-c-usr"><col class="cc-c-m"><col class="cc-c-m"><col class="cc-c-m"><col class="cc-c-m"><col class="cc-c-x"></colgroup>
+<thead><tr class="cc-grupos"><th colspan="5"></th><th colspan="3" class="cc-g-ing">Ingreso</th><th class="cc-g-egr">Egreso</th><th></th></tr>
+<tr><th>#</th><th>Tipo</th><th>Doc.</th><th>Descripción</th><th>Usuario</th><th class="num">Efectivo</th><th class="num">Tarjeta</th><th class="num">Transf./dep.</th><th class="num">Monto</th><th><span class="sr-only">Quitar</span></th></tr></thead>
+<tbody id="ccBody"></tbody><tfoot id="ccPie"></tfoot></table></div>
+<p id="ccQuitados" class="cc-quitados" hidden></p>
+<div><button type="button" id="ccGastoBtn" class="adm-btn" hidden>+ Registrar gasto de caja</button></div>
+<form id="ccGastoForm" class="cc-form" hidden novalidate>
+<label class="cc-form-ancho">Descripción *<input id="ccGDesc" type="text" maxlength="150" class="adm-input" placeholder="Ej.: insumos de limpieza"></label>
+<label>Monto (Q) *<input id="ccGMonto" type="number" min="0.01" step="0.01" class="adm-input"></label>
+<label>Método<select id="ccGMetodo" class="adm-input"><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="cheque">Cheque</option><option value="tarjeta">Tarjeta</option></select></label>
+<label>N.º de documento<input id="ccGDoc" type="text" maxlength="40" class="adm-input"></label>
+<div class="cc-form-btns"><button type="submit" class="adm-btn adm-primary">Agregar gasto</button><button type="button" id="ccGCancelar" class="adm-btn">Cancelar</button></div>
+</form>
+<label class="cc-obs">Observaciones<textarea id="ccObs" rows="2" maxlength="500" placeholder="Notas del corte (se guardan al cerrar la caja)"></textarea></label>
+</section>
+<p id="ccMsg" class="dlg-msg" role="status"></p>
 </div>
 
 <!-- 7. Posiciones y clínicas -->
@@ -3231,6 +3311,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="recargos.js"></script>
 <script src="usuarios-pacientes.js?v=20261028b"></script>
 <script src="comisiones.js?v=20261029a"></script>
+<script src="cierres.js?v=20261103a"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="chatbot.js?v=20261102a"></script>

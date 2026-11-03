@@ -7459,6 +7459,228 @@ alter table public.posiciones enable trigger posiciones_datos_admin;
 -- ===== Todos los odontólogos atienden de lunes a viernes de 7:00 a. m. a 7:00 p. m. (el sábado no cambia) =====
 update public.dentistas set horario = horario || '{"1": {"abre": "07:00", "cierra": "19:00"}, "2": {"abre": "07:00", "cierra": "19:00"}, "3": {"abre": "07:00", "cierra": "19:00"}, "4": {"abre": "07:00", "cierra": "19:00"}, "5": {"abre": "07:00", "cierra": "19:00"}}'::jsonb;
 
+-- ===== Cierres (corte de caja) =====
+-- Una sola caja abierta a la vez. Mientras está abierta, el corte lista los cobros (pagos) y los pagos de honorarios
+-- (comisiones) que aún no pertenecen a ningún corte, salvo los que se quitaron de este corte, más los gastos de caja
+-- registrados en él. Al cerrar, esos movimientos quedan asignados al corte y los totales se congelan.
+create table if not exists public.caja_cierres (
+  id bigint generated always as identity primary key,
+  numero integer not null unique,
+  tipo text not null default 'general' check (tipo in ('general', 'cuenta_ajena')),
+  estado text not null default 'abierta' check (estado in ('abierta', 'cerrada')),
+  operador text,
+  abierta_en timestamptz not null default now(),
+  cerrada_en timestamptz,
+  saldo_inicial numeric(14,2) not null default 0,
+  ingresos numeric(14,2) not null default 0,
+  egresos numeric(14,2) not null default 0,
+  saldo_final numeric(14,2),
+  observaciones text check (char_length(observaciones) <= 500),
+  revisado_por text,
+  revisado_en timestamptz,
+  ajuste_motivo text check (char_length(ajuste_motivo) <= 200),
+  ajustado_por text,
+  ajustado_en timestamptz
+);
+create unique index if not exists caja_una_abierta on public.caja_cierres ((true)) where estado = 'abierta';
+
+create table if not exists public.caja_gastos (
+  id bigint generated always as identity primary key,
+  cierre_id bigint not null references public.caja_cierres (id) on delete restrict,
+  descripcion text not null check (char_length(descripcion) between 1 and 150),
+  monto numeric(12,2) not null check (monto > 0),
+  metodo text not null default 'efectivo' check (metodo in ('efectivo', 'transferencia', 'cheque', 'tarjeta')),
+  documento text check (char_length(documento) <= 40),
+  registrado_por text,
+  creado timestamptz not null default now(),
+  anulado boolean not null default false
+);
+
+-- Movimientos quitados de un corte abierto (vuelven a estar pendientes para el siguiente corte)
+create table if not exists public.caja_excluidos (
+  cierre_id bigint not null references public.caja_cierres (id) on delete cascade,
+  origen text not null check (origen in ('pago', 'honorario')),
+  ref_id bigint not null,
+  primary key (cierre_id, origen, ref_id)
+);
+
+alter table public.pagos add column if not exists cierre_id bigint references public.caja_cierres (id) on delete set null;
+alter table public.comisiones_pagos add column if not exists cierre_id bigint references public.caja_cierres (id) on delete set null;
+
+alter table public.caja_cierres enable row level security;
+alter table public.caja_gastos enable row level security;
+alter table public.caja_excluidos enable row level security;
+drop policy if exists "personal ve cierres" on public.caja_cierres;
+create policy "personal ve cierres" on public.caja_cierres for select using (public.es_personal());
+drop policy if exists "personal ve gastos de caja" on public.caja_gastos;
+create policy "personal ve gastos de caja" on public.caja_gastos for select using (public.es_personal());
+drop policy if exists "personal ve excluidos" on public.caja_excluidos;
+create policy "personal ve excluidos" on public.caja_excluidos for select using (public.es_personal());
+revoke insert, update, delete on public.caja_cierres, public.caja_gastos, public.caja_excluidos from anon, authenticated;
+
+create or replace function public.caja_usuario()
+returns text language sql stable security definer set search_path = public as $$
+  select coalesce((select usuario from public.perfiles where id = auth.uid()), 'sistema');
+$$;
+
+-- Movimientos de un corte (los del corte cerrado, o los pendientes si está abierto)
+create or replace function public.caja_movimientos(p_cierre bigint)
+returns table (origen text, ref_id bigint, momento timestamptz, tipo text, documento text, tipo_documento text,
+  descripcion text, usuario text, efectivo numeric, tarjeta numeric, transferencia numeric, egreso numeric, metodo text, incluido boolean)
+language plpgsql stable security definer set search_path = public as $$
+declare v_abierta boolean;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select estado = 'abierta' into v_abierta from public.caja_cierres where id = p_cierre;
+  if v_abierta is null then raise exception 'El corte no existe'; end if;
+  return query
+  with mov as (
+    select 'pago'::text as origen, p.id as ref_id, p.creado as momento, 'Ingreso'::text as tipo,
+      coalesce(nullif(concat_ws('-', p.serie, p.numero_factura), ''), p.correlativo, 'P-' || p.id) as documento,
+      coalesce(p.tipo_documento, 'recibo') as tipo_documento,
+      coalesce(pa.nombre, 'Paciente') || coalesce(' · ' || nullif(trim(p.concepto), ''), '') as descripcion,
+      p.registrado_por as usuario,
+      case when p.metodo::text = 'efectivo' then p.monto else 0 end as efectivo,
+      case when p.metodo::text = 'tarjeta' then p.monto else 0 end as tarjeta,
+      case when p.metodo::text in ('transferencia', 'deposito') then p.monto else 0 end as transferencia,
+      0::numeric as egreso, p.metodo::text as metodo, p.cierre_id
+    from public.pagos p left join public.pacientes pa on pa.id = p.paciente_id
+    where not p.anulado
+    union all
+    select 'honorario', c.id, c.creado, 'Egreso', 'HON-' || c.id, 'honorario',
+      coalesce(nullif(trim(c.beneficiario), ''), a.nombre, 'Agente') || ' · pago de honorarios', c.registrado_por,
+      0, 0, 0, c.monto, coalesce(c.metodo, 'deposito'), c.cierre_id
+    from public.comisiones_pagos c left join public.agentes a on a.id = c.agente_id
+    where not c.anulado
+    union all
+    select 'gasto', g.id, g.creado, 'Egreso', 'GAS-' || g.id, 'gasto', 'Gasto de caja · ' || g.descripcion
+      || coalesce(' · Doc. ' || nullif(trim(g.documento), ''), ''), g.registrado_por,
+      0, 0, 0, g.monto, g.metodo, g.cierre_id
+    from public.caja_gastos g
+    where not g.anulado
+  )
+  select m.origen, m.ref_id, m.momento, m.tipo, m.documento, m.tipo_documento, m.descripcion, m.usuario,
+         m.efectivo, m.tarjeta, m.transferencia, m.egreso, m.metodo,
+         not exists (select 1 from public.caja_excluidos x where x.cierre_id = p_cierre and x.origen = m.origen and x.ref_id = m.ref_id)
+  from mov m
+  where m.cierre_id = p_cierre
+     or (v_abierta and m.origen <> 'gasto' and m.cierre_id is null)
+  order by m.momento, m.origen, m.ref_id;
+end;
+$$;
+
+create or replace function public.caja_abrir(p_tipo text default 'general')
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint; v_saldo numeric;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  perform pg_advisory_xact_lock(771204);
+  if exists (select 1 from public.caja_cierres where estado = 'abierta') then raise exception 'Ya hay una caja abierta. Ciérrala antes de abrir otra.'; end if;
+  select saldo_final into v_saldo from public.caja_cierres where estado = 'cerrada' order by numero desc limit 1;
+  insert into public.caja_cierres (numero, tipo, operador, saldo_inicial)
+  values ((select coalesce(max(numero), 0) + 1 from public.caja_cierres),
+          case when p_tipo = 'cuenta_ajena' then 'cuenta_ajena' else 'general' end,
+          public.caja_usuario(), coalesce(v_saldo, 0))
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+create or replace function public.caja_quitar(p_cierre bigint, p_origen text, p_ref bigint, p_quitar boolean default true)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if not exists (select 1 from public.caja_cierres where id = p_cierre and estado = 'abierta') then raise exception 'El corte ya está cerrado'; end if;
+  if p_origen = 'gasto' then
+    update public.caja_gastos set anulado = p_quitar where id = p_ref and cierre_id = p_cierre;
+  elsif p_quitar then
+    insert into public.caja_excluidos (cierre_id, origen, ref_id) values (p_cierre, p_origen, p_ref) on conflict do nothing;
+  else
+    delete from public.caja_excluidos where cierre_id = p_cierre and origen = p_origen and ref_id = p_ref;
+  end if;
+end;
+$$;
+
+create or replace function public.caja_gasto(p_cierre bigint, p_descripcion text, p_monto numeric, p_metodo text, p_documento text)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  if not exists (select 1 from public.caja_cierres where id = p_cierre and estado = 'abierta') then raise exception 'El corte ya está cerrado'; end if;
+  if coalesce(trim(p_descripcion), '') = '' then raise exception 'Escribe la descripción del gasto'; end if;
+  if coalesce(p_monto, 0) <= 0 then raise exception 'El monto debe ser mayor que cero'; end if;
+  insert into public.caja_gastos (cierre_id, descripcion, monto, metodo, documento, registrado_por)
+  values (p_cierre, trim(p_descripcion), round(p_monto, 2), coalesce(nullif(p_metodo, ''), 'efectivo'), nullif(trim(p_documento), ''), public.caja_usuario())
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+create or replace function public.caja_cerrar(p_cierre bigint, p_observaciones text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_ing numeric; v_egr numeric;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  perform 1 from public.caja_cierres where id = p_cierre and estado = 'abierta' for update;
+  if not found then raise exception 'El corte ya está cerrado'; end if;
+  update public.pagos set cierre_id = p_cierre
+   where cierre_id is null and id in (select m.ref_id from public.caja_movimientos(p_cierre) m where m.origen = 'pago' and m.incluido);
+  update public.comisiones_pagos set cierre_id = p_cierre
+   where cierre_id is null and id in (select m.ref_id from public.caja_movimientos(p_cierre) m where m.origen = 'honorario' and m.incluido);
+  select coalesce(sum(m.efectivo + m.tarjeta + m.transferencia), 0), coalesce(sum(m.egreso), 0) into v_ing, v_egr
+    from public.caja_movimientos(p_cierre) m where m.incluido;
+  delete from public.caja_excluidos where cierre_id = p_cierre;
+  update public.caja_cierres set estado = 'cerrada', cerrada_en = now(), ingresos = v_ing, egresos = v_egr,
+    saldo_final = saldo_inicial + v_ing - v_egr, observaciones = nullif(trim(p_observaciones), '')
+  where id = p_cierre;
+end;
+$$;
+
+create or replace function public.caja_observaciones(p_cierre bigint, p_observaciones text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  update public.caja_cierres set observaciones = nullif(trim(p_observaciones), '') where id = p_cierre and estado = 'abierta';
+  if not found then raise exception 'El corte ya está cerrado'; end if;
+end;
+$$;
+
+-- Revisión: la marca otra persona del personal (el Super Administrador puede revisar cualquier corte)
+create or replace function public.caja_revisar(p_cierre bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_op text;
+begin
+  if not public.es_personal() then raise exception 'No tienes permiso para esta acción'; end if;
+  select operador into v_op from public.caja_cierres where id = p_cierre and estado = 'cerrada' and revisado_por is null;
+  if not found then raise exception 'El corte debe estar cerrado y sin revisar'; end if;
+  if v_op = public.caja_usuario() and not public.es_super_administrador() then raise exception 'El corte lo debe revisar otra persona'; end if;
+  update public.caja_cierres set revisado_por = public.caja_usuario(), revisado_en = now() where id = p_cierre;
+end;
+$$;
+
+-- Ajuste del saldo inicial (solo Super Administrador, con motivo); recalcula el saldo final si el corte está cerrado
+create or replace function public.caja_ajustar_saldo(p_cierre bigint, p_saldo numeric, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.es_super_administrador() then raise exception 'Solo el Super Administrador puede ajustar el saldo'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escribe el motivo del ajuste'; end if;
+  update public.caja_cierres set saldo_inicial = round(p_saldo, 2),
+    saldo_final = case when estado = 'cerrada' then round(p_saldo, 2) + ingresos - egresos end,
+    ajuste_motivo = trim(p_motivo), ajustado_por = public.caja_usuario(), ajustado_en = now()
+  where id = p_cierre;
+  if not found then raise exception 'El corte no existe'; end if;
+end;
+$$;
+
+revoke execute on function public.caja_usuario(), public.caja_movimientos(bigint), public.caja_abrir(text),
+  public.caja_quitar(bigint, text, bigint, boolean), public.caja_gasto(bigint, text, numeric, text, text),
+  public.caja_cerrar(bigint, text), public.caja_observaciones(bigint, text), public.caja_revisar(bigint),
+  public.caja_ajustar_saldo(bigint, numeric, text) from public, anon;
+grant execute on function public.caja_movimientos(bigint), public.caja_abrir(text),
+  public.caja_quitar(bigint, text, bigint, boolean), public.caja_gasto(bigint, text, numeric, text, text),
+  public.caja_cerrar(bigint, text), public.caja_observaciones(bigint, text), public.caja_revisar(bigint),
+  public.caja_ajustar_saldo(bigint, numeric, text) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
