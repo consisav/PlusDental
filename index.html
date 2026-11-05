@@ -331,6 +331,11 @@ select.pre-ie{font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;
 .hv-estado{flex-basis:100%;margin:0;font-size:13.5px;color:#08504C}.hv-estado:empty{display:none}.hv-parcial{color:#5A6D7A;font-style:italic}
 .hv-campo{display:flex;flex-direction:column;gap:6px}
 .od-voz{margin-bottom:12px}
+#olVoz.escuchando{background:#C0263A;border-color:#C0263A;color:#FFFFFF;animation:vozPulso 1.4s ease-in-out infinite}
+.ol-voz{margin:10px 0}.ol-nueva-voz{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:8px}
+.od-voz-log li.ok b{color:#08504C}.od-voz-log li.no{color:#9A3B2E}
+.ol-recep{display:flex;flex-direction:column;gap:8px;margin:12px 0;padding:12px 14px;border:1px solid #BFE6D8;background:#F3FBF8;border-radius:14px}.ol-recep-form{border-color:#D9E4EC;background:#F8FBFD}
+.ol-ahora{display:flex;gap:8px;align-items:center}.ol-ahora input{flex:1;min-width:0}
 .od-voz-panel{flex-basis:100%;display:flex;flex-direction:column;gap:6px;background:#FFFFFF;border:1px dashed #9CC3DA;border-radius:12px;padding:10px 14px}
 .od-voz-panel p{margin:0}.od-voz-panel p:empty{display:none}
 .od-voz-log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
@@ -3349,7 +3354,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="cuentas.js?v=20261029b"></script>
 <script src="tratamientos-paciente.js?v=20261028a"></script>
 <script src="recetas.js"></script>
-<script src="laboratorio.js"></script>
+<script src="laboratorio.js?v=20261105a"></script>
+<script src="voz-laboratorio.js?v=20261105a"></script>
 <script src="historias-medicas.js"></script>
 <script src="seguimientos.js?v=20261028a"></script>
 <script src="posiciones.js?v=20261102a"></script>

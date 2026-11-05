@@ -11,6 +11,10 @@
   function hoy() { return iso(new Date()); }
   function fechaCorta(f) { return f ? new Date(String(f).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'; }
   function fechaHora(t) { return t ? new Date(t).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
+  // Fecha y hora con segundos: para mostrar y para el campo datetime-local (hora local de la clínica)
+  function fechaHoraSeg(t) { return t ? new Date(t).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'; }
+  function aLocal(t) { if (!t) return ''; var d = new Date(t), p = function (n) { return ('0' + n).slice(-2); }; return iso(d) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
+  function usuarioSes() { return (window.PD_SESION && window.PD_SESION.usuario()) || ''; }
   function q(n) { return n == null || n === '' ? '—' : 'Q' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function edad(f) { if (!f) return ''; var n = new Date(f + 'T12:00:00'), h = new Date(), a = h.getFullYear() - n.getFullYear(); if (h.getMonth() < n.getMonth() || (h.getMonth() === n.getMonth() && h.getDate() < n.getDate())) a--; return a + ' años'; }
   function telWa(t) { var n = String(t || '').replace(/\D/g, ''); if (n.length === 8) n = '502' + n; return n; }
@@ -132,6 +136,7 @@
       campo('Cita de colocación', cita ? fechaCorta(cita.fecha) + ' · ' + String(cita.hora).slice(0, 5) : '—') + '</div>' +
       ((o.envia || []).length ? '<div class="ol-envia"><span class="pos-lbl">Se envía al laboratorio</span>' + o.envia.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '</div>' : '') +
       (o.indicaciones ? '<p class="rc-ind"><b>Indicaciones:</b> ' + esc(o.indicaciones) + '</p>' : '') +
+      recepcionHtml(o) +
       datosPaciente() +
       '<div class="ol-cambio"><label>Cambiar estado<select id="olNuevoEstado">' + Object.keys(ESTADOS).map(function (e) { return '<option value="' + e + '"' + (e === o.estado ? ' selected' : '') + '>' + ESTADOS[e] + '</option>'; }).join('') + '</select></label>' +
       '<label class="ol-nota">Nota (opcional)<input id="olNota" type="text" maxlength="200" placeholder="Ej.: prueba de metal con ajuste correcto"></label><button type="button" class="adm-btn adm-primary" data-ol-estado>Guardar estado</button></div>' +
@@ -139,6 +144,33 @@
         return '<div><b>' + (ESTADOS[h.estado] || h.estado) + '</b><span>' + fechaHora(h.fecha) + ' · ' + esc(h.usuario || '') + '</span>' + (h.nota ? '<em>' + esc(h.nota) + '</em>' : '') + '</div>';
       }).join('') || '<p class="dlg-msg">Sin cambios registrados.</p>') + '</div>' +
       '<p class="rc-reg">Registrada por ' + esc(o.creada_por || 'Sin usuario') + ' · ' + fechaHora(o.creada) + (o.modificada ? ' · Modificada por ' + esc(o.modificada_por || '') + ' · ' + fechaHora(o.modificada) : '') + '</p>';
+  }
+
+  // Recepción del trabajo: datos registrados, o formulario rápido mientras la orden sigue en el laboratorio
+  function recepcionHtml(o) {
+    var campo = function (t, v) { return '<div><span>' + t + '</span>' + v + '</div>'; };
+    if (o.recibida_en) return '<div class="ol-recep"><span class="pos-lbl">Recepción del laboratorio</span><div class="rc-datos ol-datos">' +
+      campo('Fecha y hora', '<b>' + fechaHoraSeg(o.recibida_en) + '</b>') + campo('Entregó', esc(o.recepcion_entrega || '—')) + campo('Recibió', esc(o.recepcion_recibe || '—')) + '</div>' +
+      (o.recepcion_obs ? '<p class="rc-ind"><b>Observaciones de recepción:</b> ' + esc(o.recepcion_obs) + '</p>' : '') + '</div>';
+    if (ABIERTAS.indexOf(o.estado) < 0 && o.estado !== 'borrador') return '';
+    return '<div class="ol-recep ol-recep-form"><span class="pos-lbl">Registrar recepción del trabajo</span><div class="exp-form rc-g4">' +
+      '<label class="rc-span2">Fecha y hora de recepción<span class="ol-ahora"><input id="olRRFecha" type="datetime-local" step="1" value="' + aLocal(new Date()) + '"><button type="button" class="adm-btn" data-ol-ahora="olRRFecha">Ahora</button></span></label>' +
+      '<label>Persona que entrega<input id="olRREntrega" maxlength="120" placeholder="Mensajero o técnico del laboratorio"></label>' +
+      '<label>Persona que recibe<input id="olRRRecibe" maxlength="120" value="' + esc(usuarioSes()) + '"></label>' +
+      '<label class="full">Observaciones de recepción<textarea id="olRRObs" rows="2" maxlength="1500" placeholder="Ej.: llega en caja sellada, con modelos y antagonista; color correcto"></textarea></label>' +
+      '</div><div class="rc-pie"><button type="button" class="adm-btn adm-primary" data-ol-recibir>Registrar recepción</button></div></div>';
+  }
+  async function recibir(o, boton) {
+    var f = $('olRRFecha').value;
+    if (!f) { aviso('Indica la fecha y hora de recepción.', true); $('olRRFecha').focus(); return; }
+    if (!$('olRREntrega').value.trim()) { aviso('Indica la persona que entrega el trabajo.', true); $('olRREntrega').focus(); return; }
+    if (!$('olRRRecibe').value.trim()) { aviso('Indica la persona que recibe el trabajo.', true); $('olRRRecibe').focus(); return; }
+    boton.disabled = true;
+    var r = await sb.from('ordenes_lab').update({ recibida_en: new Date(f).toISOString(), recepcion_entrega: $('olRREntrega').value.trim(), recepcion_recibe: $('olRRRecibe').value.trim(),
+      recepcion_obs: $('olRRObs').value.trim() || null, estado: 'recibida' }).eq('id', o.id).select('*').single();
+    if (r.error) { boton.disabled = false; aviso(traducir(r.error), true); return; }
+    await cargar(paciente, o.id);
+    aviso('Recepción registrada: ' + fechaHoraSeg(r.data.recibida_en) + '.');
   }
 
   function opciones(lista, sel, vacio) { return (vacio ? '<option value="">' + vacio + '</option>' : '') + lista.map(function (x) { return '<option' + (x === sel ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join(''); }
@@ -168,6 +200,13 @@
       '<label>Estado<select id="olEstado">' + Object.keys(ESTADOS).map(function (e) { return '<option value="' + e + '"' + ((o ? o.estado : 'enviada') === e ? ' selected' : '') + '>' + ESTADOS[e] + '</option>'; }).join('') + '</select></label>' +
       '<label class="rc-span2">Cita de colocación<select id="olCita"><option value="">Sin cita</option>' + citasPac.map(function (c) { return '<option value="' + c.id + '"' + (o && o.cita_id === c.id ? ' selected' : '') + '>' + fechaCorta(c.fecha) + ' · ' + String(c.hora).slice(0, 5) + ' · ' + esc(c.servicio || '') + '</option>'; }).join('') + '</select></label>' +
       '<p id="olEntregaInfo" class="rc-span2 dlg-msg"></p>' +
+      '</div></fieldset>' +
+      '<fieldset class="pos-sec"><legend>Recepción del laboratorio</legend><div class="exp-form rc-g4">' +
+      '<label class="rc-span2">Fecha y hora de recepción<span class="ol-ahora"><input id="olRecFecha" type="datetime-local" step="1" value="' + aLocal(o && o.recibida_en) + '"><button type="button" class="adm-btn" data-ol-ahora="olRecFecha">Ahora</button></span></label>' +
+      '<label>Persona que entrega<input id="olRecEntrega" maxlength="120" value="' + esc(o ? o.recepcion_entrega || '' : '') + '" placeholder="Mensajero o técnico"></label>' +
+      '<label>Persona que recibe<input id="olRecRecibe" maxlength="120" value="' + esc(o ? o.recepcion_recibe || '' : '') + '" placeholder="' + esc(usuarioSes() || 'Quién recibe en la clínica') + '"></label>' +
+      '<label class="full">Observaciones de recepción<textarea id="olRecObs" rows="2" maxlength="1500" placeholder="Ej.: llega completo, color correcto, falta el antagonista">' + esc(o ? o.recepcion_obs || '' : '') + '</textarea></label>' +
+      '<p class="full dlg-msg">Llénalo cuando el trabajo llegue a la clínica; al indicar la fecha y hora, la orden pasa a «Recibida».</p>' +
       '</div></fieldset>' +
       '<p class="rc-reg">' + (nueva ? 'Número, fecha, hora y usuario se registran al grabar · ' + esc((window.PD_SESION && window.PD_SESION.usuario()) || 'Sin usuario') : 'Registrada por ' + esc(o.creada_por || '') + ' · ' + fechaHora(o.creada)) + '</p>' +
       '<div class="rc-pie"><button type="button" class="adm-btn" data-ol-cancelar>Cancelar</button><button type="submit" class="dlg-submit" id="olGrabar">' + (nueva ? 'Grabar orden' : 'Guardar cambios') + '</button></div>' +
@@ -211,8 +250,13 @@
       trabajo: trabajo, piezas: $('olPiezas').value.trim() || null, material: $('olMaterial').value.trim() || null, color: $('olColor').value || null,
       impresion: $('olImpresion').value || null, envia: [].map.call(document.querySelectorAll('[data-ol-envia]:checked'), function (c) { return c.value; }),
       indicaciones: $('olInd').value.trim() || null, fecha_envio: $('olEnvio').value || null, fecha_entrega: $('olEntrega').value || null,
-      costo: $('olCosto').value === '' ? null : Number($('olCosto').value), estado: $('olEstado').value
+      costo: $('olCosto').value === '' ? null : Number($('olCosto').value), estado: $('olEstado').value,
+      recibida_en: $('olRecFecha').value ? new Date($('olRecFecha').value).toISOString() : null,
+      recepcion_entrega: $('olRecEntrega').value.trim() || null, recepcion_recibe: $('olRecRecibe').value.trim() || ($('olRecFecha').value ? usuarioSes() || null : null),
+      recepcion_obs: $('olRecObs').value.trim() || null
     };
+    // Con fecha de recepción, una orden que seguía en el laboratorio pasa a «Recibida»
+    if (datos.recibida_en && ['borrador', 'enviada', 'proceso', 'prueba', 'devuelta'].indexOf(datos.estado) >= 0) datos.estado = 'recibida';
     aviso('Grabando…');
     var id = editando === 'nueva' ? null : editando;
     var r = id ? await sb.from('ordenes_lab').update(datos).eq('id', id).select('*').single()
@@ -274,6 +318,8 @@
       ((o.envia || []).length ? sec('Se envía al laboratorio') + '<div style="font-size:13px;line-height:1.8">' + o.envia.map(function (x) { return '☑ ' + esc(x); }).join('&nbsp;&nbsp;&nbsp; ') + '</div>' : '') +
       (o.indicaciones ? sec('Indicaciones') + '<div style="font-size:13.5px;line-height:1.6;white-space:pre-line">' + esc(o.indicaciones) + '</div>' : '') +
       sec('Fechas') + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' + dato('Fecha de envío', fechaCorta(o.fecha_envio)) + dato('Entrega solicitada', fechaCorta(o.fecha_entrega)) + dato('Estado', ESTADOS[o.estado]) + dato('Costo acordado', q(o.costo)) + '</div>' +
+      (o.recibida_en ? sec('Recepción del laboratorio') + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' + dato('Fecha y hora', fechaHoraSeg(o.recibida_en)) + dato('Entregó', esc(o.recepcion_entrega || '—')) + dato('Recibió', esc(o.recepcion_recibe || '—')) + '</div>' +
+        (o.recepcion_obs ? '<div style="font-size:13px;margin-top:8px"><b>Observaciones:</b> ' + esc(o.recepcion_obs) + '</div>' : '') : '') +
       '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:40px;margin-top:34px;flex-wrap:wrap">' +
       (firma ? window.PD_FIRMA.bloque(firma, { etiqueta: 'Firma y sello del odontólogo solicitante' }) : '<div style="width:260px;border-top:1.5px solid #0B2B40;padding-top:6px;text-align:center;font-size:12.5px">' + esc(d ? 'Dr(a). ' + d.nombre : 'Odontólogo solicitante') + '</div>') +
       '<div style="width:240px;text-align:center"><div style="border-top:1.5px solid #0B2B40;padding-top:7px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:#475B68">Recibido por el laboratorio<br><span style="font-weight:600;letter-spacing:0;text-transform:none">Fecha: ____ / ____ / ______</span></div></div></div>' +
@@ -296,6 +342,10 @@
     var be = e.target.closest('[data-ol-estado]');
     if (be && o) { cambiarEstado(o, be); return; }
     if (e.target.closest('[data-ol-cancelar]')) { editando = null; aviso(''); pintar(); return; }
+    var ah = e.target.closest('[data-ol-ahora]');
+    if (ah) { $(ah.dataset.olAhora).value = aLocal(new Date()); return; }
+    var br = e.target.closest('[data-ol-recibir]');
+    if (br && o) { recibir(o, br); return; }
     var pz = e.target.closest('[data-ol-pieza]');
     if (pz) { var v = $('olPiezas').value.split(/[,\s]+/).filter(Boolean); if (v.indexOf(pz.dataset.olPieza) < 0) v.push(pz.dataset.olPieza); $('olPiezas').value = v.join(', '); }
   });

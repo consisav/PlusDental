@@ -8121,6 +8121,30 @@ exception
 end;
 $$;
 
+-- ===== Órdenes de laboratorio: recepción del trabajo =====
+-- Fecha y hora exacta (con segundos) en que llega el trabajo, persona del laboratorio que lo entrega, persona de la
+-- clínica que lo recibe y observaciones de la recepción. La fecha de recepción (fecha_recibida) se toma de ella.
+alter table public.ordenes_lab add column if not exists recibida_en timestamptz;
+alter table public.ordenes_lab add column if not exists recepcion_entrega text check (char_length(recepcion_entrega) <= 120);
+alter table public.ordenes_lab add column if not exists recepcion_recibe text check (char_length(recepcion_recibe) <= 120);
+alter table public.ordenes_lab add column if not exists recepcion_obs text check (char_length(recepcion_obs) <= 1500);
+
+create or replace function public.ordenes_lab_recepcion()
+returns trigger language plpgsql as $$
+begin
+  if new.recibida_en is not null then
+    new.fecha_recibida := (new.recibida_en at time zone 'America/Guatemala')::date;
+  end if;
+  return new;
+end;
+$$;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'ordenes_lab_recepcion' and tgrelid = 'public.ordenes_lab'::regclass) then
+    create trigger ordenes_lab_recepcion before insert or update of recibida_en on public.ordenes_lab
+      for each row execute function public.ordenes_lab_recepcion();
+  end if;
+end $$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
