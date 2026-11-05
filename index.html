@@ -681,6 +681,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .mn-g button:hover{background:#F5F9FC;color:#0B2B40}
 .mn-g button[aria-current="true"]{background:#0B2B40;color:#FFFFFF}
 .mn-ok{font-style:normal;font-size:12px;font-weight:800;color:#0E7A5F}.mn-g button[aria-current="true"] .mn-ok{color:#9FE1CB}
+.mn-parte{margin:28px 0 4px;font-size:13px;letter-spacing:1.4px;text-transform:uppercase;font-weight:800;color:#005A87}.mn-parte:first-child{margin-top:0}.mn-sec{padding:22px 0 26px;border-bottom:1px solid #E3EBF1;scroll-margin-top:calc(var(--pd-menu-top,150px) + 70px)}.mn-sec:last-child{border-bottom:0}.mn-sec .mn-cab{border-bottom:0;padding-bottom:6px;margin-bottom:10px}
 .mn-cap{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:22px;padding:24px 26px;box-shadow:0 12px 32px rgba(11,43,64,.05);min-height:320px}
 .mn-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;border-bottom:1px solid #E3EBF1;padding-bottom:16px;margin-bottom:18px}
 .mn-cab small{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:800;color:#005A87}
@@ -1885,8 +1886,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 
 <!-- Manual del CRM (manual.js) -->
 <div id="admManual" role="tabpanel" aria-labelledby="tabManual" hidden class="adm-pane">
-<div class="mn-top"><div><h3 class="adm-h">Manual del CRM</h3><p>Guía paso a paso de cada pantalla del panel, redactada con IA a partir de la pantalla real y con ejemplos de los datos de la clínica.</p></div>
-<div class="mn-acc"><div class="mn-avance"><span id="mnAvance"></span><div><i id="mnAvanceBarra"></i></div></div><button type="button" id="mnImprimirTodo" class="adm-btn">Imprimir manual</button></div></div>
+<div class="mn-top"><div><h3 class="adm-h">Manual del CRM</h3><p>Guía paso a paso de cada pantalla del panel, con ejemplos de la clínica. Elige un tema en el índice o recorre el manual completo.</p></div>
+<div class="mn-acc"><div class="mn-avance" hidden><span id="mnAvance"></span><div><i id="mnAvanceBarra"></i></div></div><button type="button" id="mnImprimirTodo" class="adm-btn">Imprimir manual</button></div></div>
 <p id="mnMsg" style="margin:10px 0 0;font-size:14px;font-weight:600" role="status" aria-live="polite"></p>
 <div class="mn-grid"><nav id="mnIndice" class="mn-ind" aria-label="Contenido del manual"></nav><article id="mnCap" class="mn-cap" aria-live="polite"></article></div>
 </div>
@@ -3375,7 +3376,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="usuarios-pacientes.js?v=20261028b"></script>
 <script src="comisiones.js?v=20261029a"></script>
 <script src="cierres.js?v=20261103a"></script>
-<script src="manual.js?v=20261105a"></script>
+<script src="manual.js?v=20261105b"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="chatbot.js?v=20261102a"></script>
