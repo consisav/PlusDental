@@ -80,7 +80,7 @@ html{scroll-behavior:smooth;scroll-padding-top:170px}
 .adm-barra .adm-g:has([aria-selected="true"])>.adm-grupo{background:#0B2B40;color:#FFFFFF}
 .adm-barra .adm-g:has([aria-selected="true"])>.adm-grupo .adm-chev{border-color:#FFFFFF}
 .adm-barra .adm-g-items{position:absolute;top:calc(100% + 8px);left:0;z-index:30;min-width:300px;max-height:calc(100vh - var(--pd-menu-top,150px) - 90px);overflow:auto;background:#FFFFFF;border:1px solid #D9E4EC;border-radius:16px;box-shadow:0 20px 44px rgba(11,43,64,.18);padding:8px}
-.adm-barra .adm-g:nth-last-child(-n+3) .adm-g-items{left:auto;right:0}
+.adm-barra .adm-g:nth-last-child(-n+4) .adm-g-items{left:auto;right:0}
 }
 .hero-imagen{display:block;width:100%;height:auto;border-radius:24px;box-shadow:0 18px 40px rgba(11,43,64,.12)}
 .ct-lista{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
@@ -662,6 +662,46 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .adm-menu button[data-tab]::before{content:"";position:absolute;left:-10px;top:50%;width:4px;height:4px;border-radius:50%;background:#94A6B2;transform:translateY(-50%)}
 .adm-menu button[data-tab][aria-selected="true"]::before{background:#005A87}
 @media (max-width:960px){.adm-menu button[data-tab]{margin-left:12px}}
+.adm-menu button.adm-directo{margin-left:0;width:100%;font-size:13.5px;letter-spacing:1.4px;text-transform:uppercase;font-weight:800;color:#0B2B40;padding:16px 12px;justify-content:flex-start;gap:8px}
+.adm-menu button.adm-directo::before{display:none}
+.adm-menu button.adm-directo svg{width:15px;height:15px;flex:none}
+.adm-menu button.adm-directo[aria-selected="true"]{background:#0B2B40;color:#FFFFFF}
+.adm-barra .adm-menu button.adm-directo{width:auto;min-height:40px;padding:9px 10px;font-size:11px;letter-spacing:.6px;border-radius:10px;gap:6px;white-space:nowrap}
+.mn-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.mn-top p{margin:4px 0 0;font-size:14px;color:#475B68;max-width:640px}
+.mn-avance{display:flex;flex-direction:column;gap:6px;min-width:200px;font-size:12px;font-weight:700;color:#475B68}
+.mn-avance>div{height:6px;background:#E3EBF1;border-radius:6px;overflow:hidden}.mn-avance>div>i{display:block;height:100%;background:#005A87;border-radius:6px;transition:width .3s}
+.mn-grid{display:grid;grid-template-columns:280px minmax(0,1fr);gap:20px;align-items:start;margin-top:18px}
+.mn-ind{position:sticky;top:calc(var(--pd-menu-top,150px) + 70px);max-height:calc(100vh - var(--pd-menu-top,150px) - 100px);overflow:auto;background:#FFFFFF;border:1px solid #D9E4EC;border-radius:20px;padding:12px;scrollbar-width:thin}
+.mn-g{display:flex;flex-direction:column;gap:2px;padding:6px 0 10px;border-bottom:1px solid #EEF2F5}.mn-g:last-child{border-bottom:0}
+.mn-g>b{font-size:11.5px;letter-spacing:1.1px;text-transform:uppercase;color:#0B2B40;padding:6px 8px}
+.mn-sg{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;font-weight:800;color:#005A87;padding:6px 8px 2px 14px}
+.mn-g button{display:flex;justify-content:space-between;align-items:center;gap:8px;font:inherit;font-size:13.5px;font-weight:600;color:#475B68;background:transparent;border:0;border-radius:10px;padding:8px 10px 8px 14px;text-align:left;cursor:pointer}
+.mn-g button.mn-en-sub{padding-left:22px}
+.mn-g button:hover{background:#F5F9FC;color:#0B2B40}
+.mn-g button[aria-current="true"]{background:#0B2B40;color:#FFFFFF}
+.mn-ok{font-style:normal;font-size:12px;font-weight:800;color:#0E7A5F}.mn-g button[aria-current="true"] .mn-ok{color:#9FE1CB}
+.mn-cap{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:22px;padding:24px 26px;box-shadow:0 12px 32px rgba(11,43,64,.05);min-height:320px}
+.mn-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;border-bottom:1px solid #E3EBF1;padding-bottom:16px;margin-bottom:18px}
+.mn-cab small{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:800;color:#005A87}
+.mn-cab h4{margin:4px 0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:32px;line-height:1.1;color:#0B2B40}
+.mn-meta{font-size:12.5px;color:#5A6D7A}
+.mn-acc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mn-resumen{font-size:15.5px;line-height:1.65;color:#334652;margin:0 0 20px}
+.mn-pasos{list-style:none;counter-reset:paso;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.mn-pasos li{counter-increment:paso;display:grid;grid-template-columns:34px minmax(0,1fr);gap:14px}
+.mn-pasos li::before{content:counter(paso);width:34px;height:34px;border-radius:50%;background:#0B2B40;color:#FFFFFF;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center}
+.mn-pasos b{font-size:15.5px;color:#0B2B40}.mn-pasos p{margin:4px 0 0;font-size:14.5px;line-height:1.6;color:#475B68}
+.mn-ej{margin-top:8px;background:#FFF8E8;border:1px solid #F2DDB0;border-radius:12px;padding:9px 12px;font-size:13.5px;line-height:1.55;color:#5C4210}
+.mn-ej span{display:block;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;font-weight:800;color:#8A5A00;margin-bottom:2px}
+.mn-consejos{margin-top:22px;background:#EEF5FA;border-radius:16px;padding:14px 18px;font-size:14px;color:#334652}
+.mn-consejos b{color:#0B2B40}.mn-consejos ul{margin:6px 0 0;padding-left:20px;line-height:1.6}
+.mn-vacio{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:#F5F9FC;border:1px dashed #9FC3D8;border-radius:20px;padding:20px 22px}
+.mn-vacio>div{display:flex;flex-direction:column;gap:4px;max-width:560px;font-size:14px;color:#475B68}.mn-vacio b{font-size:16px;color:#0B2B40}
+.mn-cargando{display:flex;align-items:center;gap:12px;padding:28px 6px;font-size:14.5px;color:#475B68}
+.mn-cargando i{width:22px;height:22px;border-radius:50%;border:3px solid #D9E4EC;border-top-color:#005A87;animation:mnGira .9s linear infinite}
+@keyframes mnGira{to{transform:rotate(360deg)}}
+@media (max-width:960px){.mn-grid{grid-template-columns:1fr}.mn-ind{position:static;max-height:300px}.mn-cap{padding:18px}.mn-cab h4{font-size:26px}}
 .marca-logo{height:104px;width:auto;display:block;flex:0 0 auto;transition:height .25s ease}
 .marca-frase{font-family:'Playfair Display',Georgia,serif;font-style:italic;font-weight:600;font-size:18px;line-height:1.3;color:#0B2B40;max-width:260px;padding-left:18px;border-left:1px solid #C4D4DF;transition:font-size .25s ease}
 .topbar.compacta .marca-logo{height:74px}.topbar.compacta .marca-frase{font-size:15px}
@@ -1829,11 +1869,20 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" role="tab" id="tabHistorias" data-tab="admHistorias" aria-selected="false" aria-controls="admHistorias">Historias de impacto</button>
 </div>
 </div>
+<button type="button" role="tab" id="tabManual" data-tab="admManual" aria-selected="false" aria-controls="admManual" class="adm-directo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>Manual</button>
 </div>
 </div>
 
 <div class="adm-layout">
 <div class="adm-main">
+
+<!-- Manual del CRM (manual.js) -->
+<div id="admManual" role="tabpanel" aria-labelledby="tabManual" hidden class="adm-pane">
+<div class="mn-top"><div><h3 class="adm-h">Manual del CRM</h3><p>Guía paso a paso de cada pantalla del panel, redactada con IA a partir de la pantalla real y con ejemplos de los datos de la clínica.</p></div>
+<div class="mn-acc"><div class="mn-avance"><span id="mnAvance"></span><div><i id="mnAvanceBarra"></i></div></div><button type="button" id="mnImprimirTodo" class="adm-btn">Imprimir manual</button></div></div>
+<p id="mnMsg" style="margin:10px 0 0;font-size:14px;font-weight:600" role="status" aria-live="polite"></p>
+<div class="mn-grid"><nav id="mnIndice" class="mn-ind" aria-label="Contenido del manual"></nav><article id="mnCap" class="mn-cap" aria-live="polite"></article></div>
+</div>
 
 <!-- 1. Administración de usuarios -->
 <div id="admUsuarios" role="tabpanel" aria-labelledby="tabUsuarios" hidden class="adm-pane">
@@ -3312,6 +3361,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="usuarios-pacientes.js?v=20261028b"></script>
 <script src="comisiones.js?v=20261029a"></script>
 <script src="cierres.js?v=20261103a"></script>
+<script src="manual.js?v=20261105a"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="chatbot.js?v=20261102a"></script>

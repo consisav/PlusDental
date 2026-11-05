@@ -7681,6 +7681,25 @@ grant execute on function public.caja_movimientos(bigint), public.caja_abrir(tex
   public.caja_cerrar(bigint, text), public.caja_observaciones(bigint, text), public.caja_revisar(bigint),
   public.caja_ajustar_saldo(bigint, numeric, text) to authenticated;
 
+-- ===== Manual del CRM (capítulos generados con IA, función manual-ia) =====
+-- Un capítulo por pantalla del panel (clave = id de la pestaña). Lo genera y regenera el personal; se guarda para no repetir.
+create table if not exists public.manual_capitulos (
+  clave         text primary key,
+  ruta          text not null default '',
+  titulo        text not null default '',
+  contenido     jsonb not null,
+  generado_por  text,
+  generado_en   timestamptz not null default now()
+);
+alter table public.manual_capitulos enable row level security;
+drop policy if exists manual_ver on public.manual_capitulos;
+create policy manual_ver on public.manual_capitulos for select to authenticated using (public.es_personal());
+drop policy if exists manual_crear on public.manual_capitulos;
+create policy manual_crear on public.manual_capitulos for insert to authenticated with check (public.es_personal());
+drop policy if exists manual_cambiar on public.manual_capitulos;
+create policy manual_cambiar on public.manual_capitulos for update to authenticated using (public.es_personal()) with check (public.es_personal());
+grant select, insert, update on public.manual_capitulos to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
