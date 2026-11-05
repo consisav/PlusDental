@@ -1784,6 +1784,13 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" role="tab" id="tabRecargos" data-tab="admRecargos" aria-selected="false" aria-controls="admRecargos" class="adm-sub-item">Recargo de tarjetas</button>
 </div>
 </div>
+<div class="adm-sg">
+<button type="button" class="adm-subgrupo" id="subQuiro" aria-expanded="false" aria-controls="subQuiroItems">5 · Quiroprácticos<span class="adm-chev" aria-hidden="true"></span></button>
+<div class="adm-sg-items" id="subQuiroItems" role="presentation">
+<button type="button" role="tab" id="tabTiposQui" data-tab="admTiposQui" aria-selected="false" aria-controls="admTiposQui" class="adm-sub-item">Tipos de quiroprácticos</button>
+<button type="button" role="tab" id="tabQuiropracticos" data-tab="admQuiropracticos" aria-selected="false" aria-controls="admQuiropracticos" class="adm-sub-item">Quiroprácticos</button>
+</div>
+</div>
 </div>
 </div>
 <div class="adm-g">
@@ -2741,6 +2748,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 
 <div id="admTiposDen" role="tabpanel" aria-labelledby="tabTiposDen" hidden class="adm-pane"></div>
+<!-- Quiroprácticos (tipos-quiropracticos.js, quiropracticos.js) -->
+<div id="admTiposQui" role="tabpanel" aria-labelledby="tabTiposQui" hidden class="adm-pane"></div>
+<div id="admQuiropracticos" role="tabpanel" aria-labelledby="tabQuiropracticos" hidden class="adm-pane"></div>
 <div id="admGeografia" role="tabpanel" aria-labelledby="tabGeografia" hidden class="adm-pane"></div>
 <div id="admOrganizaciones" role="tabpanel" aria-labelledby="tabOrganizaciones" hidden class="adm-pane"></div>
 <div id="admInvProveedores" role="tabpanel" aria-labelledby="tabInvProveedores" hidden class="adm-pane"></div>
@@ -3350,6 +3360,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="inventarios-ordenes.js?v=20261027f"></script>
 <script src="asistentes.js"></script>
 <script src="dentistas.js?v=20261102a"></script>
+<script src="tipos-quiropracticos.js?v=20261105a"></script>
+<script src="quiropracticos.js?v=20261105a"></script>
 <script src="agenda.js?v=20261102a"></script>
 <script src="agentes.js"></script>
 <script src="reportes.js?v=20261029c"></script>

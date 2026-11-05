@@ -7700,6 +7700,208 @@ drop policy if exists manual_cambiar on public.manual_capitulos;
 create policy manual_cambiar on public.manual_capitulos for update to authenticated using (public.es_personal()) with check (public.es_personal());
 grant select, insert, update on public.manual_capitulos to authenticated;
 
+-- ===== Quiroprácticos (Catálogos › 5 · Quiroprácticos) =====
+-- Tipos de quiroprácticos que ejercen en Guatemala (preparado con IA) y catálogo de quiroprácticos de la clínica,
+-- con el mismo diseño de Odontólogos. Cada registro pertenece a una Organización y Localidad / Empresa (separación por sede).
+
+-- Tipos de quiroprácticos. Código automático TQ-01, TQ-02…
+create table if not exists public.tipos_quiropractico (
+  id              bigint generated always as identity primary key,
+  codigo          text,
+  nombre          text not null check (char_length(nombre) between 1 and 120),
+  especialidad    text not null check (char_length(especialidad) between 1 and 120),
+  descripcion     text check (char_length(descripcion) <= 600),
+  formacion       text check (char_length(formacion) <= 400),
+  atiende         text[] not null default '{}',
+  estado          text not null default 'activo' check (estado in ('activo', 'inactivo')),
+  orden           int not null default 0,
+  organizacion_id bigint references public.organizaciones (id) on delete set null,
+  localidad_id    bigint references public.org_localidades (id) on delete set null,
+  registrado_por  text,
+  creado          timestamptz not null default now(),
+  actualizado_por text,
+  actualizado     timestamptz not null default now()
+);
+create unique index if not exists tipos_quiropractico_nombre on public.tipos_quiropractico (lower(nombre));
+create unique index if not exists tipos_quiropractico_codigo on public.tipos_quiropractico (codigo);
+create index if not exists tipos_quiropractico_localidad on public.tipos_quiropractico (localidad_id);
+
+create or replace function public.tipos_quiropractico_auditoria()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    perform pg_advisory_xact_lock(hashtext('tipos_quiropractico_codigo'));
+    new.codigo := 'TQ-' || lpad(((select coalesce(max(substring(codigo from 4)::int), 0) from public.tipos_quiropractico where codigo ~ '^TQ-\d+$') + 1)::text, 2, '0');
+    new.registrado_por := coalesce(v_usuario, 'sistema');
+    new.creado := now();
+  else
+    new.codigo := old.codigo; new.registrado_por := old.registrado_por; new.creado := old.creado;
+  end if;
+  new.nombre := trim(new.nombre); new.especialidad := trim(new.especialidad);
+  new.actualizado_por := coalesce(v_usuario, 'sistema');
+  new.actualizado := now();
+  return new;
+end;
+$$;
+
+-- Quiroprácticos. Código QUI-001 (lo propone la pantalla; si llega vacío lo asigna la base de datos).
+create table if not exists public.quiropracticos (
+  id               bigint generated always as identity primary key,
+  codigo           text not null,
+  nombre           text not null check (char_length(nombre) between 1 and 150),
+  telefono         text,
+  correo           text,
+  direccion        text,
+  registro         text,
+  tipo_id          bigint references public.tipos_quiropractico (id) on delete set null,
+  tecnicas         text[] not null default '{}',
+  inicio_profesion date,
+  fecha_ingreso    date not null default current_date,
+  fecha_salida     date,
+  horario          jsonb not null default '{}',
+  estado           text not null default 'activo' check (estado in ('activo', 'inactivo', 'baja')),
+  notas            text,
+  foto             text,
+  organizacion_id  bigint references public.organizaciones (id) on delete set null,
+  localidad_id     bigint references public.org_localidades (id) on delete set null,
+  registrado_por   text,
+  creado           timestamptz not null default now(),
+  actualizado_por  text,
+  actualizado      timestamptz not null default now(),
+  constraint quiropracticos_fechas check (fecha_salida is null or fecha_salida >= fecha_ingreso)
+);
+create unique index if not exists quiropracticos_codigo_unico on public.quiropracticos (lower(codigo));
+create index if not exists quiropracticos_localidad on public.quiropracticos (localidad_id);
+
+create or replace function public.quiropracticos_auditoria()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_usuario text := (select usuario from public.perfiles where id = auth.uid());
+begin
+  if tg_op = 'INSERT' then
+    if coalesce(trim(new.codigo), '') = '' then
+      perform pg_advisory_xact_lock(hashtext('quiropracticos_codigo'));
+      new.codigo := 'QUI-' || lpad(((select coalesce(max(substring(codigo from 5)::int), 0) from public.quiropracticos where codigo ~ '^QUI-\d+$') + 1)::text, 3, '0');
+    end if;
+    new.registrado_por := coalesce(v_usuario, 'sistema');
+    new.creado := now();
+  else
+    new.registrado_por := old.registrado_por; new.creado := old.creado;
+  end if;
+  new.codigo := upper(trim(new.codigo)); new.nombre := trim(new.nombre);
+  new.actualizado_por := coalesce(v_usuario, 'sistema');
+  new.actualizado := now();
+  return new;
+end;
+$$;
+
+-- Títulos de cada quiropráctico (archivo escaneado en expedientes/quiropracticos/<id>/…)
+create table if not exists public.quiropractico_titulos (
+  id               bigint generated always as identity primary key,
+  quiropractico_id bigint not null references public.quiropracticos (id) on delete cascade,
+  titulo           text not null,
+  institucion      text,
+  anio             int check (anio between 1950 and 2100),
+  archivo          text,
+  registrado_por   text,
+  creado           timestamptz not null default now()
+);
+create index if not exists quiropractico_titulos_quiro on public.quiropractico_titulos (quiropractico_id);
+
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'tipos_quiropractico_auditoria' and tgrelid = 'public.tipos_quiropractico'::regclass) then
+    create trigger tipos_quiropractico_auditoria before insert or update on public.tipos_quiropractico for each row execute function public.tipos_quiropractico_auditoria();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'quiropracticos_auditoria' and tgrelid = 'public.quiropracticos'::regclass) then
+    create trigger quiropracticos_auditoria before insert or update on public.quiropracticos for each row execute function public.quiropracticos_auditoria();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'quiropractico_titulos_firma' and tgrelid = 'public.quiropractico_titulos'::regclass) then
+    create trigger quiropractico_titulos_firma before insert on public.quiropractico_titulos for each row execute function public.firmar_titulo();
+  end if;
+  -- Sede coherente (la organización sale de la localidad; sin sede, la del usuario que graba)
+  if not exists (select 1 from pg_trigger where tgname = 'tipos_quiropractico_sede' and tgrelid = 'public.tipos_quiropractico'::regclass) then
+    create trigger tipos_quiropractico_sede before insert or update of organizacion_id, localidad_id on public.tipos_quiropractico for each row execute function public.sede_registro();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'quiropracticos_sede' and tgrelid = 'public.quiropracticos'::regclass) then
+    create trigger quiropracticos_sede before insert or update of organizacion_id, localidad_id on public.quiropracticos for each row execute function public.sede_registro();
+  end if;
+end $$;
+
+-- Permisos: el personal ve y edita solo su sede; los títulos solo los borra el Super Administrador
+alter table public.tipos_quiropractico enable row level security;
+alter table public.quiropracticos enable row level security;
+alter table public.quiropractico_titulos enable row level security;
+drop policy if exists "personal administra tipos de quiropractico" on public.tipos_quiropractico;
+create policy "personal administra tipos de quiropractico" on public.tipos_quiropractico for all
+  using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal ve quiropracticos" on public.quiropracticos;
+create policy "personal ve quiropracticos" on public.quiropracticos for select using (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal crea quiropracticos" on public.quiropracticos;
+create policy "personal crea quiropracticos" on public.quiropracticos for insert with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal edita quiropracticos" on public.quiropracticos;
+create policy "personal edita quiropracticos" on public.quiropracticos for update using (public.es_personal() and public.ve_sede(localidad_id)) with check (public.es_personal() and public.ve_sede(localidad_id));
+drop policy if exists "personal ve titulos de quiropracticos" on public.quiropractico_titulos;
+create policy "personal ve titulos de quiropracticos" on public.quiropractico_titulos for select using (public.es_personal());
+drop policy if exists "personal registra titulos de quiropracticos" on public.quiropractico_titulos;
+create policy "personal registra titulos de quiropracticos" on public.quiropractico_titulos for insert with check (public.es_personal());
+drop policy if exists "super administrador borra titulos de quiropracticos" on public.quiropractico_titulos;
+create policy "super administrador borra titulos de quiropracticos" on public.quiropractico_titulos for delete using (public.es_super_administrador());
+grant select, insert, update, delete on public.tipos_quiropractico to authenticated;
+grant select, insert, update on public.quiropracticos to authenticated;
+grant select, insert, delete on public.quiropractico_titulos to authenticated;
+
+-- Tipos de quiroprácticos en Guatemala (preparado con IA; solo se agregan los que falten), en la sede 2 · GRUPO PLUS DENTAL / 2-01
+insert into public.tipos_quiropractico (nombre, especialidad, descripcion, formacion, atiende, orden, localidad_id)
+select v.nombre, v.especialidad, v.descripcion, v.formacion, v.atiende, v.orden,
+       (select l.id from public.org_localidades l join public.organizaciones o on o.id = l.organizacion_id where o.codigo = '2' and l.codigo = '1')
+  from (values
+    (1, 'Quiropráctico general', 'Quiropráctica general',
+     'Evalúa y trata problemas de la columna y las articulaciones con ajustes manuales; es la puerta de entrada para adultos con dolor de espalda o cuello.',
+     'Doctor en Quiropráctica (D.C.), 4 a 5 años; en Guatemala la mayoría se forma en el extranjero (México, EE. UU., Chile).',
+     array['Dolor lumbar y de espalda', 'Dolor de cuello', 'Rigidez articular', 'Ciática', 'Revisión de columna']),
+    (2, 'Quiropráctico deportivo', 'Quiropráctica deportiva',
+     'Atiende a deportistas aficionados y de alto rendimiento: lesiones, recuperación y prevención para mejorar el desempeño.',
+     'D.C. con certificación en quiropráctica deportiva (p. ej. CCSP / ICSC) o diplomado en medicina del deporte.',
+     array['Esguinces y distensiones', 'Lesiones de hombro y rodilla', 'Recuperación después de competencias', 'Prevención de lesiones', 'Vendaje neuromuscular']),
+    (3, 'Quiropráctico pediátrico', 'Quiropráctica pediátrica',
+     'Trabaja con bebés, niños y adolescentes con técnicas suaves adaptadas a cada edad.',
+     'D.C. con posgrado o certificación en quiropráctica pediátrica (p. ej. ICPA).',
+     array['Revisión postural infantil', 'Escoliosis en niños y adolescentes', 'Postura y mochilas escolares', 'Cólicos y tortícolis del lactante (apoyo)']),
+    (4, 'Quiropráctico prenatal y perinatal', 'Quiropráctica prenatal',
+     'Acompaña a la mujer durante el embarazo y el posparto para aliviar molestias de la pelvis y la espalda.',
+     'D.C. con certificación en técnica Webster y atención perinatal.',
+     array['Dolor lumbar en el embarazo', 'Dolor de pelvis y sacroilíaco', 'Técnica Webster', 'Recuperación posparto']),
+    (5, 'Quiropráctico geriátrico', 'Quiropráctica geriátrica',
+     'Atiende a adultos mayores con técnicas de baja fuerza para mantener movilidad, equilibrio e independencia.',
+     'D.C. con formación en técnicas de baja fuerza (instrumentales y de flexión-distracción).',
+     array['Artrosis de columna', 'Rigidez y pérdida de movilidad', 'Equilibrio y prevención de caídas', 'Dolor crónico']),
+    (6, 'Quiropráctico neuromusculoesquelético', 'Quiropráctica ortopédica y neuromusculoesquelética',
+     'Se enfoca en trastornos de nervios, músculos y articulaciones, incluidos problemas de disco y nervio pinzado.',
+     'D.C. con diplomado en ortopedia quiropráctica o neurología quiropráctica.',
+     array['Hernia y protrusión de disco', 'Nervio pinzado / radiculopatía', 'Síndrome del túnel carpiano', 'Hombro congelado', 'Flexión-distracción (Cox)']),
+    (7, 'Quiropráctico de columna estructural', 'Corrección postural y estructural',
+     'Corrige alteraciones de la curvatura de la columna con análisis radiográfico y planes de corrección postural.',
+     'D.C. con certificación en técnicas estructurales (Chiropractic BioPhysics, Gonstead).',
+     array['Escoliosis del adulto', 'Pérdida de la curva cervical', 'Hipercifosis', 'Postura de cabeza adelantada', 'Análisis radiográfico de columna']),
+    (8, 'Quiropráctico de cervical superior', 'Quiropráctica de cervical superior',
+     'Trabaja la zona del atlas y el axis con ajustes precisos de baja fuerza.',
+     'D.C. con certificación en técnicas de cervical superior (NUCCA, Atlas Orthogonal, Toggle recoil).',
+     array['Cefaleas cervicogénicas', 'Migraña (apoyo)', 'Mareo de origen cervical', 'Latigazo cervical']),
+    (9, 'Quiropráctico de ATM y dolor craneofacial', 'Quiropráctica de ATM',
+     'Trata la articulación temporomandibular y el dolor de cabeza y cara en coordinación con el odontólogo.',
+     'D.C. con formación en trastornos temporomandibulares y técnica craneal (SOT).',
+     array['Dolor de la mandíbula (ATM)', 'Bruxismo (apoyo al odontólogo)', 'Cefalea tensional', 'Chasquido o bloqueo mandibular']),
+    (10, 'Quiropráctico ocupacional y ergonómico', 'Quiropráctica ocupacional',
+     'Atiende a trabajadores de oficina, conductores y personal de fuerza para prevenir lesiones laborales.',
+     'D.C. con formación en ergonomía y salud ocupacional.',
+     array['Dolor por trabajo de escritorio', 'Ergonomía del puesto de trabajo', 'Programas para empresas', 'Lesiones por esfuerzo repetitivo']),
+    (11, 'Quiropráctico de rehabilitación', 'Rehabilitación quiropráctica',
+     'Combina el ajuste con ejercicio terapéutico, terapia de tejidos blandos y fisioterapia de apoyo.',
+     'D.C. con diplomado en rehabilitación (p. ej. DACRB) o terapias de tejido blando.',
+     array['Rehabilitación después de accidentes', 'Ejercicio terapéutico', 'Terapia de tejidos blandos', 'Puntos gatillo', 'Fortalecimiento de core'])
+  ) as v(orden, nombre, especialidad, descripcion, formacion, atiende)
+ where not exists (select 1 from public.tipos_quiropractico t where lower(t.nombre) = lower(v.nombre));
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
