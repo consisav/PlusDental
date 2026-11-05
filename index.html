@@ -667,6 +667,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .adm-menu button.adm-directo svg{width:15px;height:15px;flex:none}
 .adm-menu button.adm-directo[aria-selected="true"]{background:#0B2B40;color:#FFFFFF}
 .adm-barra .adm-menu button.adm-directo{width:auto;min-height:40px;padding:9px 10px;font-size:11px;letter-spacing:.6px;border-radius:10px;gap:6px;white-space:nowrap}
+.ag-area{margin-right:auto}.ag-area button[aria-pressed="true"]{background:#0B2B40;color:#FFFFFF}
 .mn-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 .mn-top p{margin:4px 0 0;font-size:14px;color:#475B68;max-width:640px}
 .mn-avance{display:flex;flex-direction:column;gap:6px;min-width:200px;font-size:12px;font-weight:700;color:#475B68}
@@ -1982,7 +1983,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 <div class="pg-sec"><b aria-hidden="true">4</b>Atención y seguimiento</div>
 <div class="pg-grid">
-<label>Médico asignado<select id="pDentista"><option value="">Sin asignar</option></select></label>
+<label>Tipo de paciente<select id="pTipoPac" title="Odontología: se asigna un odontólogo · Quiropráctica: se asigna un quiropráctico"><option value="odontologia">Odontología</option><option value="quiropractica">Quiropráctica</option></select></label>
+<label><span id="pDentistaLbl">Odontólogo asignado</span><select id="pDentista"><option value="">Sin asignar</option></select></label>
 <label>Agente comercial<select id="pAgente"><option value="">0 · NINGUNO</option></select></label>
 <label>Tipo de cliente<select id="pTipoCliente" title="Define el precio que se le aplica (Precios por tipo de cliente)"><option value="directo">Cliente directo</option><option value="institucional">Institucional</option><option value="vip">VIP</option><option value="referido">Referido</option><option value="paquete">Paquete</option><option value="especial">Especial</option></select></label>
 <label>Estado del paciente<select id="pEstado" class="pac-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="suspendido">Suspendido</option><option value="baja">Baja</option></select></label>
@@ -2109,7 +2111,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <!-- 3. Historial de citas -->
 <div id="admCitas" role="tabpanel" aria-labelledby="tabCitas" class="adm-pane">
 <div class="adm-pane-head">
-<h3 class="adm-h">Historial de citas</h3>
+<h3 class="adm-h">Historial de citas</h3><div class="ag-vista ag-area" role="group" aria-label="Área de atención"><button type="button" data-area="odontologia" aria-pressed="true">Odontología</button><button type="button" data-area="quiropractica" aria-pressed="false">Quiropráctica</button></div>
 <div id="citaPeriodo" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Periodo">
 <button type="button" class="adm-btn" data-periodo="proximas" aria-pressed="true">Próximas</button>
 <button type="button" class="adm-btn" data-periodo="anteriores" aria-pressed="false">Anteriores</button>
@@ -2157,7 +2159,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 
 <!-- 9. Agenda de clínicas -->
 <div id="admAgenda" role="tabpanel" aria-labelledby="tabAgenda" hidden class="adm-pane">
-<div class="adm-pane-head"><h3 class="adm-h">Administrar citas</h3><span class="pronto-pill" style="background: #E2EEF6; color: #00476B">Asistente inteligente</span></div>
+<div class="adm-pane-head"><h3 class="adm-h">Administrar citas</h3><div class="ag-vista ag-area" role="group" aria-label="Área de atención"><button type="button" data-area="odontologia" aria-pressed="true">Odontología</button><button type="button" data-area="quiropractica" aria-pressed="false">Quiropráctica</button></div><span class="pronto-pill" style="background: #E2EEF6; color: #00476B">Asistente inteligente</span></div>
 
 <form id="agForm" class="adm-box ag-form">
 <div class="ag-form-head">
@@ -2247,7 +2249,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 
 <div id="admVerCitas" role="tabpanel" aria-labelledby="tabVerCitas" hidden class="adm-pane">
-<div class="adm-pane-head"><h3 class="adm-h">Visualizar citas</h3></div>
+<div class="adm-pane-head"><h3 class="adm-h">Visualizar citas</h3><div class="ag-vista ag-area" role="group" aria-label="Área de atención"><button type="button" data-area="odontologia" aria-pressed="true">Odontología</button><button type="button" data-area="quiropractica" aria-pressed="false">Quiropráctica</button></div></div>
 <div class="adm-pane-head">
 <div class="ag-titulo"><h3 id="agTitulo" style="margin: 0; font-size: 19px; font-weight: 700">Agenda del día</h3><p id="agResumen" class="ag-resumen"></p></div>
 <div class="ag-nav">
@@ -3336,12 +3338,12 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="marca.js?v=20261029d"></script>
 <script src="firmas.js"></script>
 <script src="app.js?v=20261102a"></script>
-<script src="auth.js?v=20261029a"></script>
+<script src="auth.js?v=20261105a"></script>
 <script src="voz-citas.js"></script>
 <script src="voz-historia.js"></script>
 <script src="voz-odontograma.js"></script>
 <script src="odontograma.js?v=20261029a"></script>
-<script src="expedientes.js?v=20261029a"></script>
+<script src="expedientes.js?v=20261105a"></script>
 <script src="presupuestos.js"></script>
 <script src="cuentas.js?v=20261029b"></script>
 <script src="tratamientos-paciente.js?v=20261028a"></script>
@@ -3364,10 +3366,10 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="asistentes.js"></script>
 <script src="dentistas.js?v=20261105a"></script>
 <script src="tipos-quiropracticos.js?v=20261105a"></script>
-<script src="quiropracticos.js?v=20261105b"></script>
-<script src="agenda.js?v=20261105a"></script>
+<script src="quiropracticos.js?v=20261105c"></script>
+<script src="agenda.js?v=20261105b"></script>
 <script src="agentes.js"></script>
-<script src="reportes.js?v=20261029c"></script>
+<script src="reportes.js?v=20261105a"></script>
 <script src="constancias.js"></script>
 <script src="tipos.js"></script>
 <script src="precios.js?v=20261027"></script>

@@ -31,6 +31,9 @@
   var ESPECIALIDADES = ['Odontología general', 'Ortodoncia', 'Endodoncia', 'Periodoncia', 'Odontopediatría', 'Prostodoncia', 'Rehabilitación oral', 'Cirugía', 'Implantología', 'Estética', 'Higiene', 'Trastornos temporomandibulares'];
   var SERVICIOS = ['Evaluación general', 'Limpieza', 'Urgencia / dolor', 'Estética', 'Ortodoncia', 'Implantes'];
 
+  // Área de atención: Odontología (odontólogos y salas) o Quiropráctica (quiroprácticos, sin salas)
+  window.PD_AREA = window.PD_AREA || 'odontologia';
+  function esQuiro() { return window.PD_AREA === 'quiropractica'; }
   var canceladas = [];   // se muestran en la agenda, pero no ocupan horario
   var dentistas = [], salas = [], pacientes = [], citas = [], bloqueos = [], fijo = null, sugerencias = [], diaCitas = [], vista = 'semana';
 
@@ -266,7 +269,8 @@
       var r = await sb.rpc('agendar_cita', {
         p_fecha: o.fecha, p_hora: o.hora, p_paciente_id: p ? p.id : null,
         p_nombre: nuevo ? $('agNombre').value.trim() : null, p_telefono: nuevo ? $('agTelefono').value.trim() : null,
-        p_servicio: $('agTratamiento').value.trim(), p_dentista_id: o.dentista ? o.dentista.id : null, p_posicion_id: o.sala ? o.sala.id : null,
+        p_servicio: $('agTratamiento').value.trim(), p_dentista_id: o.dentista && !esQuiro() ? o.dentista.id : null, p_posicion_id: o.sala && !esQuiro() ? o.sala.id : null,
+        p_quiropractico_id: o.dentista && esQuiro() ? o.dentista.id : null,
         p_prioridad: $('agPrioridad').value, p_notas: [$('agNotas').value.trim(), lista.length > 1 ? '(cita ' + (i + 1) + ' de ' + lista.length + ')' : ''].filter(Boolean).join(' '),
         p_estado: $('agEstado').value
       });
@@ -333,13 +337,15 @@
   // Nombre, teléfono, correo, médico (el de la cita o el elegido) y sede; estado Activo, tipo de cliente y agente por defecto
   async function crearExpediente(dentistaId) {
     var datos = { nombre: $('agNombre').value.trim(), telefono: $('agTelefono').value.trim() || null, correo: $('agCorreo').value.trim() || null, estado: 'activo',
-      dentista_id: dentistaId || ($('agMedico').value ? +$('agMedico').value : null) || medicoPrincipal() };
+      dentista_id: dentistaId || ($('agMedico').value ? +$('agMedico').value : null) || (esQuiro() ? null : medicoPrincipal()) };
+    if (esQuiro()) { datos.tipo_paciente = 'quiropractica'; datos.quiropractico_id = datos.dentista_id; datos.dentista_id = null; }
     if (window.PD_SEDES && $('agLoc').options.length > 1 && $('agLoc').value) Object.assign(datos, window.PD_SEDES.valores($('agOrg'), $('agLoc')));
     if (instCat.length) Object.assign(datos, datosTipo(null));
     var r = await sb.from('pacientes').insert(datos).select('*').single();
     if (r.error && /tipo_cliente|institucion_id|sucursal_id/.test(r.error.message || '')) { delete datos.tipo_cliente; delete datos.institucion_id; delete datos.sucursal_id; r = await sb.from('pacientes').insert(datos).select('*').single(); }
     if (r.error && /correo/.test(r.error.message || '')) { delete datos.correo; r = await sb.from('pacientes').insert(datos).select('id,nombre,dpi,telefono,dentista_id,estado').single(); }
     if (r.error) throw r.error;
+    if (esQuiro()) r.data.dentista_id = r.data.quiropractico_id || null;
     pacientes.push(r.data);
     pacientes.sort(function (a, b) { return String(a.nombre).localeCompare(String(b.nombre), 'es'); });
     $('agPaciente').insertAdjacentHTML('beforeend', '<option value="' + r.data.id + '">' + esc(r.data.nombre) + '</option>');
@@ -510,8 +516,9 @@
       p_nombre: nuevo ? $('agNombre').value.trim() : null,
       p_telefono: nuevo ? $('agTelefono').value.trim() : null,
       p_servicio: $('agTratamiento').value.trim(),
-      p_dentista_id: o.dentista ? o.dentista.id : null,
-      p_posicion_id: o.sala ? o.sala.id : null,
+      p_dentista_id: o.dentista && !esQuiro() ? o.dentista.id : null,
+      p_posicion_id: o.sala && !esQuiro() ? o.sala.id : null,
+      p_quiropractico_id: o.dentista && esQuiro() ? o.dentista.id : null,
       p_prioridad: $('agPrioridad').value,
       p_notas: $('agNotas').value.trim(),
       p_estado: $('agEstado').value
@@ -561,7 +568,9 @@
     var hasta = sumar(hoy(), DIAS_BUSQUEDA + 31);
     if (fin > hasta) hasta = fin;
     if (inicio < desde) desde = inicio;
-    var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada,creada_por,reprogramada_de')
+    var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada,creada_por,reprogramada_de,tipo,quiropractico_id')
+      .gte('fecha', desde).lte('fecha', hasta);
+    if (r.error && /tipo|quiropractico_id/.test(r.error.message)) r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada,creada_por,reprogramada_de')
       .gte('fecha', desde).lte('fecha', hasta);
     if (r.error && /creada_por|reprogramada_de/.test(r.error.message)) {
       r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada')
@@ -572,7 +581,7 @@
       r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id').gte('fecha', desde).lte('fecha', hasta);
       aviso('agMsg', 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para agendar desde aquí.', true);
     }
-    var todasC = r.error ? [] : r.data;
+    var todasC = r.error ? [] : delArea(r.data);
     canceladas = todasC.filter(function (c) { return c.estado === 'cancelada'; });
     citas = todasC.filter(function (c) { return c.estado !== 'cancelada'; });
     $('agFechaM').min = hoy();
@@ -580,6 +589,11 @@
     pintar();
   }
 
+  // Citas del área elegida; en Quiropráctica el «médico» de la cita es su quiropráctico
+  function delArea(lista) {
+    return lista.filter(function (c) { return (c.tipo || 'odontologia') === window.PD_AREA; })
+      .map(function (c) { if (esQuiro()) c.dentista_id = c.quiropractico_id || null; return c; });
+  }
   // ---------- Filtros de la agenda: institución y médico ----------
   // El Super Administrador, el personal que no es médico y los médicos principales ven a todos los médicos;
   // un médico alterno (con usuario propio) solo ve sus citas.
@@ -664,14 +678,14 @@
       var n = enRango.filter(function (c) { return c.estado === e; }).length;
       return '<span title="Punto de estado en la esquina de cada cita"><i style="background:' + COLOR_ESTADO[e] + '"></i>' + ESTADOS_CITA[e] + ' · <b>' + n + '</b></span>';
     }).join('') + '<span class="ag-ley-urg">Urgente = borde rojo' + (urg ? ' · <b>' + urg + '</b>' : '') + '</span>' +
-      (window.PD_COLOR ? dentistas.filter(function (d) { return window.PD_COLOR.color(d.id) && enRango.some(function (c) { return c.dentista_id === d.id; }); }).map(function (d) {
+      (window.PD_COLOR && !esQuiro() ? dentistas.filter(function (d) { return window.PD_COLOR.color(d.id) && enRango.some(function (c) { return c.dentista_id === d.id; }); }).map(function (d) {
         return '<span class="ag-ley-med"><i style="background:' + window.PD_COLOR.color(d.id) + ';box-shadow:0 0 0 1px ' + window.PD_COLOR.linea(window.PD_COLOR.color(d.id)) + '"></i>' + esc(d.nombre) + ' · <b>' + enRango.filter(function (c) { return c.dentista_id === d.id; }).length + '</b></span>';
       }).join('') : '');
   }
 
   // Vista de semana: lunes a sábado, todas las salas en cada casilla
   // En pantallas angostas la semana se muestra como lista por día (sin desplazamiento lateral)
-  function medEstilo(id) { return window.PD_COLOR ? window.PD_COLOR.estilo(id) : ''; }
+  function medEstilo(id) { return window.PD_COLOR && !esQuiro() ? window.PD_COLOR.estilo(id) : ''; }
   function semanaAngosta() { return window.innerWidth < 760; }
   function pintarSemanaLista(dias) {
     var g = document.querySelector('.ag-grid'); g.classList.remove('semana', 'semana2'); g.classList.add('semana-lista');
@@ -891,7 +905,7 @@
     var rs = await Promise.all([
       sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo,usuario,frecuencia').eq('estado', 'activo').order('nombre'),
       sb.from('posiciones').select('id,codigo,nombre,especialidad,estado,activa,horario').order('codigo'),
-      sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo,tipo_cliente,institucion_id,sucursal_id').order('nombre'),
+      sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo,tipo_cliente,institucion_id,sucursal_id,tipo_paciente,quiropractico_id').order('nombre'),
       sb.from('tratamientos').select('nombre,activo').eq('activo', true).order('nombre'),
       sb.from('bloqueos').select('fecha,hora').gte('fecha', hoyF)
     ]);
@@ -899,6 +913,7 @@
     if (rs[0].error && /frecuencia/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo,usuario').eq('estado', 'activo').order('nombre');
     if (rs[0].error && /usuario/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo').eq('estado', 'activo').order('nombre');
     if (rs[0].error && /correo/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono').eq('estado', 'activo').order('nombre');
+    if (rs[2].error && /tipo_paciente|quiropractico_id/.test(rs[2].error.message)) rs[2] = await sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo,tipo_cliente,institucion_id,sucursal_id').order('nombre');
     if (rs[2].error && /tipo_cliente|institucion_id|sucursal_id/.test(rs[2].error.message)) rs[2] = await sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo').order('nombre');
     try {
       var ri = await Promise.all([sb.from('jor_instituciones').select('id,numero,nombre,estado').order('nombre'), sb.from('jor_sucursales').select('id,numero,institucion_id,nombre,estado').order('nombre')]);
@@ -911,8 +926,13 @@
     if (rs[2].error && /correo/.test(rs[2].error.message)) rs[2] = await sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado').order('nombre');
     dentistas = rs[0].error ? [] : rs[0].data;
     salas = rs[1].error ? [] : rs[1].data;
+    if (esQuiro()) {
+      dentistas = (window.PD_QUIROPRACTICOS ? await window.PD_QUIROPRACTICOS() : []).map(function (q) { return Object.assign({}, q, { especialidades: q.tecnicas || [], posicion_id: null, rol_sala: 'principal', usuario: null }); });
+      salas = [];
+    }
     pacInst = {}; pacSuc = {}; (rs[2].error ? [] : rs[2].data).forEach(function (p) { if (p.institucion_id) pacInst[p.id] = p.institucion_id; if (p.sucursal_id) pacSuc[p.id] = p.sucursal_id; });
-    pacientes = rs[2].error ? [] : rs[2].data.filter(function (p) { return !p.estado || p.estado === 'activo'; });
+    pacientes = rs[2].error ? [] : rs[2].data.filter(function (p) { return (!p.estado || p.estado === 'activo') && (p.tipo_paciente || 'odontologia') === window.PD_AREA; });
+    if (esQuiro()) pacientes.forEach(function (p) { p.dentista_id = p.quiropractico_id || null; });
     opcionesFiltros();
     var catalogo = rs[3].error ? [] : rs[3].data.map(function (t) { return t.nombre; });
     bloqueos = rs[4].error ? [] : rs[4].data;
@@ -935,7 +955,8 @@
     $('agUsuarioGraba').textContent = usuarioSesion();
     opcionesHorario();
     alCambiarPaciente();
-    if (!dentistas.length) aviso('agFormMsg', 'Aún no hay odontólogos activos con horario: registra a los odontólogos para que el asistente pueda asignarlos.', true);
+    if (!dentistas.length) aviso('agFormMsg', esQuiro() ? 'Aún no hay quiroprácticos activos con horario: regístralos en Catálogos › 5 · Quiroprácticos.' : 'Aún no hay odontólogos activos con horario: registra a los odontólogos para que el asistente pueda asignarlos.', true);
+    else if ($('agFormMsg').textContent.indexOf('Aún no hay') === 0) aviso('agFormMsg', '');
     await cargarCitas();
   }
 
@@ -946,7 +967,9 @@
     $('reproHora').disabled = true;
     $('reproHora').innerHTML = '<option value="">' + (f ? 'Buscando horas libres…' : 'Elige la fecha') + '</option>';
     if (!f) return;
-    var r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id').eq('fecha', f).neq('estado', 'cancelada');
+    var r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id,tipo,quiropractico_id').eq('fecha', f).neq('estado', 'cancelada');
+    if (r.error) r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id').eq('fecha', f).neq('estado', 'cancelada');
+    if (!r.error) r.data = delArea(r.data);
     if ($('reproFecha').value !== f) return;
     var otras = (r.error ? [] : r.data).filter(function (x) { return String(x.id) !== String(c.id); });
     var ahora = new Date(), hAhora = ('0' + ahora.getHours()).slice(-2) + ':' + ('0' + ahora.getMinutes()).slice(-2);
@@ -1010,6 +1033,17 @@
       $('agForm').scrollIntoView({ block: 'start' });
     })();
   }
+  // Área de atención (Administrar citas, Visualizar citas e Historial de citas): Odontología o Quiropráctica
+  function pintarArea() { document.querySelectorAll('[data-area]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.area === window.PD_AREA); }); }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-area]'); if (!b || b.dataset.area === window.PD_AREA) return;
+    window.PD_AREA = b.dataset.area; pintarArea();
+    $('agMedico').value = ''; $('agFMed').value = ''; fijo = null; serie = null; $('agSugerencias').innerHTML = '';
+    document.dispatchEvent(new CustomEvent('pd-area'));
+    cargar();
+  });
+  pintarArea();
+
   window.PD_AGENDA = { reprogramar: reprogramar, estados: ESTADOS_CITA, preparar: preparar };
 
   function pedirConfirmacion(b) {

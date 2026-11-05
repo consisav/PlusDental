@@ -16,7 +16,7 @@
     'Suegro(a)', 'Yerno', 'Nuera', 'Cuñado(a)', 'Pareja', 'Novio(a)', 'Amigo(a)', 'Tutor(a) / Encargado(a)', 'Compañero(a) de trabajo'];
   var ESTADOS_PAC = { activo: 'Activo', inactivo: 'Inactivo', suspendido: 'Suspendido', baja: 'Baja' };
   var pacientes = [], actual = null, odontoCambiado = false;
-  var filtroEstado = 'activo', editando = false, fotos = {}, medicos = [], agentesCat = [], clientes = [], usuariosTomados = {}, hayUsuario = false;
+  var filtroEstado = 'activo', editando = false, fotos = {}, medicos = [], agentesCat = [], clientes = [], usuariosTomados = {}, hayUsuario = false; var quiros = [];
   var instCat = [], sucCat = [];   // Jornadas › Instituciones y sus sucursales (pacientes institucionales)
 
   function $(id) { return document.getElementById(id); }
@@ -59,12 +59,14 @@
     if (window.PD_COLOR) await window.PD_COLOR.cargar(true);
     aviso('expMsg', '');
     $('expBody').innerHTML = '<tr><td colspan="8">Cargando…</td></tr>';
-    var r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado,estado,foto,dentista_id,medico:dentistas(nombre)').order('nombre');
+    var r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado,estado,foto,dentista_id,medico:dentistas(nombre),tipo_paciente,quiropractico_id,quiro:quiropracticos(nombre)').order('nombre');
+    if (r.error && /tipo_paciente|quiropractic/.test(r.error.message)) r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado,estado,foto,dentista_id,medico:dentistas(nombre)').order('nombre');
     if (r.error && /dentista/.test(r.error.message)) r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado,estado,foto').order('nombre');
     // Si aún no existen las columnas nuevas, se muestra la lista sin ellas
     if (r.error && /estado|foto/.test(r.error.message)) r = await sb.from('pacientes').select('id,nombre,dpi,telefono,fecha_nacimiento,actualizado,creado').order('nombre');
     if (r.error) { $('expBody').innerHTML = ''; aviso('expMsg', traducir(r.error), true); return; }
     pacientes = r.data;
+    pacientes.forEach(medicoDelTipo);
     pintarLista();
     // Fotos de la lista (enlaces temporales del almacenamiento privado)
     var rutas = pacientes.filter(function (p) { return p.foto; }).map(function (p) { return p.foto; });
@@ -122,23 +124,29 @@
     if (id === 'fLab' && window.PD_LAB) window.PD_LAB.cargar(actual);
   }
 
+  // Paciente de Quiropráctica: su «médico» es el quiropráctico asignado
+  function esQuiro() { return $('pTipoPac').value === 'quiropractica'; }
+  function medicoDelTipo(p) { if (p && p.tipo_paciente === 'quiropractica') p.medico = p.quiro ? { nombre: p.quiro.nombre + ' · Quiropráctica' } : null; return p; }
   // Médico principal por defecto: el primer dentista activo marcado como principal (si no hay, el primero activo)
   function medicoPorDefecto() {
+    if (esQuiro()) return quiros[0] ? String(quiros[0].id) : '';
     var p = medicos.filter(function (m) { return m.rol_sala !== 'alterno'; })[0] || medicos[0];
     return p ? String(p.id) : '';
   }
   function opcionesMedicos(elegido) {
-    var lista = medicos.slice();
+    var q = esQuiro(), lista = (q ? quiros : medicos).slice();
+    $('pDentistaLbl').textContent = q ? 'Quiropráctico asignado' : 'Odontólogo asignado';
     // Si el paciente tiene un médico que ya no está activo, se muestra igual
     if (elegido && !lista.some(function (m) { return m.id === elegido; }) && actual && actual.medico) lista.push({ id: elegido, nombre: actual.medico.nombre + ' (inactivo)', rol_sala: 'alterno' });
     $('pDentista').innerHTML = '<option value="">Sin asignar</option>' + lista.map(function (m) {
-      return '<option value="' + m.id + '">' + esc(m.nombre) + (m.rol_sala === 'alterno' ? ' · alterno' : ' · principal') + '</option>';
+      return '<option value="' + m.id + '">' + esc(m.nombre) + (q ? '' : m.rol_sala === 'alterno' ? ' · alterno' : ' · principal') + '</option>';
     }).join('');
     $('pDentista').value = elegido ? String(elegido) : '';
   }
   async function cargarMedicos() {
     var r = await Promise.all([window.PD_DENTISTAS ? window.PD_DENTISTAS() : [], window.PD_AGENTES ? window.PD_AGENTES() : []]);
     medicos = r[0]; agentesCat = r[1];
+    quiros = window.PD_QUIROPRACTICOS ? await window.PD_QUIROPRACTICOS() : [];
     await cargarUsuarios();
     try {
       var ri = await Promise.all([sb.from('jor_instituciones').select('id,numero,nombre,estado').order('nombre'), sb.from('jor_sucursales').select('id,numero,institucion_id,nombre,estado').order('nombre')]);
@@ -236,7 +244,8 @@
     $('pEstado').value = (p && p.estado) || 'activo';
     $('pTipoCliente').value = (p && TIPOS_CLIENTE[p.tipo_cliente]) ? p.tipo_cliente : 'directo';
     opcionesInst(p ? p.institucion_id : null, p ? p.sucursal_id : null); pintarInstVis();
-    opcionesMedicos(p ? p.dentista_id : null);
+    $('pTipoPac').value = p && p.tipo_paciente === 'quiropractica' ? 'quiropractica' : 'odontologia';
+    opcionesMedicos(p ? (esQuiro() ? p.quiropractico_id : p.dentista_id) : null);
     if (!p) $('pDentista').value = medicoPorDefecto();
     opcionesAgentes(p ? p.agente_id : null);
     opcionesUsuarios(p);
@@ -362,10 +371,11 @@
   async function abrir(id) {
     aviso('expMsg', '');
     await cargarMedicos();
-    var r = await sb.from('pacientes').select('*,medico:dentistas(nombre)').eq('id', id).single();
+    var r = await sb.from('pacientes').select('*,medico:dentistas(nombre),quiro:quiropracticos(nombre)').eq('id', id).single();
+    if (r.error && /quiropractic/.test(r.error.message)) r = await sb.from('pacientes').select('*,medico:dentistas(nombre)').eq('id', id).single();
     if (r.error && /dentista/.test(r.error.message)) r = await sb.from('pacientes').select('*').eq('id', id).single();
     if (r.error) { aviso('expMsg', traducir(r.error), true); return; }
-    actual = r.data;
+    actual = medicoDelTipo(r.data);
     cargarOdonto();
     rellenar(actual);
     ['fDatosMsg', 'fHistoriaMsg', 'notaMsg', 'rxMsg'].forEach(function (m) { aviso(m, ''); });
@@ -397,7 +407,10 @@
     var o = {};
     claves.forEach(function (k) { var v = $(CAMPOS[k]).value.trim(); o[k] = v === '' ? null : v; });
     if (claves.indexOf('nombre') >= 0) {
-      o.dentista_id = $('pDentista').value ? +$('pDentista').value : null;
+      var medSel = $('pDentista').value ? +$('pDentista').value : null;
+      o.tipo_paciente = $('pTipoPac').value;
+      o.dentista_id = esQuiro() ? null : medSel;
+      o.quiropractico_id = esQuiro() ? medSel : null;
       o.agente_id = $('pAgente').value ? +$('pAgente').value : null;   // vacío = Supabase pone el agente 0
       if (hayUsuario) o.usuario = $('pUsuario').value || null;
       if (instCat.length || (actual && actual.institucion_id)) { var ins = esInstitucional(); o.institucion_id = ins && $('pInstitucion').value ? +$('pInstitucion').value : null; o.sucursal_id = ins && $('pSucursal').value ? +$('pSucursal').value : null; }
@@ -824,6 +837,8 @@
   $('pFotoBtn').addEventListener('click', function () { $('pFotoArchivo').click(); });
   $('pNacimiento').addEventListener('input', pintarDerivados);
   $('pEstado').addEventListener('change', pintarDerivados);
+  // Tipo de paciente: cambia la lista de médicos (odontólogos o quiroprácticos)
+  $('pTipoPac').addEventListener('change', function () { opcionesMedicos(null); $('pDentista').value = medicoPorDefecto(); });
   $('pTipoCliente').addEventListener('change', function () { pintarInstVis(); if (esInstitucional() && !$('pInstitucion').value) $('pInstitucion').focus(); });
   $('pInstitucion').addEventListener('change', function () { opcionesSuc(null); });
   $('pNombre').addEventListener('input', function () { if (!actual) $('pPerfilNombre').textContent = this.value.trim() || 'Nuevo paciente'; });

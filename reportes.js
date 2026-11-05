@@ -76,14 +76,16 @@
         ['Institución · sucursal', function (f) { return f.tipo_cliente === 'institucional' && f.institucion ? f.institucion.nombre + (f.sucursal ? ' · ' + f.sucursal.nombre : '') : '—'; }]
       ],
       cargar: async function (d, h, o) {
-        var campos = 'id,nombre,dpi,telefono,correo,creado,estado,medico:dentistas(nombre),agente:agentes(codigo,nombre)';
+        var quiro = o && o.area === 'quiropractica';
+        var campos = 'id,nombre,dpi,telefono,correo,creado,estado,medico:dentistas(nombre),agente:agentes(codigo,nombre),tipo_paciente,quiro:quiropracticos(nombre)';
         // Filtros: odontólogo asignado e institución (vacío = todos)
-        function filtrar(x, conInst) { x = x.gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado'); if (o && o.medico) x = x.eq('dentista_id', +o.medico); return x; }
+        function filtrar(x, conInst) { x = x.gte('creado', desdeHora(d)).lte('creado', hastaHora(h)).order('creado'); if (o && o.area) x = x.eq('tipo_paciente', o.area); if (o && o.medico) x = x.eq(quiro ? 'quiropractico_id' : 'dentista_id', +o.medico); return x; }
         var r = await filtrar(sb.from('pacientes').select(campos + ',tipo_cliente,institucion_id,sucursal_id,institucion:jor_instituciones(nombre),sucursal:jor_sucursales(nombre)'), true);
         // Sin el SQL de pacientes institucionales: el listado sale sin institución ni sucursal
         if (r.error && /institucion|sucursal|tipo_cliente|jor_/i.test(r.error.message || '')) r = await filtrar(sb.from('pacientes').select(campos), false);
         if (r.error) throw r.error;
-        return r.data.filter(function (p) { return !('institucion_id' in p) || pasaInstSuc(o, p.institucion_id, p.sucursal_id); });
+        return r.data.filter(function (p) { return !('institucion_id' in p) || pasaInstSuc(o, p.institucion_id, p.sucursal_id); })
+          .map(function (p) { if (p.tipo_paciente === 'quiropractica') p.medico = p.quiro || null; return p; });
       },
       totales: function (filas) { return [['Pacientes', filas.length]]; }
     },
@@ -145,14 +147,17 @@
         ['Paciente', function (f) { return f.nombre; }],
         ['Teléfono', function (f) { return f.telefono || '—'; }],
         ['Servicio', function (f) { return f.servicio; }],
-        ['Odontólogo', function (f) { return f.dentista ? f.dentista.nombre : '—'; }],
-        ['Sala', function (f) { return f.sala ? f.sala.codigo + ' · ' + f.sala.nombre : '—'; }]
+        ['Médico', function (f) { return f.dentista ? f.dentista.nombre : f.quiro ? f.quiro.nombre : '—'; }],
+        ['Sala', function (f) { return f.sala ? f.sala.codigo + ' · ' + f.sala.nombre : '—'; }],
+        ['Área', function (f) { return f.tipo === 'quiropractica' ? 'Quiropráctica' : 'Odontología'; }]
       ],
       cargar: async function (d, h, o) {
         var filtra = o && (o.inst || o.suc);
-        var c = sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista:dentistas(nombre),sala:posiciones(codigo,nombre)' + (filtra ? ',pac:pacientes(institucion_id,sucursal_id)' : ''))
+        var quiro = o && o.area === 'quiropractica';
+        var c = sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,tipo,dentista:dentistas(nombre),quiro:quiropracticos(nombre),sala:posiciones(codigo,nombre)' + (filtra ? ',pac:pacientes(institucion_id,sucursal_id)' : ''))
           .gte('fecha', d).lte('fecha', h);
-        if (o && o.medico) c = c.eq('dentista_id', +o.medico);   // odontólogo de la cita
+        if (o && o.area) c = c.eq('tipo', o.area);   // Odontología o Quiropráctica
+        if (o && o.medico) c = c.eq(quiro ? 'quiropractico_id' : 'dentista_id', +o.medico);   // médico de la cita
         var r = await c.order('fecha').order('hora');
         if (r.error) throw r.error;
         if (!filtra) return r.data;
@@ -237,7 +242,8 @@
       (def.cliente ? '<label class="rep-cliente">Cliente<select name="cliente"><option value="">Todos los clientes</option></select></label>' : '') +
       (def.tipoBanco ? '<label>Tipo de cliente<select name="tipo"><option value="">Todos</option><option value="institucional">Institucional</option><option value="privado">Cliente privado</option></select></label>' +
         '<label>Banco<select name="banco"><option value="">Todos los bancos</option></select></label>' : '') +
-      (def.medicoInst ? '<label>Odontólogo<select name="medico"><option value="">Todos los odontólogos</option></select></label>' +
+      (def.medicoInst ? '<label>Tipo de paciente<select name="area"><option value="odontologia">Odontología</option><option value="quiropractica">Quiropráctica</option></select></label>' +
+        '<label><span data-med-lbl>Odontólogo</span><select name="medico"><option value="">Todos los odontólogos</option></select></label>' +
         (def.instSuc ? '' : '<label>Institución<select name="inst"><option value="">Todas las instituciones</option></select></label>') : '') +
       (def.instSuc ? '<label>Institución<select name="inst"><option value="ninguna">Ninguna (sin institución)</option><option value="">Todas las instituciones</option></select></label>' +
         '<label>Sucursal<select name="suc" disabled><option value="">Ninguna</option></select></label>' : '') +
@@ -282,11 +288,14 @@
   }
   // Listas de odontólogos e instituciones para el listado de pacientes
   async function llenarMedicoInst(p) {
-    var r = await Promise.all([sb.from('dentistas').select('id,nombre,estado').order('nombre'), sb.from('jor_instituciones').select('id,nombre').order('nombre')]);
+    var sa = p.querySelector('select[name=area]'), quiro = sa && sa.value === 'quiropractica';
+    if (sa && !sa.onchange) sa.onchange = function () { p.querySelector('select[name=medico]').value = ''; llenarMedicoInst(p); };
+    var r = await Promise.all([sb.from(quiro ? 'quiropracticos' : 'dentistas').select('id,nombre,estado').order('nombre'), sb.from('jor_instituciones').select('id,nombre').order('nombre')]);
+    var lbl = p.querySelector('[data-med-lbl]'); if (lbl) lbl.textContent = quiro ? 'Quiropráctico' : 'Odontólogo';
     var sm = p.querySelector('select[name=medico]'), si = tieneSucursal(p) ? null : p.querySelector('select[name=inst]');
     if (!sm || !sm.isConnected) return;
     var vm = sm.value, vi = si ? si.value : '';
-    sm.innerHTML = '<option value="">Todos los odontólogos</option>' + (r[0].error ? [] : r[0].data).map(function (x) { return '<option value="' + x.id + '">' + esc(x.nombre) + (x.estado && x.estado !== 'activo' ? ' (' + x.estado + ')' : '') + '</option>'; }).join('');
+    sm.innerHTML = '<option value="">' + (quiro ? 'Todos los quiroprácticos' : 'Todos los odontólogos') + '</option>' + (r[0].error ? [] : r[0].data).map(function (x) { return '<option value="' + x.id + '">' + esc(x.nombre) + (x.estado && x.estado !== 'activo' ? ' (' + x.estado + ')' : '') + '</option>'; }).join('');
     if (si) si.innerHTML = '<option value="">Todas las instituciones</option>' + (r[1].error ? [] : r[1].data).map(function (i) { return '<option value="' + i.id + '">' + esc(i.nombre) + '</option>'; }).join('');
     sm.value = vm; if (si) si.value = vi;
   }
@@ -336,13 +345,13 @@
     form.querySelector('button').disabled = true;
     try {
       var tipo = form.tipo ? form.tipo.value : '', banco = form.banco ? form.banco.value : '';
-      var agente = form.agente ? form.agente.value : '', inst = form.inst ? form.inst.value : '', medico = form.medico ? form.medico.value : '', suc = form.suc ? form.suc.value : '';
-      s.filas = await def.cargar(d, h, { cliente: cli, tipo: tipo, banco: banco, agente: agente, inst: inst, medico: medico, suc: suc });
+      var agente = form.agente ? form.agente.value : '', inst = form.inst ? form.inst.value : '', medico = form.medico ? form.medico.value : '', suc = form.suc ? form.suc.value : '', area = form.area ? form.area.value : '';
+      s.filas = await def.cargar(d, h, { cliente: cli, tipo: tipo, banco: banco, agente: agente, inst: inst, medico: medico, suc: suc, area: area });
       var txt = function (sel, def0) { return sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : def0; };
       var ex = [];
       if (def.tipoBanco) ex.push(['Tipo de cliente', txt(form.tipo, 'Todos')], ['Banco', banco || 'Todos los bancos']);
       if (def.agenteInst) ex.push(['Agente comercial', txt(form.agente, 'Todos los agentes')], ['Institución', txt(form.inst, 'Todas las instituciones')]);
-      if (def.medicoInst) ex.push(['Odontólogo', txt(form.medico, 'Todos los odontólogos')]);
+      if (def.medicoInst) ex.push(['Tipo de paciente', txt(form.area, 'Odontología')], [area === 'quiropractica' ? 'Quiropráctico' : 'Odontólogo', txt(form.medico, 'Todos')]);
       if (def.medicoInst && !def.instSuc) ex.push(['Institución', txt(form.inst, 'Todas las instituciones')]);
       if (def.instSuc) ex.push(['Institución', txt(form.inst, 'Ninguna (sin institución)')], ['Sucursal', form.suc.disabled ? 'No aplica' : txt(form.suc, 'Ninguna')]);
       s.extras = ex.length ? ex : null;

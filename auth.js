@@ -150,6 +150,8 @@
     return 'https://wa.me/' + num + '?text=' + encodeURIComponent(texto);
   }
 
+  // Al cambiar el área (Odontología / Quiropráctica) en cualquiera de las agendas
+  document.addEventListener('pd-area', function () { if (!panel.hidden) cargarCitas(); });
   async function cargarCitas() {
     if (window.PD_COLOR) await window.PD_COLOR.cargar(true);
     aviso('citasMsg', '');
@@ -166,14 +168,16 @@
         ? q.gte('fecha', hoyISO()).order('fecha').order('hora')
         : q.lt('fecha', hoyISO()).order('fecha', { ascending: false }).order('hora', { ascending: false }).limit(300);
     }
-    var r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,creada_por,reprogramada_de,posicion_id,dentista_id,paciente_id');
+    var area = window.PD_AREA || 'odontologia', quiro = area === 'quiropractica';
+    var r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,creada_por,reprogramada_de,posicion_id,dentista_id,paciente_id,tipo,quiropractico_id');
+    if (r.error && /tipo|quiropractico_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,creada_por,reprogramada_de,posicion_id,dentista_id,paciente_id');
     if (r.error && /creada_por|reprogramada_de/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id,dentista_id,paciente_id');
     if (r.error && /paciente_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id,dentista_id');
     // Si todavía no existen las columnas nuevas, se muestran las citas sin ellas
     if (r.error && /dentista_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada,posicion_id');
     if (r.error && /posicion_id/.test(r.error.message)) r = await consulta('id,fecha,hora,servicio,nombre,telefono,estado,creada');
-    dentistasCita = window.PD_DENTISTAS ? await window.PD_DENTISTAS() : [];
-    posicionesCita = window.PD_POSICIONES ? await window.PD_POSICIONES() : [];
+    dentistasCita = quiro ? (window.PD_QUIROPRACTICOS ? await window.PD_QUIROPRACTICOS() : []) : window.PD_DENTISTAS ? await window.PD_DENTISTAS() : [];
+    posicionesCita = quiro ? [] : window.PD_POSICIONES ? await window.PD_POSICIONES() : [];
     contarPendientes();
     if (r.error) {
       $('citasBody').innerHTML = '';
@@ -181,7 +185,8 @@
         ? 'Falta ejecutar en Supabase el script de la agenda.' : traducir(r.error), true);
       return;
     }
-    citas = r.data;
+    // Solo las citas del área elegida; en Quiropráctica el «médico» de la cita es su quiropráctico
+    citas = r.data.filter(function (c) { return (c.tipo || 'odontologia') === area; }).map(function (c) { if (quiro) c.dentista_id = c.quiropractico_id || null; return c; });
     cargarOpcionesBusqueda();
     pintarCitas();
   }
@@ -267,6 +272,7 @@
   }
 
   function selectorPosicion(c) {
+    if (window.PD_AREA === 'quiropractica') return '';
     if (!posicionesCita.length || !('posicion_id' in c)) return '<span style="color:#94A6B2">—</span>';
     return '<select class="adm-input" data-pos-cita="' + c.id + '" aria-label="Posición de la cita de ' + esc(c.nombre) + '" title="Posición"' +
       (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Posición: sin asignar</option>' +
@@ -276,8 +282,9 @@
 
   function selectorDentista(c) {
     if (!dentistasCita.length || !('dentista_id' in c)) return '<span style="color:#94A6B2">—</span>';
-    return (window.PD_COLOR ? window.PD_COLOR.punto(c.dentista_id) : '') + '<select class="adm-input" data-den-cita="' + c.id + '" aria-label="Odontólogo de la cita de ' + esc(c.nombre) + '" title="Odontólogo"' +
-      (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">Odontólogo: sin asignar</option>' +
+    var q = window.PD_AREA === 'quiropractica', med = q ? 'Quiropráctico' : 'Odontólogo';
+    return (window.PD_COLOR && !q ? window.PD_COLOR.punto(c.dentista_id) : '') + '<select class="adm-input" data-den-cita="' + c.id + '" aria-label="' + med + ' de la cita de ' + esc(c.nombre) + '" title="' + med + '"' +
+      (c.estado === 'cancelada' ? ' disabled' : '') + '><option value="">' + med + ': sin asignar</option>' +
       dentistasCita.map(function (d) { return '<option value="' + d.id + '"' + (d.id === c.dentista_id ? ' selected' : '') + '>' + esc(d.nombre) + '</option>'; }).join('') +
       '</select>';
   }
@@ -288,13 +295,14 @@
     var valor = sel.value ? +sel.value : null;
     var cita = citas.filter(function (c) { return String(c.id) === sel.dataset.denCita; })[0];
     var d = dentistasCita.filter(function (x) { return x.id === valor; })[0];
-    var cambios = { dentista_id: valor };
-    if (d && d.posicion_id && cita && !cita.posicion_id) cambios.posicion_id = d.posicion_id;
+    var quiro = window.PD_AREA === 'quiropractica';
+    var cambios = quiro ? { quiropractico_id: valor } : { dentista_id: valor };
+    if (!quiro && d && d.posicion_id && cita && !cita.posicion_id) cambios.posicion_id = d.posicion_id;
     var r = await sb.from('citas').update(cambios).eq('id', sel.dataset.denCita).select('id');
     sel.disabled = false;
     if (r.error || !r.data || !r.data.length) { aviso('citasMsg', r.error ? traducir(r.error) : 'No tienes permiso para cambiar esta cita.', true); return; }
     if (cita) { cita.dentista_id = valor; if (cambios.posicion_id) cita.posicion_id = cambios.posicion_id; }
-    aviso('citasMsg', d ? 'Cita asignada a ' + d.nombre + (cambios.posicion_id ? ' y a su sala.' : '.') : 'La cita quedó sin odontólogo asignado.');
+    aviso('citasMsg', d ? 'Cita asignada a ' + d.nombre + (cambios.posicion_id ? ' y a su sala.' : '.') : quiro ? 'La cita quedó sin quiropráctico asignado.' : 'La cita quedó sin odontólogo asignado.');
     if (cambios.posicion_id) pintarCitas();
   }
 

@@ -8021,6 +8021,73 @@ insert into public.manual_capitulos (clave, ruta, titulo, contenido, generado_po
 ('admHistorias','Página web › Historias de impacto','Historias de impacto','{"resumen":"Publica en la página web historias de pacientes (antes y después, testimonios) con fotos o video.","pasos":[{"titulo":"Consultar","detalle":"La tabla muestra Historia, Tipo, Tratamiento, Orden y Estado. Presiona Abrir.","ejemplo":""},{"titulo":"Nueva historia","detalle":"Presiona Nueva historia y llena Tipo, Orden en la página (0 = primero), Título, Tratamiento, Detalle y Descripción.","ejemplo":"Título: «Una sonrisa nueva en 6 meses» · Tratamiento: Ortodoncia."},{"titulo":"Fotos y video","detalle":"Usa Elegir archivo para las fotos o pega un enlace de YouTube; Quitar elimina un archivo.","ejemplo":""},{"titulo":"Autorización y publicación","detalle":"Marca que el paciente firmó la autorización y Mostrar en la página pública. Presiona Guardar (Borrar historia la elimina).","ejemplo":""}],"consejos":["Publica solo con la autorización firmada del paciente."]}'::jsonb,'Claude (IA)',now())
 on conflict (clave) do update set ruta = excluded.ruta, titulo = excluded.titulo, contenido = excluded.contenido, generado_por = excluded.generado_por, generado_en = excluded.generado_en;
 
+-- ===== Tipo de paciente: Odontología o Quiropráctica =====
+-- Cada paciente es de Odontología (con su odontólogo asignado) o de Quiropráctica (con su quiropráctico asignado).
+-- Los pacientes existentes quedan como Odontología (valor por defecto). Las citas también llevan el tipo y, si son de
+-- quiropráctica, el quiropráctico que atiende: así las agendas y los reportes se ven por Odontología o por Quiropráctica.
+alter table public.pacientes add column if not exists tipo_paciente text not null default 'odontologia'
+  check (tipo_paciente in ('odontologia', 'quiropractica'));
+alter table public.pacientes add column if not exists quiropractico_id bigint references public.quiropracticos (id) on delete set null;
+create index if not exists pacientes_quiropractico on public.pacientes (quiropractico_id);
+
+alter table public.citas add column if not exists tipo text not null default 'odontologia'
+  check (tipo in ('odontologia', 'quiropractica'));
+alter table public.citas add column if not exists quiropractico_id bigint references public.quiropracticos (id) on delete set null;
+create index if not exists citas_quiropractico on public.citas (quiropractico_id, fecha);
+-- Un quiropráctico no tiene dos citas a la misma hora; las citas de quiropráctica no ocupan el turno «sin asignar» de odontología
+create unique index if not exists citas_quiropractico_horario on public.citas (fecha, hora, quiropractico_id)
+  where estado <> 'cancelada' and quiropractico_id is not null;
+drop index if exists public.citas_sin_asignar_horario;
+create unique index citas_sin_asignar_horario on public.citas (fecha, hora)
+  where estado <> 'cancelada' and dentista_id is null and posicion_id is null and quiropractico_id is null and tipo = 'odontologia';
+
+-- Agendar desde el panel: con p_quiropractico_id la cita es de quiropráctica (sin odontólogo ni sala)
+drop function if exists public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text);
+create or replace function public.agendar_cita(
+  p_fecha date, p_hora text, p_paciente_id bigint, p_nombre text, p_telefono text, p_servicio text,
+  p_dentista_id bigint, p_posicion_id bigint, p_prioridad text, p_notas text, p_estado text,
+  p_quiropractico_id bigint default null)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_id bigint;
+  v_nombre text := trim(coalesce(p_nombre, ''));
+  v_tel text := trim(coalesce(p_telefono, ''));
+  v_quiro boolean := p_quiropractico_id is not null;
+begin
+  if not public.es_personal() then
+    raise exception 'No tienes permiso para esta acción';
+  end if;
+  if p_paciente_id is not null then
+    select coalesce(nullif(v_nombre, ''), nombre), coalesce(nullif(v_tel, ''), telefono, '')
+      into v_nombre, v_tel
+      from public.pacientes where id = p_paciente_id;
+  end if;
+  if coalesce(v_nombre, '') = '' then
+    raise exception 'Indica el paciente';
+  end if;
+  if exists (select 1 from public.bloqueos b where b.fecha = p_fecha and (b.hora is null or b.hora = p_hora::time)) then
+    raise exception 'Ese horario está bloqueado';
+  end if;
+
+  insert into public.citas (fecha, hora, servicio, nombre, telefono, paciente_id, dentista_id, posicion_id,
+                            prioridad, notas, estado, creada_por, tipo, quiropractico_id)
+  values (p_fecha, p_hora::time, coalesce(nullif(trim(p_servicio), ''), 'Evaluación general'), v_nombre, v_tel,
+          p_paciente_id, case when v_quiro then null else p_dentista_id end, case when v_quiro then null else p_posicion_id end,
+          case when p_prioridad = 'urgente' then 'urgente' else 'normal' end,
+          nullif(trim(p_notas), ''),
+          (case when p_estado in ('confirmada', 'atendida') then p_estado else 'pendiente' end)::public.estado_cita,
+          (select usuario from public.perfiles where id = auth.uid()),
+          case when v_quiro then 'quiropractica' else 'odontologia' end, p_quiropractico_id)
+  returning id into v_id;
+  return v_id;
+exception
+  when unique_violation then
+    raise exception 'Ese horario ya está ocupado para ese médico o esa sala';
+end;
+$$;
+revoke execute on function public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text, bigint) from public, anon;
+grant execute on function public.agendar_cita(date, text, bigint, text, text, text, bigint, bigint, text, text, text, bigint) to authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

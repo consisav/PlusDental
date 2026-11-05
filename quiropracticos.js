@@ -514,6 +514,14 @@
   });
   $('tabQuiropracticos').addEventListener('click', function () { if (!$('quLista').hidden) cargar(); });
 
+  // Quiroprácticos activos para otras pantallas (expediente, agendas, historial y reportes)
+  window.PD_QUIROPRACTICOS = async function (todos) {
+    var q = sb.from('quiropracticos').select('id,nombre,tecnicas,horario,frecuencia,estado,fecha_ingreso,fecha_salida,telefono,correo');
+    if (!todos) q = q.eq('estado', 'activo');
+    var r = await q.order('nombre');
+    return r.error ? [] : r.data;
+  };
+
   (window.PD_MODULOS = window.PD_MODULOS || []).push({
     cargar: function () { if (!$('quLista').hidden) cargar(); },
     limpiar: function () {
