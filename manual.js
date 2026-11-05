@@ -64,10 +64,60 @@
         '<em class="mnf-btn claro">Subir foto</em></div>';
     },
     'exp-pestanas': function () {
-      var t = [['Datos', 'Identificación, contacto, emergencia y atención'], ['Historia médica', 'Alergias, enfermedades y medicamentos'], ['Odontograma', 'Estado de cada pieza dental'], ['Tratamientos', 'Procedimientos realizados y pendientes'],
-        ['Notas', 'Notas de evolución'], ['Radiografías', 'Imágenes del paciente'], ['Recetas', 'Recetas con firma del odontólogo'], ['Órdenes Laboratorio', 'Trabajos enviados al laboratorio']];
-      return '<div class="mnf-tabs">' + t.map(function (x, i) { return '<span' + (i ? '' : ' class="on"') + '>' + esc(x[0]) + '</span>'; }).join('') + '</div>' +
-        '<div class="mnf-tabdesc">' + t.map(function (x) { return '<div><b>' + esc(x[0]) + '</b>' + esc(x[1]) + '</div>'; }).join('') + '</div>';
+      var t = [['Datos', 'Identificación, contacto, emergencia y atención', 'tab-datos'], ['Historia médica', 'Alergias, enfermedades y medicamentos', 'tab-historia'], ['Odontograma', 'Estado de cada pieza dental', 'tab-odonto'], ['Tratamientos', 'Procedimientos realizados y pendientes', 'tab-trat'],
+        ['Notas', 'Notas de evolución', 'tab-notas'], ['Radiografías', 'Imágenes del paciente', 'tab-rx'], ['Recetas', 'Recetas con firma del odontólogo', 'tab-recetas'], ['Órdenes Laboratorio', 'Trabajos enviados al laboratorio', 'tab-lab']];
+      return '<div class="mnf-tabs">' + t.map(function (x, i) { return '<button type="button" data-mn-ir="' + x[2] + '"' + (i ? '' : ' class="on"') + ' title="Ir a la explicación de ' + esc(x[0]) + '">' + esc(x[0]) + '</button>'; }).join('') + '</div>' +
+        '<div class="mnf-tabdesc">' + t.map(function (x) { return '<button type="button" data-mn-ir="' + x[2] + '"><b>' + esc(x[0]) + '</b>' + esc(x[1]) + '<em>Ver explicación ›</em></button>'; }).join('') + '</div>';
+    },
+    'tab-historia': function () {
+      return '<div class="mnf-2col"><div class="mnf-lista"><b class="mnf-mini">Registros por fecha</b><span class="on">05 nov 2026 · Cita 128</span><span>12 ago 2026 · Cita 97</span><em class="mnf-btn">+ Agregar nuevo registro</em></div><div>' +
+        '<div class="mnf-barra"><em class="mnf-btn osc">Dictar historia médica</em><small class="mnf-ayuda">«alergias penicilina, enfermedades hipertensión, medicamentos losartán 50 mg cada 24 horas… guardar»</small></div>' +
+        '<div class="mnf-grid">' + campo('Fecha *', '05/11/2026') + campo('Número de cita (agenda)', 'Cita 128 · Limpieza', { sel: true, ancho: 'm' }) + '<div></div>' +
+        campo('Alergias', 'Penicilina', { ancho: 't', boton: 'Dictar' }) + campo('Enfermedades y condiciones', 'Hipertensión arterial controlada', { ancho: 't', boton: 'Dictar' }) + campo('Medicamentos actuales', 'Losartán 50 mg cada 24 horas', { ancho: 't', boton: 'Dictar' }) + '</div>' +
+        '<div class="mnf-barra"><em class="mnf-btn osc">Guardar</em><em class="mnf-btn">Modificar</em><em class="mnf-btn">Eliminar</em></div></div></div>';
+    },
+    'tab-odonto': function () {
+      var marcas = { 16: ['car', 'Caries O'], 21: ['azul', 'CR'], 36: ['rojo', 'EX'], 46: ['azul', 'TC'], 26: ['azul', 'Obt.'], 48: ['gris', 'AU'] };
+      function pieza(n) { var m = marcas[n]; return '<span class="mnf-pieza' + (m ? ' ' + m[0] : '') + '" title="' + n + (m ? ' · ' + m[1] : '') + '"><i>' + (m ? esc(m[1]) : '') + '</i><small>' + n + '</small></span>'; }
+      var sup = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28], inf = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+      return '<div class="mnf-barra"><span class="on">Permanente</span><span>Mixta</span><span>Temporal</span><b class="mnf-mini" style="margin-left:8px">Por cara</b><span>Caries</span><span class="on">Obturación</span><b class="mnf-mini">Pieza completa</b><span>Corona</span><span>Endodoncia</span><span>Implante</span><span>Extracción</span><span>Ausente</span><span>Borrar</span><b class="mnf-mini">Toda la boca</b><span>Limpieza</span><em class="mnf-btn osc">Dictar odontograma</em></div>' +
+        '<div class="mnf-boca"><div>' + sup.map(pieza).join('') + '</div><div>' + inf.map(pieza).join('') + '</div></div>' +
+        '<div class="mnf-leyenda"><span><i class="rojo"></i>Requerido (rojo)</span><span><i class="azul"></i>Realizado (azul)</span><span><i class="gris"></i>Ausente</span></div>' +
+        '<table class="mnf-tabla"><thead><tr><th>Fecha del cambio</th><th>Pieza</th><th>Cambio</th><th>Observaciones</th><th>Usuario</th></tr></thead><tbody>' +
+        '<tr><td>05 nov 2026</td><td>16</td><td>Caries oclusal (requerido)</td><td>Pasa al presupuesto: Resina de una superficie</td><td>oliver</td></tr>' +
+        '<tr><td>05 nov 2026</td><td>46</td><td>Endodoncia (realizado)</td><td>—</td><td>oliver</td></tr></tbody></table>';
+    },
+    'tab-trat': function () {
+      return '<div class="mnf-kpis"><div><span>Tratamientos finalizados</span><b>Q1,750.00</b></div><div><span>Pagado</span><b>Q1,400.00</b></div><div class="alerta"><span>Saldo pendiente</span><b>Q350.00</b></div><div><span>Pendiente y en proceso</span><b>Q900.00</b></div></div>' +
+        '<div class="mnf-barra"><span class="on">Finalizados (2)</span><span>En proceso (1)</span><span>Todos (3)</span><em class="mnf-btn">✦ Seguimientos</em><em class="mnf-btn">✦ Cuidados</em><em class="mnf-btn">Imprimir</em></div>' +
+        '<table class="mnf-tabla"><thead><tr><th>Fecha estado</th><th>Tratamiento</th><th>Estado</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Presupuesto</th></tr></thead><tbody>' +
+        '<tr><td>05 nov 2026</td><td>Resina de una superficie · pieza 16</td><td><em class="mnf-est">Finalizado</em></td><td>1</td><td>Q350.00</td><td>Q350.00</td><td>PRE-0034</td></tr>' +
+        '<tr><td>05 nov 2026</td><td>Limpieza dental (profilaxis)</td><td><em class="mnf-est">Finalizado</em></td><td>1</td><td>Q1,400.00</td><td>Q1,400.00</td><td>PRE-0034</td></tr>' +
+        '<tr><td>05 nov 2026</td><td>Tratamiento de conductos unirradicular · pieza 46</td><td><em class="mnf-est proc">Proceso</em></td><td>1</td><td>Q900.00</td><td>Q900.00</td><td>PRE-0034</td></tr></tbody></table>';
+    },
+    'tab-notas': function () {
+      return '<div class="mnf-grid">' + campo('Fecha de la visita', '05/11/2026') + campo('Nota', 'Paciente refiere sensibilidad al frío en pieza 16; se coloca resina y se dan indicaciones.', { ancho: 'g' }) + '</div>' +
+        '<div class="mnf-barra"><em class="mnf-btn osc">Agregar nota</em></div>' +
+        '<div class="mnf-notasvis"><div><b>05 nov 2026 · oliver</b>Paciente refiere sensibilidad al frío en pieza 16; se coloca resina y se dan indicaciones.</div><div><b>12 ago 2026 · oliver</b>Limpieza completa; se recomienda control en 6 meses.</div></div>';
+    },
+    'tab-rx': function () {
+      return '<div class="mnf-barra"><em class="mnf-buscar" style="margin-left:0;min-width:260px">Archivo (JPG, PNG, WEBP o PDF, hasta 10 MB)</em><em class="mnf-btn osc">Subir</em></div>' +
+        '<div class="mnf-rx"><figure><i></i><figcaption>Panorámica · 05 nov 2026</figcaption></figure><figure><i class="peri"></i><figcaption>Periapical pieza 46 · 05 nov 2026</figcaption></figure><figure><i class="pdf">PDF</i><figcaption>Informe radiológico · 12 ago 2026</figcaption></figure></div>';
+    },
+    'tab-recetas': function () {
+      return '<div class="mnf-grid">' + campo('Fecha de atención *', '05/11/2026') + campo('Hora', '10:30') + campo('Médico que receta', 'Isaack Salaverria Donis', { sel: true, ancho: 'm' }) +
+        campo('Diagnóstico', 'Pulpitis irreversible pieza 46', { ancho: 'g' }) + campo('Próxima cita', '12/11/2026') + '</div>' +
+        '<div class="mnf-barra"><em class="mnf-btn osc">✦ Sugerir receta con IA</em><small class="mnf-ayuda">La IA propone medicamentos según el diagnóstico y las alergias registradas; el odontólogo revisa y ajusta.</small></div>' +
+        '<table class="mnf-tabla"><thead><tr><th>Medicamento y presentación</th><th>Dosis</th><th>Frecuencia</th><th>Duración</th></tr></thead><tbody>' +
+        '<tr><td>Ibuprofeno 400 mg, tabletas</td><td>1 tableta</td><td>Cada 8 horas</td><td>3 días</td></tr><tr><td>Clorhexidina 0.12 %, enjuague</td><td>15 ml</td><td>Cada 12 horas</td><td>7 días</td></tr></tbody></table>' +
+        '<p class="mnf-ayuda" style="margin:8px 0 0">Indicaciones generales: tomar con alimentos. Alergia registrada: <b>penicilina</b> — no se recetan amoxicilinas.</p>';
+    },
+    'tab-lab': function () {
+      return '<div class="mnf-2col"><div class="mnf-lista"><em class="mnf-btn osc">+ Nueva orden</em><em class="mnf-btn">Nueva orden por voz</em><span class="on">LAB-0012 · Corona sobre implante · pieza 36 <small>Dental Lab Guatemala · En proceso</small></span></div><div>' +
+        '<div class="mnf-flujo"><span>Enviada · 05 nov</span><i>›</i><span class="clave">En proceso</span><i>›</i><span>Prueba en clínica</span><i>›</i><span>Recibida</span><i>›</i><span>Colocada</span></div>' +
+        '<div class="mnf-grid" style="margin-top:10px">' + campo('Laboratorio', 'Dental Lab Guatemala', { sel: true, ancho: 'm' }) + campo('Tipo de trabajo', 'Corona sobre implante', { ancho: 'm' }) +
+        campo('Piezas (FDI)', '36') + campo('Material', 'Disilicato de litio (e.max)') + campo('Color (VITA)', 'A2', { sel: true }) + campo('Entrega prometida', '20/11/2026') + '</div>' +
+        '<div class="mnf-sec"><b>✓</b>Recepción del laboratorio</div><div class="mnf-grid">' + campo('Fecha y hora de recepción', '21/11/2026 15:15:00', { ancho: 'm' }) + campo('Persona que entrega', 'Mensajero del laboratorio') + campo('Persona que recibe', 'Recepción') + '</div></div></div>';
     },
     'exp-ident': function () {
       return seccion(1, 'Identificación', campo('Nombre completo *', 'Javier R.', { ancho: 'm' }) + campo('Fecha de nacimiento', '03/12/1942') + campo('Edad', '83 años', { calc: true }) +
@@ -96,6 +146,7 @@
     }).join('') + '</div>';
   }
   function figura(f) {
+    if (Array.isArray(f)) return f.map(figura).join('');
     if (!f) return '';
     var cuerpo = f.tipo === 'barras' ? barras(f) : MAQUETAS[f.id] ? MAQUETAS[f.id]() : '';
     if (!cuerpo) return '';
@@ -108,7 +159,7 @@
   function htmlContenido(c) {
     return '<p class="mn-resumen">' + esc(c.resumen) + '</p>' +
       '<ol class="mn-pasos">' + (c.pasos || []).map(function (p) {
-        return '<li><div><b>' + esc(p.titulo) + '</b><p>' + esc(p.detalle) + '</p>' + figura(p.figura) +
+        return '<li' + (p.id ? ' id="mnp-' + esc(p.id) + '"' : '') + '><div><b>' + esc(p.titulo) + '</b><p>' + esc(p.detalle) + '</p>' + figura(p.figura) +
           (p.ejemplo ? '<div class="mn-ej"><span>Ejemplo</span>' + esc(p.ejemplo) + '</div>' : '') + '</div></li>';
       }).join('') + '</ol>' +
       ((c.consejos || []).length ? '<div class="mn-consejos"><b>Consejos</b><ul>' + c.consejos.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>' : '');
@@ -170,6 +221,11 @@
   $('mnCap').addEventListener('click', function (e) {
     var b = e.target.closest('[data-ir]'); if (!b) return;
     var t = document.querySelector('.adm-menu [data-tab="' + b.dataset.ir + '"]'); if (t) t.click();
+  });
+  // Botones dentro de las figuras que llevan a otro paso del capítulo (p. ej. las pestañas del expediente)
+  $('mnCap').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mn-ir]'), d = b && $('mnp-' + b.dataset.mnIr);
+    if (d) { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); d.classList.remove('mn-resalta'); void d.offsetWidth; d.classList.add('mn-resalta'); }
   });
   $('mnImprimirTodo').addEventListener('click', imprimir);
   $('tabManual').addEventListener('click', cargar);
