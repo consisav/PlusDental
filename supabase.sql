@@ -7902,6 +7902,73 @@ select v.nombre, v.especialidad, v.descripcion, v.formacion, v.atiende, v.orden,
   ) as v(orden, nombre, especialidad, descripcion, formacion, atiende)
  where not exists (select 1 from public.tipos_quiropractico t where lower(t.nombre) = lower(v.nombre));
 
+-- ===== Frecuencia de atención (cada cuántos minutos se agendan pacientes) =====
+-- Odontólogos y quiroprácticos: 10, 15, 20, 30, 40, 45, 60, 90 o 120 minutos. Vacía = automática
+-- (ortodoncia 10 minutos, los demás tratamientos 30). Las agendas ofrecen las horas de cada médico desde su hora de
+-- inicio, con ese paso, dentro de su horario (lunes a viernes 7:00 a. m. – 7:00 p. m.), y cada cita ocupa ese tiempo.
+alter table public.dentistas add column if not exists frecuencia int check (frecuencia between 5 and 240);
+alter table public.quiropracticos add column if not exists frecuencia int check (frecuencia between 5 and 240);
+
+-- Minutos que ocupa una cita: la frecuencia de su médico o, si no tiene, la regla automática
+create or replace function public.cita_minutos(p_servicio text, p_frecuencia int)
+returns int language sql immutable as $$
+  select coalesce(p_frecuencia, case when coalesce(p_servicio, '') ~* 'ortodon' then 10 else 30 end);
+$$;
+
+-- Dentista libre a la hora h: atiende ese día, la cita cabe antes de su hora de cierre y no se traslapa con otra cita
+-- suya ni de su sala
+create or replace function public.dentista_libre(d public.dentistas, f date, h time)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.dentista_atiende(d, f, h)
+     and h + make_interval(mins => coalesce(d.frecuencia, 30)) <= ((d.horario -> extract(isodow from f)::int::text) ->> 'cierra')::time
+     and not exists (select 1 from public.citas c left join public.dentistas cd on cd.id = c.dentista_id
+                     where c.fecha = f and c.estado <> 'cancelada'
+                       and (c.dentista_id = d.id or (d.posicion_id is not null and c.posicion_id = d.posicion_id))
+                       and c.hora < h + make_interval(mins => coalesce(d.frecuencia, 30))
+                       and c.hora + make_interval(mins => public.cita_minutos(c.servicio, cd.frecuencia)) > h);
+$$;
+
+-- Horas que ofrece la agenda en línea: las de cada odontólogo activo, desde su hora de inicio y con su frecuencia
+-- (sin odontólogos con horario: los turnos fijos de la clínica)
+create or replace function public.disponibilidad(desde date, hasta date)
+returns table (fecha date, hora text, libre boolean)
+language sql stable security definer set search_path = public as $$
+  with dias as (
+    select dia::date as f from generate_series(desde::timestamp, least(hasta, desde + 31)::timestamp, interval '1 day') as dia
+  ),
+  con_horario as (
+    select exists (select 1 from public.dentistas where estado = 'activo' and horario <> '{}'::jsonb) as hay
+  ),
+  turnos as (
+    select distinct x.f, x.h from (
+      select di.f, s.h::time as h
+        from dias di
+        join public.dentistas d on d.estado = 'activo' and di.f >= d.fecha_ingreso and (d.fecha_salida is null or di.f <= d.fecha_salida)
+        cross join lateral (select (d.horario -> extract(isodow from di.f)::int::text) as j) hj
+        cross join lateral generate_series(
+            ('2000-01-01 ' || (hj.j ->> 'abre'))::timestamp,
+            ('2000-01-01 ' || (hj.j ->> 'cierra'))::timestamp - make_interval(mins => coalesce(d.frecuencia, 30)),
+            make_interval(mins => coalesce(d.frecuencia, 30))) as s(h)
+       where hj.j is not null and (select hay from con_horario)
+      union all
+      select di.f, t.h from dias di cross join lateral public.turnos_del_dia(di.f) as t(h)
+       where not (select hay from con_horario)
+    ) x
+  )
+  select t.f,
+         to_char(t.h, 'HH24:MI'),
+         (t.f + t.h) > (now() at time zone 'America/Guatemala') + interval '1 hour'
+         and not exists (select 1 from public.bloqueos b where b.fecha = t.f and (b.hora is null or b.hora = t.h))
+         and case
+               when (select hay from con_horario)
+                 then exists (select 1 from public.dentistas d where public.dentista_libre(d, t.f, t.h))
+               else not exists (select 1 from public.citas c where c.fecha = t.f and c.hora = t.h and c.estado <> 'cancelada')
+             end
+  from turnos t
+  order by 1, 2;
+$$;
+grant execute on function public.disponibilidad(date, date) to anon, authenticated;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

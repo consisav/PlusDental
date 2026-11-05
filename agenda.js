@@ -49,7 +49,18 @@
   function aMin(h) { var p = hhmm(h).split(':'); return +p[0] * 60 + (+p[1] || 0); }
   function aHora(m) { return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + m % 60).slice(-2); }
   function esOrtodoncia(servicio, esp) { return esp === 'Ortodoncia' || /ortodon/.test(sinTildes(servicio)); }
-  function duracion(c) { return esOrtodoncia(c.servicio) ? MINUTOS.ortodoncia : MINUTOS.general; }
+  // Frecuencia de atención del médico (Odontólogos): cada cita ocupa ese tiempo y sus horas se ofrecen con ese paso
+  function frecDe(id) { var d = id && dentistas.filter(function (x) { return x.id === id; })[0]; return d && d.frecuencia ? d.frecuencia : 0; }
+  function duracion(c) { return frecDe(c.dentista_id) || (esOrtodoncia(c.servicio) ? MINUTOS.ortodoncia : MINUTOS.general); }
+  function durMedico(d) { return (d && d.frecuencia) || durNueva(); }
+  // Horas del médico ese día: desde su hora de inicio, cada «frecuencia» minutos, y la cita termina antes de su cierre
+  function horariosMedico(f, d) {
+    if (!d || !d.frecuencia) return horarios(f, durMedico(d));
+    var x = (d.horario || {})[diaSemana(f)], l = [];
+    if (!x) return l;
+    for (var m = aMin(x.abre); m + d.frecuencia <= aMin(x.cierra); m += d.frecuencia) l.push(aHora(m));
+    return l;
+  }
   // Horas de inicio del día con el paso indicado (la cita debe terminar dentro del bloque de la jornada)
   function horarios(f, paso) {
     var d = fecha(f).getDay(), j = d === 0 ? [] : d === 6 ? JORNADA.sabado : JORNADA.semana, l = [];
@@ -122,8 +133,11 @@
     else for (var i = 0; i < DIAS_BUSQUEDA; i++) fechas.push(sumar(desde, i));
 
     var dur = durNueva();
+    var posibles = conHorario ? dentistas.filter(function (d) { return !medico || d.id === medico; }) : [];
     fechas.forEach(function (f, iDia) {
-      var lista = fijo ? [fijo.hora] : horarios(f, dur);
+      var horasDe = {}, todas = {};
+      posibles.forEach(function (d) { horasDe[d.id] = {}; horariosMedico(f, d).forEach(function (h) { horasDe[d.id][h] = 1; todas[h] = 1; }); });
+      var lista = fijo ? [fijo.hora] : conHorario ? Object.keys(todas).sort() : horarios(f, dur);
       lista.forEach(function (h, iTurno) {
         if (f < ahoraF || (f === ahoraF && h <= ahoraH)) return;
         if (bloqueado(f, h, dur)) return;
@@ -131,12 +145,12 @@
         if (franja === 'tarde' && h < '12:00') return;
 
         var candidatos = conHorario ? dentistas.filter(function (d) {
-          return (!medico || d.id === medico) && atiende(d, f, h) && !dentistaOcupado(d.id, f, h, dur);
+          return (!medico || d.id === medico) && (fijo || (horasDe[d.id] && horasDe[d.id][h])) && atiende(d, f, h) && !dentistaOcupado(d.id, f, h, durMedico(d));
         }) : [null];
 
         candidatos.forEach(function (d) {
           // Sala: la fija, la del dentista o la mejor libre
-          var opcionesSala = salas.filter(function (s) { return salaAbierta(s, f, h) && !salaOcupada(s.id, f, h, dur); });
+          var opcionesSala = salas.filter(function (s) { return salaAbierta(s, f, h) && !salaOcupada(s.id, f, h, durMedico(d)); });
           var sala = null;
           if (fijo && fijo.sala) sala = opcionesSala.filter(function (s) { return s.id === fijo.sala; })[0] || null;
           else if (d && d.posicion_id) sala = opcionesSala.filter(function (s) { return s.id === d.posicion_id; })[0] || null;
@@ -436,8 +450,8 @@
     var medicoId = $('agMedico').value ? +$('agMedico').value : null;
     var medico = medicoId ? dentistas.filter(function (d) { return d.id === medicoId; })[0] : null;
     var salaId = sala ? +sala : medico && medico.posicion_id ? medico.posicion_id : null;
-    var dur = durNueva();
-    var lista = f ? horarios(f, dur).filter(function (h) { return horaLibre(f, h, medicoId, salaId, dur); }) : [];
+    var dur = durMedico(medico);
+    var lista = f ? horariosMedico(f, medico).filter(function (h) { return horaLibre(f, h, medicoId, salaId, dur); }) : [];
     $('agHoraM').innerHTML = lista.length ? lista.map(function (h) { return '<option value="' + h + '">' + h + '</option>'; }).join('')
       : '<option value="">' + (!f ? 'Elige la fecha' : !turnos(f).length ? 'La clínica no atiende ese día' : 'Sin horarios libres ese día') + '</option>';
     $('agHoraM').disabled = !lista.length;
@@ -454,7 +468,7 @@
     if (!$('agTratamiento').value.trim()) { aviso('agMsgM', 'Indica el tratamiento arriba.', true); return; }
     if (!f || !h) { aviso('agMsgM', 'Elige la fecha y la hora.', true); return; }
     if (bloqueado(f, h, durNueva())) { aviso('agMsgM', 'Ese horario está bloqueado.', true); return; }
-    if (!horaLibre(f, h, $('agMedico').value ? +$('agMedico').value : null, $('agSalaM').value ? +$('agSalaM').value : null)) { aviso('agMsgM', 'Ese horario ya pasó o está ocupado. Elige otra hora.', true); opcionesHorario(); return; }
+    if (!horaLibre(f, h, $('agMedico').value ? +$('agMedico').value : null, $('agSalaM').value ? +$('agSalaM').value : null, durMedico($('agMedico').value ? dentistas.filter(function (d) { return d.id === +$('agMedico').value; })[0] : null))) { aviso('agMsgM', 'Ese horario ya pasó o está ocupado. Elige otra hora.', true); opcionesHorario(); return; }
     var salaElegida = $('agSalaM').value ? +$('agSalaM').value : null;
     var medico = $('agMedico').value ? dentistas.filter(function (d) { return d.id === +$('agMedico').value; })[0] : null;
     var opcion = null;
@@ -875,13 +889,14 @@
     if (!$('agDesde').value) $('agDesde').value = sumar(hoyF, 1);
     if (!$('agDia').value) $('agDia').value = hoyF;
     var rs = await Promise.all([
-      sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo,usuario').eq('estado', 'activo').order('nombre'),
+      sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo,usuario,frecuencia').eq('estado', 'activo').order('nombre'),
       sb.from('posiciones').select('id,codigo,nombre,especialidad,estado,activa,horario').order('codigo'),
       sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo,tipo_cliente,institucion_id,sucursal_id').order('nombre'),
       sb.from('tratamientos').select('nombre,activo').eq('activo', true).order('nombre'),
       sb.from('bloqueos').select('fecha,hora').gte('fecha', hoyF)
     ]);
     if (window.PD_COLOR) await window.PD_COLOR.cargar(true);
+    if (rs[0].error && /frecuencia/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo,usuario').eq('estado', 'activo').order('nombre');
     if (rs[0].error && /usuario/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono,correo').eq('estado', 'activo').order('nombre');
     if (rs[0].error && /correo/.test(rs[0].error.message)) rs[0] = await sb.from('dentistas').select('id,nombre,especialidades,posicion_id,rol_sala,horario,estado,fecha_ingreso,fecha_salida,telefono').eq('estado', 'activo').order('nombre');
     if (rs[2].error && /tipo_cliente|institucion_id|sucursal_id/.test(rs[2].error.message)) rs[2] = await sb.from('pacientes').select('id,nombre,dpi,telefono,dentista_id,estado,correo').order('nombre');
@@ -936,8 +951,8 @@
     var otras = (r.error ? [] : r.data).filter(function (x) { return String(x.id) !== String(c.id); });
     var ahora = new Date(), hAhora = ('0' + ahora.getHours()).slice(-2) + ':' + ('0' + ahora.getMinutes()).slice(-2);
     var sala = c.posicion_id ? salas.filter(function (x) { return x.id === c.posicion_id; })[0] : null;
-    var dur = duracion(c);
-    var lista = horarios(f, dur).filter(function (h) {
+    var dur = duracion(c), med = c.dentista_id ? dentistas.filter(function (d) { return d.id === c.dentista_id; })[0] : null;
+    var lista = horariosMedico(f, med && med.frecuencia ? med : null).filter(function (h) {
       if (f < hoy() || (f === hoy() && h <= hAhora) || bloqueado(f, h, dur)) return false;
       if (f === c.fecha && h === hhmm(c.hora)) return false;
       if (sala && !salaAbierta(sala, f, h)) return false;

@@ -274,6 +274,7 @@
     $('deIngreso').value = d ? d.fecha_ingreso : hoy();
     $('deSalida').value = (d && d.fecha_salida) || '';
     $('deEstado').value = (d && d.estado) || 'activo';
+    $('deFrecuencia').value = d && d.frecuencia ? String(d.frecuencia) : '';
     $('deWeb').checked = d ? d.mostrar_en_web !== false : true;
     $('deNotas').value = (d && d.notas) || '';
     especialidades = d ? (d.especialidades || []).slice() : [];
@@ -289,7 +290,7 @@
   function pintarCabecera() {
     $('denTitulo').textContent = actual ? actual.nombre : 'Nuevo odontólogo';
     $('denSub').textContent = actual
-      ? [actual.codigo, actual.posicion_id ? (actual.rol_sala === 'alterno' ? 'Alterno' : 'Principal') + ' en ' + nombrePosicion(actual.posicion_id) : '', (actual.especialidades || []).join(', '), actual.colegiado ? 'Colegiado ' + actual.colegiado : ''].filter(Boolean).join(' · ')
+      ? [actual.codigo, actual.posicion_id ? (actual.rol_sala === 'alterno' ? 'Alterno' : 'Principal') + ' en ' + nombrePosicion(actual.posicion_id) : '', (actual.especialidades || []).join(', '), actual.frecuencia ? 'Citas cada ' + actual.frecuencia + ' min' : '', actual.colegiado ? 'Colegiado ' + actual.colegiado : ''].filter(Boolean).join(' · ')
       : 'Llena los datos y guarda. Después podrás agregar la foto y los títulos.';
     $('denEstadoPill').hidden = !actual;
     if (actual) { $('denEstadoPill').className = 'estado estado-' + actual.estado; $('denEstadoPill').textContent = ESTADOS[actual.estado]; }
@@ -378,6 +379,7 @@
       asistente_id: $('deAsistente').value ? +$('deAsistente').value : null,
       horario: horario,
       estado: $('deEstado').value,
+      frecuencia: $('deFrecuencia').value ? +$('deFrecuencia').value : null,
       mostrar_en_web: $('deWeb').checked,
       notas: $('deNotas').value.trim() || null
     };

@@ -122,6 +122,7 @@
     '<label>Fecha de inicio en la clínica<input id="quIngreso" type="date" required></label>' +
     '<label>Fecha final en la clínica (déjala vacía si sigue trabajando)<input id="quSalida" type="date"></label>' +
     '<label>Estado<select id="quEstado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="baja">Baja</option></select></label>' +
+    '<label>Frecuencia de atención<select id="quFrecuencia" title="Cada cuántos minutos se agendan sus pacientes."><option value="">Automática (cada 30 minutos)</option><option value="10">Cada 10 minutos</option><option value="15">Cada 15 minutos</option><option value="20">Cada 20 minutos</option><option value="30">Cada 30 minutos</option><option value="40">Cada 40 minutos</option><option value="45">Cada 45 minutos</option><option value="60">Cada 1 hora</option><option value="90">Cada 1 hora 30 minutos</option><option value="120">Cada 2 horas</option></select></label>' +
     '</div></fieldset>' +
     '<fieldset class="pos-sec"><legend>Días y horas de atención a pacientes</legend><div id="quHorario" class="pos-horario"></div></fieldset>' +
     '<div class="exp-form"><label class="full">Notas<textarea id="quNotas" rows="2" maxlength="1000" placeholder="Opcional"></textarea></label></div>' +
@@ -228,6 +229,7 @@
     $('quIngreso').value = x ? x.fecha_ingreso : hoy();
     $('quSalida').value = (x && x.fecha_salida) || '';
     $('quEstado').value = (x && x.estado) || 'activo';
+    $('quFrecuencia').value = x && x.frecuencia ? String(x.frecuencia) : '';
     $('quNotas').value = (x && x.notas) || '';
     tecnicas = x ? (x.tecnicas || []).slice() : [];
     pintarChips();
@@ -237,7 +239,7 @@
   function pintarCabecera() {
     $('quTitulo').textContent = actual ? actual.nombre : 'Nuevo quiropráctico';
     $('quSub').textContent = actual
-      ? [actual.codigo, actual.tipo_id ? nombreTipo(actual.tipo_id) : '', sede(actual), actual.registro ? 'Registro ' + actual.registro : ''].filter(function (v) { return v && v !== '—'; }).join(' · ')
+      ? [actual.codigo, actual.tipo_id ? nombreTipo(actual.tipo_id) : '', sede(actual), actual.frecuencia ? 'Citas cada ' + actual.frecuencia + ' min' : '', actual.registro ? 'Registro ' + actual.registro : ''].filter(function (v) { return v && v !== '—'; }).join(' · ')
       : 'Llena los datos y guarda. Después podrás agregar la foto y los títulos.';
     $('quEstadoPill').hidden = !actual;
     if (actual) { $('quEstadoPill').className = 'estado estado-' + actual.estado; $('quEstadoPill').textContent = ESTADOS[actual.estado]; }
@@ -293,6 +295,7 @@
       fecha_salida: $('quSalida').value || null,
       horario: horario,
       estado: $('quEstado').value,
+      frecuencia: $('quFrecuencia').value ? +$('quFrecuencia').value : null,
       notas: $('quNotas').value.trim() || null
     };
     if (window.PD_SEDES) Object.assign(datos, window.PD_SEDES.valores($('quOrg'), $('quLoc')));
