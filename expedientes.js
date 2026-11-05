@@ -827,7 +827,7 @@
   });
   $('fichaTabs').addEventListener('click', function (e) {
     var b = e.target.closest('[data-ficha]');
-    if (b && !b.disabled) parte(b.dataset.ficha);
+    if (b && !b.disabled) { parte(b.dataset.ficha); if (window.PD_IR_ARRIBA) window.PD_IR_ARRIBA($('fichaTabs')); }
   });
 
   document.querySelectorAll('[data-exp-accion]').forEach(function (b) {

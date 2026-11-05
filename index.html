@@ -18,6 +18,8 @@ a{color:#005A87}a:hover{color:#00476B}
 input:focus{outline:2px solid #005A87;outline-offset:1px}
 button:focus-visible,a:focus-visible{outline:2px solid #005A87;outline-offset:2px}
 html{scroll-behavior:smooth;scroll-padding-top:170px}
+/* Dentro del panel, «ir al inicio» deja el elemento debajo de la barra fija del panel (no tapado por ella) */
+#administracion .adm-main [id]{scroll-margin-top:calc(var(--pd-menu-top,150px) + 56px - 170px)}
 .topbar{position:sticky;top:0;z-index:20;background:rgba(245,249,252,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid #D9E4EC}
 .mainmenu{display:flex;align-items:center;gap:18px;font-size:14.5px;font-weight:500}
 .nav-movil{display:none}
@@ -3368,12 +3370,12 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="marca.js?v=20261029d"></script>
 <script src="firmas.js"></script>
 <script src="app.js?v=20261102a"></script>
-<script src="auth.js?v=20261105a"></script>
+<script src="auth.js?v=20261105b"></script>
 <script src="voz-citas.js"></script>
 <script src="voz-historia.js"></script>
 <script src="voz-odontograma.js"></script>
 <script src="odontograma.js?v=20261029a"></script>
-<script src="expedientes.js?v=20261105a"></script>
+<script src="expedientes.js?v=20261105b"></script>
 <script src="presupuestos.js"></script>
 <script src="cuentas.js?v=20261029b"></script>
 <script src="tratamientos-paciente.js?v=20261028a"></script>

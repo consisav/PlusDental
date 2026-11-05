@@ -115,7 +115,28 @@
     });
     var elegido = document.querySelector('.adm-menu [data-tab="' + id + '"]');
     if (elegido) { abrirSubgrupo(elegido.closest('.adm-sg')); abrirGrupo(menuArriba() ? null : elegido.closest('.adm-g')); }
+    irArriba($(id));
   }
+  // Lleva el inicio de una opción justo debajo de la barra fija del panel (sin quedar al final de la página)
+  function altoFijo() {
+    var b = document.querySelector('.adm-barra'), cs = b && getComputedStyle(b);
+    if (cs && cs.position === 'sticky' && b.offsetHeight) return (parseFloat(cs.top) || 0) + b.offsetHeight + 12;
+    return (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hdr')) || 132) + 12;
+  }
+  function irArriba(el) {
+    if (!el || el.hidden || !el.offsetParent) return;
+    window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - altoFijo()), behavior: 'instant' });
+  }
+  window.PD_IR_ARRIBA = irArriba;
+  // Red de seguridad: si tras cualquier acción del panel la opción abierta quedó fuera de la vista
+  // (p. ej. al pasar de una pantalla larga a una corta la página queda en el pie), se vuelve a su inicio
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#administracion')) return;
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      var p = document.querySelector('#administracion .adm-main > [role=tabpanel]:not([hidden])');
+      if (p && p.getBoundingClientRect().bottom < altoFijo() + 80) irArriba(p);
+    }); });
+  });
   // En pantallas anchas el menú va en la barra fija de arriba y cada grupo se despliega como lista
   function menuArriba() { return window.matchMedia('(min-width: 961px)').matches; }
   // Subgrupos dentro de un grupo (p. ej. Catálogos iniciales): solo uno abierto a la vez dentro de su grupo
