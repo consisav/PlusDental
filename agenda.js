@@ -430,12 +430,10 @@
     return b.length ? '<div class="ag-aviso-btns">' + b.join('') + '</div>' : '';
   }
 
-  // Horas libres para guardar en un horario específico: sin horas pasadas, bloqueadas ni ocupadas
+  // Horas libres para guardar en un horario específico: sin horas bloqueadas ni ocupadas (las pasadas sí se permiten)
   // (ocupada = el médico elegido ya tiene cita, la sala elegida ya está usada, o no queda ninguna sala libre)
   function horaLibre(f, h, medicoId, salaId, dur) {
     dur = dur || durNueva();
-    var ahora = new Date(), hAhora = ('0' + ahora.getHours()).slice(-2) + ':' + ('0' + ahora.getMinutes()).slice(-2);
-    if (f < hoy() || (f === hoy() && h <= hAhora)) return false;
     if (bloqueado(f, h, dur)) return false;
     if (medicoId && dentistaOcupado(medicoId, f, h, dur)) return false;
     var activas = salas.filter(function (x) { return x.activa; });
@@ -584,7 +582,6 @@
     var todasC = r.error ? [] : delArea(r.data);
     canceladas = todasC.filter(function (c) { return c.estado === 'cancelada'; });
     citas = todasC.filter(function (c) { return c.estado !== 'cancelada'; });
-    $('agFechaM').min = hoy();
     if ($('agHoraM')) opcionesHorario();
     pintar();
   }
@@ -773,7 +770,8 @@
           if (bloqueado(f, hh, PASO)) return ['bloq', '', 'Bloqueado'];
           var hay = activas.length ? activas.some(function (x) { return salaAbierta(x, f, hh) && !salaOcupada(x.id, f, hh, PASO); }) : !ocupan(f, hh, PASO).length;
           if (!hay) return ['lleno'];
-          if (yaPaso(f, m)) return ['pasado'];
+          // Horas ya pasadas: también se pueden registrar (citas atendidas o que faltó anotar)
+          if (yaPaso(f, m)) return ['pasado-libre', botonMas(f, hh, null, 'el ' + textoFecha(f)), 'Hora pasada: puedes registrar una cita'];
           return ['libre', botonMas(f, hh, null, 'el ' + textoFecha(f))];
         }
       };
@@ -856,7 +854,7 @@
           if (k.sala && !salaAbierta(k.sala, f, hh)) return ['cerrada', '', k.sala.estado === 'mantenimiento' ? 'Fuera de servicio' : 'Sala cerrada'];
           var ocupada = k.sala ? salaOcupada(k.id, f, hh, PASO) : todas.some(function (x) { return x.fecha === f && !x.posicion_id && choca(m, PASO, aMin(x.hora), duracion(x)); });
           if (ocupada) return ['lleno'];
-          if (yaPaso(f, m)) return ['pasado'];
+          if (yaPaso(f, m)) return ['pasado-libre', botonMas(f, hh, k.id, 'en ' + k.titulo), 'Hora pasada: puedes registrar una cita'];
           return ['libre', botonMas(f, hh, k.id, 'en ' + k.titulo)];
         }
       };
@@ -972,11 +970,10 @@
     if (!r.error) r.data = delArea(r.data);
     if ($('reproFecha').value !== f) return;
     var otras = (r.error ? [] : r.data).filter(function (x) { return String(x.id) !== String(c.id); });
-    var ahora = new Date(), hAhora = ('0' + ahora.getHours()).slice(-2) + ':' + ('0' + ahora.getMinutes()).slice(-2);
     var sala = c.posicion_id ? salas.filter(function (x) { return x.id === c.posicion_id; })[0] : null;
     var dur = duracion(c), med = c.dentista_id ? dentistas.filter(function (d) { return d.id === c.dentista_id; })[0] : null;
     var lista = horariosMedico(f, med && med.frecuencia ? med : null).filter(function (h) {
-      if (f < hoy() || (f === hoy() && h <= hAhora) || bloqueado(f, h, dur)) return false;
+      if (bloqueado(f, h, dur)) return false;
       if (f === c.fecha && h === hhmm(c.hora)) return false;
       if (sala && !salaAbierta(sala, f, h)) return false;
       return !otras.some(function (x) { return choca(aMin(h), dur, aMin(x.hora), duracion(x)) && ((c.dentista_id && x.dentista_id === c.dentista_id) || (c.posicion_id && x.posicion_id === c.posicion_id)); });
@@ -991,7 +988,6 @@
     $('reproActual').textContent = 'Fecha actual: ' + textoFecha(c.fecha) + ' · ' + hhmm(c.hora) + (c.servicio ? ' · ' + c.servicio : '');
     aviso('reproMsg', '');
     $('reproGuardar').disabled = false;
-    $('reproFecha').min = hoy();
     $('reproFecha').value = c.fecha >= hoy() ? c.fecha : hoy();
     $('reproDlg').showModal();
     if (!salas.length && !dentistas.length) {
