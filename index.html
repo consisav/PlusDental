@@ -673,6 +673,26 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .adm-menu button.adm-directo[aria-selected="true"]{background:#0B2B40;color:#FFFFFF}
 .adm-barra .adm-menu button.adm-directo{width:auto;min-height:40px;padding:9px 10px;font-size:11px;letter-spacing:.6px;border-radius:10px;gap:6px;white-space:nowrap}
 .ag-area{margin-right:auto}.ag-area button[aria-pressed="true"]{background:#0B2B40;color:#FFFFFF}
+.bk{display:flex;flex-direction:column;gap:14px}
+.bk-cab{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.bk-icono{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;background:#EEF3F7;color:#0B2B40;flex:none}
+.bk-tit small{display:block;font-size:12.5px;color:#5A6D7A;font-weight:600}.bk-tit h3{margin:0;font-size:21px;font-weight:800;color:#0B2B40}
+.bk-marca{display:inline-flex;align-items:center;gap:5px;background:#0B2B40;color:#FFFFFF;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:700}.bk-marca.pend{background:#FFF4DA;color:#7A4B00}
+.bk-generar{margin-left:auto;display:inline-flex;align-items:center;gap:8px;background:#0B2B40;border-color:#0B2B40}
+.bk-error{margin:0;color:#9A3B2E;font-weight:600}.bk-error:empty{display:none}
+.bk-bloque{background:#FFFFFF;border:1px solid #D9E4EC;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.bk-bloque h4{margin:0;display:flex;align-items:center;gap:7px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:#0B2B40}
+.bk-linea{display:grid;grid-template-columns:1fr 1fr;gap:10px}.bk-linea select,.bk-ruta input{width:100%;max-width:none}.bk-acc a.adm-btn{text-decoration:none}.bk-linea label,.bk-ruta{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:#475B68}
+.bk-contenido{border:0;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.bk-contenido legend{font-size:13px;font-weight:600;color:#475B68;padding:0;margin-bottom:5px}
+.bk-opcion{display:flex;align-items:center;gap:10px;border:1px solid #D9E4EC;border-radius:12px;padding:9px 12px;cursor:pointer;color:#475B68}.bk-opcion b{display:block;color:#0B2B40;font-size:14px}.bk-opcion small{font-size:12px;color:#5A6D7A}
+.bk-opcion.marcada{background:#EEF5FF;border-color:#3B82F6;color:#1D4ED8}.bk-opcion.marcada b{color:#1D4ED8}.bk-opcion input{width:16px;height:16px;accent-color:#1D4ED8}
+.bk-nota{margin:0;display:flex;align-items:center;gap:6px;font-size:12.5px;color:#5A6D7A}.bk-aviso{color:#9A5B00}
+.bk-control{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.bk-control span{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:#5A6D7A}.bk-control b{display:block;font-size:14px;color:#0B2B40}.bk-control small{font-size:12px;color:#5A6D7A}.bk-azul{color:#1D4ED8!important}
+.bk-acc{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.bk-acc .adm-btn{display:inline-flex;align-items:center;gap:6px}.bk-check{display:inline-flex;align-items:center;gap:8px;font-weight:700;color:#0B2B40}.bk-check input{width:17px;height:17px;accent-color:#15803D}
+.bk-carpeta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#5A6D7A}.bk-carpeta .adm-btn{display:inline-flex;align-items:center;gap:6px}.bk-verde{color:#15803D}
+.bk-progreso{background:#F5F9FC;border:1px solid #D9E4EC;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:13px;color:#334652}.bk-barra{height:8px;background:#E3EBF1;border-radius:6px;overflow:hidden}.bk-barra i{display:block;height:100%;background:#0B2B40;transition:width .3s}
+.bk-tabla{font-size:12.5px}.bk-tabla th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}.bk-tabla td{white-space:nowrap}.bk-tabla .num{text-align:right}.bk-fuerte{font-weight:700;color:#0B2B40}.bk-vacio{text-align:center;color:#5A6D7A;padding:18px}.bk-rojo{color:#9A3B2E}
+@media (max-width:760px){.bk-linea,.bk-contenido,.bk-control{grid-template-columns:1fr}.bk-generar{margin-left:0;width:100%;justify-content:center}}
 .mn-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 .mn-top p{margin:4px 0 0;font-size:14px;color:#475B68;max-width:640px}
 .mn-avance{display:flex;flex-direction:column;gap:6px;min-width:200px;font-size:12px;font-weight:700;color:#475B68}
@@ -1790,6 +1810,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <button type="button" role="tab" id="tabGenUsuario" data-tab="admGenUsuario" aria-selected="false" aria-controls="admGenUsuario" class="adm-sub-item">Generación Usuario</button>
 <hr class="adm-sep" role="separator">
 <button type="button" role="tab" id="tabRecargos" data-tab="admRecargos" aria-selected="false" aria-controls="admRecargos" class="adm-sub-item">Recargo de tarjetas</button>
+<button type="button" role="tab" id="tabBackup" data-tab="admBackup" aria-selected="false" aria-controls="admBackup" class="adm-sub-item">Backup</button>
 </div>
 </div>
 <div class="adm-sg">
@@ -2631,6 +2652,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div id="admPrecios" role="tabpanel" aria-labelledby="tabPrecios" hidden class="adm-pane"></div>
 <div id="admPaquetes" role="tabpanel" aria-labelledby="tabPaquetes" hidden class="adm-pane"></div>
 <div id="admRecargos" role="tabpanel" aria-labelledby="tabRecargos" hidden class="adm-pane"></div>
+<!-- Backup de la información (backup.js) -->
+<div id="admBackup" role="tabpanel" aria-labelledby="tabBackup" hidden class="adm-pane"></div>
 
 <!-- Reportes -->
 <div id="admRepPacientes" role="tabpanel" aria-labelledby="tabRepPacientes" hidden class="adm-pane"></div>
@@ -3386,6 +3409,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="comisiones.js?v=20261029a"></script>
 <script src="cierres.js?v=20261103a"></script>
 <script src="manual.js?v=20261105c"></script>
+<script src="backup.js?v=20261105a"></script>
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="chatbot.js?v=20261102a"></script>
