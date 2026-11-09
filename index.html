@@ -1107,6 +1107,11 @@ select.pg-estado-lista{font:inherit;font-size:13px;padding:6px 10px;border:1px s
 .estado-cancelada{background:#FDE2E4;color:#9F1239}
 .estado-reprogramada{background:#EDE9FE;color:#5B21B6}
 .estado-atendida{background:#DBEAFE;color:#1E40AF}
+.estado-sala_espera{background:#CFFAFE;color:#155E75}.estado-atendiendose{background:#FCE7F3;color:#9D174D}.estado-no_asiste{background:#E2E8F0;color:#334155}
+.ct-est{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:0}
+#administracion .ag-grid.semana2 .ag2-cita .ag2-est{display:inline-block;margin-top:2px;font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--est);background:#FFFFFFCC;border:1px solid var(--est);border-radius:999px;padding:0 6px;line-height:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#administracion .ag-grid.semana2 .ag2-cita.no_asiste{background:#E2E8F0;border-left-color:#475569;color:#334155}#administracion .ag-grid.semana2 .ag2-cita.atendiendose{box-shadow:inset 0 0 0 1.5px #DB2777}
+.ag-det-est{font-size:12.5px;font-weight:700;color:#475B68;align-self:center}.ag-est-btn{border-color:var(--est);color:var(--est)}.ag-est-btn:hover{background:var(--est);color:#FFFFFF}.ag-det-sep{flex-basis:100%;height:0}
 .cita-grab{display:block;font-size:12px;color:#5A6D7A;margin-top:3px;line-height:1.4}
 .roles-wrap:has(> table.citas-tabla){overflow:visible}
 table.citas-tabla{table-layout:fixed}
@@ -2148,11 +2153,14 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 </div>
 </div>
 <div id="citaFiltros" style="display: flex; gap: 8px; flex-wrap: wrap" aria-label="Filtrar citas">
-<button type="button" class="adm-btn" data-filtro="pendiente" aria-pressed="true">Programadas</button>
-<button type="button" class="adm-btn" data-filtro="confirmada" aria-pressed="false">Confirmadas</button>
-<button type="button" class="adm-btn" data-filtro="reprogramada" aria-pressed="false">Reprogramadas</button>
-<button type="button" class="adm-btn" data-filtro="atendida" aria-pressed="false">Atendidas</button>
-<button type="button" class="adm-btn" data-filtro="cancelada" aria-pressed="false">Canceladas</button>
+<button type="button" class="adm-btn" data-filtro="pendiente" aria-pressed="true">No confirmado</button>
+<button type="button" class="adm-btn" data-filtro="confirmada" aria-pressed="false">Confirmado por teléfono</button>
+<button type="button" class="adm-btn" data-filtro="sala_espera" aria-pressed="false">En sala de espera</button>
+<button type="button" class="adm-btn" data-filtro="atendiendose" aria-pressed="false">Atendiéndose</button>
+<button type="button" class="adm-btn" data-filtro="atendida" aria-pressed="false">Atendido</button>
+<button type="button" class="adm-btn" data-filtro="no_asiste" aria-pressed="false">No asiste</button>
+<button type="button" class="adm-btn" data-filtro="reprogramada" aria-pressed="false">Reprogramado</button>
+<button type="button" class="adm-btn" data-filtro="cancelada" aria-pressed="false">Anulado</button>
 <button type="button" class="adm-btn" data-filtro="todas" aria-pressed="false">Todas</button>
 </div>
 <div class="cb-voz">
@@ -2249,7 +2257,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <section class="ag-paso">
 <h4><span class="ag-num">4</span>Estado, notas y avisos</h4>
 <div class="exp-form">
-<label>Estado de la cita<select id="agEstado"><option value="pendiente" selected>Programado</option><option value="confirmada">Confirmado</option><option value="atendida">Atendido</option></select></label>
+<label>Estado de la cita<select id="agEstado"><option value="pendiente" selected>No confirmado</option><option value="confirmada">Confirmado por teléfono</option><option value="sala_espera">En sala de espera</option><option value="atendiendose">Atendiéndose</option><option value="atendida">Atendido</option><option value="no_asiste">No asiste</option></select></label>
 <label>Prioridad<select id="agPrioridad"><option value="normal">Normal</option><option value="urgente">Urgente (lo antes posible)</option></select></label>
 <label>Organización<select id="agOrg"><option value="">—</option></select></label>
 <label>Localidad / Empresa<select id="agLoc"><option value="">—</option></select></label>
@@ -3370,8 +3378,8 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="marca.js?v=20261029d"></script>
 <script src="firmas.js"></script>
 <script src="app.js?v=20261102a"></script>
-<script src="auth.js?v=20261105b"></script>
-<script src="voz-citas.js"></script>
+<script src="auth.js?v=20261109a"></script>
+<script src="voz-citas.js?v=20261109a"></script>
 <script src="voz-historia.js"></script>
 <script src="voz-odontograma.js"></script>
 <script src="odontograma.js?v=20261029a"></script>
@@ -3379,10 +3387,10 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="presupuestos.js"></script>
 <script src="cuentas.js?v=20261029b"></script>
 <script src="tratamientos-paciente.js?v=20261028a"></script>
-<script src="recetas.js"></script>
+<script src="recetas.js?v=20261109a"></script>
 <script src="laboratorio.js?v=20261105a"></script>
 <script src="voz-laboratorio.js?v=20261105a"></script>
-<script src="historias-medicas.js"></script>
+<script src="historias-medicas.js?v=20261109a"></script>
 <script src="seguimientos.js?v=20261028a"></script>
 <script src="posiciones.js?v=20261102a"></script>
 <script src="sedes.js?v=20261027"></script>
@@ -3400,9 +3408,9 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="dentistas.js?v=20261105a"></script>
 <script src="tipos-quiropracticos.js?v=20261105a"></script>
 <script src="quiropracticos.js?v=20261105c"></script>
-<script src="agenda.js?v=20261105c"></script>
+<script src="agenda.js?v=20261109a"></script>
 <script src="agentes.js"></script>
-<script src="reportes.js?v=20261105a"></script>
+<script src="reportes.js?v=20261109a"></script>
 <script src="constancias.js"></script>
 <script src="tipos.js"></script>
 <script src="precios.js?v=20261027"></script>
@@ -3416,7 +3424,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="historias.js"></script>
 <script src="faq.js"></script>
 <script src="chatbot.js?v=20261102a"></script>
-<script src="portal.js"></script>
+<script src="portal.js?v=20261109a"></script>
 <script src="idiomas-admin.js?v=20261028g"></script>
 <script src="movil.js"></script>
 <script src="idiomas.js?v=20261102a"></script>

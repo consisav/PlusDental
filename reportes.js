@@ -140,7 +140,7 @@
     citas: {
       panel: 'admRepCitas', titulo: 'Citas agendadas', medicoInst: true, instSuc: true,
       nota: 'Citas con fecha entre las dos fechas; de un odontólogo o de todos, y de pacientes de una institución y sucursal o de todas.',
-      estados: { pendiente: ['Programado', 'ambar'], confirmada: ['Confirmado', 'verde'], reprogramada: ['Reprogramado', 'azul'], atendida: ['Atendido', 'azul'], cancelada: ['Cancelado', 'gris'] },
+      estados: { pendiente: ['No confirmado', 'ambar'], confirmada: ['Confirmado por teléfono', 'verde'], sala_espera: ['En sala de espera', 'azul'], atendiendose: ['Atendiéndose', 'azul'], atendida: ['Atendido', 'azul'], no_asiste: ['No asiste', 'gris'], reprogramada: ['Reprogramado', 'azul'], cancelada: ['Anulado', 'rojo'] },
       columnas: [
         ['Fecha', function (f) { return fechaCorta(f.fecha); }],
         ['Hora', function (f) { return String(f.hora || '').slice(0, 5); }],

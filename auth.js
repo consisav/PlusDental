@@ -13,7 +13,10 @@
   var dlg = $('loginDlg'), claveDlg = $('claveDlg'), panel = $('administracion');
   var perfil = null, quiereAdmin = false, usuarios = [], claveDe = null;
   var citas = [], bloqueos = [], filtro = 'pendiente', periodo = 'proximas', posicionesCita = [], dentistasCita = [];
-  var ESTADOS = { pendiente: 'Programado', confirmada: 'Confirmado', reprogramada: 'Reprogramado', atendida: 'Atendido', cancelada: 'Cancelado' };
+  // Catálogo de estados de la cita: orden del menú y acción principal que sigue en el flujo de la consulta
+  var ESTADOS = { pendiente: 'No confirmado', confirmada: 'Confirmado por teléfono', sala_espera: 'En sala de espera', atendiendose: 'Atendiéndose', atendida: 'Atendido', no_asiste: 'No asiste', reprogramada: 'Reprogramado', cancelada: 'Anulado' };
+  var CATALOGO = ['atendida', 'atendiendose', 'confirmada', 'sala_espera', 'no_asiste', 'pendiente'];
+  var SIGUIENTE = { pendiente: ['confirmada', 'Confirmar'], reprogramada: ['confirmada', 'Confirmar'], confirmada: ['sala_espera', 'En sala de espera'], sala_espera: ['atendiendose', 'Atendiéndose'], atendiendose: ['atendida', 'Atendido'] };
   function fechaHoraGrab(t) { return t ? new Date(t).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
   var DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -267,22 +270,22 @@
     if (!lista.length && buscando) { $('citasBody').innerHTML = '<tr><td colspan="5">Ninguna cita coincide con la búsqueda.</td></tr>'; return; }
     if (!lista.length) {
       var cuando = periodo === 'proximas' ? 'próximas' : 'anteriores';
-      var vacio = { pendiente: 'No hay citas programadas ' + cuando + '.', confirmada: 'No hay citas confirmadas ' + cuando + '.', reprogramada: 'No hay citas reprogramadas ' + cuando + '.', atendida: 'No hay citas atendidas ' + cuando + '.', cancelada: 'No hay citas canceladas ' + cuando + '.', todas: 'No hay citas ' + cuando + '.' };
-      $('citasBody').innerHTML = '<tr><td colspan="5">' + vacio[filtro] + '</td></tr>';
+      $('citasBody').innerHTML = '<tr><td colspan="5">' + (filtro === 'todas' ? 'No hay citas ' + cuando + '.' : 'No hay citas «' + ESTADOS[filtro] + '» ' + cuando + '.') + '</td></tr>';
       return;
     }
     $('citasBody').innerHTML = lista.map(function (c) {
       // Una acción principal visible; las demás en el menú «⋯»
       var activa = c.estado !== 'cancelada' && c.estado !== 'atendida';
-      var principal = c.estado === 'pendiente' || c.estado === 'reprogramada'
-        ? '<button type="button" class="adm-btn adm-primary" data-cita="' + c.id + '" data-estado="confirmada">Confirmar</button>'
-        : c.estado === 'confirmada' ? '<button type="button" class="adm-btn adm-primary" data-cita="' + c.id + '" data-estado="atendida">Atendido</button>' : '';
-      var menu = '<div class="ct-info">Grabada: ' + fechaHoraGrab(c.creada) + '<br>Usuario: ' + esc(c.creada_por || 'Sin usuario') + '</div><hr>';
-      if (activa && c.estado !== 'confirmada') menu += '<button type="button" data-cita="' + c.id + '" data-estado="atendida">Marcar atendido</button>';
+      // Una acción principal (el siguiente paso de la consulta) y el catálogo completo en el menú «⋯»
+      var sig = SIGUIENTE[c.estado];
+      var principal = sig ? '<button type="button" class="adm-btn adm-primary" data-cita="' + c.id + '" data-estado="' + sig[0] + '">' + sig[1] + '</button>' : '';
+      var menu = '<div class="ct-info">Grabada: ' + fechaHoraGrab(c.creada) + '<br>Usuario: ' + esc(c.creada_por || 'Sin usuario') + '</div><hr>' +
+        '<button type="button" data-mail-cita="' + c.id + '">Notificar por e-mail</button><hr>' +
+        CATALOGO.filter(function (e) { return e !== c.estado; }).map(function (e) { return '<button type="button" data-cita="' + c.id + '" data-estado="' + e + '"><i class="ct-est estado-' + e + '"></i>' + ESTADOS[e] + '</button>'; }).join('') + '<hr>';
       if (activa && window.PD_AGENDA) menu += '<button type="button" data-repro="' + c.id + '">Reprogramar…</button>';
       menu += '<a href="' + esc(waPaciente(c)) + '" target="_blank" rel="noopener">WhatsApp al paciente</a>';
       if (c.paciente_id && window.PD_EXPEDIENTE) menu += '<button type="button" data-ir-exp="' + c.paciente_id + '">Ver expediente</button>';
-      if (c.estado !== 'cancelada') menu += '<hr><button type="button" class="ct-peligro" data-cita="' + c.id + '" data-estado="cancelada">Cancelar cita</button>';
+      if (c.estado !== 'cancelada') menu += '<hr><button type="button" class="ct-peligro" data-cita="' + c.id + '" data-estado="cancelada">Anulado</button>';
       return '<tr><td class="ct-fecha"><b>' + fechaLarga(c.fecha) + '</b><span class="ct-hora">' + hhmm(c.hora) + '</span>' +
         (c.reprogramada_de ? '<span class="cita-grab">Antes: ' + esc(fechaLarga(c.reprogramada_de.slice(0, 10)) + ' · ' + c.reprogramada_de.slice(11, 16)) + '</span>' : '') + '</td>' +
         '<td><span class="ct-pac">' + esc(c.nombre) + '</span><span class="ct-sub">' + esc(c.servicio || '') + (c.telefono ? ' · ' + esc(c.telefono) : '') + '</span></td>' +
@@ -348,10 +351,8 @@
     }
     citas.forEach(function (c) { if (String(c.id) === String(id)) c.estado = estado; });
     contarPendientes();
-    aviso('citasMsg', estado === 'confirmada'
-      ? 'Cita confirmada. Avísale al paciente con el botón WhatsApp.'
-      : estado === 'atendida' ? 'Cita marcada como atendida.'
-      : 'Cita cancelada. El horario quedó libre en la agenda.');
+    aviso('citasMsg', estado === 'cancelada' ? 'Cita anulada. El horario quedó libre en la agenda.'
+      : estado === 'confirmada' ? 'Cita confirmada por teléfono. Avísale al paciente con el botón WhatsApp.' : 'Estado de la cita: ' + ESTADOS[estado] + '.');
     pintarCitas();
   }
 
@@ -577,9 +578,22 @@
       if (c) window.PD_AGENDA.reprogramar(c, async function (n) { await cargarCitas(); aviso('citasMsg', 'Cita reprogramada para el ' + fechaLarga(n.fecha) + ' a las ' + n.hora + '. Avísale al paciente con el botón WhatsApp.'); });
       return;
     }
+    var ml = e.target.closest('button[data-mail-cita]');
+    if (ml) { notificarCorreo(citas.filter(function (x) { return String(x.id) === ml.dataset.mailCita; })[0]); return; }
     var b = e.target.closest('button[data-cita]');
     if (b) cambiarEstado(b.dataset.cita, b.dataset.estado, b);
   });
+  // Correo al paciente con los datos de su cita (se abre en el programa de correo)
+  async function notificarCorreo(c) {
+    if (!c) return;
+    var correo = '';
+    if (c.paciente_id) { var r = await sb.from('pacientes').select('correo').eq('id', c.paciente_id).single(); correo = r.error ? '' : r.data.correo || ''; }
+    if (!correo) aviso('citasMsg', 'El expediente del paciente no tiene correo: escríbelo en el correo que se abre o regístralo en su expediente.', true);
+    var asunto = 'Su cita en Plus Dental · ' + fechaLarga(c.fecha) + ' ' + hhmm(c.hora);
+    var cuerpo = 'Estimado(a) ' + c.nombre + ':\n\nLe recordamos su cita en Plus Dental.\n\n• Fecha y hora: ' + fechaLarga(c.fecha) + ' a las ' + hhmm(c.hora) +
+      '\n• Tratamiento: ' + (c.servicio || '') + '\n• Estado: ' + (ESTADOS[c.estado] || c.estado) + '\n\nSi necesita cambiar su cita, responda este correo o escríbanos por WhatsApp al +502 3756-5739.\n\nPlus Dental · La tranquilidad también es parte del tratamiento.';
+    location.href = 'mailto:' + encodeURIComponent(correo) + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
+  }
 
   document.addEventListener('click', function (e) {
     if (e.target.closest('#citasBody details.ct-mas')) return;

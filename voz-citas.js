@@ -46,10 +46,13 @@
     if (/\b(detener|deten|parar|para de escuchar|cancelar busqueda)\b/.test(t)) r.detener = true;
     // Estado (reprogramadas antes que programadas)
     if (/\breprogramad/.test(t)) r.estado = 'reprogramada';
-    else if (/\b(programad|pendiente)/.test(t)) r.estado = 'pendiente';
+    else if (/\b(no confirmad|programad|pendiente)/.test(t)) r.estado = 'pendiente';
     else if (/\bconfirmad/.test(t)) r.estado = 'confirmada';
+    else if (/\bsala de espera\b/.test(t)) r.estado = 'sala_espera';
+    else if (/\batendiendo/.test(t)) r.estado = 'atendiendose';
+    else if (/\bno asist/.test(t)) r.estado = 'no_asiste';
     else if (/\batendid/.test(t)) r.estado = 'atendida';
-    else if (/\bcancelad/.test(t)) r.estado = 'cancelada';
+    else if (/\b(cancelad|anulad)/.test(t)) r.estado = 'cancelada';
     else if (/\b(todas|todos los estados)\b/.test(t)) r.estado = 'todas';
     // Periodo
     if (/\b(proximas|futuras|siguientes)\b/.test(t)) r.periodo = 'proximas';
@@ -112,7 +115,7 @@
     return mejor;
   }
 
-  var ESTADOS = { pendiente: 'Programadas', confirmada: 'Confirmadas', reprogramada: 'Reprogramadas', atendida: 'Atendidas', cancelada: 'Canceladas', todas: 'Todas' };
+  var ESTADOS = { pendiente: 'No confirmadas', confirmada: 'Confirmadas por teléfono', sala_espera: 'En sala de espera', atendiendose: 'Atendiéndose', atendida: 'Atendidas', no_asiste: 'No asiste', reprogramada: 'Reprogramadas', cancelada: 'Anuladas', todas: 'Todas' };
   var rec = null, escuchando = false, textoFinal = '', pendiente = {};
 
   function marcar(id) {

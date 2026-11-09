@@ -19,7 +19,7 @@
     if (/row-level security|permission denied|No tienes permiso/i.test(m)) return 'No tienes permiso para esta acción.';
     return m.replace(/^.*?ERROR:\s*/, '') || 'No se pudo completar la acción.';
   }
-  var ESTADOS_CITA = { pendiente: 'Programado', confirmada: 'Confirmado', reprogramada: 'Reprogramado', atendida: 'Atendido' };
+  var ESTADOS_CITA = { pendiente: 'No confirmado', confirmada: 'Confirmado por teléfono', sala_espera: 'En sala de espera', atendiendose: 'Atendiéndose', atendida: 'Atendido', no_asiste: 'No asiste', reprogramada: 'Reprogramado' };
   var CAMPOS = { alergias: 'pAlergias', enfermedades: 'pEnfermedades', medicamentos: 'pMedicamentos' };
 
   var paciente = null, registros = [], citas = [], elegido = null, modo = 'ver'; // ver | editar | nuevo
