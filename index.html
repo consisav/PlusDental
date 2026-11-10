@@ -572,7 +572,7 @@ tr.anulado td{color:#94A6B2}tr.anulado td.num{text-decoration:line-through}
 .bm-meds{border:1px solid #D9E4EC;border-radius:12px;padding:10px 14px;margin:0}.bm-meds legend{font-size:13px;font-weight:700;color:#475B68;padding:0 6px}
 .bm-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 12px;margin-top:6px;max-height:220px;overflow:auto}.bm-lista.bm-off{opacity:.55}
 .bm-form label.bm-med{flex-direction:row;align-items:center;gap:8px;font-size:14px;font-weight:500}.bm-med input{width:18px;height:18px;min-height:0;margin:0}
-.ag2-lock{font-size:11px;line-height:1}.ag2-c.bloq .ag2-lock{display:block;text-align:center;opacity:.8}.ag2-c.bloq-parcial{background-image:repeating-linear-gradient(135deg,transparent 0 6px,rgba(159,18,57,.08) 6px 8px)}.ag2-lock-p{position:absolute;left:4px;top:3px;font-size:10px;opacity:.75}.ag2-c.bloq-parcial{position:relative}
+.ag2-lock{font-size:11px;line-height:1;background:transparent;border:0;padding:2px;cursor:pointer;min-height:0}.ag2-lock:hover{transform:scale(1.25)}.bm-modo{align-self:flex-start}.dlg-submit.bm-desbloq{background:#0E7490}.ag2-c.bloq .ag2-lock{display:block;text-align:center;opacity:.8}.ag2-c.bloq-parcial{background-image:repeating-linear-gradient(135deg,transparent 0 6px,rgba(159,18,57,.08) 6px 8px)}.ag2-lock-p{position:absolute;left:4px;top:3px;font-size:10px;opacity:.75}.ag2-c.bloq-parcial{position:relative}
 @media (max-width:520px){.bm-grid{grid-template-columns:minmax(0,1fr)}}
 .ag-det-editar{padding:16px 20px;border-top:1px solid #D9E4EC;background:#FFFFFF}.ag-det-editar h4{margin:0 0 12px;font-size:15px;color:#0F2A3D}
 .ag-ed-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.ag-ed-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:#475B68;text-transform:uppercase;letter-spacing:.03em}
@@ -3382,10 +3382,11 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
 <span style="font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: #005A87">Agenda</span>
 <h2 id="bmTitulo" style="margin: 0; font-size: 22px; font-weight: 700">Bloquear horarios</h2>
-<span style="color: #475B68; font-size: 14px">En ese horario no se podrán agendar citas para los médicos elegidos. Las citas que ya existen no se anulan.</span>
+<span id="bmAyuda" style="color: #475B68; font-size: 14px">En ese horario no se podrán agendar citas para los médicos elegidos. Las citas que ya existen no se anulan.</span>
 </div>
 <button type="button" id="bmCerrar" aria-label="Cerrar" style="background: transparent; border: 0; font-size: 28px; line-height: 1; color: #475B68; cursor: pointer; min-width: 44px; min-height: 44px">×</button>
 </div>
+<div class="ag-vista bm-modo" role="group" aria-label="Acción"><button type="button" data-bm-modo="bloquear" aria-pressed="true">🔒 Bloquear</button><button type="button" data-bm-modo="desbloquear" aria-pressed="false">🔓 Desbloquear</button></div>
 <div class="bm-grid">
 <label>Fecha inicial<input id="bmDesde" type="date" required></label>
 <label>Fecha final<input id="bmHasta" type="date"></label>
@@ -3396,7 +3397,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <label class="bm-med bm-todos"><input type="checkbox" id="bmTodos" checked> <b id="bmTodosTxt">Todos los odontólogos</b></label>
 <div id="bmMedicos" class="bm-lista"></div>
 </fieldset>
-<label>Motivo (opcional)<input id="bmMotivo" type="text" maxlength="80" placeholder="Ej.: almuerzo, capacitación, vacaciones"></label>
+<label id="bmMotivoWrap">Motivo (opcional)<input id="bmMotivo" type="text" maxlength="80" placeholder="Ej.: almuerzo, capacitación, vacaciones"></label>
 <button type="submit" class="dlg-submit" id="bmGuardar">Bloquear horario</button>
 <p id="bmMsg" class="dlg-msg" role="status"></p>
 <h3 style="margin: 4px 0 0; font-size: 16px">Horarios bloqueados</h3>
@@ -3465,7 +3466,7 @@ table.tabla-tarjetas td.td-sola{padding:4px 0}
 <script src="dentistas.js?v=20261110a"></script>
 <script src="tipos-quiropracticos.js?v=20261105a"></script>
 <script src="quiropracticos.js?v=20261110a"></script>
-<script src="agenda.js?v=20261110c"></script>
+<script src="agenda.js?v=20261110d"></script>
 <script src="agentes.js"></script>
 <script src="reportes.js?v=20261109a"></script>
 <script src="constancias.js"></script>

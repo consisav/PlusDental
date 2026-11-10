@@ -122,9 +122,9 @@
     var l = bloqueosMed(f, hh, PASO, null, true);
     if (!l.length) return null;
     var total = l.filter(function (b) { return !b.medicos || (medFiltro && b.medicos.indexOf(medFiltro) >= 0); })[0];
-    if (total) return ['bloq', '<span class="ag2-lock" aria-hidden="true">🔒</span>', 'Bloqueado: ' + nombresBloqueo(total) + (total.motivo ? ' · ' + total.motivo : '')];
+    if (total) return ['bloq', '<button type="button" class="ag2-lock" data-desbloq="' + total.id + '" data-fecha="' + f + '" aria-label="Desbloquear este horario">🔒</button>', 'Bloqueado: ' + nombresBloqueo(total) + (total.motivo ? ' · ' + total.motivo : '')];
     if (medFiltro) return null;
-    return { parcial: '<span class="ag2-lock ag2-lock-p" aria-hidden="true">🔒</span>', titulo: 'Bloqueado para: ' + l.map(function (b) { return nombresBloqueo(b) + (b.motivo ? ' (' + b.motivo + ')' : ''); }).join(' · ') };
+    return { parcial: '<button type="button" class="ag2-lock ag2-lock-p" data-desbloq="' + l[0].id + '" data-fecha="' + f + '" aria-label="Desbloquear este horario">🔒</button>', titulo: 'Bloqueado para: ' + l.map(function (b) { return nombresBloqueo(b) + (b.motivo ? ' (' + b.motivo + ')' : ''); }).join(' · ') };
   }
   function medDelFiltro() { var yo = soloMio(); return yo ? yo.id : +$('agFMed').value || null; }
   // Citas que empiezan dentro de la fila del calendario (bloque de 90 minutos que inicia en h)
@@ -1034,7 +1034,7 @@
   function horasBloqueo(sel) { var l = []; for (var m = 7 * 60; m <= 19 * 60; m += 15) l.push('<option value="' + aHora(m) + '"' + (aHora(m) === sel ? ' selected' : '') + '>' + aHora(m) + '</option>'); return l.join(''); }
   function pintarBloqMed() {
     var q = esQuiro(), lista = bloqMed.filter(function (b) { return b.area === window.PD_AREA && b.fecha_hasta >= hoy(); });
-    $('bmTitulo').textContent = 'Bloquear horarios · ' + (q ? 'Quiropráctica' : 'Odontología');
+    $('bmTitulo').textContent = (bmModo === 'desbloquear' ? 'Desbloquear horarios · ' : 'Bloquear horarios · ') + (q ? 'Quiropráctica' : 'Odontología');
     $('bmTodosTxt').textContent = q ? 'Todos los quiroprácticos' : 'Todos los odontólogos';
     $('bmMedicos').innerHTML = dentistas.length ? dentistas.map(function (d) {
       return '<label class="bm-med"><input type="checkbox" value="' + d.id + '"> ' + esc(d.nombre) + '</label>';
@@ -1046,8 +1046,72 @@
         '<button type="button" class="adm-btn" data-bm-quitar="' + b.id + '">Quitar</button></li>';
     }).join('') : '<li class="bloq-item" style="color:#5A6D7A">No hay horarios bloqueados.</li>';
   }
+  var bmModo = 'bloquear';
+  function modoBloqueo(m) {
+    bmModo = m;
+    document.querySelectorAll('[data-bm-modo]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.bmModo === m); });
+    $('bmGuardar').textContent = m === 'desbloquear' ? 'Desbloquear horario' : 'Bloquear horario';
+    $('bmGuardar').classList.toggle('bm-desbloq', m === 'desbloquear');
+    $('bmAyuda').textContent = m === 'desbloquear'
+      ? 'Libera el horario indicado para los médicos elegidos (o para todos). Si un bloqueo es más amplio, se conserva el resto.'
+      : 'En ese horario no se podrán agendar citas para los médicos elegidos. Las citas que ya existen no se anulan.';
+    $('bmMotivoWrap').hidden = m === 'desbloquear';
+    var q = esQuiro();
+    $('bmTitulo').textContent = (m === 'desbloquear' ? 'Desbloquear horarios · ' : 'Bloquear horarios · ') + (q ? 'Quiropráctica' : 'Odontología');
+    aviso('bmMsg', '');
+  }
+  document.querySelectorAll('[data-bm-modo]').forEach(function (b) { b.addEventListener('click', function () { modoBloqueo(b.dataset.bmModo); }); });
+  function marcarMedicos(ids) {
+    $('bmTodos').checked = !ids;
+    $('bmMedicos').classList.toggle('bm-off', !ids);
+    $('bmMedicos').querySelectorAll('input').forEach(function (x) { x.checked = !!ids && ids.indexOf(+x.value) >= 0; });
+  }
+  // Desbloquear desde el candado del calendario: se abre con el horario de ese bloqueo
+  async function abrirDesbloqueo(id, f) {
+    var b = bloqMed.filter(function (x) { return String(x.id) === String(id); })[0];
+    await abrirBloqueo();
+    modoBloqueo('desbloquear');
+    if (!b) return;
+    $('bmDesde').value = f || b.fecha_desde; $('bmHasta').value = f || b.fecha_hasta;
+    $('bmHoraIni').innerHTML = horasBloqueo(hhmm(b.desde)); $('bmHoraFin').innerHTML = horasBloqueo(hhmm(b.hasta));
+    marcarMedicos(b.medicos);
+  }
+  document.addEventListener('click', function (e) {
+    var l = e.target.closest('[data-desbloq]');
+    if (!l || !$('agBody').contains(l)) return;
+    e.preventDefault(); e.stopPropagation();
+    abrirDesbloqueo(l.dataset.desbloq, l.dataset.fecha);
+  }, true);
+  // Quita el horario [d1..d2] × [h1..h2) a los médicos indicados (null = todos). Cada bloqueo que se cruza
+  // se reemplaza por las partes que siguen bloqueadas.
+  async function desbloquear(d1, d2, h1, h2, meds) {
+    var afect = bloqMed.filter(function (b) {
+      return b.area === window.PD_AREA && b.fecha_desde <= d2 && b.fecha_hasta >= d1 && hhmm(b.desde) < h2 && hhmm(b.hasta) > h1 &&
+        (!meds || !b.medicos || b.medicos.some(function (id) { return meds.indexOf(id) >= 0; }));
+    });
+    if (!afect.length) return { cambiados: 0 };
+    var todosIds = dentistas.map(function (d) { return d.id; });
+    for (var i = 0; i < afect.length; i++) {
+      var b = afect[i], partes = [], base = { area: b.area, motivo: b.motivo, medicos: b.medicos };
+      var fi = b.fecha_desde > d1 ? b.fecha_desde : d1, ff = b.fecha_hasta < d2 ? b.fecha_hasta : d2;
+      if (b.fecha_desde < fi) partes.push(Object.assign({}, base, { fecha_desde: b.fecha_desde, fecha_hasta: sumar(fi, -1), desde: b.desde, hasta: b.hasta }));
+      if (b.fecha_hasta > ff) partes.push(Object.assign({}, base, { fecha_desde: sumar(ff, 1), fecha_hasta: b.fecha_hasta, desde: b.desde, hasta: b.hasta }));
+      var ti = hhmm(b.desde) > h1 ? hhmm(b.desde) : h1, tf = hhmm(b.hasta) < h2 ? hhmm(b.hasta) : h2;
+      if (hhmm(b.desde) < ti) partes.push(Object.assign({}, base, { fecha_desde: fi, fecha_hasta: ff, desde: b.desde, hasta: ti }));
+      if (hhmm(b.hasta) > tf) partes.push(Object.assign({}, base, { fecha_desde: fi, fecha_hasta: ff, desde: tf, hasta: b.hasta }));
+      if (meds) {
+        var quedan = (b.medicos || todosIds).filter(function (id) { return meds.indexOf(id) < 0; });
+        if (quedan.length) partes.push(Object.assign({}, base, { fecha_desde: fi, fecha_hasta: ff, desde: ti, hasta: tf, medicos: quedan }));
+      }
+      var r = await sb.from('bloqueos_medicos').delete().eq('id', b.id);
+      if (r.error) return { error: r.error };
+      if (partes.length) { r = await sb.from('bloqueos_medicos').insert(partes); if (r.error) return { error: r.error }; }
+    }
+    return { cambiados: afect.length };
+  }
   async function abrirBloqueo() {
     var f = $('agDia').value || hoy();
+    modoBloqueo('bloquear');
     $('bmDesde').value = f; $('bmHasta').value = f;
     $('bmHoraIni').innerHTML = horasBloqueo('12:00'); $('bmHoraFin').innerHTML = horasBloqueo('13:00');
     $('bmMotivo').value = ''; $('bmTodos').checked = true;
@@ -1077,7 +1141,19 @@
     if (d2 < d1) { aviso('bmMsg', 'La fecha final no puede ser antes que la inicial.', true); return; }
     if (h2 <= h1) { aviso('bmMsg', 'La hora final debe ser después de la hora inicial.', true); return; }
     if (!$('bmTodos').checked && !meds.length) { aviso('bmMsg', 'Elige uno o más médicos, o marca «Todos».', true); return; }
-    var btn = $('bmGuardar'); btn.disabled = true; aviso('bmMsg', 'Bloqueando…');
+    var btn = $('bmGuardar');
+    if (bmModo === 'desbloquear') {
+      btn.disabled = true; aviso('bmMsg', 'Desbloqueando…');
+      await cargarBloqMed();
+      var res = await desbloquear(d1, d2, h1, h2, $('bmTodos').checked ? null : meds);
+      btn.disabled = false;
+      await cargarBloqMed(); pintarBloqMed(); pintar(); modoBloqueo('desbloquear');
+      if (res.error) { aviso('bmMsg', traducir(res.error), true); return; }
+      var quien = $('bmTodos').checked ? (esQuiro() ? 'todos los quiroprácticos' : 'todos los odontólogos') : meds.map(nombreDentista).join(', ');
+      aviso('bmMsg', res.cambiados ? 'Horario desbloqueado de ' + h1 + ' a ' + h2 + ' para ' + quien + '.' : 'No había bloqueos en ese horario para ' + quien + '.', !res.cambiados);
+      return;
+    }
+    btn.disabled = true; aviso('bmMsg', 'Bloqueando…');
     var r = await sb.from('bloqueos_medicos').insert({ area: window.PD_AREA, fecha_desde: d1, fecha_hasta: d2, desde: h1, hasta: h2, medicos: $('bmTodos').checked ? null : meds, motivo: $('bmMotivo').value.trim() || null });
     btn.disabled = false;
     if (r.error) { aviso('bmMsg', /bloqueos_medicos/.test(r.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para bloquear horarios por médico.' : traducir(r.error), true); return; }
