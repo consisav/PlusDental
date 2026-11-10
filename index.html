@@ -1,6 +1,21 @@
 <!doctype html>
 <html lang="es">
 <head>
+<script>
+// Al refrescar la página se abre siempre en el inicio (el navegador no restaura la posición anterior)
+(function () {
+  try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) {}
+  var nav = null; try { nav = performance.getEntriesByType('navigation')[0]; } catch (e) {}
+  if (location.hash && !(nav && nav.type === 'reload')) return; // enlace directo a una sección: se respeta
+  if (location.hash) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+  var usuario = false, fin = Date.now() + 3000;
+  function arriba() { if (!usuario && Date.now() < fin && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
+  ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(function (ev) { window.addEventListener(ev, function () { usuario = true; }, { passive: true, once: true }); });
+  window.addEventListener('scroll', arriba, { passive: true });
+  document.addEventListener('DOMContentLoaded', arriba);
+  window.addEventListener('load', function () { if (!usuario) window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); });
+})();
+</script>
 <meta charset="utf-8">
 <title>Plus Dental — Tratamientos dentales</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
