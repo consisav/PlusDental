@@ -8351,6 +8351,26 @@ exception
 end;
 $$;
 
+-- ===== Duración de la cita =====
+-- Se puede indicar al agendar o al modificar la cita (15 a 240 minutos). Vacía = automática:
+-- la frecuencia del médico o, si no tiene, 30 minutos (10 en ortodoncia).
+alter table public.citas add column if not exists duracion int;
+do $$ begin
+  alter table public.citas add constraint citas_duracion_rango check (duracion is null or duracion between 5 and 480);
+exception when duplicate_object then null; end $$;
+
+-- La disponibilidad respeta la duración indicada en cada cita
+create or replace function public.dentista_libre(d public.dentistas, f date, h time)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.dentista_atiende(d, f, h)
+     and h + make_interval(mins => coalesce(d.frecuencia, 30)) <= ((d.horario -> extract(isodow from f)::int::text) ->> 'cierra')::time
+     and not exists (select 1 from public.citas c left join public.dentistas cd on cd.id = c.dentista_id
+                     where c.fecha = f and c.estado <> 'cancelada'
+                       and (c.dentista_id = d.id or (d.posicion_id is not null and c.posicion_id = d.posicion_id))
+                       and c.hora < h + make_interval(mins => coalesce(d.frecuencia, 30))
+                       and c.hora + make_interval(mins => coalesce(c.duracion, public.cita_minutos(c.servicio, cd.frecuencia))) > h);
+$$;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:

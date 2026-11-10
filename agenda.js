@@ -54,8 +54,13 @@
   function esOrtodoncia(servicio, esp) { return esp === 'Ortodoncia' || /ortodon/.test(sinTildes(servicio)); }
   // Frecuencia de atención del médico (Odontólogos): cada cita ocupa ese tiempo y sus horas se ofrecen con ese paso
   function frecDe(id) { var d = id && dentistas.filter(function (x) { return x.id === id; })[0]; return d && d.frecuencia ? d.frecuencia : 0; }
-  function duracion(c) { return frecDe(c.dentista_id) || (esOrtodoncia(c.servicio) ? MINUTOS.ortodoncia : MINUTOS.general); }
-  function durMedico(d) { return (d && d.frecuencia) || durNueva(); }
+  function duracion(c) { return +c.duracion || frecDe(c.dentista_id) || (esOrtodoncia(c.servicio) ? MINUTOS.ortodoncia : MINUTOS.general); }
+  // Duración de la cita (como «Duración» al agendar): 15 a 240 minutos; vacío = según el médico y el tratamiento
+  var DURACIONES = [15, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240];
+  function durElegida() { return $('agDuracion') ? +$('agDuracion').value || 0 : 0; }
+  function opcionesDuracion(sel, auto) { return '<option value="">' + (auto ? 'Automática (' + auto + ' minutos)' : 'Automática') + '</option>' + DURACIONES.map(function (m) { return '<option value="' + m + '"' + (+sel === m ? ' selected' : '') + '>' + m + ' minutos</option>'; }).join(''); }
+  async function guardarDuracion(id) { var m = durElegida(); if (id && m) await sb.from('citas').update({ duracion: m }).eq('id', id); }
+  function durMedico(d) { return durElegida() || (d && d.frecuencia) || durNueva(); }
   // Horas del médico ese día: desde su hora de inicio, cada «frecuencia» minutos, y la cita termina antes de su cierre
   function horariosMedico(f, d) {
     if (!d || !d.frecuencia) return horarios(f, durMedico(d));
@@ -104,7 +109,7 @@
   function ocupan(f, h, dur) { var a = aMin(h), d = dur || MINUTOS.general; return (citasTodas || citas).filter(function (c) { return c.fecha === f && choca(a, d, aMin(c.hora), duracion(c)); }); }
   function dentistaOcupado(id, f, h, dur) { return ocupan(f, h, dur).some(function (c) { return c.dentista_id === id; }); }
   function salaOcupada(id, f, h, dur) { return ocupan(f, h, dur).some(function (c) { return c.posicion_id === id; }); }
-  function durNueva() { return esOrtodoncia($('agTratamiento').value, especialidadRequerida()) ? MINUTOS.ortodoncia : MINUTOS.general; }
+  function durNueva() { return durElegida() || (esOrtodoncia($('agTratamiento').value, especialidadRequerida()) ? MINUTOS.ortodoncia : MINUTOS.general); }
   function cargaDelDia(id, f) { return citas.filter(function (c) { return c.fecha === f && c.dentista_id === id; }).length; }
   function nombreSala(id) { var s = salas.filter(function (x) { return x.id === id; })[0]; return s ? s.codigo + ' · ' + s.nombre : 'Sin sala'; }
   function nombreDentista(id) { var d = dentistas.filter(function (x) { return x.id === id; })[0]; return d ? d.nombre : 'Sin asignar'; }
@@ -278,6 +283,7 @@
       });
       if (r.error) { fallo = textoFecha(o.fecha) + ' · ' + o.hora + ': ' + traducir(r.error); break; }
       await sedeCita(r.data);
+      await guardarDuracion(r.data);
       hechas.push(o);
     }
     boton.disabled = false;
@@ -526,6 +532,7 @@
     boton.disabled = false;
     if (r.error) { aviso('agFormMsg', traducir(r.error), true); await cargarCitas(); return; }
     await sedeCita(r.data);
+    await guardarDuracion(r.data);
     await guardarTipo(p);
     var nombre = p ? p.nombre : $('agNombre').value.trim(), tel = p ? p.telefono : $('agTelefono').value.trim();
     var correo = (p && p.correo) || $('agCorreo').value.trim();
@@ -568,7 +575,9 @@
     var hasta = sumar(hoy(), DIAS_BUSQUEDA + 31);
     if (fin > hasta) hasta = fin;
     if (inicio < desde) desde = inicio;
-    var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada,creada_por,reprogramada_de,tipo,quiropractico_id')
+    var r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada,creada_por,reprogramada_de,tipo,quiropractico_id,duracion')
+      .gte('fecha', desde).lte('fecha', hasta);
+    if (r.error && /duracion/.test(r.error.message)) r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada,creada_por,reprogramada_de,tipo,quiropractico_id')
       .gte('fecha', desde).lte('fecha', hasta);
     if (r.error && /tipo|quiropractico_id/.test(r.error.message)) r = await sb.from('citas').select('id,fecha,hora,servicio,nombre,telefono,estado,dentista_id,posicion_id,paciente_id,prioridad,notas,creada,creada_por,reprogramada_de')
       .gte('fecha', desde).lte('fecha', hasta);
@@ -881,6 +890,7 @@
       '<dl class="ag-det-grid">' +
       campo('Odontólogo', esc(nombreDentista(c.dentista_id))) +
       campo('Sala', esc(c.posicion_id ? nombreSala(c.posicion_id) : 'Sin sala')) +
+      campo('Duración', duracion(c) + ' minutos' + (c.duracion ? '' : ' (automática)')) +
       campo('WhatsApp', c.telefono ? esc(c.telefono) : '—') +
       campo('Fecha y hora de grabación', fechaHoraGrab(c.creada)) +
       campo('Usuario que graba', esc(c.creada_por || 'Sin usuario')) +
@@ -919,6 +929,7 @@
       '<label>' + (q ? 'Quiropráctico' : 'Odontólogo') + '<select name="medico">' + opMed + '</select></label>' +
       (q ? '' : '<label>Sala<select name="sala">' + opSala + '</select></label>') +
       '<label>WhatsApp<input name="telefono" inputmode="tel" value="' + esc(c.telefono || '') + '"></label>' +
+      '<label>Duración<select name="duracion">' + opcionesDuracion(c.duracion, frecDe(c.dentista_id) || (esOrtodoncia(c.servicio) ? MINUTOS.ortodoncia : MINUTOS.general)) + '</select></label>' +
       '<label>Prioridad<select name="prioridad"><option value="normal">Normal</option><option value="urgente"' + (c.prioridad === 'urgente' ? ' selected' : '') + '>Urgente</option></select></label>' +
       '<label class="ag-ed-ancho">Notas<textarea name="notas" rows="2">' + esc(c.notas || '') + '</textarea></label>' +
       '</div><p class="ag-ed-msg" role="status"></p>' +
@@ -938,10 +949,12 @@
     if (!fecha || !hora || !servicio) { decir('Indica la fecha, la hora y el tratamiento.', true); return; }
     var med = f.elements.medico.value ? +f.elements.medico.value : null;
     var sala = f.elements.sala ? (f.elements.sala.value ? +f.elements.sala.value : null) : null;
-    var nueva = { fecha: fecha, hora: hora, servicio: servicio, dentista_id: med, posicion_id: sala };
+    var durSel = +f.elements.duracion.value || null;
+    var nueva = { fecha: fecha, hora: hora, servicio: servicio, dentista_id: med, posicion_id: sala, duracion: durSel };
     // Choques con otras citas del mismo médico o de la misma sala ese día
     btn.disabled = true; decir('Revisando el horario…');
-    var r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id,tipo,quiropractico_id').eq('fecha', fecha).neq('estado', 'cancelada');
+    var r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id,tipo,quiropractico_id,duracion').eq('fecha', fecha).neq('estado', 'cancelada');
+    if (r.error) r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id,tipo,quiropractico_id').eq('fecha', fecha).neq('estado', 'cancelada');
     if (!r.error) {
       var dur = duracion(nueva);
       var choque = delArea(r.data).filter(function (x) {
@@ -954,7 +967,8 @@
       fecha: fecha, hora: hora, servicio: servicio,
       telefono: f.elements.telefono.value.trim(),
       prioridad: f.elements.prioridad.value === 'urgente' ? 'urgente' : 'normal',
-      notas: f.elements.notas.value.trim() || null
+      notas: f.elements.notas.value.trim() || null,
+      duracion: durSel
     };
     if (esQuiro()) cambios.quiropractico_id = med; else { cambios.dentista_id = med; cambios.posicion_id = sala; }
     if (fecha !== c.fecha || hora !== hhmm(c.hora)) {
@@ -964,6 +978,7 @@
     }
     decir('Guardando…');
     var u = await sb.from('citas').update(cambios).eq('id', c.id).select('id');
+    if (u.error && /duracion/.test(u.error.message || '')) { btn.disabled = false; decir('Falta ejecutar en Supabase el script actualizado (supabase.sql) para la duración de la cita.', true); return; }
     if (u.error && /reprogramada_(en|por)/.test(u.error.message || '')) { delete cambios.reprogramada_en; delete cambios.reprogramada_por; u = await sb.from('citas').update(cambios).eq('id', c.id).select('id'); }
     btn.disabled = false;
     if (u.error || !u.data || !u.data.length) {
@@ -1046,7 +1061,8 @@
     $('reproHora').disabled = true;
     $('reproHora').innerHTML = '<option value="">' + (f ? 'Buscando horas libres…' : 'Elige la fecha') + '</option>';
     if (!f) return;
-    var r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id,tipo,quiropractico_id').eq('fecha', f).neq('estado', 'cancelada');
+    var r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id,tipo,quiropractico_id,duracion').eq('fecha', f).neq('estado', 'cancelada');
+    if (r.error) r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id,tipo,quiropractico_id').eq('fecha', f).neq('estado', 'cancelada');
     if (r.error) r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id').eq('fecha', f).neq('estado', 'cancelada');
     if (!r.error) r.data = delArea(r.data);
     if ($('reproFecha').value !== f) return;
