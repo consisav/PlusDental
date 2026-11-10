@@ -286,7 +286,7 @@
       menu += '<a href="' + esc(waPaciente(c)) + '" target="_blank" rel="noopener">WhatsApp al paciente</a>';
       if (c.paciente_id && window.PD_EXPEDIENTE) menu += '<button type="button" data-ir-exp="' + c.paciente_id + '">Ver expediente</button>';
       if (c.estado !== 'cancelada') menu += '<hr><button type="button" class="ct-peligro" data-cita="' + c.id + '" data-estado="cancelada">Anulado</button>';
-      return '<tr><td class="ct-fecha"><b>' + fechaLarga(c.fecha) + '</b><span class="ct-hora">' + hhmm(c.hora) + '</span>' +
+      return '<tr class="ct-e-' + c.estado + '"><td class="ct-fecha"><b>' + fechaLarga(c.fecha) + '</b><span class="ct-hora">' + hhmm(c.hora) + '</span>' +
         (c.reprogramada_de ? '<span class="cita-grab">Antes: ' + esc(fechaLarga(c.reprogramada_de.slice(0, 10)) + ' · ' + c.reprogramada_de.slice(11, 16)) + '</span>' : '') + '</td>' +
         '<td><span class="ct-pac">' + esc(c.nombre) + '</span><span class="ct-sub">' + esc(c.servicio || '') + (c.telefono ? ' · ' + esc(c.telefono) : '') + '</span></td>' +
         '<td><div class="ct-asig">' + selectorDentista(c) + selectorPosicion(c) + '</div></td>' +

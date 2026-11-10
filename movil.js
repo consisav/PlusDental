@@ -8,7 +8,7 @@
   var MENU_APILADO = window.matchMedia('(max-width: 960px)');
 
   // Tablas que NO se convierten: la agenda (cuadrícula de horarios) y lo que se imprime
-  function convertible(t) { return !t.classList.contains('ag-grid') && !t.closest('#impresion') && !t.closest('[data-sin-tarjetas]'); }
+  function convertible(t) { return !t.classList.contains('ag-grid') && !t.classList.contains('citas-tabla') && !t.closest('#impresion') && !t.closest('[data-sin-tarjetas]'); }
 
   function etiquetar(t) {
     var head = t.tHead && t.tHead.rows[0];
