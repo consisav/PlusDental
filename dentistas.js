@@ -264,6 +264,9 @@
     $('deNombre').value = (d && d.nombre) || '';
     $('deTelefono').value = (d && d.telefono) || '';
     $('deCorreo').value = (d && d.correo) || '';
+    $('deNacimiento').value = (d && d.fecha_nacimiento) || '';
+    $('deNacimiento').max = new Date().toISOString().slice(0, 10);
+    $('deEdad').textContent = edadDe($('deNacimiento').value);
     $('deDireccion').value = (d && d.direccion) || '';
     $('deColegiado').value = (d && d.colegiado) || '';
     opcionesTipo(d ? d.tipo_id || null : null);
@@ -357,6 +360,8 @@
     $('deNombre').focus();
   }
 
+  function edadDe(f) { if (!f) return ''; var n = new Date(f + 'T00:00:00'), h = new Date(), e = h.getFullYear() - n.getFullYear(); if (h.getMonth() < n.getMonth() || (h.getMonth() === n.getMonth() && h.getDate() < n.getDate())) e--; return e >= 0 && e < 120 ? e + ' años' : ''; }
+  $('deNacimiento').addEventListener('input', function () { $('deEdad').textContent = edadDe(this.value); });
   async function guardar(form) {
     var horario = leerHorario();
     if (Object.keys(horario).some(function (d) { return !horario[d].abre || !horario[d].cierra || horario[d].abre >= horario[d].cierra; })) {
@@ -367,6 +372,7 @@
       nombre: $('deNombre').value.trim(),
       telefono: $('deTelefono').value.trim() || null,
       correo: $('deCorreo').value.trim() || null,
+      fecha_nacimiento: $('deNacimiento').value || null,
       direccion: $('deDireccion').value.trim() || null,
       colegiado: $('deColegiado').value.trim() || null,
       tipo_id: $('deTipo').value ? +$('deTipo').value : null,

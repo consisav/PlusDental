@@ -102,7 +102,31 @@
     var x = hor[diaSemana(f)];
     return !!x && h >= x.abre && h < x.cierra;
   }
-  function bloqueado(f, h, dur) { return bloqueos.some(function (b) { return b.fecha === f && (!b.hora || choca(aMin(h), dur || MINUTOS.general, aMin(b.hora), BLOQUE)); }); }
+  // Bloqueos de la clínica (todo el día o un turno) y bloqueos por médico de una hora inicial a una final.
+  // medId: el médico de la cita; sin médico solo cuentan los bloqueos de «todos».
+  function bloqueado(f, h, dur, medId) {
+    return bloqueos.some(function (b) { return b.fecha === f && (!b.hora || choca(aMin(h), dur || MINUTOS.general, aMin(b.hora), BLOQUE)); }) ||
+      bloqueosMed(f, h, dur, medId).length > 0;
+  }
+  var bloqMed = [];
+  function bloqueosMed(f, h, dur, medId, cualquiera) {
+    return bloqMed.filter(function (b) {
+      if (b.area !== window.PD_AREA || f < b.fecha_desde || f > b.fecha_hasta) return false;
+      if (!choca(aMin(h), dur || MINUTOS.general, aMin(b.desde), aMin(b.hasta) - aMin(b.desde))) return false;
+      return cualquiera || !b.medicos || (!!medId && b.medicos.indexOf(+medId) >= 0);
+    });
+  }
+  function nombresBloqueo(b) { return b.medicos ? b.medicos.map(function (id) { return nombreDentista(id); }).join(', ') : (esQuiro() ? 'Todos los quiroprácticos' : 'Todos los odontólogos'); }
+  // Celda del calendario: bloqueada para todos (o para el médico filtrado) o solo para algunos médicos
+  function celdaBloqueo(f, hh, medFiltro) {
+    var l = bloqueosMed(f, hh, PASO, null, true);
+    if (!l.length) return null;
+    var total = l.filter(function (b) { return !b.medicos || (medFiltro && b.medicos.indexOf(medFiltro) >= 0); })[0];
+    if (total) return ['bloq', '<span class="ag2-lock" aria-hidden="true">🔒</span>', 'Bloqueado: ' + nombresBloqueo(total) + (total.motivo ? ' · ' + total.motivo : '')];
+    if (medFiltro) return null;
+    return { parcial: '<span class="ag2-lock ag2-lock-p" aria-hidden="true">🔒</span>', titulo: 'Bloqueado para: ' + l.map(function (b) { return nombresBloqueo(b) + (b.motivo ? ' (' + b.motivo + ')' : ''); }).join(' · ') };
+  }
+  function medDelFiltro() { var yo = soloMio(); return yo ? yo.id : +$('agFMed').value || null; }
   // Citas que empiezan dentro de la fila del calendario (bloque de 90 minutos que inicia en h)
   function citasEn(f, h) { var a = aMin(h); return citas.filter(function (c) { var m = aMin(c.hora); return c.fecha === f && m >= a && m < a + BLOQUE; }); }
   // Citas que se traslapan con [h, h + dur)
@@ -155,7 +179,7 @@
         if (franja === 'tarde' && h < '12:00') return;
 
         var candidatos = conHorario ? dentistas.filter(function (d) {
-          return (!medico || d.id === medico) && (fijo || (horasDe[d.id] && horasDe[d.id][h])) && atiende(d, f, h) && !dentistaOcupado(d.id, f, h, durMedico(d));
+          return (!medico || d.id === medico) && (fijo || (horasDe[d.id] && horasDe[d.id][h])) && atiende(d, f, h) && !dentistaOcupado(d.id, f, h, durMedico(d)) && !bloqueado(f, h, durMedico(d), d.id);
         }) : [null];
 
         candidatos.forEach(function (d) {
@@ -442,7 +466,7 @@
   // (ocupada = el médico elegido ya tiene cita, la sala elegida ya está usada, o no queda ninguna sala libre)
   function horaLibre(f, h, medicoId, salaId, dur) {
     dur = dur || durNueva();
-    if (bloqueado(f, h, dur)) return false;
+    if (bloqueado(f, h, dur, medicoId)) return false;
     if (medicoId && dentistaOcupado(medicoId, f, h, dur)) return false;
     var activas = salas.filter(function (x) { return x.activa; });
     if (salaId) {
@@ -479,7 +503,7 @@
     if (!$('agPaciente').value) { aviso('agMsgM', 'Elige el paciente arriba.', true); return; }
     if (!$('agTratamiento').value.trim()) { aviso('agMsgM', 'Indica el tratamiento arriba.', true); return; }
     if (!f || !h) { aviso('agMsgM', 'Elige la fecha y la hora.', true); return; }
-    if (bloqueado(f, h, durNueva())) { aviso('agMsgM', 'Ese horario está bloqueado.', true); return; }
+    if (bloqueado(f, h, durNueva(), $('agMedico').value ? +$('agMedico').value : null)) { aviso('agMsgM', 'Ese horario está bloqueado' + ($('agMedico').value ? ' para ese médico' : '') + '.', true); return; }
     if (!horaLibre(f, h, $('agMedico').value ? +$('agMedico').value : null, $('agSalaM').value ? +$('agSalaM').value : null, durMedico($('agMedico').value ? dentistas.filter(function (d) { return d.id === +$('agMedico').value; })[0] : null))) { aviso('agMsgM', 'Ese horario ya pasó o está ocupado. Elige otra hora.', true); opcionesHorario(); return; }
     var salaElegida = $('agSalaM').value ? +$('agSalaM').value : null;
     var medico = $('agMedico').value ? dentistas.filter(function (d) { return d.id === +$('agMedico').value; })[0] : null;
@@ -779,12 +803,18 @@
           (cs.length ? '<small>' + cs.length + (cs.length === 1 ? ' cita' : ' citas') + '</small>' : '') + '</button>',
         celda: function (m, hh) {
           if (!enJornada(f, m)) return ['fuera'];
+          var cb = celdaBloqueo(f, hh, medDelFiltro());
+          if (cb && cb[0]) return cb;
           if (bloqueado(f, hh, PASO)) return ['bloq', '', 'Bloqueado'];
+          var r = (function () {
           var hay = activas.length ? activas.some(function (x) { return salaAbierta(x, f, hh) && !salaOcupada(x.id, f, hh, PASO); }) : !ocupan(f, hh, PASO).length;
           if (!hay) return ['lleno'];
           // Horas ya pasadas: también se pueden registrar (citas atendidas o que faltó anotar)
           if (yaPaso(f, m)) return ['pasado-libre', botonMas(f, hh, null, 'el ' + textoFecha(f)), 'Hora pasada: puedes registrar una cita'];
           return ['libre', botonMas(f, hh, null, 'el ' + textoFecha(f))];
+          })();
+          if (cb && cb.parcial) { r[0] += ' bloq-parcial'; r[1] = (r[1] || '') + cb.parcial; r[2] = cb.titulo; }
+          return r;
         }
       };
     }), false);
@@ -862,6 +892,8 @@
         th: '<span class="ag2-dia ag2-sala">' + esc(k.titulo) + (cs.length ? '<small>' + cs.length + (cs.length === 1 ? ' cita' : ' citas') + '</small>' : '') + '</span>',
         celda: function (m, hh) {
           if (!enJornada(f, m)) return ['fuera'];
+          var cb = celdaBloqueo(f, hh, medDelFiltro());
+          if (cb && cb[0]) return cb;
           if (bloqueado(f, hh, PASO)) return ['bloq', '', 'Bloqueado'];
           if (k.sala && !salaAbierta(k.sala, f, hh)) return ['cerrada', '', k.sala.estado === 'mantenimiento' ? 'Fuera de servicio' : 'Sala cerrada'];
           var ocupada = k.sala ? salaOcupada(k.id, f, hh, PASO) : todas.some(function (x) { return x.fecha === f && !x.posicion_id && choca(m, PASO, aMin(x.hora), duracion(x)); });
@@ -951,6 +983,8 @@
     var sala = f.elements.sala ? (f.elements.sala.value ? +f.elements.sala.value : null) : null;
     var durSel = +f.elements.duracion.value || null;
     var nueva = { fecha: fecha, hora: hora, servicio: servicio, dentista_id: med, posicion_id: sala, duracion: durSel };
+    var bm = bloqueosMed(fecha, hora, duracion(nueva), med)[0];
+    if (bm) { decir('Ese horario está bloqueado para ' + nombresBloqueo(bm) + ' de ' + hhmm(bm.desde) + ' a ' + hhmm(bm.hasta) + (bm.motivo ? ' (' + bm.motivo + ')' : '') + '.', true); return; }
     // Choques con otras citas del mismo médico o de la misma sala ese día
     btn.disabled = true; decir('Revisando el horario…');
     var r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id,tipo,quiropractico_id,duracion').eq('fecha', fecha).neq('estado', 'cancelada');
@@ -991,6 +1025,79 @@
     verDetalle(c.id);
   }
 
+  // ---------- Bloquear horarios por médico ----------
+  async function cargarBloqMed() {
+    var r = await sb.from('bloqueos_medicos').select('id,area,fecha_desde,fecha_hasta,desde,hasta,medicos,motivo,creado_por').gte('fecha_hasta', sumar(hoy(), -120)).order('fecha_desde').order('desde');
+    bloqMed = r.error ? [] : r.data;
+    return r.error;
+  }
+  function horasBloqueo(sel) { var l = []; for (var m = 7 * 60; m <= 19 * 60; m += 15) l.push('<option value="' + aHora(m) + '"' + (aHora(m) === sel ? ' selected' : '') + '>' + aHora(m) + '</option>'); return l.join(''); }
+  function pintarBloqMed() {
+    var q = esQuiro(), lista = bloqMed.filter(function (b) { return b.area === window.PD_AREA && b.fecha_hasta >= hoy(); });
+    $('bmTitulo').textContent = 'Bloquear horarios · ' + (q ? 'Quiropráctica' : 'Odontología');
+    $('bmTodosTxt').textContent = q ? 'Todos los quiroprácticos' : 'Todos los odontólogos';
+    $('bmMedicos').innerHTML = dentistas.length ? dentistas.map(function (d) {
+      return '<label class="bm-med"><input type="checkbox" value="' + d.id + '"> ' + esc(d.nombre) + '</label>';
+    }).join('') : '<span class="dlg-msg">No hay ' + (q ? 'quiroprácticos' : 'odontólogos') + ' activos.</span>';
+    $('bmLista').innerHTML = lista.length ? lista.map(function (b) {
+      var dias = b.fecha_desde === b.fecha_hasta ? textoFecha(b.fecha_desde) : textoFecha(b.fecha_desde) + ' al ' + textoFecha(b.fecha_hasta);
+      return '<li class="bloq-item"><span><strong>' + dias + '</strong> · ' + hhmm(b.desde) + ' a ' + hhmm(b.hasta) + ' · ' + esc(nombresBloqueo(b)) +
+        (b.motivo ? ' <span style="color:#5A6D7A">— ' + esc(b.motivo) + '</span>' : '') + '</span>' +
+        '<button type="button" class="adm-btn" data-bm-quitar="' + b.id + '">Quitar</button></li>';
+    }).join('') : '<li class="bloq-item" style="color:#5A6D7A">No hay horarios bloqueados.</li>';
+  }
+  async function abrirBloqueo() {
+    var f = $('agDia').value || hoy();
+    $('bmDesde').value = f; $('bmHasta').value = f;
+    $('bmHoraIni').innerHTML = horasBloqueo('12:00'); $('bmHoraFin').innerHTML = horasBloqueo('13:00');
+    $('bmMotivo').value = ''; $('bmTodos').checked = true;
+    aviso('bmMsg', '');
+    pintarBloqMed();
+    $('bmMedicos').classList.add('bm-off');
+    $('bmDlg').showModal();
+    var err = await cargarBloqMed();
+    if (err) aviso('bmMsg', /bloqueos_medicos/.test(err.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para bloquear horarios por médico.' : traducir(err), true);
+    pintarBloqMed();
+  }
+  $('agBloquear').addEventListener('click', abrirBloqueo);
+  $('bmCerrar').addEventListener('click', function () { $('bmDlg').close(); });
+  $('bmTodos').addEventListener('change', function () {
+    $('bmMedicos').classList.toggle('bm-off', this.checked);
+    if (this.checked) $('bmMedicos').querySelectorAll('input').forEach(function (x) { x.checked = false; });
+  });
+  $('bmMedicos').addEventListener('change', function () {
+    var alguno = !!$('bmMedicos').querySelector('input:checked');
+    $('bmTodos').checked = !alguno; $('bmMedicos').classList.toggle('bm-off', !alguno);
+  });
+  $('bmForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var d1 = $('bmDesde').value, d2 = $('bmHasta').value || d1, h1 = $('bmHoraIni').value, h2 = $('bmHoraFin').value;
+    var meds = [].map.call($('bmMedicos').querySelectorAll('input:checked'), function (x) { return +x.value; });
+    if (!d1) { aviso('bmMsg', 'Indica la fecha.', true); return; }
+    if (d2 < d1) { aviso('bmMsg', 'La fecha final no puede ser antes que la inicial.', true); return; }
+    if (h2 <= h1) { aviso('bmMsg', 'La hora final debe ser después de la hora inicial.', true); return; }
+    if (!$('bmTodos').checked && !meds.length) { aviso('bmMsg', 'Elige uno o más médicos, o marca «Todos».', true); return; }
+    var btn = $('bmGuardar'); btn.disabled = true; aviso('bmMsg', 'Bloqueando…');
+    var r = await sb.from('bloqueos_medicos').insert({ area: window.PD_AREA, fecha_desde: d1, fecha_hasta: d2, desde: h1, hasta: h2, medicos: $('bmTodos').checked ? null : meds, motivo: $('bmMotivo').value.trim() || null });
+    btn.disabled = false;
+    if (r.error) { aviso('bmMsg', /bloqueos_medicos/.test(r.error.message || '') ? 'Falta ejecutar en Supabase el script actualizado (supabase.sql) para bloquear horarios por médico.' : traducir(r.error), true); return; }
+    var afectadas = citas.filter(function (c) {
+      return c.fecha >= d1 && c.fecha <= d2 && choca(aMin(c.hora), duracion(c), aMin(h1), aMin(h2) - aMin(h1)) && ($('bmTodos').checked || meds.indexOf(c.dentista_id) >= 0);
+    });
+    await cargarBloqMed();
+    pintarBloqMed(); pintar();
+    $('bmMotivo').value = ''; $('bmTodos').checked = true; $('bmMedicos').classList.add('bm-off');
+    aviso('bmMsg', 'Horario bloqueado de ' + h1 + ' a ' + h2 + '.' + (afectadas.length ? ' Ojo: ya hay ' + afectadas.length + (afectadas.length === 1 ? ' cita' : ' citas') + ' en ese horario; el bloqueo no las anula.' : ''), afectadas.length > 0);
+  });
+  $('bmLista').addEventListener('click', async function (e) {
+    var b = e.target.closest('[data-bm-quitar]'); if (!b) return;
+    b.disabled = true;
+    var r = await sb.from('bloqueos_medicos').delete().eq('id', b.dataset.bmQuitar);
+    if (r.error) { b.disabled = false; aviso('bmMsg', traducir(r.error), true); return; }
+    aviso('bmMsg', 'Bloqueo quitado. Ese horario vuelve a estar disponible.');
+    await cargarBloqMed(); pintarBloqMed(); pintar();
+  });
+
   // ---------- Carga general ----------
   async function cargar() {
     var hoyF = hoy();
@@ -1030,6 +1137,7 @@
     opcionesFiltros();
     var catalogo = rs[3].error ? [] : rs[3].data.map(function (t) { return t.nombre; });
     bloqueos = rs[4].error ? [] : rs[4].data;
+    await cargarBloqMed();
 
     var actual = $('agPaciente').value;
     $('agPaciente').innerHTML = '<option value="">Elige un paciente…</option><option value="nuevo">+ Paciente nuevo (se crea su expediente)</option>' +
@@ -1070,7 +1178,7 @@
     var sala = c.posicion_id ? salas.filter(function (x) { return x.id === c.posicion_id; })[0] : null;
     var dur = duracion(c), med = c.dentista_id ? dentistas.filter(function (d) { return d.id === c.dentista_id; })[0] : null;
     var lista = horariosMedico(f, med && med.frecuencia ? med : null).filter(function (h) {
-      if (bloqueado(f, h, dur)) return false;
+      if (bloqueado(f, h, dur, c.dentista_id)) return false;
       if (f === c.fecha && h === hhmm(c.hora)) return false;
       if (sala && !salaAbierta(sala, f, h)) return false;
       return !otras.some(function (x) { return choca(aMin(h), dur, aMin(x.hora), duracion(x)) && ((c.dentista_id && x.dentista_id === c.dentista_id) || (c.posicion_id && x.posicion_id === c.posicion_id)); });

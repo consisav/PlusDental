@@ -37,6 +37,8 @@
   var tecnicas = [], sugerencias = [], marcada = -1, fotos = {};
 
   function $(id) { return document.getElementById(id); }
+  function edadDe(f) { if (!f) return ''; var n = new Date(f + 'T00:00:00'), h = new Date(), e = h.getFullYear() - n.getFullYear(); if (h.getMonth() < n.getMonth() || (h.getMonth() === n.getMonth() && h.getDate() < n.getDate())) e--; return e >= 0 && e < 120 ? e + ' años' : ''; }
+  document.addEventListener('input', function (e) { if (e.target && e.target.id === 'quNacimiento') $('quEdad').textContent = edadDe(e.target.value); });
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function aviso(id, texto, error) { $(id).textContent = texto || ''; $(id).style.color = error ? '#9A3B2E' : '#475B68'; }
   function esSuper() { return window.PD_SESION && window.PD_SESION.esSuper(); }
@@ -105,6 +107,7 @@
     '<label>Nombre completo *<input id="quNombre" type="text" maxlength="150" required></label>' +
     '<label>Teléfono / WhatsApp<input id="quTelefono" type="tel" maxlength="40"></label>' +
     '<label>Correo electrónico<input id="quCorreo" type="email" maxlength="120"></label>' +
+    '<label>Fecha de nacimiento <span id="quEdad" class="de-edad"></span><input id="quNacimiento" type="date"></label>' +
     '<label>Registro profesional (opcional)<input id="quRegistro" type="text" maxlength="40" placeholder="Número de registro o licencia D.C."></label>' +
     '<label>Tipo de quiropráctico<select id="quTipo"><option value="">Sin asignar</option></select></label>' +
     '<label>Organización *<select id="quOrg"><option value="">—</option></select></label>' +
@@ -221,6 +224,9 @@
     $('quNombre').value = (x && x.nombre) || '';
     $('quTelefono').value = (x && x.telefono) || '';
     $('quCorreo').value = (x && x.correo) || '';
+    $('quNacimiento').value = (x && x.fecha_nacimiento) || '';
+    $('quNacimiento').max = new Date().toISOString().slice(0, 10);
+    $('quEdad').textContent = edadDe($('quNacimiento').value);
     $('quRegistro').value = (x && x.registro) || '';
     $('quDireccion').value = (x && x.direccion) || '';
     opcionesTipo(x ? x.tipo_id || null : null);
@@ -286,6 +292,7 @@
       nombre: $('quNombre').value.trim(),
       telefono: $('quTelefono').value.trim() || null,
       correo: $('quCorreo').value.trim() || null,
+      fecha_nacimiento: $('quNacimiento').value || null,
       registro: $('quRegistro').value.trim() || null,
       direccion: $('quDireccion').value.trim() || null,
       tipo_id: $('quTipo').value ? +$('quTipo').value : null,

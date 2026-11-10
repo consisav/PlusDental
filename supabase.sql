@@ -8371,6 +8371,94 @@ returns boolean language sql stable security definer set search_path = public as
                        and c.hora + make_interval(mins => coalesce(c.duracion, public.cita_minutos(c.servicio, cd.frecuencia))) > h);
 $$;
 
+-- ===== Bloqueo de horarios por médico (Agendas › Visualizar citas › Bloquear horarios) =====
+-- Bloquea de una hora inicial a una hora final, en uno o varios días, para uno o más odontólogos o
+-- quiroprácticos (medicos vacío = todos los del área). Las citas existentes no se cancelan.
+create table if not exists public.bloqueos_medicos (
+  id          bigint generated always as identity primary key,
+  area        text not null default 'odontologia' check (area in ('odontologia', 'quiropractica')),
+  fecha_desde date not null,
+  fecha_hasta date not null,
+  desde       time not null,
+  hasta       time not null,
+  medicos     bigint[],
+  motivo      text,
+  creado      timestamptz not null default now(),
+  creado_por  text,
+  check (fecha_hasta >= fecha_desde),
+  check (hasta > desde)
+);
+create index if not exists bloqueos_medicos_fechas on public.bloqueos_medicos (fecha_desde, fecha_hasta);
+alter table public.bloqueos_medicos enable row level security;
+drop policy if exists "personal gestiona bloqueos de medicos" on public.bloqueos_medicos;
+create policy "personal gestiona bloqueos de medicos" on public.bloqueos_medicos for all
+  using (public.es_personal()) with check (public.es_personal());
+
+create or replace function public.bloqueo_medico_registro()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.creado := now();
+  new.creado_por := coalesce((select usuario from public.perfiles where id = auth.uid()), 'Sin usuario');
+  if new.medicos = '{}' then new.medicos := null; end if;
+  return new;
+end;
+$$;
+drop trigger if exists bloqueos_medicos_registro on public.bloqueos_medicos;
+create trigger bloqueos_medicos_registro before insert on public.bloqueos_medicos
+  for each row execute function public.bloqueo_medico_registro();
+
+-- ¿La cita (área, fecha, hora, minutos, médico) cae en un horario bloqueado?
+create or replace function public.cita_bloqueada(p_area text, f date, h time, p_min int, p_medico bigint)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.bloqueos_medicos b
+                 where b.area = coalesce(p_area, 'odontologia')
+                   and f between b.fecha_desde and b.fecha_hasta
+                   and h < b.hasta and h + make_interval(mins => coalesce(p_min, 30)) > b.desde
+                   and (b.medicos is null or (p_medico is not null and p_medico = any (b.medicos))));
+$$;
+
+-- Ninguna cita (panel, página, reprogramación o modificación) se guarda en un horario bloqueado
+create or replace function public.cita_revisa_bloqueo()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_area text := coalesce(new.tipo, 'odontologia');
+  v_med bigint := case when coalesce(new.tipo, 'odontologia') = 'quiropractica' then new.quiropractico_id else new.dentista_id end;
+  v_min int;
+begin
+  if new.estado = 'cancelada' then return new; end if;
+  if tg_op = 'UPDATE' and new.fecha is not distinct from old.fecha and new.hora is not distinct from old.hora
+     and new.dentista_id is not distinct from old.dentista_id and new.quiropractico_id is not distinct from old.quiropractico_id
+     and new.duracion is not distinct from old.duracion and old.estado <> 'cancelada' then
+    return new;
+  end if;
+  v_min := coalesce(new.duracion, public.cita_minutos(new.servicio, (select frecuencia from public.dentistas where id = new.dentista_id)));
+  if public.cita_bloqueada(v_area, new.fecha, new.hora, v_min, v_med) then
+    raise exception 'Ese horario está bloqueado para el médico (Bloquear horarios)';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists citas_revisa_bloqueo on public.citas;
+create trigger citas_revisa_bloqueo before insert or update on public.citas
+  for each row execute function public.cita_revisa_bloqueo();
+
+-- La agenda en línea no ofrece horas bloqueadas del odontólogo
+create or replace function public.dentista_libre(d public.dentistas, f date, h time)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.dentista_atiende(d, f, h)
+     and h + make_interval(mins => coalesce(d.frecuencia, 30)) <= ((d.horario -> extract(isodow from f)::int::text) ->> 'cierra')::time
+     and not public.cita_bloqueada('odontologia', f, h, coalesce(d.frecuencia, 30), d.id)
+     and not exists (select 1 from public.citas c left join public.dentistas cd on cd.id = c.dentista_id
+                     where c.fecha = f and c.estado <> 'cancelada'
+                       and (c.dentista_id = d.id or (d.posicion_id is not null and c.posicion_id = d.posicion_id))
+                       and c.hora < h + make_interval(mins => coalesce(d.frecuencia, 30))
+                       and c.hora + make_interval(mins => coalesce(c.duracion, public.cita_minutos(c.servicio, cd.frecuencia))) > h);
+$$;
+
+-- ===== Fecha de nacimiento de odontólogos y quiroprácticos =====
+alter table public.dentistas add column if not exists fecha_nacimiento date;
+alter table public.quiropracticos add column if not exists fecha_nacimiento date;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
