@@ -487,7 +487,10 @@
     var medico = medicoId ? dentistas.filter(function (d) { return d.id === medicoId; })[0] : null;
     var salaId = sala ? +sala : medico && medico.posicion_id ? medico.posicion_id : null;
     var dur = durMedico(medico);
-    var lista = f ? horariosMedico(f, medico).filter(function (h) { return horaLibre(f, h, medicoId, salaId, dur); }) : [];
+    // Con una sala elegida se ofrecen todas las horas libres de la agenda (cada 15 minutos, de 7:00 a 19:00),
+    // no solo las del horario y la frecuencia del médico; se descartan las bloqueadas y las que chocan con otra cita
+    var base = !f ? [] : sala ? horarios(f, PASO).filter(function (h) { return enJornada(f, aMin(h) + dur - 1); }) : horariosMedico(f, medico);
+    var lista = base.filter(function (h) { return horaLibre(f, h, medicoId, salaId, dur); });
     $('agHoraM').innerHTML = lista.length ? lista.map(function (h) { return '<option value="' + h + '">' + h + '</option>'; }).join('')
       : '<option value="">' + (!f ? 'Elige la fecha' : !turnos(f).length ? 'La clínica no atiende ese día' : 'Sin horarios libres ese día') + '</option>';
     $('agHoraM').disabled = !lista.length;
