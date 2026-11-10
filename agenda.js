@@ -891,12 +891,89 @@
       '<span class="ag-det-est">Cambiar estado:</span>' + CATALOGO_CITA.filter(function (e) { return e !== c.estado; }).map(function (e) {
         return '<button type="button" class="adm-btn ag-est-btn" style="--est:' + COLOR_ESTADO[e] + '" data-det-estado="' + e + '" data-id="' + c.id + '">' + ESTADOS_CITA[e] + '</button>';
       }).join('') + '<span class="ag-det-sep"></span>' +
+      (c.estado !== 'cancelada' ? '<button type="button" class="adm-btn ag-det-mod" data-det-editar="' + c.id + '">✎ Modificar cita</button>' : '') +
       (activa ? '<button type="button" class="adm-btn" data-det-repro="' + c.id + '">Reprogramar</button>' : '') +
       (c.paciente_id && window.PD_EXPEDIENTE ? '<button type="button" class="adm-btn" data-ir-exp="' + c.paciente_id + '">Ver expediente</button>' : '') +
       (c.estado !== 'cancelada' ? '<button type="button" class="adm-btn ag-det-cancel" data-det-estado="cancelada" data-id="' + c.id + '" data-confirmar="0">Anular cita</button>' : '') +
       '</div>' +
       '<details class="ag-det-avisos"><summary>Avisos y recordatorios</summary><div>' + avisosHtml(conCorreo, { paciente: true, medico: true, correo: true }) + '</div></details>';
     $('agDetalle').scrollIntoView({ block: 'nearest' });
+  }
+
+  // ---------- Modificar la cita desde la agenda ----------
+  function editarCita(id) {
+    var c = citas.concat(canceladas).filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!c) return;
+    var q = esQuiro();
+    var opMed = '<option value="">Sin asignar</option>' + dentistas.map(function (d) { return '<option value="' + d.id + '"' + (d.id === c.dentista_id ? ' selected' : '') + '>' + esc(d.nombre) + '</option>'; }).join('');
+    if (c.dentista_id && !dentistas.some(function (d) { return d.id === c.dentista_id; })) opMed += '<option value="' + c.dentista_id + '" selected>' + esc(nombreDentista(c.dentista_id)) + '</option>';
+    var opSala = '<option value="">Sin sala</option>' + salas.map(function (s) { return '<option value="' + s.id + '"' + (s.id === c.posicion_id ? ' selected' : '') + '>' + esc(s.codigo + ' · ' + s.nombre) + (s.activa ? '' : ' (inactiva)') + '</option>'; }).join('');
+    var cont = document.createElement('form');
+    cont.className = 'ag-det-editar';
+    cont.id = 'agDetEditar';
+    cont.dataset.id = c.id;
+    cont.innerHTML = '<h4>Modificar cita</h4><div class="ag-ed-grid">' +
+      '<label>Fecha<input type="date" name="fecha" required value="' + c.fecha + '"></label>' +
+      '<label>Hora<input type="time" name="hora" required step="300" min="07:00" max="19:00" value="' + hhmm(c.hora) + '"></label>' +
+      '<label>Tratamiento<input name="servicio" list="agTratamientos" required value="' + esc(c.servicio || '') + '"></label>' +
+      '<label>' + (q ? 'Quiropráctico' : 'Odontólogo') + '<select name="medico">' + opMed + '</select></label>' +
+      (q ? '' : '<label>Sala<select name="sala">' + opSala + '</select></label>') +
+      '<label>WhatsApp<input name="telefono" inputmode="tel" value="' + esc(c.telefono || '') + '"></label>' +
+      '<label>Prioridad<select name="prioridad"><option value="normal">Normal</option><option value="urgente"' + (c.prioridad === 'urgente' ? ' selected' : '') + '>Urgente</option></select></label>' +
+      '<label class="ag-ed-ancho">Notas<textarea name="notas" rows="2">' + esc(c.notas || '') + '</textarea></label>' +
+      '</div><p class="ag-ed-msg" role="status"></p>' +
+      '<div class="ag-ed-acc"><button type="submit" class="adm-btn adm-primary">Guardar cambios</button><button type="button" class="adm-btn" data-ed-cancelar>Cancelar</button></div>';
+    var viejo = $('agDetEditar'); if (viejo) viejo.remove();
+    var acc = $('agDetalle').querySelector('.ag-det-acc');
+    $('agDetalle').insertBefore(cont, acc);
+    cont.querySelector('[data-ed-cancelar]').addEventListener('click', function () { cont.remove(); });
+    cont.addEventListener('submit', function (e) { e.preventDefault(); guardarEdicion(c, cont); });
+    cont.elements.fecha.focus();
+    cont.scrollIntoView({ block: 'nearest' });
+  }
+  async function guardarEdicion(c, f) {
+    var msg = f.querySelector('.ag-ed-msg'), btn = f.querySelector('[type=submit]');
+    var decir = function (t, err) { msg.textContent = t; msg.classList.toggle('error', !!err); };
+    var fecha = f.elements.fecha.value, hora = f.elements.hora.value, servicio = f.elements.servicio.value.trim();
+    if (!fecha || !hora || !servicio) { decir('Indica la fecha, la hora y el tratamiento.', true); return; }
+    var med = f.elements.medico.value ? +f.elements.medico.value : null;
+    var sala = f.elements.sala ? (f.elements.sala.value ? +f.elements.sala.value : null) : null;
+    var nueva = { fecha: fecha, hora: hora, servicio: servicio, dentista_id: med, posicion_id: sala };
+    // Choques con otras citas del mismo médico o de la misma sala ese día
+    btn.disabled = true; decir('Revisando el horario…');
+    var r = await sb.from('citas').select('id,hora,servicio,dentista_id,posicion_id,tipo,quiropractico_id').eq('fecha', fecha).neq('estado', 'cancelada');
+    if (!r.error) {
+      var dur = duracion(nueva);
+      var choque = delArea(r.data).filter(function (x) {
+        return String(x.id) !== String(c.id) && choca(aMin(hora), dur, aMin(x.hora), duracion(x)) &&
+          ((med && x.dentista_id === med) || (sala && x.posicion_id === sala));
+      })[0];
+      if (choque) { btn.disabled = false; decir('Ese horario choca con otra cita a las ' + hhmm(choque.hora) + (choque.dentista_id === med ? ' del mismo ' + (esQuiro() ? 'quiropráctico' : 'odontólogo') : ' en la misma sala') + '.', true); return; }
+    }
+    var cambios = {
+      fecha: fecha, hora: hora, servicio: servicio,
+      telefono: f.elements.telefono.value.trim(),
+      prioridad: f.elements.prioridad.value === 'urgente' ? 'urgente' : 'normal',
+      notas: f.elements.notas.value.trim() || null
+    };
+    if (esQuiro()) cambios.quiropractico_id = med; else { cambios.dentista_id = med; cambios.posicion_id = sala; }
+    if (fecha !== c.fecha || hora !== hhmm(c.hora)) {
+      cambios.reprogramada_de = c.fecha + ' ' + hhmm(c.hora);
+      cambios.reprogramada_en = new Date().toISOString();
+      cambios.reprogramada_por = usuarioSesion();
+    }
+    decir('Guardando…');
+    var u = await sb.from('citas').update(cambios).eq('id', c.id).select('id');
+    if (u.error && /reprogramada_(en|por)/.test(u.error.message || '')) { delete cambios.reprogramada_en; delete cambios.reprogramada_por; u = await sb.from('citas').update(cambios).eq('id', c.id).select('id'); }
+    btn.disabled = false;
+    if (u.error || !u.data || !u.data.length) {
+      var m = u.error ? u.error.message || '' : '';
+      decir(/duplicate key|unique/i.test(m) ? 'Ese horario ya está ocupado para ese médico o esa sala.' : u.error ? traducir(u.error) : 'No tienes permiso para esta acción.', true);
+      return;
+    }
+    aviso('agMsg', 'Cita modificada: ' + textoFecha(fecha) + ' · ' + hora + ' · ' + servicio + '.');
+    await cargarCitas();
+    verDetalle(c.id);
   }
 
   // ---------- Carga general ----------
@@ -1156,6 +1233,8 @@
     if (e.target.closest('[data-det-cerrar]')) { $('agDetalle').hidden = true; return; }
     var ex2 = e.target.closest('[data-ir-exp]');
     if (ex2) { irExpediente(ex2.dataset.irExp); return; }
+    var ed = e.target.closest('[data-det-editar]');
+    if (ed) { editarCita(ed.dataset.detEditar); return; }
     var rp = e.target.closest('[data-det-repro]');
     if (rp) {
       var cr = citas.filter(function (x) { return String(x.id) === rp.dataset.detRepro; })[0];
