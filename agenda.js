@@ -759,7 +759,8 @@
   // Bloque de una cita dentro de la celda de la fila donde empieza
   function bloque2(c, m, conMedico) {
     var dur = duracion(c), alto = Math.max(1, dur / PASO) * ALTO - 3, ancho = 100 / c._lanes, off = (aMin(c.hora) - m) / PASO * ALTO;
-    var pos = 'top:' + (off + 1) + 'px;height:' + alto + 'px;left:calc(' + (c._lane * ancho) + '% + 2px);width:calc(' + ancho + '% - 4px)';
+    // Se deja libre una franja a la derecha para el «+»: en el mismo horario se agenda otra cita en otra silla.
+    var pos = 'top:' + (off + 1) + 'px;height:' + alto + 'px;left:calc((100% - 22px) * ' + (c._lane / c._lanes) + ' + 2px);width:calc((100% - 22px) / ' + c._lanes + ' - 4px)';
     var est = medEstilo(c.dentista_id), estilo = est ? est.replace('style="', 'style="' + pos + ';') : ' style="' + pos + '"';
     var filas = Math.max(1, dur / PASO);
     return '<button type="button" class="ag2-cita ' + c.estado + (c.prioridad === 'urgente' ? ' urgente' : '') + '" data-cita="' + c.id + '"' + estilo +
