@@ -522,6 +522,14 @@
         : medico && medico.posicion_id ? salas.filter(function (s) { return s.id === medico.posicion_id; })[0] : null;
       opcion = { fecha: f, hora: h, dentista: medico, sala: sala || null };
     }
+    // Sin silla elegida: se asigna una silla libre a esa hora (la del médico si está libre), así varias citas
+    // pueden quedar en el mismo horario, cada una en su silla.
+    if (!opcion.sala && !esQuiro()) {
+      var durS = durMedico(opcion.dentista || null), activasS = salas.filter(function (s) { return s.activa && salaAbierta(s, f, h) && !salaOcupada(s.id, f, h, durS); });
+      var propia = opcion.dentista && opcion.dentista.posicion_id ? activasS.filter(function (s) { return s.id === opcion.dentista.posicion_id; })[0] : null;
+      if (activasS.length) opcion.sala = propia || activasS[0];
+      else if (salas.some(function (s) { return s.activa; })) { aviso('agMsgM', 'No queda ninguna silla libre a esa hora: elige otro horario.', true); return; }
+    }
     var avisoHorario = opcion.dentista && !atiende(opcion.dentista, f, h) ? ' Ojo: según su ficha, ' + opcion.dentista.nombre + ' no atiende a esa hora.' : '';
     aviso('agMsgM', '');
     aviso('agFormMsg', '');
