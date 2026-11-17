@@ -204,7 +204,7 @@
         if (franja === 'tarde' && h < '12:00') return;
 
         var candidatos = conHorario ? dentistas.filter(function (d) {
-          return (!medico || d.id === medico) && (fijo || (horasDe[d.id] && horasDe[d.id][h])) && atiende(d, f, h) && !dentistaOcupado(d.id, f, h, durMedico(d)) && !bloqueado(f, h, durMedico(d), d.id);
+          return (!medico || d.id === medico) && (fijo || (horasDe[d.id] && horasDe[d.id][h])) && atiende(d, f, h) && (!dentistaOcupado(d.id, f, h, durMedico(d)) || (fijo && medico && !esQuiro())) && !bloqueado(f, h, durMedico(d), d.id);
         }) : [null];
 
         candidatos.forEach(function (d) {
@@ -492,7 +492,8 @@
   function horaLibre(f, h, medicoId, salaId, dur) {
     dur = dur || durNueva();
     if (bloqueado(f, h, dur, medicoId)) return false;
-    if (medicoId && dentistaOcupado(medicoId, f, h, dur)) return false;
+    // Un odontólogo puede atender varias citas a la misma hora en sillas distintas (alternando); el quiropráctico no.
+    if (medicoId && esQuiro() && dentistaOcupado(medicoId, f, h, dur)) return false;
     var activas = salas.filter(function (x) { return x.activa; });
     if (salaId) {
       var sala = salas.filter(function (x) { return x.id === salaId; })[0];
@@ -1031,7 +1032,7 @@
       var dur = duracion(nueva);
       var choque = delArea(r.data).filter(function (x) {
         return String(x.id) !== String(c.id) && choca(aMin(hora), dur, aMin(x.hora), duracion(x)) &&
-          ((med && x.dentista_id === med) || (sala && x.posicion_id === sala));
+          ((med && esQuiro() && x.dentista_id === med) || (sala && x.posicion_id === sala));
       })[0];
       if (choque) { btn.disabled = false; decir('Ese horario choca con otra cita a las ' + hhmm(choque.hora) + (choque.dentista_id === med ? ' del mismo ' + (esQuiro() ? 'quiropráctico' : 'odontólogo') : ' en la misma sala') + '.', true); return; }
     }

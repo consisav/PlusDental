@@ -8459,6 +8459,11 @@ $$;
 alter table public.dentistas add column if not exists fecha_nacimiento date;
 alter table public.quiropracticos add column if not exists fecha_nacimiento date;
 
+-- ===== Un odontólogo puede tener varias citas a la misma hora en sillas distintas =====
+-- (atiende alternando entre sillas). La sala sigue sin poder tener dos citas a la misma hora;
+-- el quiropráctico sigue con una cita por horario (citas_quiropractico_horario).
+drop index if exists public.citas_dentista_horario;
+
 -- PRIMER SUPER ADMINISTRADOR
 -- Después de crear tu usuario desde la página (botón «Crear usuario»), ejecuta esta línea
 -- cambiando «oliver» por tu nombre de usuario:
