@@ -122,9 +122,34 @@
     var l = bloqueosMed(f, hh, PASO, null, true);
     if (!l.length) return null;
     var total = l.filter(function (b) { return !b.medicos || (medFiltro && b.medicos.indexOf(medFiltro) >= 0); })[0];
-    if (total) return ['bloq', '<button type="button" class="ag2-lock" data-desbloq="' + total.id + '" data-fecha="' + f + '" aria-label="Desbloquear este horario">🔒</button>', 'Bloqueado: ' + nombresBloqueo(total) + (total.motivo ? ' · ' + total.motivo : '')];
+    if (total) return ['bloq', '', 'Bloqueado: ' + nombresBloqueo(total) + (total.motivo ? ' · ' + total.motivo : '')];
     if (medFiltro) return null;
-    return { parcial: '<button type="button" class="ag2-lock ag2-lock-p" data-desbloq="' + l[0].id + '" data-fecha="' + f + '" aria-label="Desbloquear este horario">🔒</button>', titulo: 'Bloqueado para: ' + l.map(function (b) { return nombresBloqueo(b) + (b.motivo ? ' (' + b.motivo + ')' : ''); }).join(' · ') };
+    return { parcial: '', titulo: 'Bloqueado para: ' + l.map(function (b) { return nombresBloqueo(b) + (b.motivo ? ' (' + b.motivo + ')' : ''); }).join(' · ') };
+  }
+  // Bloqueos de un día como bloques de la cuadrícula: { desde, hasta (minutos), total (bloquea a todos o al médico filtrado), texto, id }
+  function duracionTxt(min) { var h = Math.floor(min / 60), m = min % 60; return (h ? h + ' h' : '') + (h && m ? ' ' : '') + (m ? m + ' min' : '') || '0 min'; }
+  function bloquesDelDia(f, medFiltro) {
+    var out = [];
+    bloqMed.forEach(function (b) {
+      if (b.area !== window.PD_AREA || f < b.fecha_desde || f > b.fecha_hasta) return;
+      var total = !b.medicos || (medFiltro && b.medicos.indexOf(medFiltro) >= 0);
+      if (!total && medFiltro) return;
+      out.push({ id: b.id, desde: aMin(b.desde), hasta: aMin(b.hasta), total: total, quien: nombresBloqueo(b), motivo: b.motivo || '' });
+    });
+    bloqueos.forEach(function (b) {
+      if (b.fecha !== f) return;
+      var j = JORNADA.semana, a = b.hora ? aMin(b.hora) : aMin(j[0][0]), z = b.hora ? a + BLOQUE : aMin(j[j.length - 1][1]);
+      out.push({ id: null, desde: a, hasta: z, total: true, quien: 'Toda la clínica', motivo: '' });
+    });
+    return out.filter(function (x) { return x.hasta > x.desde; });
+  }
+  function bloqueVisual(x, m) {
+    var off = (x.desde - m) / PASO * ALTO, alto = Math.max(1, (x.hasta - x.desde) / PASO) * ALTO - 2;
+    var rango = hhmmDe(x.desde) + '–' + hhmmDe(x.hasta), tit = 'Bloqueado ' + rango + ' (' + duracionTxt(x.hasta - x.desde) + ') · ' + x.quien + (x.motivo ? ' · ' + x.motivo : '');
+    return '<div class="ag2-bloq' + (x.total ? '' : ' parcial') + '" style="top:' + (off + 1) + 'px;height:' + alto + 'px" title="' + esc(tit) + '">' +
+      (x.id != null ? '<button type="button" class="ag2-lock" data-desbloq="' + x.id + '" data-fecha="' + (x.fecha || '') + '" aria-label="Desbloquear este horario">🔒</button>' : '<span class="ag2-lock">🔒</span>') +
+      '<b>Bloqueado' + (x.total ? '' : ' (algunos médicos)') + '</b><span>' + rango + ' · ' + duracionTxt(x.hasta - x.desde) + '</span>' +
+      (alto > 60 ? '<small>' + esc(x.quien + (x.motivo ? ' · ' + x.motivo : '')) + '</small>' : '') + '</div>';
   }
   function medDelFiltro() { var yo = soloMio(); return yo ? yo.id : +$('agFMed').value || null; }
   // Citas que empiezan dentro de la fila del calendario (bloque de 90 minutos que inicia en h)
@@ -784,7 +809,8 @@
     var desde = aMin(JORNADA.semana[0][0]), hasta = aMin(JORNADA.semana[JORNADA.semana.length - 1][1]);
     cols.forEach(function (c) {
       carriles(c.citas).forEach(function (x) { var a = aMin(x.hora); desde = Math.min(desde, Math.floor(a / PASO) * PASO); hasta = Math.max(hasta, Math.ceil((a + duracion(x)) / PASO) * PASO); });
-      c.inicioEn = {};
+      c.inicioEn = {}; c.bloqEn = {};
+      (c.bloques || []).forEach(function (b) { var k = Math.floor(b.desde / PASO) * PASO; desde = Math.min(desde, k); hasta = Math.max(hasta, Math.ceil(b.hasta / PASO) * PASO); (c.bloqEn[k] = c.bloqEn[k] || []).push(b); });
       c.citas.forEach(function (x) { var k = Math.floor(aMin(x.hora) / PASO) * PASO; (c.inicioEn[k] = c.inicioEn[k] || []).push(x); });
     });
     $('agHead').innerHTML = '<tr><th class="ag2-h"></th>' + cols.map(function (c) { return '<th class="' + (c.hoy ? 'hoy' : '') + '">' + c.th + '</th>'; }).join('') + '<th class="ag2-h"></th></tr>';
@@ -792,7 +818,7 @@
     for (var m = desde; m < hasta; m += PASO) {
       var hh = hhmmDe(m);
       filas.push('<tr' + (m % 60 === 0 ? ' class="ag2-hora"' : '') + '><td class="ag2-t">' + hh + '</td>' + cols.map(function (c) {
-        var blq = (c.inicioEn[m] || []).map(function (x) { return bloque2(x, m, conMedico); }).join(''), e = c.celda(m, hh);
+        var blq = (c.bloqEn[m] || []).map(function (x) { return bloqueVisual(x, m); }).join('') + (c.inicioEn[m] || []).map(function (x) { return bloque2(x, m, conMedico); }).join(''), e = c.celda(m, hh);
         return '<td class="ag2-c ' + e[0] + (c.hoy ? ' hoy' : '') + '"' + (e[2] ? ' title="' + esc(e[2]) + '"' : '') + '>' + (e[1] || '') + blq + '</td>';
       }).join('') + '<td class="ag2-t">' + hh + '</td></tr>');
     }
@@ -810,7 +836,7 @@
     cuadricula(dias.map(function (f) {
       var d = fecha(f), cs = citas.filter(function (c) { return c.fecha === f; });
       return {
-        hoy: f === hoy(), citas: cs,
+        hoy: f === hoy(), citas: cs, bloques: bloquesDelDia(f, medDelFiltro()).map(function (b) { b.fecha = f; return b; }),
         th: '<button type="button" class="ag2-dia" data-ir-dia="' + f + '" title="Ver el día por salas">' + ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][d.getDay()] + ' ' + ('0' + d.getDate()).slice(-2) +
           (cs.length ? '<small>' + cs.length + (cs.length === 1 ? ' cita' : ' citas') + '</small>' : '') + '</button>',
         celda: function (m, hh) {
@@ -900,7 +926,7 @@
     cuadricula(cols.map(function (k) {
       var cs = del.filter(function (c) { return (c.posicion_id || null) === k.id; });
       return {
-        hoy: false, citas: cs,
+        hoy: false, citas: cs, bloques: bloquesDelDia(f, medDelFiltro()).map(function (b) { b.fecha = f; return b; }),
         th: '<span class="ag2-dia ag2-sala">' + esc(k.titulo) + (cs.length ? '<small>' + cs.length + (cs.length === 1 ? ' cita' : ' citas') + '</small>' : '') + '</span>',
         celda: function (m, hh) {
           if (!enJornada(f, m)) return ['fuera'];
