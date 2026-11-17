@@ -148,8 +148,8 @@
     var rango = hhmmDe(x.desde) + '–' + hhmmDe(x.hasta), tit = 'Bloqueado ' + rango + ' (' + duracionTxt(x.hasta - x.desde) + ') · ' + x.quien + (x.motivo ? ' · ' + x.motivo : '');
     return '<div class="ag2-bloq' + (x.total ? '' : ' parcial') + '" style="top:' + (off + 1) + 'px;height:' + alto + 'px" title="' + esc(tit) + '">' +
       (x.id != null ? '<button type="button" class="ag2-lock" data-desbloq="' + x.id + '" data-fecha="' + (x.fecha || '') + '" aria-label="Desbloquear este horario">🔒</button>' : '<span class="ag2-lock">🔒</span>') +
-      '<b>Bloqueado' + (x.total ? '' : ' (algunos médicos)') + '</b><span>' + rango + ' · ' + duracionTxt(x.hasta - x.desde) + '</span>' +
-      (alto > 60 ? '<small>' + esc(x.quien + (x.motivo ? ' · ' + x.motivo : '')) + '</small>' : '') + '</div>';
+      '<b>Bloqueado' + (x.total ? '' : ' (algunos médicos)') + '</b>' + (x.motivo ? '<em>' + esc(x.motivo) + '</em>' : '') + '<span>' + rango + ' · ' + duracionTxt(x.hasta - x.desde) + '</span>' +
+      (alto > 75 ? '<small>' + esc(x.quien) + '</small>' : '') + '</div>';
   }
   function medDelFiltro() { var yo = soloMio(); return yo ? yo.id : +$('agFMed').value || null; }
   // Citas que empiezan dentro de la fila del calendario (bloque de 90 minutos que inicia en h)
@@ -1085,6 +1085,7 @@
         '<button type="button" class="adm-btn" data-bm-quitar="' + b.id + '">Quitar</button></li>';
     }).join('') : '<li class="bloq-item" style="color:#5A6D7A">No hay horarios bloqueados.</li>';
   }
+  document.addEventListener('click', function (e) { var c = e.target.closest && e.target.closest('[data-bm-motivo]'); if (!c) return; var m = $('bmMotivo'); m.value = m.value.trim() ? m.value.trim() + ' · ' + c.dataset.bmMotivo : c.dataset.bmMotivo; m.focus(); });
   var bmModo = 'bloquear';
   function modoBloqueo(m) {
     bmModo = m;
@@ -1192,6 +1193,7 @@
       aviso('bmMsg', res.cambiados ? 'Horario desbloqueado de ' + h1 + ' a ' + h2 + ' para ' + quien + '.' : 'No había bloqueos en ese horario para ' + quien + '.', !res.cambiados);
       return;
     }
+    if (!$('bmMotivo').value.trim()) { aviso('bmMsg', 'Escribe la descripción o el motivo del bloqueo.', true); $('bmMotivo').focus(); return; }
     btn.disabled = true; aviso('bmMsg', 'Bloqueando…');
     var r = await sb.from('bloqueos_medicos').insert({ area: window.PD_AREA, fecha_desde: d1, fecha_hasta: d2, desde: h1, hasta: h2, medicos: $('bmTodos').checked ? null : meds, motivo: $('bmMotivo').value.trim() || null });
     btn.disabled = false;
